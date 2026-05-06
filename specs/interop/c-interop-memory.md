@@ -24,7 +24,7 @@ Current repo exports:
 - `CString`
 - `CPtr`
 
-from `crates/musi_foundation/modules/core.ms` and `packages/std/prelude.ms`.
+from `crates/musi_foundation/modules/core.ms` and `lib/std/prelude.ms`.
 
 These names remain valid, but their role is narrow:
 
