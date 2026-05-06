@@ -11,14 +11,14 @@ use async_lsp::lsp_types::{
     DocumentDiagnosticReport, DocumentDiagnosticReportResult, DocumentHighlightKind,
     DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
     ExecuteCommandParams, FoldingRangeKind, FoldingRangeParams, GotoDefinitionParams,
-    GotoDefinitionResponse, InitializeParams, InlayHintKind, LinkedEditingRangeParams,
-    PartialResultParams, Position, SelectionRangeParams, SemanticToken, SignatureHelpParams,
-    TextDocumentIdentifier, TextDocumentPositionParams, TextDocumentSaveReason,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability, WillSaveTextDocumentParams,
-    WorkDoneProgressParams, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
-    WorkspaceDocumentDiagnosticReport, WorkspaceFolder, WorkspaceFoldersChangeEvent,
-    WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    GotoDefinitionResponse, InitializeParams, InlayHintKind, InlayHintServerCapabilities,
+    InlayHintTooltip, LinkedEditingRangeParams, PartialResultParams, Position,
+    SelectionRangeParams, SemanticToken, SignatureHelpParams, TextDocumentIdentifier,
+    TextDocumentPositionParams, TextDocumentSaveReason, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
+    TypeDefinitionProviderCapability, WillSaveTextDocumentParams, WorkDoneProgressParams,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
+    WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceSymbolParams, WorkspaceSymbolResponse,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -26,8 +26,8 @@ use musi_tooling::{
 };
 
 use super::convert::{
-    default_range, diagnostic_matches_path, to_cli_range, to_lsp_diagnostic, to_lsp_inlay_hint,
-    to_severity, truncate_hover_contents,
+    default_range, diagnostic_matches_path, resolve_lsp_inlay_hint, to_cli_range,
+    to_lsp_diagnostic, to_lsp_inlay_hint, to_severity, truncate_hover_contents,
 };
 use super::*;
 
@@ -107,7 +107,14 @@ mod success {
                 .semantic_tokens_provider
                 .is_some()
         );
-        assert!(initialize_result.capabilities.inlay_hint_provider.is_some());
+        let inlay_hint = initialize_result
+            .capabilities
+            .inlay_hint_provider
+            .expect("inlay hint provider");
+        let OneOf::Right(InlayHintServerCapabilities::Options(inlay_hint)) = inlay_hint else {
+            panic!("inlay hint options expected");
+        };
+        assert_eq!(inlay_hint.resolve_provider, Some(true));
         assert!(initialize_result.capabilities.completion_provider.is_some());
         assert_eq!(
             initialize_result.capabilities.declaration_provider,
@@ -1632,15 +1639,26 @@ let other := value + 2;
 
     #[test]
     fn inlay_hint_conversion_uses_lsp_kind_and_padding() {
-        let hint = to_lsp_inlay_hint(ToolInlayHint::new(
+        let mut tool_hint = ToolInlayHint::new(
             ToolPosition::new(2, 5),
             "value:",
             ToolInlayHintKind::Parameter,
-        ));
+        );
+        tool_hint.tooltip = Some("parameter `value`".to_owned());
+        let hint = to_lsp_inlay_hint(tool_hint);
 
         assert_eq!(hint.position, Position::new(1, 4));
         assert!(matches!(hint.kind, Some(InlayHintKind::PARAMETER)));
         assert_eq!(hint.padding_right, Some(true));
+        assert!(hint.tooltip.is_none());
+        assert!(hint.data.is_some());
+
+        let hint = resolve_lsp_inlay_hint(hint);
+
+        assert!(matches!(
+            hint.tooltip,
+            Some(InlayHintTooltip::String(ref tooltip)) if tooltip == "parameter `value`"
+        ));
     }
 
     #[test]

@@ -314,11 +314,26 @@ pub(super) fn to_lsp_inlay_hint(hint: ToolInlayHint) -> InlayHint {
             ToolInlayHintKind::Parameter => InlayHintKind::PARAMETER,
         }),
         text_edits: None,
-        tooltip: hint.tooltip.map(InlayHintTooltip::String),
+        tooltip: None,
         padding_left: Some(matches!(hint.kind, ToolInlayHintKind::Type)),
         padding_right: Some(matches!(hint.kind, ToolInlayHintKind::Parameter)),
-        data: None,
+        data: Some(json!({
+            "tooltip": hint.tooltip,
+        })),
     }
+}
+
+pub(super) fn resolve_lsp_inlay_hint(mut hint: InlayHint) -> InlayHint {
+    if hint.tooltip.is_some() {
+        return hint;
+    }
+    let Some(Value::Object(data)) = hint.data.as_ref() else {
+        return hint;
+    };
+    if let Some(tooltip) = data.get("tooltip").and_then(Value::as_str) {
+        hint.tooltip = Some(InlayHintTooltip::String(tooltip.to_owned()));
+    }
+    hint
 }
 
 pub(super) fn full_document_range(text: &str) -> Range {

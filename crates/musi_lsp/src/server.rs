@@ -58,11 +58,11 @@ mod convert;
 use config::LspConfig;
 use convert::{
     diagnostic_matches_path, encode_semantic_tokens, full_document_range, position_in_range,
-    resolve_lsp_document_link, semantic_tokens_legend, to_lsp_completion, to_lsp_diagnostic,
-    to_lsp_document_highlight, to_lsp_document_link, to_lsp_document_symbol, to_lsp_folding_range,
-    to_lsp_inlay_hint, to_lsp_location, to_lsp_selection_range, to_lsp_signature_help,
-    to_lsp_symbol_information, to_lsp_workspace_edit, to_tool_range, tool_location_matches_path,
-    truncate_hover_contents,
+    resolve_lsp_document_link, resolve_lsp_inlay_hint, semantic_tokens_legend, to_lsp_completion,
+    to_lsp_diagnostic, to_lsp_document_highlight, to_lsp_document_link, to_lsp_document_symbol,
+    to_lsp_folding_range, to_lsp_inlay_hint, to_lsp_location, to_lsp_selection_range,
+    to_lsp_signature_help, to_lsp_symbol_information, to_lsp_workspace_edit, to_tool_range,
+    tool_location_matches_path, truncate_hover_contents,
 };
 
 type ServerFuture<T> = Pin<Box<dyn Future<Output = Result<T, ResponseError>> + Send + 'static>>;
@@ -187,7 +187,7 @@ impl MusiLanguageServer {
                         work_done_progress_options: WorkDoneProgressOptions {
                             work_done_progress: None,
                         },
-                        resolve_provider: Some(false),
+                        resolve_provider: Some(true),
                     },
                 ))),
                 semantic_tokens_provider: Some(
@@ -803,6 +803,10 @@ impl MusiLanguageServer {
         Some(hints)
     }
 
+    fn resolve_inlay_hint(&self, hint: InlayHint) -> InlayHint {
+        resolve_lsp_inlay_hint(hint)
+    }
+
     fn document_diagnostics(
         &self,
         params: DocumentDiagnosticParams,
@@ -1415,6 +1419,11 @@ impl LanguageServer for MusiLanguageServer {
     fn inlay_hint(&mut self, params: InlayHintParams) -> ServerFuture<Option<Vec<InlayHint>>> {
         let inlay_hints_response = self.inlay_hints(&params);
         Box::pin(async move { Ok(inlay_hints_response) })
+    }
+
+    fn inlay_hint_resolve(&mut self, params: InlayHint) -> ServerFuture<InlayHint> {
+        let hint = self.resolve_inlay_hint(params);
+        Box::pin(async move { Ok(hint) })
     }
 }
 
