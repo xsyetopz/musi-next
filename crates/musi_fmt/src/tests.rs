@@ -1318,6 +1318,17 @@ let io := import "@std/io";
     }
 
     #[test]
+    fn formats_attribute_style_musi_markdown_fences() {
+        let markdown = "# Example\n\n```{.musi #sample}\nlet x:=1;\n```\n";
+        let formatted_result = format_markdown(markdown, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "# Example\n\n```{.musi #sample}\nlet x := 1;\n```\n"
+        );
+    }
+
+    #[test]
     fn markdown_fence_closing_matches_opening_marker_length() {
         let markdown = "# Example\n\n````musi\nlet text := \"```\";\nlet x:=1;\n````\n";
         let formatted_result = format_markdown(markdown, &options()).unwrap();

@@ -146,12 +146,7 @@ impl<'a> Fence<'a> {
         if marker_len < 3 {
             return None;
         }
-        let tag = trimmed
-            .trim_start_matches(marker)
-            .trim()
-            .split(|char: char| char.is_whitespace() || char == '{')
-            .next()
-            .unwrap_or_default();
+        let tag = fence_tag(trimmed.trim_start_matches(marker).trim());
         Some(Self {
             marker,
             marker_len,
@@ -178,6 +173,17 @@ impl<'a> Fence<'a> {
             .iter()
             .any(|tag| self.tag.eq_ignore_ascii_case(tag))
     }
+}
+
+fn fence_tag(info: &str) -> &str {
+    if let Some(attributes) = info.strip_prefix('{') {
+        return attributes
+            .trim_end_matches('}')
+            .split(|char: char| char.is_whitespace())
+            .find_map(|attribute| attribute.strip_prefix('.'))
+            .unwrap_or_default();
+    }
+    info.split_whitespace().next().unwrap_or_default()
 }
 
 fn has_markdown_ignore_file(source: &str) -> bool {
