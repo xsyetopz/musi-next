@@ -7,17 +7,18 @@ use async_lsp::lsp_types::{
     ClientCapabilities, CodeActionContext, CodeActionKind, CodeActionOrCommand, CodeActionParams,
     CodeLensParams, CompletionItemKind, CompletionTextEdit, DeclarationCapability,
     DiagnosticOptions, DiagnosticServerCapabilities, DiagnosticSeverity,
-    DidChangeWorkspaceFoldersParams, DocumentDiagnosticParams, DocumentDiagnosticReport,
-    DocumentDiagnosticReportResult, DocumentHighlightKind, DocumentLinkParams,
-    DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, ExecuteCommandParams,
-    FoldingRangeKind, FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse,
-    InitializeParams, InlayHintKind, LinkedEditingRangeParams, PartialResultParams, Position,
-    SelectionRangeParams, SemanticToken, SignatureHelpParams, TextDocumentIdentifier,
-    TextDocumentPositionParams, TextDocumentSaveReason, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
-    TypeDefinitionProviderCapability, WillSaveTextDocumentParams, WorkDoneProgressParams,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
-    WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    DidChangeConfigurationParams, DidChangeWorkspaceFoldersParams, DocumentDiagnosticParams,
+    DocumentDiagnosticReport, DocumentDiagnosticReportResult, DocumentHighlightKind,
+    DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
+    ExecuteCommandParams, FoldingRangeKind, FoldingRangeParams, GotoDefinitionParams,
+    GotoDefinitionResponse, InitializeParams, InlayHintKind, LinkedEditingRangeParams,
+    PartialResultParams, Position, SelectionRangeParams, SemanticToken, SignatureHelpParams,
+    TextDocumentIdentifier, TextDocumentPositionParams, TextDocumentSaveReason,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability, WillSaveTextDocumentParams,
+    WorkDoneProgressParams, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
+    WorkspaceDocumentDiagnosticReport, WorkspaceFolder, WorkspaceFoldersChangeEvent,
+    WorkspaceSymbolParams, WorkspaceSymbolResponse,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -578,6 +579,49 @@ render(8080, 1 = 1);
         assert_eq!(help.active_signature, Some(0));
         assert_eq!(help.active_parameter, Some(1));
         assert_eq!(help.signatures[0].label, "render(Int, Bool) -> Int");
+    }
+
+    #[test]
+    fn did_change_configuration_updates_hover_settings() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let message : String := \"Hello\";\nmessage;\n";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        server.update_configuration(DidChangeConfigurationParams {
+            settings: serde_json::json!({
+                "hover": {
+                    "maximumLength": 10,
+                },
+            }),
+        });
+        let hover = server
+            .hover_at(HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 2),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("hover should resolve");
+
+        let HoverContents::Markup(contents) = hover.contents else {
+            panic!("markup hover expected");
+        };
+        assert_eq!(contents.value, "```musi\n(v…");
     }
 
     #[test]
