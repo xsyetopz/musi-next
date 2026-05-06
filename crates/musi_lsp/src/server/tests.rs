@@ -9,6 +9,8 @@ use async_lsp::lsp_types::{
     DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
     FoldingRangeKind, FoldingRangeParams, InlayHintKind, PartialResultParams, Position,
     SelectionRangeParams, SemanticToken, TextDocumentIdentifier, TextDocumentPositionParams,
+    TextDocumentSaveReason, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, WillSaveTextDocumentParams,
     WorkDoneProgressParams,
 };
 use musi_tooling::{
@@ -47,7 +49,15 @@ mod success {
         );
         assert_eq!(
             initialize_result.capabilities.text_document_sync,
-            Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL))
+            Some(TextDocumentSyncCapability::Options(
+                TextDocumentSyncOptions {
+                    open_close: Some(true),
+                    change: Some(TextDocumentSyncKind::FULL),
+                    will_save: Some(true),
+                    will_save_wait_until: Some(true),
+                    save: Some(TextDocumentSyncSaveOptions::Supported(true)),
+                }
+            ))
         );
         assert_eq!(
             initialize_result.capabilities.hover_provider,
@@ -190,6 +200,25 @@ mod success {
 
         assert_eq!(edits.len(), 1);
         assert_eq!(edits[0].new_text, expected);
+    }
+
+    #[test]
+    fn will_save_wait_until_formats_open_document() {
+        let uri = Url::parse("file:///tmp/index.ms").expect("uri should parse");
+        let source = "let x:=1;";
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let edits = server
+            .will_save_formatting(WillSaveTextDocumentParams {
+                text_document: TextDocumentIdentifier { uri },
+                reason: TextDocumentSaveReason::MANUAL,
+            })
+            .expect("will save formatting should run");
+
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].range, full_document_range(source));
+        assert_eq!(edits[0].new_text, "let x := 1;\n");
     }
 
     #[test]

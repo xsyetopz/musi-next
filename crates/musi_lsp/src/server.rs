@@ -23,8 +23,9 @@ use async_lsp::lsp_types::{
     SemanticTokensRangeParams, SemanticTokensRangeResult, SemanticTokensResult,
     SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
     TextDocumentContentChangeEvent, TextDocumentItem, TextDocumentPositionParams,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url, WorkDoneProgressOptions,
-    WorkspaceEdit, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions, TextEdit, Url, WillSaveTextDocumentParams,
+    WorkDoneProgressOptions, WorkspaceEdit, WorkspaceSymbolParams, WorkspaceSymbolResponse,
     notification::PublishDiagnostics,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
@@ -76,8 +77,14 @@ impl MusiLanguageServer {
     fn initialize_result() -> InitializeResult {
         InitializeResult {
             capabilities: ServerCapabilities {
-                text_document_sync: Some(TextDocumentSyncCapability::Kind(
-                    TextDocumentSyncKind::FULL,
+                text_document_sync: Some(TextDocumentSyncCapability::Options(
+                    TextDocumentSyncOptions {
+                        open_close: Some(true),
+                        change: Some(TextDocumentSyncKind::FULL),
+                        will_save: Some(true),
+                        will_save_wait_until: Some(true),
+                        save: Some(TextDocumentSyncSaveOptions::Supported(true)),
+                    },
                 )),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 definition_provider: Some(OneOf::Left(true)),
@@ -598,6 +605,28 @@ impl MusiLanguageServer {
         )])
     }
 
+    fn will_save_formatting(&self, params: WillSaveTextDocumentParams) -> Option<Vec<TextEdit>> {
+        let uri = params.text_document.uri;
+        let text = self.open_documents.get(&uri)?;
+        let path = uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let options = load_project_ancestor(&path, ProjectOptions::default())
+            .ok()
+            .map_or_else(FormatOptions::default, |project| {
+                FormatOptions::from_manifest(project.manifest().fmt.as_ref())
+            });
+        let formatted = format_text_for_path(&path, text, &options).ok()?;
+        if !formatted.changed {
+            return Some(Vec::new());
+        }
+        Some(vec![TextEdit::new(
+            full_document_range(text),
+            formatted.text,
+        )])
+    }
+
     fn document_on_type_formatting(
         &self,
         params: DocumentOnTypeFormattingParams,
@@ -765,6 +794,14 @@ impl LanguageServer for MusiLanguageServer {
     fn did_save(&mut self, params: DidSaveTextDocumentParams) -> NotifyResult {
         self.did_save_document(&params.text_document.uri);
         ControlFlow::Continue(())
+    }
+
+    fn will_save_wait_until(
+        &mut self,
+        params: WillSaveTextDocumentParams,
+    ) -> ServerFuture<Option<Vec<TextEdit>>> {
+        let formatting_response = self.will_save_formatting(params);
+        Box::pin(async move { Ok(formatting_response) })
     }
 
     fn completion(&mut self, params: CompletionParams) -> ServerFuture<Option<CompletionResponse>> {
