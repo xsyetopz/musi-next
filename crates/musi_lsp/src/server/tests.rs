@@ -4,11 +4,12 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use async_lsp::lsp_types::{
-    CodeActionContext, CodeActionKind, CodeActionOrCommand, CodeActionParams, CompletionItemKind,
-    CompletionTextEdit, DiagnosticSeverity, DocumentHighlightKind, DocumentLinkParams,
-    DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, FoldingRangeKind,
-    FoldingRangeParams, InlayHintKind, PartialResultParams, Position, SelectionRangeParams,
-    SemanticToken, TextDocumentIdentifier, TextDocumentPositionParams, WorkDoneProgressParams,
+    CodeActionContext, CodeActionKind, CodeActionOrCommand, CodeActionParams, CodeLensParams,
+    CompletionItemKind, CompletionTextEdit, DiagnosticSeverity, DocumentHighlightKind,
+    DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
+    FoldingRangeKind, FoldingRangeParams, InlayHintKind, PartialResultParams, Position,
+    SelectionRangeParams, SemanticToken, TextDocumentIdentifier, TextDocumentPositionParams,
+    WorkDoneProgressParams,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -101,6 +102,7 @@ mod success {
                 .document_link_provider
                 .is_some()
         );
+        assert!(initialize_result.capabilities.code_lens_provider.is_some());
         assert!(
             initialize_result
                 .capabilities
@@ -587,6 +589,45 @@ let other := value + value;
                 .expect("dep URI should build")
             )
         );
+    }
+
+    #[test]
+    fn code_lens_returns_reference_counts_for_document_symbols() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = r"let value := 1;
+let other := value + value;
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let lenses = server
+            .code_lenses(CodeLensParams {
+                text_document: TextDocumentIdentifier { uri },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("code lenses should run");
+
+        let value_lens = lenses
+            .iter()
+            .find(|lens| lens.range.start == Position::new(0, 4))
+            .expect("value reference lens should exist");
+        let command = value_lens.command.as_ref().expect("lens command");
+        assert_eq!(command.title, "2 references");
+        assert_eq!(command.command, "musi.references");
     }
 
     #[test]

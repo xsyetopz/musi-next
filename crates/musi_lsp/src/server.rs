@@ -6,13 +6,14 @@ use std::pin::Pin;
 
 use async_lsp::lsp_types::{
     CodeAction, CodeActionKind, CodeActionOptions, CodeActionOrCommand, CodeActionParams,
-    CodeActionProviderCapability, CodeActionResponse, CompletionList, CompletionOptions,
-    CompletionParams, CompletionResponse, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentFormattingParams,
-    DocumentHighlight, DocumentHighlightParams, DocumentLink, DocumentLinkOptions,
-    DocumentLinkParams, DocumentOnTypeFormattingOptions, DocumentOnTypeFormattingParams,
-    DocumentRangeFormattingParams, DocumentSymbolParams, DocumentSymbolResponse, FoldingRange,
-    FoldingRangeParams, FoldingRangeProviderCapability, FormattingOptions, GotoDefinitionParams,
+    CodeActionProviderCapability, CodeActionResponse, CodeLens, CodeLensOptions, CodeLensParams,
+    Command, CompletionList, CompletionOptions, CompletionParams, CompletionResponse,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams, DocumentFormattingParams, DocumentHighlight,
+    DocumentHighlightParams, DocumentLink, DocumentLinkOptions, DocumentLinkParams,
+    DocumentOnTypeFormattingOptions, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
+    DocumentSymbolParams, DocumentSymbolResponse, FoldingRange, FoldingRangeParams,
+    FoldingRangeProviderCapability, FormattingOptions, GotoDefinitionParams,
     GotoDefinitionResponse, Hover, HoverContents, HoverParams, HoverProviderCapability,
     InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintOptions,
     InlayHintParams, InlayHintServerCapabilities, Location, MarkupContent, MarkupKind, OneOf,
@@ -30,13 +31,14 @@ use async_lsp::{ClientSocket, LanguageServer, ResponseError};
 use musi_fmt::{FormatOptions, format_text_for_path};
 use musi_project::{ProjectOptions, load_project_ancestor};
 use musi_tooling::{
-    collect_project_diagnostics_with_overlay, completions_for_project_file_with_overlay,
-    definition_for_project_file_with_overlay, document_links_for_project_file_with_overlay,
-    document_symbols_for_project_file_with_overlay, folding_ranges_for_project_file_with_overlay,
-    hover_for_project_file_with_overlay, inlay_hints_for_project_file_with_overlay,
-    prepare_rename_for_project_file_with_overlay, references_for_project_file_with_overlay,
-    rename_for_project_file_with_overlay, selection_ranges_for_project_file_with_overlay,
-    semantic_tokens_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
+    ToolDocumentSymbol, collect_project_diagnostics_with_overlay,
+    completions_for_project_file_with_overlay, definition_for_project_file_with_overlay,
+    document_links_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
+    folding_ranges_for_project_file_with_overlay, hover_for_project_file_with_overlay,
+    inlay_hints_for_project_file_with_overlay, prepare_rename_for_project_file_with_overlay,
+    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
+    selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
+    workspace_symbols_for_project_file_with_overlay,
 };
 
 mod config;
@@ -87,6 +89,9 @@ impl MusiLanguageServer {
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: None,
                     },
+                }),
+                code_lens_provider: Some(CodeLensOptions {
+                    resolve_provider: Some(false),
                 }),
                 folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
                 selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
@@ -346,6 +351,50 @@ impl MusiLanguageServer {
             .filter_map(to_lsp_document_link)
             .collect();
         Some(links)
+    }
+
+    fn code_lenses(&self, params: CodeLensParams) -> Option<Vec<CodeLens>> {
+        let uri = params.text_document.uri;
+        let path = uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let overlay = self.open_documents.get(&uri).map(String::as_str);
+        let mut lenses = Vec::new();
+        for symbol in document_symbols_for_project_file_with_overlay(&path, overlay) {
+            self.push_reference_lenses(&path, overlay, &symbol, &mut lenses);
+        }
+        Some(lenses)
+    }
+
+    fn push_reference_lenses(
+        &self,
+        path: &Path,
+        overlay: Option<&str>,
+        symbol: &ToolDocumentSymbol,
+        lenses: &mut Vec<CodeLens>,
+    ) {
+        let references = references_for_project_file_with_overlay(
+            path,
+            overlay,
+            symbol.selection_range.start_line,
+            symbol.selection_range.start_col,
+            false,
+        );
+        if !references.is_empty() {
+            lenses.push(CodeLens {
+                range: to_tool_range(&symbol.selection_range),
+                command: Some(Command::new(
+                    reference_lens_title(references.len()),
+                    "musi.references".to_owned(),
+                    None,
+                )),
+                data: None,
+            });
+        }
+        for child in &symbol.children {
+            self.push_reference_lenses(path, overlay, child, lenses);
+        }
     }
 
     fn code_actions(&self, params: CodeActionParams) -> Option<CodeActionResponse> {
@@ -636,6 +685,14 @@ fn on_type_formatting_trigger(ch: &str) -> bool {
     matches!(ch, ";" | ")" | "]" | "}")
 }
 
+fn reference_lens_title(count: usize) -> String {
+    if count == 1 {
+        "1 reference".to_owned()
+    } else {
+        format!("{count} references")
+    }
+}
+
 fn lsp_range_offsets(text: &str, range: Range) -> Option<(usize, usize)> {
     let start = lsp_position_offset(text, range.start)?;
     let end = lsp_position_offset(text, range.end)?;
@@ -755,6 +812,11 @@ impl LanguageServer for MusiLanguageServer {
     ) -> ServerFuture<Option<Vec<DocumentLink>>> {
         let document_links = self.document_links(params);
         Box::pin(async move { Ok(document_links) })
+    }
+
+    fn code_lens(&mut self, params: CodeLensParams) -> ServerFuture<Option<Vec<CodeLens>>> {
+        let code_lenses = self.code_lenses(params);
+        Box::pin(async move { Ok(code_lenses) })
     }
 
     fn code_action(
