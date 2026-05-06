@@ -5,16 +5,16 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use async_lsp::lsp_types::{
     CodeActionContext, CodeActionKind, CodeActionOrCommand, CodeActionParams, CodeLensParams,
-    CompletionItemKind, CompletionTextEdit, DiagnosticOptions, DiagnosticServerCapabilities,
-    DiagnosticSeverity, DocumentDiagnosticParams, DocumentDiagnosticReport,
-    DocumentDiagnosticReportResult, DocumentHighlightKind, DocumentLinkParams,
-    DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, FoldingRangeKind,
-    FoldingRangeParams, InlayHintKind, LinkedEditingRangeParams, PartialResultParams, Position,
-    SelectionRangeParams, SemanticToken, TextDocumentIdentifier, TextDocumentPositionParams,
-    TextDocumentSaveReason, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, WillSaveTextDocumentParams,
-    WorkDoneProgressParams, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
-    WorkspaceDocumentDiagnosticReport,
+    CompletionItemKind, CompletionTextEdit, DeclarationCapability, DiagnosticOptions,
+    DiagnosticServerCapabilities, DiagnosticSeverity, DocumentDiagnosticParams,
+    DocumentDiagnosticReport, DocumentDiagnosticReportResult, DocumentHighlightKind,
+    DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
+    FoldingRangeKind, FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse,
+    InlayHintKind, LinkedEditingRangeParams, PartialResultParams, Position, SelectionRangeParams,
+    SemanticToken, TextDocumentIdentifier, TextDocumentPositionParams, TextDocumentSaveReason,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions, WillSaveTextDocumentParams, WorkDoneProgressParams,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -93,6 +93,10 @@ mod success {
         );
         assert!(initialize_result.capabilities.inlay_hint_provider.is_some());
         assert!(initialize_result.capabilities.completion_provider.is_some());
+        assert_eq!(
+            initialize_result.capabilities.declaration_provider,
+            Some(DeclarationCapability::Simple(true))
+        );
         assert_eq!(
             initialize_result.capabilities.definition_provider,
             Some(OneOf::Left(true))
@@ -502,6 +506,46 @@ point.
                 .iter()
                 .all(|item| item.kind == Some(CompletionItemKind::PROPERTY))
         );
+    }
+
+    #[test]
+    fn declaration_reuses_symbol_definition_location() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = r"let value := 1;
+let other := value;
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let declaration = server
+            .definition_at(GotoDefinitionParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 14),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("declaration should exist");
+
+        let GotoDefinitionResponse::Scalar(location) = declaration else {
+            panic!("declaration should return scalar location");
+        };
+        assert_eq!(location.range.start, Position::new(0, 4));
+        assert_eq!(location.range.end, Position::new(0, 9));
     }
 
     #[test]
