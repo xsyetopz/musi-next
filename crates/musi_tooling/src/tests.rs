@@ -671,6 +671,28 @@ match value (| .Some(inner) => inner | .None => 0);
     }
 
     #[test]
+    fn hover_on_module_doc_returns_module_docs() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "--! module docs\n--! more module docs\nlet message : String := \"Hello\";\n";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let hover = hover_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            1,
+            4,
+        )
+        .expect("module doc hover should resolve");
+
+        assert_eq!(hover.range.start_line, 1);
+        assert_eq!(hover.range.start_col, 1);
+        assert_eq!(hover.range.end_line, 2);
+        assert!(hover.contents.contains("module docs"));
+        assert!(hover.contents.contains("more module docs"));
+    }
+
+    #[test]
     fn hover_uses_member_facts_for_record_properties() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);

@@ -18,7 +18,7 @@ mod inlay;
 mod model;
 pub(crate) mod type_render;
 
-use docs::{leading_doc_text, module_doc_text};
+use docs::{leading_doc_text, module_doc_hover, module_doc_text};
 use type_render::render_hir_ty;
 
 pub use diagnostics::{collect_project_diagnostics, collect_project_diagnostics_with_overlay};
@@ -67,6 +67,9 @@ pub fn hover_for_project_file_with_overlay(
     let parsed = session.parsed_module_cached(&module_key).ok().flatten()?;
     let source = session.source(parsed.source_id)?;
     let offset = source.offset(line, character)?;
+    if let Some((span, contents)) = module_doc_hover(source, offset) {
+        return Some(ToolHover::new(span, tool_range(source, span), contents));
+    }
     let resolved = session.resolved_module_cached(&module_key).ok().flatten()?;
     let sema = session.sema_module_cached(&module_key).ok().flatten();
     if let Some(sema) = sema
