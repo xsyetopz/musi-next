@@ -365,7 +365,6 @@ mod success {
         let source = "export let (self : Expect[T, E]).mapFail [T, E, F] (f : E -> F) : Expect[T, F,] := mapFail[T, E, F](self, f);";
 
         let formatted_result = format_source(source, &options).unwrap();
-        std::fs::write("/private/tmp/musi_fmt_out.txt", &formatted_result.text).unwrap();
 
         assert!(
             formatted_result
