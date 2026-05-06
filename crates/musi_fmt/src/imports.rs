@@ -147,22 +147,34 @@ fn attached_statement_start(source: &str, token_start: usize) -> usize {
     let line_start = prefix
         .rfind('\n')
         .map_or(0, |index| index.saturating_add(1));
-    let before_line = source.get(..line_start).unwrap_or_default();
-    let Some(previous_line_end) = before_line.trim_end_matches('\n').rfind('\n') else {
-        let previous_line = source.get(..line_start).unwrap_or_default();
-        if line_start > 0 && previous_line.trim_start().starts_with("--") {
-            return 0;
+
+    let mut attach_start = line_start;
+    while let Some(previous_start) = previous_line_start(source, attach_start) {
+        let previous_line = source
+            .get(previous_start..attach_start)
+            .unwrap_or_default()
+            .trim_end_matches(['\r', '\n']);
+        if !previous_line.trim_start().starts_with("--") {
+            break;
         }
-        return token_start;
-    };
-    let previous_line_start = previous_line_end.saturating_add(1);
-    let previous_line = source
-        .get(previous_line_start..line_start)
-        .unwrap_or_default();
-    if previous_line.trim_start().starts_with("--") {
-        return previous_line_start;
+        attach_start = previous_start;
+    }
+    if attach_start != line_start {
+        return attach_start;
     }
     token_start
+}
+
+fn previous_line_start(source: &str, line_start: usize) -> Option<usize> {
+    if line_start == 0 {
+        return None;
+    }
+    let before = source.get(..line_start)?.trim_end_matches(['\r', '\n']);
+    Some(
+        before
+            .rfind('\n')
+            .map_or(0, |index| index.saturating_add(1)),
+    )
 }
 
 fn import_block_replacements(source: &str, statements: &[ImportStatement]) -> Vec<Replacement> {

@@ -1165,6 +1165,30 @@ let testing := import "@std/testing";
     }
 
     #[test]
+    fn attached_import_comment_blocks_move_with_sorted_imports() {
+        let source = r#"-- testing helpers
+-- used by assertions
+let testing := import "@std/testing";
+-- io helpers
+-- used by stdout
+let io := import "@std/io";
+"#;
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            r#"-- io helpers
+-- used by stdout
+let io := import "@std/io";
+-- testing helpers
+-- used by assertions
+let testing := import "@std/testing";
+"#
+        );
+    }
+
+    #[test]
     fn standalone_comments_split_import_sort_groups() {
         let source = r#"let testing := import "@std/testing";
 
