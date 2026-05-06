@@ -16,8 +16,9 @@ use async_lsp::lsp_types::{
     FoldingRangeProviderCapability, FormattingOptions, GotoDefinitionParams,
     GotoDefinitionResponse, Hover, HoverContents, HoverParams, HoverProviderCapability,
     InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintOptions,
-    InlayHintParams, InlayHintServerCapabilities, Location, MarkupContent, MarkupKind, OneOf,
-    PrepareRenameResponse, PublishDiagnosticsParams, Range, ReferenceParams, RenameOptions,
+    InlayHintParams, InlayHintServerCapabilities, LinkedEditingRangeParams,
+    LinkedEditingRangeServerCapabilities, LinkedEditingRanges, Location, MarkupContent, MarkupKind,
+    OneOf, PrepareRenameResponse, PublishDiagnosticsParams, Range, ReferenceParams, RenameOptions,
     RenameParams, SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability,
     SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
     SemanticTokensRangeParams, SemanticTokensRangeResult, SemanticTokensResult,
@@ -89,6 +90,9 @@ impl MusiLanguageServer {
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
+                linked_editing_range_provider: Some(LinkedEditingRangeServerCapabilities::Simple(
+                    true,
+                )),
                 document_highlight_provider: Some(OneOf::Left(true)),
                 document_symbol_provider: Some(OneOf::Left(true)),
                 document_link_provider: Some(DocumentLinkOptions {
@@ -330,6 +334,37 @@ impl MusiLanguageServer {
         .map(to_lsp_document_highlight)
         .collect();
         Some(highlights)
+    }
+
+    fn linked_editing_ranges(
+        &self,
+        params: LinkedEditingRangeParams,
+    ) -> Option<LinkedEditingRanges> {
+        let text_document = params.text_document_position_params.text_document;
+        let position = params.text_document_position_params.position;
+        let path = text_document.uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let overlay = self
+            .open_documents
+            .get(&text_document.uri)
+            .map(String::as_str);
+        let ranges = references_for_project_file_with_overlay(
+            &path,
+            overlay,
+            usize::try_from(position.line).ok()?.saturating_add(1),
+            usize::try_from(position.character).ok()?.saturating_add(1),
+            true,
+        )
+        .into_iter()
+        .filter(|location| tool_location_matches_path(&path, location))
+        .map(|location| to_tool_range(&location.range))
+        .collect::<Vec<_>>();
+        (ranges.len() > 1).then_some(LinkedEditingRanges {
+            ranges,
+            word_pattern: Some("[A-Za-z_][A-Za-z0-9_]*".to_owned()),
+        })
     }
 
     fn document_symbols(&self, params: DocumentSymbolParams) -> Option<DocumentSymbolResponse> {
@@ -833,6 +868,14 @@ impl LanguageServer for MusiLanguageServer {
     ) -> ServerFuture<Option<Vec<DocumentHighlight>>> {
         let document_highlights = self.document_highlights(params);
         Box::pin(async move { Ok(document_highlights) })
+    }
+
+    fn linked_editing_range(
+        &mut self,
+        params: LinkedEditingRangeParams,
+    ) -> ServerFuture<Option<LinkedEditingRanges>> {
+        let linked_ranges = self.linked_editing_ranges(params);
+        Box::pin(async move { Ok(linked_ranges) })
     }
 
     fn document_symbol(

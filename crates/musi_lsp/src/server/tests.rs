@@ -7,11 +7,11 @@ use async_lsp::lsp_types::{
     CodeActionContext, CodeActionKind, CodeActionOrCommand, CodeActionParams, CodeLensParams,
     CompletionItemKind, CompletionTextEdit, DiagnosticSeverity, DocumentHighlightKind,
     DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
-    FoldingRangeKind, FoldingRangeParams, InlayHintKind, PartialResultParams, Position,
-    SelectionRangeParams, SemanticToken, TextDocumentIdentifier, TextDocumentPositionParams,
-    TextDocumentSaveReason, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, WillSaveTextDocumentParams,
-    WorkDoneProgressParams,
+    FoldingRangeKind, FoldingRangeParams, InlayHintKind, LinkedEditingRangeParams,
+    PartialResultParams, Position, SelectionRangeParams, SemanticToken, TextDocumentIdentifier,
+    TextDocumentPositionParams, TextDocumentSaveReason, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
+    WillSaveTextDocumentParams, WorkDoneProgressParams,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -97,6 +97,12 @@ mod success {
         assert_eq!(
             initialize_result.capabilities.references_provider,
             Some(OneOf::Left(true))
+        );
+        assert!(
+            initialize_result
+                .capabilities
+                .linked_editing_range_provider
+                .is_some()
         );
         assert_eq!(
             initialize_result.capabilities.document_highlight_provider,
@@ -534,6 +540,57 @@ let other := value + value;
                 .filter(|highlight| highlight.range.start.line == 1)
                 .count()
                 == 2
+        );
+    }
+
+    #[test]
+    fn linked_editing_range_returns_same_file_symbol_ranges() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = r"let value := 1;
+let other := value + value;
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let linked = server
+            .linked_editing_ranges(LinkedEditingRangeParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 14),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("linked editing ranges should exist");
+
+        assert_eq!(linked.ranges.len(), 3);
+        assert!(linked.ranges.contains(&Range {
+            start: Position::new(0, 4),
+            end: Position::new(0, 9),
+        }));
+        assert!(linked.ranges.contains(&Range {
+            start: Position::new(1, 13),
+            end: Position::new(1, 18),
+        }));
+        assert!(linked.ranges.contains(&Range {
+            start: Position::new(1, 21),
+            end: Position::new(1, 26),
+        }));
+        assert_eq!(
+            linked.word_pattern.as_deref(),
+            Some("[A-Za-z_][A-Za-z0-9_]*")
         );
     }
 
