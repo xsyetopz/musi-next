@@ -170,7 +170,7 @@ impl ImmixBlock {
 }
 
 #[cfg(test)]
-mod tests {
+mod success {
     use super::{HeapSpace, IMMIX_LINES_PER_BLOCK, ImmixBlock};
 
     #[test]
@@ -190,3 +190,6 @@ mod tests {
         assert_eq!(block.reserve_lines(2), None);
     }
 }
+
+#[cfg(test)]
+mod failure {}
