@@ -1,7 +1,7 @@
 use super::*;
 
 #[must_use]
-pub(crate) fn render_hir_ty(sema: &SemaModule, session: &Session, ty: HirTyId) -> String {
+pub fn render_hir_ty(sema: &SemaModule, session: &Session, ty: HirTyId) -> String {
     let kind = &sema.ty(ty).kind;
     if let Some(atomic) = render_atomic_hir_ty(kind) {
         return atomic;

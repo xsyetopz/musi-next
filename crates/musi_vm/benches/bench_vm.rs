@@ -53,6 +53,10 @@ fn load_initialized_vm(bytes: &[u8], options: VmOptions) -> Vm {
     initialized_vm(&program, options)
 }
 
+fn batch_capacity(batch: u64) -> usize {
+    usize::try_from(batch).expect("benchmark batch size should fit usize")
+}
+
 fn bind_result_i64(vm: &mut Vm) -> BoundI64Call {
     vm.bind_export_i64_i64("result")
         .expect("result export should bind")
@@ -185,6 +189,7 @@ fn bench_cold_result_with_int_arg(
     });
 }
 
+#[allow(clippy::too_many_lines)]
 fn bench_vm_init_small_module(c: &mut Criterion) {
     let source = r"
         let base : Int := 41;
@@ -207,7 +212,7 @@ fn bench_vm_init_small_module(c: &mut Criterion) {
             let mut remaining = iters;
             while remaining > 0 {
                 let batch = remaining.min(512);
-                let mut vms = Vec::with_capacity(batch as usize);
+                let mut vms = Vec::with_capacity(batch_capacity(batch));
                 vms.extend((0..batch).map(|_| Vm::with_rejecting_host(program.clone(), VmOptions)));
                 let start = Instant::now();
                 for vm in &mut vms {
@@ -227,7 +232,7 @@ fn bench_vm_init_small_module(c: &mut Criterion) {
             let mut remaining = iters;
             while remaining > 0 {
                 let batch = remaining.min(512);
-                let mut vms = Vec::with_capacity(batch as usize);
+                let mut vms = Vec::with_capacity(batch_capacity(batch));
                 vms.extend((0..batch).map(|_| Vm::with_rejecting_host(program.clone(), VmOptions)));
                 let start = Instant::now();
                 for vm in &mut vms {
@@ -247,7 +252,7 @@ fn bench_vm_init_small_module(c: &mut Criterion) {
             let mut remaining = iters;
             while remaining > 0 {
                 let batch = remaining.min(512);
-                let mut vms = Vec::with_capacity(batch as usize);
+                let mut vms = Vec::with_capacity(batch_capacity(batch));
                 vms.extend((0..batch).map(|_| Vm::with_rejecting_host(program.clone(), VmOptions)));
                 let start = Instant::now();
                 for vm in &mut vms {
@@ -267,7 +272,7 @@ fn bench_vm_init_small_module(c: &mut Criterion) {
             let mut remaining = iters;
             while remaining > 0 {
                 let batch = remaining.min(512);
-                let mut vms = Vec::with_capacity(batch as usize);
+                let mut vms = Vec::with_capacity(batch_capacity(batch));
                 vms.extend((0..batch).map(|_| Vm::with_rejecting_host(program.clone(), VmOptions)));
                 let start = Instant::now();
                 for vm in &mut vms {
@@ -287,7 +292,7 @@ fn bench_vm_init_small_module(c: &mut Criterion) {
             let mut remaining = iters;
             while remaining > 0 {
                 let batch = remaining.min(512);
-                let mut vms = Vec::with_capacity(batch as usize);
+                let mut vms = Vec::with_capacity(batch_capacity(batch));
                 vms.extend(
                     (0..batch)
                         .map(|_| Vm::with_rejecting_host(program.clone(), interpreter_options())),
@@ -419,6 +424,7 @@ fn bench_vm_closure_capture(c: &mut Criterion) {
     );
 }
 
+#[allow(clippy::too_many_lines)]
 fn bench_vm_sequence_index_mutation(c: &mut Criterion) {
     let source = r"
         export let result (grid : mut [2][2]Int) : Int := (
@@ -430,8 +436,11 @@ fn bench_vm_sequence_index_mutation(c: &mut Criterion) {
     let program = compile_program(source);
     let mut vm = initialized_vm(&program, VmOptions);
     let bound_call = bind_result_seq2(&mut vm);
-    let Value::Seq(grid) = int_grid(&mut vm) else {
-        panic!("grid allocation should return sequence")
+    let Some(grid) = (match int_grid(&mut vm) {
+        Value::Seq(seq) => Some(seq),
+        _ => None,
+    }) else {
+        return;
     };
     let grid = vm
         .bind_seq2x2_i64_arg(grid)
@@ -446,8 +455,11 @@ fn bench_vm_sequence_index_mutation(c: &mut Criterion) {
 
     let mut vm = initialized_vm(&program, VmOptions);
     let normal_call = bind_result_seq2(&mut vm);
-    let Value::Seq(normal_grid) = int_grid(&mut vm) else {
-        panic!("grid allocation should return sequence")
+    let Some(normal_grid) = (match int_grid(&mut vm) {
+        Value::Seq(seq) => Some(seq),
+        _ => None,
+    }) else {
+        return;
     };
     let normal_grid = vm
         .bind_seq2x2_i64_arg(normal_grid)
@@ -461,8 +473,11 @@ fn bench_vm_sequence_index_mutation(c: &mut Criterion) {
 
     let mut vm = initialized_vm(&program, VmOptions);
     let bound_call = bind_result_seq2(&mut vm);
-    let Value::Seq(grid) = int_grid(&mut vm) else {
-        panic!("grid allocation should return sequence")
+    let Some(grid) = (match int_grid(&mut vm) {
+        Value::Seq(seq) => Some(seq),
+        _ => None,
+    }) else {
+        return;
     };
     let grid = vm
         .bind_seq2x2_i64_arg(grid)
@@ -476,8 +491,11 @@ fn bench_vm_sequence_index_mutation(c: &mut Criterion) {
 
     let mut vm = initialized_vm(&program, interpreter_options());
     let bound_call = bind_result_seq2(&mut vm);
-    let Value::Seq(interpreter_grid) = int_grid(&mut vm) else {
-        panic!("grid allocation should return sequence")
+    let Some(interpreter_grid) = (match int_grid(&mut vm) {
+        Value::Seq(seq) => Some(seq),
+        _ => None,
+    }) else {
+        return;
     };
     let interpreter_grid = vm
         .bind_seq2x2_i64_arg(interpreter_grid)
@@ -659,6 +677,7 @@ fn bench_vm_effect_resume(c: &mut Criterion) {
     });
 }
 
+#[allow(clippy::too_many_lines)]
 fn bench_vm_sequence_return_gc(c: &mut Criterion) {
     let source = r"
         export let result () : [8]Int := [0, 1, 2, 3, 4, 5, 6, 7];

@@ -9,7 +9,7 @@ use crate::analysis::{ToolPosition, ToolRange, tool_range};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolSelectionRange {
     pub range: ToolRange,
-    pub parent: Option<Box<ToolSelectionRange>>,
+    pub parent: Option<Box<Self>>,
 }
 
 #[must_use]

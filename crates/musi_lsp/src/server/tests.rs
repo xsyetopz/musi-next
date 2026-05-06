@@ -1,3 +1,5 @@
+#![allow(clippy::panic, clippy::too_many_lines)]
+
 use std::env::temp_dir;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -500,7 +502,7 @@ let current := bef;
         assert_eq!(before.detail, None);
         assert_eq!(before.documentation, None);
         assert!(before.data.is_some());
-        let before = server.resolve_completion(before.clone());
+        let before = MusiLanguageServer::resolve_completion(before.clone());
         assert_eq!(before.detail.as_deref(), Some("binding"));
         assert_eq!(before.documentation, None);
         let edit = before
@@ -627,7 +629,7 @@ render(8080, 1 = 1);
         let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
         let _ = server.open_documents.insert(uri.clone(), source.to_owned());
 
-        server.update_configuration(DidChangeConfigurationParams {
+        server.update_configuration(&DidChangeConfigurationParams {
             settings: serde_json::json!({
                 "hover": {
                     "maximumLength": 10,
@@ -689,13 +691,11 @@ render(8080, 1 = 1);
             work_done_progress_params: WorkDoneProgressParams::default(),
         });
 
-        let response = server
-            .workspace_symbols(&WorkspaceSymbolParams {
-                query: "Value".to_owned(),
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: PartialResultParams::default(),
-            })
-            .expect("workspace symbols should run");
+        let response = server.workspace_symbols(&WorkspaceSymbolParams {
+            query: "Value".to_owned(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        });
         let WorkspaceSymbolResponse::Nested(symbols) = response else {
             panic!("workspace symbols expected");
         };
@@ -712,7 +712,7 @@ render(8080, 1 = 1);
             .expect("entry symbol should exist");
         assert!(matches!(entry.location, OneOf::Right(_)));
         assert!(entry.data.is_some());
-        let entry = server.resolve_workspace_symbol(entry.clone());
+        let entry = MusiLanguageServer::resolve_workspace_symbol(entry.clone());
         assert!(matches!(entry.location, OneOf::Left(_)));
     }
 
@@ -754,13 +754,11 @@ render(8080, 1 = 1);
             .open_documents
             .insert(uri, "let unsavedValue := 1;\n".to_owned());
 
-        let response = server
-            .workspace_symbols(&WorkspaceSymbolParams {
-                query: "Value".to_owned(),
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: PartialResultParams::default(),
-            })
-            .expect("workspace symbols should run");
+        let response = server.workspace_symbols(&WorkspaceSymbolParams {
+            query: "Value".to_owned(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        });
         let WorkspaceSymbolResponse::Nested(symbols) = response else {
             panic!("workspace symbols expected");
         };
@@ -831,13 +829,11 @@ render(8080, 1 = 1);
             },
         });
 
-        let response = server
-            .workspace_symbols(&WorkspaceSymbolParams {
-                query: "Value".to_owned(),
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: PartialResultParams::default(),
-            })
-            .expect("workspace symbols should run");
+        let response = server.workspace_symbols(&WorkspaceSymbolParams {
+            query: "Value".to_owned(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        });
         let WorkspaceSymbolResponse::Nested(symbols) = response else {
             panic!("workspace symbols expected");
         };
@@ -1119,7 +1115,7 @@ let other := value + value;
         assert_eq!(links[0].tooltip, None);
         assert!(links[0].data.is_some());
 
-        let link = server.resolve_document_link(links[0].clone());
+        let link = MusiLanguageServer::resolve_document_link(links[0].clone());
 
         assert_eq!(
             link.target.as_ref(),
@@ -1224,13 +1220,13 @@ let other := value + value;
             Some(uri.as_str())
         );
         assert_eq!(
-            arguments[0].get("line").and_then(|value| value.as_u64()),
+            arguments[0].get("line").and_then(serde_json::Value::as_u64),
             Some(0)
         );
         assert_eq!(
             arguments[0]
                 .get("character")
-                .and_then(|value| value.as_u64()),
+                .and_then(serde_json::Value::as_u64),
             Some(4)
         );
     }
@@ -1258,7 +1254,7 @@ let other := value + value;
         let _ = server.open_documents.insert(uri.clone(), source.to_owned());
 
         let result = server
-            .execute_command_request(ExecuteCommandParams {
+            .execute_command_request(&ExecuteCommandParams {
                 command: "musi.references".to_owned(),
                 arguments: vec![serde_json::json!({
                     "uri": uri.as_str(),
@@ -1393,7 +1389,7 @@ let other := value + 2;
         let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
         let _ = server.open_documents.insert(uri.clone(), source.to_owned());
 
-        let report = server.document_diagnostics(DocumentDiagnosticParams {
+        let report = server.document_diagnostics(&DocumentDiagnosticParams {
             text_document: TextDocumentIdentifier { uri },
             identifier: Some("musi".to_owned()),
             previous_result_id: None,
@@ -1426,7 +1422,7 @@ let other := value + 2;
         fs::write(&path, source).expect("entry should be written");
         let uri = Url::from_file_path(&path).expect("file URI should build");
         let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
-        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+        let _ = server.open_documents.insert(uri, source.to_owned());
 
         let report = server.workspace_diagnostics(WorkspaceDiagnosticParams {
             identifier: Some("musi".to_owned()),
@@ -1465,7 +1461,7 @@ let other := value + 2;
         .expect("manifest should be written");
         let path = root.join("index.ms");
         fs::write(&path, "let value : Int := \"bad\";\n").expect("entry should be written");
-        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let _uri = Url::from_file_path(&path).expect("file URI should build");
         let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
         #[allow(deprecated)]
         server.configure(&InitializeParams {

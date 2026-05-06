@@ -67,14 +67,14 @@ pub(super) fn to_lsp_location(location: ToolLocation) -> Option<Location> {
     })
 }
 
-pub(super) fn to_lsp_document_highlight(location: ToolLocation) -> DocumentHighlight {
+pub(super) fn to_lsp_document_highlight(location: &ToolLocation) -> DocumentHighlight {
     DocumentHighlight {
         range: to_tool_range(&location.range),
         kind: Some(DocumentHighlightKind::TEXT),
     }
 }
 
-pub(super) fn to_lsp_folding_range(range: ToolFoldingRange) -> FoldingRange {
+pub(super) fn to_lsp_folding_range(range: &ToolFoldingRange) -> FoldingRange {
     let lsp_range = to_tool_range(&range.range);
     FoldingRange {
         start_line: lsp_range.start.line,

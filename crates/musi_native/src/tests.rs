@@ -12,6 +12,13 @@ use music_session::{Session, SessionOptions};
 use crate::platform::{NativeAbiCallSupport, NativeAbiTypePosition, PlatformHost};
 use crate::{NativeHost, NativeTestCaseResult, NativeTestReport};
 
+fn assert_float_eq(actual: f64, expected: f64) {
+    assert!(
+        (actual - expected).abs() <= f64::EPSILON,
+        "expected {expected}, got {actual}"
+    );
+}
+
 #[derive(Default)]
 struct FallbackHost;
 
@@ -223,7 +230,7 @@ mod success {
         let Value::Float(actual) = value else {
             panic!("expected `Float` result");
         };
-        assert_eq!(actual, 32.0);
+        assert_float_eq(actual, 32.0);
     }
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -240,7 +247,7 @@ mod success {
         let Value::Float(actual) = value else {
             panic!("expected `Float` result");
         };
-        assert_eq!(actual, 32.0);
+        assert_float_eq(actual, 32.0);
     }
 
     #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]

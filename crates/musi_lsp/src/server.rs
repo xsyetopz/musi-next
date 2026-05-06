@@ -8,21 +8,21 @@ use async_lsp::lsp_types::{
     CodeAction, CodeActionKind, CodeActionOptions, CodeActionOrCommand, CodeActionParams,
     CodeActionProviderCapability, CodeActionResponse, CodeLens, CodeLensOptions, CodeLensParams,
     Command, CompletionItem, CompletionList, CompletionOptions, CompletionParams,
-    CompletionResponse, DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
-    DidChangeConfigurationParams, DidChangeTextDocumentParams, DidChangeWorkspaceFoldersParams,
-    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
-    DocumentFormattingParams, DocumentHighlight, DocumentHighlightParams, DocumentLink,
-    DocumentLinkOptions, DocumentLinkParams, DocumentOnTypeFormattingOptions,
-    DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, DocumentSymbolParams,
-    DocumentSymbolResponse, ExecuteCommandOptions, ExecuteCommandParams, FoldingRange,
-    FoldingRangeParams, FoldingRangeProviderCapability, FormattingOptions,
+    CompletionResponse, DeclarationCapability, Diagnostic, DiagnosticOptions,
+    DiagnosticServerCapabilities, DidChangeConfigurationParams, DidChangeTextDocumentParams,
+    DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams, DocumentDiagnosticParams, DocumentDiagnosticReport,
+    DocumentDiagnosticReportResult, DocumentFormattingParams, DocumentHighlight,
+    DocumentHighlightParams, DocumentLink, DocumentLinkOptions, DocumentLinkParams,
+    DocumentOnTypeFormattingOptions, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
+    DocumentSymbolParams, DocumentSymbolResponse, ExecuteCommandOptions, ExecuteCommandParams,
+    FoldingRange, FoldingRangeParams, FoldingRangeProviderCapability, FormattingOptions,
     FullDocumentDiagnosticReport, GotoDefinitionParams, GotoDefinitionResponse, Hover,
     HoverContents, HoverParams, HoverProviderCapability, InitializeParams, InitializeResult,
     InitializedParams, InlayHint, InlayHintOptions, InlayHintParams, InlayHintServerCapabilities,
     LinkedEditingRangeParams, LinkedEditingRangeServerCapabilities, LinkedEditingRanges, Location,
-    MarkupContent, MarkupKind, OneOf, PrepareRenameResponse, PublishDiagnosticsParams, Range,
-    ReferenceParams, RelatedFullDocumentDiagnosticReport, RenameOptions, RenameParams,
+    MarkupContent, MarkupKind, OneOf, Position, PrepareRenameResponse, PublishDiagnosticsParams,
+    Range, ReferenceParams, RelatedFullDocumentDiagnosticReport, RenameOptions, RenameParams,
     SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability, SemanticTokens,
     SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
     SemanticTokensRangeParams, SemanticTokensRangeResult, SemanticTokensResult,
@@ -90,6 +90,7 @@ impl MusiLanguageServer {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn initialize_result() -> InitializeResult {
         InitializeResult {
             capabilities: ServerCapabilities {
@@ -261,7 +262,7 @@ impl MusiLanguageServer {
         }
     }
 
-    fn update_configuration(&mut self, params: DidChangeConfigurationParams) {
+    fn update_configuration(&mut self, params: &DidChangeConfigurationParams) {
         self.config = LspConfig::from_settings(&params.settings);
     }
 
@@ -312,7 +313,7 @@ impl MusiLanguageServer {
         }))
     }
 
-    fn resolve_completion(&self, completion: CompletionItem) -> CompletionItem {
+    fn resolve_completion(completion: CompletionItem) -> CompletionItem {
         resolve_lsp_completion(completion)
     }
 
@@ -452,7 +453,7 @@ impl MusiLanguageServer {
         )
         .into_iter()
         .filter(|location| tool_location_matches_path(&path, location))
-        .map(to_lsp_document_highlight)
+        .map(|location| to_lsp_document_highlight(&location))
         .collect();
         Some(highlights)
     }
@@ -516,7 +517,7 @@ impl MusiLanguageServer {
         Some(links)
     }
 
-    fn resolve_document_link(&self, link: DocumentLink) -> DocumentLink {
+    fn resolve_document_link(link: DocumentLink) -> DocumentLink {
         resolve_lsp_document_link(link)
     }
 
@@ -529,27 +530,9 @@ impl MusiLanguageServer {
         let overlay = self.open_documents.get(&uri).map(String::as_str);
         let mut lenses = Vec::new();
         for symbol in document_symbols_for_project_file_with_overlay(&path, overlay) {
-            self.push_reference_lenses(&path, &symbol, &mut lenses);
+            push_reference_lenses(&path, &symbol, &mut lenses);
         }
         Some(lenses)
-    }
-
-    fn push_reference_lenses(
-        &self,
-        path: &Path,
-        symbol: &ToolDocumentSymbol,
-        lenses: &mut Vec<CodeLens>,
-    ) {
-        if let Some(data) = reference_lens_data(path, symbol) {
-            lenses.push(CodeLens {
-                range: to_tool_range(&symbol.selection_range),
-                command: None,
-                data: Some(data),
-            });
-        }
-        for child in &symbol.children {
-            self.push_reference_lenses(path, child, lenses);
-        }
     }
 
     fn resolve_code_lens(&self, mut lens: CodeLens) -> CodeLens {
@@ -652,7 +635,7 @@ impl MusiLanguageServer {
         })
     }
 
-    fn execute_command_request(&self, params: ExecuteCommandParams) -> Option<Value> {
+    fn execute_command_request(&self, params: &ExecuteCommandParams) -> Option<Value> {
         if params.command != REFERENCES_COMMAND {
             return None;
         }
@@ -685,7 +668,7 @@ impl MusiLanguageServer {
         let overlay = self.open_documents.get(&uri).map(String::as_str);
         let ranges = folding_ranges_for_project_file_with_overlay(&path, overlay)
             .into_iter()
-            .map(to_lsp_folding_range)
+            .map(|range| to_lsp_folding_range(&range))
             .collect();
         Some(ranges)
     }
@@ -714,7 +697,7 @@ impl MusiLanguageServer {
         Some(ranges)
     }
 
-    fn workspace_symbols(&self, params: &WorkspaceSymbolParams) -> Option<WorkspaceSymbolResponse> {
+    fn workspace_symbols(&self, params: &WorkspaceSymbolParams) -> WorkspaceSymbolResponse {
         let open_paths = self
             .open_documents
             .keys()
@@ -763,10 +746,10 @@ impl MusiLanguageServer {
             .into_iter()
             .filter_map(to_lsp_workspace_symbol)
             .collect();
-        Some(WorkspaceSymbolResponse::Nested(symbols))
+        WorkspaceSymbolResponse::Nested(symbols)
     }
 
-    fn resolve_workspace_symbol(&self, symbol: WorkspaceSymbol) -> WorkspaceSymbol {
+    fn resolve_workspace_symbol(symbol: WorkspaceSymbol) -> WorkspaceSymbol {
         resolve_lsp_workspace_symbol(symbol)
     }
 
@@ -844,13 +827,13 @@ impl MusiLanguageServer {
         Some(hints)
     }
 
-    fn resolve_inlay_hint(&self, hint: InlayHint) -> InlayHint {
+    fn resolve_inlay_hint(hint: InlayHint) -> InlayHint {
         resolve_lsp_inlay_hint(hint)
     }
 
     fn document_diagnostics(
         &self,
-        params: DocumentDiagnosticParams,
+        params: &DocumentDiagnosticParams,
     ) -> DocumentDiagnosticReportResult {
         let Some(path) = params.text_document.uri.to_file_path().ok() else {
             return full_document_diagnostic_report(Vec::new());
@@ -894,7 +877,7 @@ impl MusiLanguageServer {
                     .collect();
                 Some(WorkspaceDocumentDiagnosticReport::Full(
                     WorkspaceFullDocumentDiagnosticReport {
-                        uri: uri.clone(),
+                        uri,
                         version: None,
                         full_document_diagnostic_report: FullDocumentDiagnosticReport {
                             result_id: None,
@@ -1081,6 +1064,19 @@ fn reference_lens_title(count: usize) -> String {
     }
 }
 
+fn push_reference_lenses(path: &Path, symbol: &ToolDocumentSymbol, lenses: &mut Vec<CodeLens>) {
+    if let Some(data) = reference_lens_data(path, symbol) {
+        lenses.push(CodeLens {
+            range: to_tool_range(&symbol.selection_range),
+            command: None,
+            data: Some(data),
+        });
+    }
+    for child in &symbol.children {
+        push_reference_lenses(path, child, lenses);
+    }
+}
+
 fn reference_lens_data(path: &Path, symbol: &ToolDocumentSymbol) -> Option<Value> {
     Some(json!({
         "uri": Url::from_file_path(path).ok()?.as_str(),
@@ -1144,8 +1140,8 @@ fn canonical_path(path: &Path) -> PathBuf {
     path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
-fn full_document_diagnostic_report(
-    diagnostics: Vec<async_lsp::lsp_types::Diagnostic>,
+const fn full_document_diagnostic_report(
+    diagnostics: Vec<Diagnostic>,
 ) -> DocumentDiagnosticReportResult {
     DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(
         RelatedFullDocumentDiagnosticReport {
@@ -1164,7 +1160,7 @@ fn lsp_range_offsets(text: &str, range: Range) -> Option<(usize, usize)> {
     (start <= end).then_some((start, end))
 }
 
-fn lsp_position_offset(text: &str, position: async_lsp::lsp_types::Position) -> Option<usize> {
+fn lsp_position_offset(text: &str, position: Position) -> Option<usize> {
     let target_line = usize::try_from(position.line).ok()?;
     let target_character = usize::try_from(position.character).ok()?;
     let mut line = 0usize;
@@ -1233,7 +1229,7 @@ impl LanguageServer for MusiLanguageServer {
     }
 
     fn did_change_configuration(&mut self, params: DidChangeConfigurationParams) -> NotifyResult {
-        self.update_configuration(params);
+        self.update_configuration(&params);
         ControlFlow::Continue(())
     }
 
@@ -1257,7 +1253,7 @@ impl LanguageServer for MusiLanguageServer {
         &mut self,
         params: DocumentDiagnosticParams,
     ) -> ServerFuture<DocumentDiagnosticReportResult> {
-        let report = self.document_diagnostics(params);
+        let report = self.document_diagnostics(&params);
         Box::pin(async move { Ok(report) })
     }
 
@@ -1275,7 +1271,7 @@ impl LanguageServer for MusiLanguageServer {
     }
 
     fn completion_item_resolve(&mut self, params: CompletionItem) -> ServerFuture<CompletionItem> {
-        let completion = self.resolve_completion(params);
+        let completion = Self::resolve_completion(params);
         Box::pin(async move { Ok(completion) })
     }
 
@@ -1354,7 +1350,7 @@ impl LanguageServer for MusiLanguageServer {
     }
 
     fn document_link_resolve(&mut self, params: DocumentLink) -> ServerFuture<DocumentLink> {
-        let document_link = self.resolve_document_link(params);
+        let document_link = Self::resolve_document_link(params);
         Box::pin(async move { Ok(document_link) })
     }
 
@@ -1369,7 +1365,7 @@ impl LanguageServer for MusiLanguageServer {
     }
 
     fn execute_command(&mut self, params: ExecuteCommandParams) -> ServerFuture<Option<Value>> {
-        let command_response = self.execute_command_request(params);
+        let command_response = self.execute_command_request(&params);
         Box::pin(async move { Ok(command_response) })
     }
 
@@ -1407,14 +1403,14 @@ impl LanguageServer for MusiLanguageServer {
         params: WorkspaceSymbolParams,
     ) -> ServerFuture<Option<WorkspaceSymbolResponse>> {
         let workspace_symbols = self.workspace_symbols(&params);
-        Box::pin(async move { Ok(workspace_symbols) })
+        Box::pin(async move { Ok(Some(workspace_symbols)) })
     }
 
     fn workspace_symbol_resolve(
         &mut self,
         params: WorkspaceSymbol,
     ) -> ServerFuture<WorkspaceSymbol> {
-        let workspace_symbol = self.resolve_workspace_symbol(params);
+        let workspace_symbol = Self::resolve_workspace_symbol(params);
         Box::pin(async move { Ok(workspace_symbol) })
     }
 
@@ -1481,7 +1477,7 @@ impl LanguageServer for MusiLanguageServer {
     }
 
     fn inlay_hint_resolve(&mut self, params: InlayHint) -> ServerFuture<InlayHint> {
-        let hint = self.resolve_inlay_hint(params);
+        let hint = Self::resolve_inlay_hint(params);
         Box::pin(async move { Ok(hint) })
     }
 }
