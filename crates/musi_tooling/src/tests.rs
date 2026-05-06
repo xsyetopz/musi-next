@@ -19,12 +19,13 @@ use crate::{
     ToolFoldingRangeKind, ToolInlayHintKind, ToolSemanticModifier, ToolSemanticTokenKind,
     ToolingDiagKind, ToolingError, artifact::write_output,
     collect_project_diagnostics_with_overlay, completions_for_project_file_with_overlay,
-    definition_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
-    folding_ranges_for_project_file_with_overlay, hover_for_project_file_with_overlay,
-    inlay_hints_for_project_file_with_overlay, load_direct_graph,
-    module_docs_for_project_file_with_overlay, prepare_rename_for_project_file_with_overlay,
-    project_error_report, references_for_project_file_with_overlay,
-    rename_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
+    definition_for_project_file_with_overlay, document_links_for_project_file_with_overlay,
+    document_symbols_for_project_file_with_overlay, folding_ranges_for_project_file_with_overlay,
+    hover_for_project_file_with_overlay, inlay_hints_for_project_file_with_overlay,
+    load_direct_graph, module_docs_for_project_file_with_overlay,
+    prepare_rename_for_project_file_with_overlay, project_error_report,
+    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
+    selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
     session_error_report, tooling_error_report, workspace_symbols_for_project_file_with_overlay,
 };
 
@@ -350,6 +351,29 @@ span.lower
     }
 
     #[test]
+    fn document_links_resolve_static_imports_to_module_paths() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "let dep := import \"./dep\";\n";
+        write_file(test_dir.path(), "index.ms", source);
+        write_file(test_dir.path(), "dep.ms", "export let value := 1;\n");
+
+        let links = document_links_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+        );
+
+        assert_eq!(links.len(), 1);
+        assert_eq!(
+            links[0].target,
+            fs::canonicalize(test_dir.path().join("dep.ms")).expect("dep path should canonicalize")
+        );
+        assert_eq!(links[0].range.start_line, 1);
+        assert_eq!(links[0].range.start_col, 19);
+        assert_eq!(links[0].range.end_col, 26);
+    }
+
+    #[test]
     fn folding_ranges_include_multiline_nodes_and_block_comments() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
@@ -386,6 +410,38 @@ let value := match 1 (
             ranges
                 .iter()
                 .any(|range| range.range.start_line == 7 && range.range.end_line == 10)
+        );
+    }
+
+    #[test]
+    fn selection_ranges_expand_from_token_to_parent_nodes() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "\
+let value := 1;
+let other := value + 2;
+";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let ranges = selection_ranges_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            &[crate::ToolPosition::new(2, 14)],
+        );
+        let selection = ranges[0]
+            .as_ref()
+            .expect("selection range should exist for identifier");
+
+        assert_eq!(selection.range.start_line, 2);
+        assert_eq!(selection.range.start_col, 14);
+        assert_eq!(selection.range.end_line, 2);
+        assert_eq!(selection.range.end_col, 19);
+        assert!(
+            selection
+                .parent
+                .as_ref()
+                .is_some_and(|parent| parent.range.start_line == 2
+                    && parent.range.end_col >= selection.range.end_col)
         );
     }
 

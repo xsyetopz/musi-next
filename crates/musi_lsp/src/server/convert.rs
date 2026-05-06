@@ -4,16 +4,17 @@ use std::path::{Component, Path, PathBuf};
 use async_lsp::lsp_types::{
     CompletionItem, CompletionItemKind, CompletionTextEdit, Diagnostic,
     DiagnosticRelatedInformation, DiagnosticSeverity, DocumentHighlight, DocumentHighlightKind,
-    DocumentSymbol, Documentation, FoldingRange, FoldingRangeKind, InlayHint, InlayHintKind,
-    InlayHintLabel, InlayHintTooltip, Location, NumberOrString, Position, Range, SemanticToken,
-    SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend, SymbolInformation, SymbolKind,
-    TextEdit, Url, WorkspaceEdit,
+    DocumentLink, DocumentSymbol, Documentation, FoldingRange, FoldingRangeKind, InlayHint,
+    InlayHintKind, InlayHintLabel, InlayHintTooltip, Location, NumberOrString, Position, Range,
+    SelectionRange, SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend,
+    SymbolInformation, SymbolKind, TextEdit, Url, WorkspaceEdit,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolCompletion, ToolCompletionKind,
-    ToolDocumentSymbol, ToolFoldingRange, ToolFoldingRangeKind, ToolInlayHint, ToolInlayHintKind,
-    ToolLocation, ToolPosition, ToolRange, ToolSemanticModifier, ToolSemanticToken,
-    ToolSemanticTokenKind, ToolSymbolKind, ToolWorkspaceEdit, ToolWorkspaceSymbol,
+    ToolDocumentLink, ToolDocumentSymbol, ToolFoldingRange, ToolFoldingRangeKind, ToolInlayHint,
+    ToolInlayHintKind, ToolLocation, ToolPosition, ToolRange, ToolSelectionRange,
+    ToolSemanticModifier, ToolSemanticToken, ToolSemanticTokenKind, ToolSymbolKind,
+    ToolWorkspaceEdit, ToolWorkspaceSymbol,
 };
 
 pub(super) fn to_lsp_completion(completion: ToolCompletion) -> CompletionItem {
@@ -59,6 +60,24 @@ pub(super) fn to_lsp_folding_range(range: ToolFoldingRange) -> FoldingRange {
         end_character: Some(lsp_range.end.character),
         kind: range.kind.map(to_folding_range_kind),
         collapsed_text: None,
+    }
+}
+
+pub(super) fn to_lsp_document_link(link: ToolDocumentLink) -> Option<DocumentLink> {
+    Some(DocumentLink {
+        range: to_tool_range(&link.range),
+        target: Some(Url::from_file_path(link.target).ok()?),
+        tooltip: link.tooltip,
+        data: None,
+    })
+}
+
+pub(super) fn to_lsp_selection_range(range: ToolSelectionRange) -> SelectionRange {
+    SelectionRange {
+        range: to_tool_range(&range.range),
+        parent: range
+            .parent
+            .map(|parent| Box::new(to_lsp_selection_range(*parent))),
     }
 }
 

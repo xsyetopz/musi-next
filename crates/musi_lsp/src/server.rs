@@ -9,15 +9,17 @@ use async_lsp::lsp_types::{
     CodeActionProviderCapability, CodeActionResponse, CompletionList, CompletionOptions,
     CompletionParams, CompletionResponse, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentFormattingParams,
-    DocumentHighlight, DocumentHighlightParams, DocumentSymbolParams, DocumentSymbolResponse,
-    FoldingRange, FoldingRangeParams, FoldingRangeProviderCapability, FormattingOptions,
-    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
-    HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, InlayHint,
-    InlayHintOptions, InlayHintParams, InlayHintServerCapabilities, Location, MarkupContent,
-    MarkupKind, OneOf, PrepareRenameResponse, PublishDiagnosticsParams, Range, ReferenceParams,
-    RenameOptions, RenameParams, SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions,
-    SemanticTokensParams, SemanticTokensRangeParams, SemanticTokensRangeResult,
-    SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
+    DocumentHighlight, DocumentHighlightParams, DocumentLink, DocumentLinkOptions,
+    DocumentLinkParams, DocumentSymbolParams, DocumentSymbolResponse, FoldingRange,
+    FoldingRangeParams, FoldingRangeProviderCapability, FormattingOptions, GotoDefinitionParams,
+    GotoDefinitionResponse, Hover, HoverContents, HoverParams, HoverProviderCapability,
+    InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintOptions,
+    InlayHintParams, InlayHintServerCapabilities, Location, MarkupContent, MarkupKind, OneOf,
+    PrepareRenameResponse, PublishDiagnosticsParams, Range, ReferenceParams, RenameOptions,
+    RenameParams, SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability,
+    SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
+    SemanticTokensRangeParams, SemanticTokensRangeResult, SemanticTokensResult,
+    SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
     TextDocumentContentChangeEvent, TextDocumentItem, TextDocumentPositionParams,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url, WorkDoneProgressOptions,
     WorkspaceEdit, WorkspaceSymbolParams, WorkspaceSymbolResponse,
@@ -28,10 +30,11 @@ use musi_fmt::{FormatOptions, format_text_for_path};
 use musi_project::{ProjectOptions, load_project_ancestor};
 use musi_tooling::{
     collect_project_diagnostics_with_overlay, completions_for_project_file_with_overlay,
-    definition_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
-    folding_ranges_for_project_file_with_overlay, hover_for_project_file_with_overlay,
-    inlay_hints_for_project_file_with_overlay, prepare_rename_for_project_file_with_overlay,
-    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
+    definition_for_project_file_with_overlay, document_links_for_project_file_with_overlay,
+    document_symbols_for_project_file_with_overlay, folding_ranges_for_project_file_with_overlay,
+    hover_for_project_file_with_overlay, inlay_hints_for_project_file_with_overlay,
+    prepare_rename_for_project_file_with_overlay, references_for_project_file_with_overlay,
+    rename_for_project_file_with_overlay, selection_ranges_for_project_file_with_overlay,
     semantic_tokens_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
 };
 
@@ -42,9 +45,9 @@ use config::LspConfig;
 use convert::{
     diagnostic_matches_path, encode_semantic_tokens, full_document_range, position_in_range,
     semantic_tokens_legend, to_lsp_completion, to_lsp_diagnostic, to_lsp_document_highlight,
-    to_lsp_document_symbol, to_lsp_folding_range, to_lsp_inlay_hint, to_lsp_location,
-    to_lsp_symbol_information, to_lsp_workspace_edit, to_tool_range, tool_location_matches_path,
-    truncate_hover_contents,
+    to_lsp_document_link, to_lsp_document_symbol, to_lsp_folding_range, to_lsp_inlay_hint,
+    to_lsp_location, to_lsp_selection_range, to_lsp_symbol_information, to_lsp_workspace_edit,
+    to_tool_range, tool_location_matches_path, truncate_hover_contents,
 };
 
 type ServerFuture<T> = Pin<Box<dyn Future<Output = Result<T, ResponseError>> + Send + 'static>>;
@@ -78,7 +81,14 @@ impl MusiLanguageServer {
                 references_provider: Some(OneOf::Left(true)),
                 document_highlight_provider: Some(OneOf::Left(true)),
                 document_symbol_provider: Some(OneOf::Left(true)),
+                document_link_provider: Some(DocumentLinkOptions {
+                    resolve_provider: Some(false),
+                    work_done_progress_options: WorkDoneProgressOptions {
+                        work_done_progress: None,
+                    },
+                }),
                 folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
+                selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
                 workspace_symbol_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Options(
                     CodeActionOptions {
@@ -314,6 +324,20 @@ impl MusiLanguageServer {
         Some(DocumentSymbolResponse::Nested(symbols))
     }
 
+    fn document_links(&self, params: DocumentLinkParams) -> Option<Vec<DocumentLink>> {
+        let uri = params.text_document.uri;
+        let path = uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let overlay = self.open_documents.get(&uri).map(String::as_str);
+        let links = document_links_for_project_file_with_overlay(&path, overlay)
+            .into_iter()
+            .filter_map(to_lsp_document_link)
+            .collect();
+        Some(links)
+    }
+
     fn code_actions(&self, params: CodeActionParams) -> Option<CodeActionResponse> {
         if !code_action_kind_requested(
             params.context.only.as_deref(),
@@ -366,6 +390,30 @@ impl MusiLanguageServer {
         let ranges = folding_ranges_for_project_file_with_overlay(&path, overlay)
             .into_iter()
             .map(to_lsp_folding_range)
+            .collect();
+        Some(ranges)
+    }
+
+    fn selection_ranges(&self, params: SelectionRangeParams) -> Option<Vec<SelectionRange>> {
+        let uri = params.text_document.uri;
+        let path = uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let overlay = self.open_documents.get(&uri).map(String::as_str);
+        let positions = params
+            .positions
+            .into_iter()
+            .map(|position| {
+                Some(musi_tooling::ToolPosition::new(
+                    usize::try_from(position.line).ok()?.saturating_add(1),
+                    usize::try_from(position.character).ok()?.saturating_add(1),
+                ))
+            })
+            .collect::<Option<Vec<_>>>()?;
+        let ranges = selection_ranges_for_project_file_with_overlay(&path, overlay, &positions)
+            .into_iter()
+            .filter_map(|range| range.map(to_lsp_selection_range))
             .collect();
         Some(ranges)
     }
@@ -608,6 +656,14 @@ impl LanguageServer for MusiLanguageServer {
         Box::pin(async move { Ok(document_symbols) })
     }
 
+    fn document_link(
+        &mut self,
+        params: DocumentLinkParams,
+    ) -> ServerFuture<Option<Vec<DocumentLink>>> {
+        let document_links = self.document_links(params);
+        Box::pin(async move { Ok(document_links) })
+    }
+
     fn code_action(
         &mut self,
         params: CodeActionParams,
@@ -622,6 +678,14 @@ impl LanguageServer for MusiLanguageServer {
     ) -> ServerFuture<Option<Vec<FoldingRange>>> {
         let folding_ranges = self.folding_ranges(params);
         Box::pin(async move { Ok(folding_ranges) })
+    }
+
+    fn selection_range(
+        &mut self,
+        params: SelectionRangeParams,
+    ) -> ServerFuture<Option<Vec<SelectionRange>>> {
+        let selection_ranges = self.selection_ranges(params);
+        Box::pin(async move { Ok(selection_ranges) })
     }
 
     fn symbol(

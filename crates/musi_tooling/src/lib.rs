@@ -6,9 +6,11 @@ mod completion;
 mod diag;
 mod diagnostics;
 mod direct;
+mod document_link;
 mod errors;
 mod folding;
 mod navigation;
+mod selection;
 mod semantic;
 
 pub use analysis::{
@@ -29,6 +31,9 @@ pub use diagnostics::{
     session_error_report, tooling_error_report,
 };
 pub use direct::{DirectGraph, load_direct_graph};
+pub use document_link::{
+    ToolDocumentLink, document_links_for_project_file, document_links_for_project_file_with_overlay,
+};
 pub use errors::{ToolingError, ToolingResult};
 pub use folding::{
     ToolFoldingRange, ToolFoldingRangeKind, folding_ranges_for_project_file,
@@ -39,6 +44,10 @@ pub use navigation::{
     definition_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
     prepare_rename_for_project_file_with_overlay, references_for_project_file_with_overlay,
     rename_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
+};
+pub use selection::{
+    ToolSelectionRange, selection_ranges_for_project_file,
+    selection_ranges_for_project_file_with_overlay,
 };
 pub use semantic::{
     ToolSemanticModifier, ToolSemanticModifierList, ToolSemanticToken, ToolSemanticTokenKind,

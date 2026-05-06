@@ -5,9 +5,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use async_lsp::lsp_types::{
     CodeActionContext, CodeActionKind, CodeActionOrCommand, CodeActionParams, CompletionItemKind,
-    CompletionTextEdit, DiagnosticSeverity, DocumentHighlightKind, FoldingRangeKind,
-    FoldingRangeParams, InlayHintKind, PartialResultParams, Position, SemanticToken,
-    TextDocumentIdentifier, TextDocumentPositionParams, WorkDoneProgressParams,
+    CompletionTextEdit, DiagnosticSeverity, DocumentHighlightKind, DocumentLinkParams,
+    FoldingRangeKind, FoldingRangeParams, InlayHintKind, PartialResultParams, Position,
+    SelectionRangeParams, SemanticToken, TextDocumentIdentifier, TextDocumentPositionParams,
+    WorkDoneProgressParams,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -82,7 +83,19 @@ mod success {
         assert!(
             initialize_result
                 .capabilities
+                .document_link_provider
+                .is_some()
+        );
+        assert!(
+            initialize_result
+                .capabilities
                 .folding_range_provider
+                .is_some()
+        );
+        assert!(
+            initialize_result
+                .capabilities
+                .selection_range_provider
                 .is_some()
         );
         assert!(
@@ -430,6 +443,50 @@ let other := value + value;
     }
 
     #[test]
+    fn document_link_returns_static_import_targets() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let dep_path = root.join("dep.ms");
+        let source = "let dep := import \"./dep\";\n";
+        fs::write(&path, source).expect("entry should be written");
+        fs::write(&dep_path, "export let value := 1;\n").expect("dep should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let links = server
+            .document_links(DocumentLinkParams {
+                text_document: TextDocumentIdentifier { uri },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("document links should run");
+
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].range.start, Position::new(0, 18));
+        assert_eq!(links[0].range.end, Position::new(0, 25));
+        assert_eq!(
+            links[0].target.as_ref(),
+            Some(
+                &Url::from_file_path(
+                    fs::canonicalize(dep_path).expect("dep path should canonicalize")
+                )
+                .expect("dep URI should build")
+            )
+        );
+    }
+
+    #[test]
     fn folding_range_returns_multiline_node_and_comment_ranges() {
         let root = temp_project();
         let path = root.join("index.ms");
@@ -462,6 +519,49 @@ let Pair := data {
             ranges
                 .iter()
                 .any(|range| range.start_line == 2 && range.end_line == 5)
+        );
+    }
+
+    #[test]
+    fn selection_range_expands_identifier_selection_to_parent_ranges() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = r"let value := 1;
+let other := value + 2;
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let ranges = server
+            .selection_ranges(SelectionRangeParams {
+                text_document: TextDocumentIdentifier { uri },
+                positions: vec![Position::new(1, 13)],
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("selection ranges should run");
+
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0].range.start, Position::new(1, 13));
+        assert_eq!(ranges[0].range.end, Position::new(1, 18));
+        assert!(
+            ranges[0]
+                .parent
+                .as_ref()
+                .is_some_and(|parent| parent.range.start.line == 1
+                    && parent.range.end.character >= ranges[0].range.end.character)
         );
     }
 
