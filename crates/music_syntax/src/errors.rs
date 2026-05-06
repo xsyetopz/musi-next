@@ -5,6 +5,7 @@ use thiserror::Error;
 use crate::TokenKind;
 
 #[path = "diag_catalog_gen.rs"]
+#[rustfmt::skip]
 mod diag_catalog_gen;
 
 #[repr(u8)]

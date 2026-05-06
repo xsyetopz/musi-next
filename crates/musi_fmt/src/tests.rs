@@ -1329,6 +1329,17 @@ let io := import "@std/io";
     }
 
     #[test]
+    fn markdown_fence_closing_rejects_non_space_suffix() {
+        let markdown = "# Example\n\n````text\n````not a close\nraw\n````\n";
+        let formatted_result = format_markdown(markdown, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "# Example\n\n````text\n````not a close\nraw\n````\n"
+        );
+    }
+
+    #[test]
     fn markdown_ignore_skips_next_musi_fence() {
         let markdown = "<!-- musi-fmt-ignore -->\n```musi\nlet x:=1;\n```\n";
         let formatted_result = format_markdown(markdown, &options()).unwrap();
