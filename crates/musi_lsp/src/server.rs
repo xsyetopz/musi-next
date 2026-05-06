@@ -14,15 +14,15 @@ use async_lsp::lsp_types::{
     DocumentDiagnosticReportResult, DocumentFormattingParams, DocumentHighlight,
     DocumentHighlightParams, DocumentLink, DocumentLinkOptions, DocumentLinkParams,
     DocumentOnTypeFormattingOptions, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
-    DocumentSymbolParams, DocumentSymbolResponse, FoldingRange, FoldingRangeParams,
-    FoldingRangeProviderCapability, FormattingOptions, FullDocumentDiagnosticReport,
-    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
-    HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, InlayHint,
-    InlayHintOptions, InlayHintParams, InlayHintServerCapabilities, LinkedEditingRangeParams,
-    LinkedEditingRangeServerCapabilities, LinkedEditingRanges, Location, MarkupContent, MarkupKind,
-    OneOf, PrepareRenameResponse, PublishDiagnosticsParams, Range, ReferenceParams,
-    RelatedFullDocumentDiagnosticReport, RenameOptions, RenameParams, SelectionRange,
-    SelectionRangeParams, SelectionRangeProviderCapability, SemanticTokens,
+    DocumentSymbolParams, DocumentSymbolResponse, ExecuteCommandOptions, ExecuteCommandParams,
+    FoldingRange, FoldingRangeParams, FoldingRangeProviderCapability, FormattingOptions,
+    FullDocumentDiagnosticReport, GotoDefinitionParams, GotoDefinitionResponse, Hover,
+    HoverContents, HoverParams, HoverProviderCapability, InitializeParams, InitializeResult,
+    InitializedParams, InlayHint, InlayHintOptions, InlayHintParams, InlayHintServerCapabilities,
+    LinkedEditingRangeParams, LinkedEditingRangeServerCapabilities, LinkedEditingRanges, Location,
+    MarkupContent, MarkupKind, OneOf, PrepareRenameResponse, PublishDiagnosticsParams, Range,
+    ReferenceParams, RelatedFullDocumentDiagnosticReport, RenameOptions, RenameParams,
+    SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability, SemanticTokens,
     SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
     SemanticTokensRangeParams, SemanticTokensRangeResult, SemanticTokensResult,
     SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, SignatureHelp,
@@ -48,6 +48,7 @@ use musi_tooling::{
     signature_help_for_project_file_with_overlay, type_definition_for_project_file_with_overlay,
     workspace_symbols_for_project_file_with_overlay,
 };
+use serde_json::{Value, json};
 
 mod config;
 mod convert;
@@ -63,6 +64,7 @@ use convert::{
 
 type ServerFuture<T> = Pin<Box<dyn Future<Output = Result<T, ResponseError>> + Send + 'static>>;
 type NotifyResult = ControlFlow<async_lsp::Result<()>>;
+const REFERENCES_COMMAND: &str = "musi.references";
 
 #[derive(Debug)]
 pub struct MusiLanguageServer {
@@ -118,6 +120,12 @@ impl MusiLanguageServer {
                 }),
                 code_lens_provider: Some(CodeLensOptions {
                     resolve_provider: Some(false),
+                }),
+                execute_command_provider: Some(ExecuteCommandOptions {
+                    commands: vec![REFERENCES_COMMAND.to_owned()],
+                    work_done_progress_options: WorkDoneProgressOptions {
+                        work_done_progress: None,
+                    },
                 }),
                 diagnostic_provider: Some(DiagnosticServerCapabilities::Options(
                     DiagnosticOptions {
@@ -494,8 +502,8 @@ impl MusiLanguageServer {
                 range: to_tool_range(&symbol.selection_range),
                 command: Some(Command::new(
                     reference_lens_title(references.len()),
-                    "musi.references".to_owned(),
-                    None,
+                    REFERENCES_COMMAND.to_owned(),
+                    reference_command_arguments(path, symbol),
                 )),
                 data: None,
             });
@@ -545,6 +553,30 @@ impl MusiLanguageServer {
             disabled: None,
             data: None,
         })])
+    }
+
+    fn execute_command_request(&self, params: ExecuteCommandParams) -> Option<Value> {
+        if params.command != REFERENCES_COMMAND {
+            return None;
+        }
+        let argument = params.arguments.first()?;
+        let uri = argument.get("uri")?.as_str()?;
+        let line = usize::try_from(argument.get("line")?.as_u64()?).ok()?;
+        let character = usize::try_from(argument.get("character")?.as_u64()?).ok()?;
+        let uri = Url::parse(uri).ok()?;
+        let path = uri.to_file_path().ok()?;
+        let overlay = self.open_documents.get(&uri).map(String::as_str);
+        let locations = references_for_project_file_with_overlay(
+            &path,
+            overlay,
+            line.saturating_add(1),
+            character.saturating_add(1),
+            false,
+        )
+        .into_iter()
+        .filter_map(to_lsp_location)
+        .collect::<Vec<_>>();
+        serde_json::to_value(locations).ok()
     }
 
     fn folding_ranges(&self, params: FoldingRangeParams) -> Option<Vec<FoldingRange>> {
@@ -878,6 +910,14 @@ fn reference_lens_title(count: usize) -> String {
     }
 }
 
+fn reference_command_arguments(path: &Path, symbol: &ToolDocumentSymbol) -> Option<Vec<Value>> {
+    Some(vec![json!({
+        "uri": Url::from_file_path(path).ok()?.as_str(),
+        "line": symbol.selection_range.start_line.saturating_sub(1),
+        "character": symbol.selection_range.start_col.saturating_sub(1),
+    })])
+}
+
 fn full_document_diagnostic_report(
     diagnostics: Vec<async_lsp::lsp_types::Diagnostic>,
 ) -> DocumentDiagnosticReportResult {
@@ -1072,6 +1112,11 @@ impl LanguageServer for MusiLanguageServer {
     fn code_lens(&mut self, params: CodeLensParams) -> ServerFuture<Option<Vec<CodeLens>>> {
         let code_lenses = self.code_lenses(params);
         Box::pin(async move { Ok(code_lenses) })
+    }
+
+    fn execute_command(&mut self, params: ExecuteCommandParams) -> ServerFuture<Option<Value>> {
+        let command_response = self.execute_command_request(params);
+        Box::pin(async move { Ok(command_response) })
     }
 
     fn code_action(

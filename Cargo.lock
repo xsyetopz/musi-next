@@ -784,6 +784,7 @@ dependencies = [
  "musi_fmt",
  "musi_project",
  "musi_tooling",
+ "serde_json",
  "tokio",
 ]
 

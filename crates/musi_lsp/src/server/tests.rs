@@ -9,13 +9,13 @@ use async_lsp::lsp_types::{
     DiagnosticServerCapabilities, DiagnosticSeverity, DocumentDiagnosticParams,
     DocumentDiagnosticReport, DocumentDiagnosticReportResult, DocumentHighlightKind,
     DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
-    FoldingRangeKind, FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse,
-    InlayHintKind, LinkedEditingRangeParams, PartialResultParams, Position, SelectionRangeParams,
-    SemanticToken, SignatureHelpParams, TextDocumentIdentifier, TextDocumentPositionParams,
-    TextDocumentSaveReason, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability,
-    WillSaveTextDocumentParams, WorkDoneProgressParams, WorkspaceDiagnosticParams,
-    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
+    ExecuteCommandParams, FoldingRangeKind, FoldingRangeParams, GotoDefinitionParams,
+    GotoDefinitionResponse, InlayHintKind, LinkedEditingRangeParams, PartialResultParams, Position,
+    SelectionRangeParams, SemanticToken, SignatureHelpParams, TextDocumentIdentifier,
+    TextDocumentPositionParams, TextDocumentSaveReason, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
+    TypeDefinitionProviderCapability, WillSaveTextDocumentParams, WorkDoneProgressParams,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -128,6 +128,11 @@ mod success {
                 .linked_editing_range_provider
                 .is_some()
         );
+        let execute_command = initialize_result
+            .capabilities
+            .execute_command_provider
+            .expect("execute command provider");
+        assert_eq!(execute_command.commands, ["musi.references"]);
         assert_eq!(
             initialize_result.capabilities.document_highlight_provider,
             Some(OneOf::Left(true))
@@ -861,7 +866,7 @@ let other := value + value;
 
         let lenses = server
             .code_lenses(CodeLensParams {
-                text_document: TextDocumentIdentifier { uri },
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
                 work_done_progress_params: WorkDoneProgressParams::default(),
                 partial_result_params: PartialResultParams::default(),
             })
@@ -874,6 +879,67 @@ let other := value + value;
         let command = value_lens.command.as_ref().expect("lens command");
         assert_eq!(command.title, "2 references");
         assert_eq!(command.command, "musi.references");
+        let arguments = command.arguments.as_ref().expect("lens arguments");
+        assert_eq!(arguments.len(), 1);
+        assert_eq!(
+            arguments[0].get("uri").and_then(|value| value.as_str()),
+            Some(uri.as_str())
+        );
+        assert_eq!(
+            arguments[0].get("line").and_then(|value| value.as_u64()),
+            Some(0)
+        );
+        assert_eq!(
+            arguments[0]
+                .get("character")
+                .and_then(|value| value.as_u64()),
+            Some(4)
+        );
+    }
+
+    #[test]
+    fn execute_references_command_returns_reference_locations() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = r"let value := 1;
+let other := value + value;
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let result = server
+            .execute_command_request(ExecuteCommandParams {
+                command: "musi.references".to_owned(),
+                arguments: vec![serde_json::json!({
+                    "uri": uri.as_str(),
+                    "line": 0,
+                    "character": 4,
+                })],
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("references command should return locations");
+        let locations: Vec<Location> =
+            serde_json::from_value(result).expect("locations should deserialize");
+
+        assert_eq!(locations.len(), 2);
+        assert!(locations.iter().all(|location| location.uri == uri));
+        assert!(
+            locations
+                .iter()
+                .all(|location| location.range.start.line == 1)
+        );
     }
 
     #[test]
