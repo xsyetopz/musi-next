@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 
 use musi_project::{ProjectOptions, load_project_ancestor};
 use music_base::{Source, SourceId};
-use music_hir::HirExprKind;
+use music_hir::{HirExprKind, HirTyId, HirTyKind};
 use music_module::ModuleKey;
-use music_names::{NameBinding, NameBindingId, NameBindingKind, NameResolution, NameSite};
+use music_names::{NameBinding, NameBindingId, NameBindingKind, NameResolution, NameSite, Symbol};
 use music_sema::SemaModule;
 use music_session::Session;
 
@@ -55,6 +55,17 @@ pub fn definition_for_project_file_with_overlay(
     let context = SymbolAnalysis::new(path, overlay_text)?;
     let binding_id = context.binding_at(line, character)?;
     context.binding_location(binding_id)
+}
+
+#[must_use]
+pub fn type_definition_for_project_file_with_overlay(
+    path: &Path,
+    overlay_text: Option<&str>,
+    line: usize,
+    character: usize,
+) -> Option<ToolLocation> {
+    let context = SymbolAnalysis::new(path, overlay_text)?;
+    context.type_definition_at(line, character)
 }
 
 #[must_use]
@@ -238,6 +249,39 @@ impl SymbolAnalysis {
             })
     }
 
+    fn type_definition_at(&self, line: usize, character: usize) -> Option<ToolLocation> {
+        let source = self.source()?;
+        let offset = source.offset(line, character)?;
+        let sema = self.sema()?;
+        let ty = self
+            .binding_at(line, character)
+            .and_then(|binding_id| sema.binding_type(binding_id))
+            .or_else(|| expr_ty_at_offset(sema, self.source_id, offset))?;
+        self.type_definition_location(sema, ty)
+    }
+
+    fn type_definition_location(&self, sema: &SemaModule, ty: HirTyId) -> Option<ToolLocation> {
+        match sema.ty(ty).kind.clone() {
+            HirTyKind::Named { name, .. } => self.type_binding_location(sema, name),
+            HirTyKind::Mut { inner } => self.type_definition_location(sema, inner),
+            _ => None,
+        }
+    }
+
+    fn type_binding_location(&self, sema: &SemaModule, name: Symbol) -> Option<ToolLocation> {
+        let resolved = self.resolved()?;
+        resolved
+            .bindings
+            .iter()
+            .find(|(binding_id, binding)| {
+                binding.name == name
+                    && sema
+                        .binding_type(*binding_id)
+                        .is_some_and(|ty| matches!(sema.ty(ty).kind, HirTyKind::Type))
+            })
+            .and_then(|(binding_id, _)| self.binding_location(binding_id))
+    }
+
     fn binding_location(&self, binding_id: NameBindingId) -> Option<ToolLocation> {
         let binding = self.resolved()?.bindings.get(binding_id);
         self.site_location(binding.site)
@@ -380,6 +424,21 @@ impl SymbolAnalysis {
             })
             .cloned()
     }
+}
+
+fn expr_ty_at_offset(sema: &SemaModule, source_id: SourceId, offset: u32) -> Option<HirTyId> {
+    sema.module()
+        .store
+        .exprs
+        .iter()
+        .filter_map(|(expr_id, expr)| {
+            if expr.origin.source_id != source_id || !expr.origin.span.contains(offset) {
+                return None;
+            }
+            Some((expr_id, expr.origin.span))
+        })
+        .min_by_key(|(_, span)| span.end.saturating_sub(span.start))
+        .and_then(|(expr_id, _)| sema.try_expr_ty(expr_id))
 }
 
 fn member_binding_at_offset(sema: &SemaModule, offset: u32) -> Option<NameBindingId> {

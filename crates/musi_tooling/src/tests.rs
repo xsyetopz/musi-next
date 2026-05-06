@@ -27,7 +27,7 @@ use crate::{
     references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
     selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
     session_error_report, signature_help_for_project_file_with_overlay, tooling_error_report,
-    workspace_symbols_for_project_file_with_overlay,
+    type_definition_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
 };
 
 static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(0);
@@ -268,6 +268,35 @@ span.lower
         assert_eq!(location.range.start_line, 1);
         assert_eq!(location.range.start_col, 5);
         assert_eq!(location.range.end_col, 11);
+    }
+
+    #[test]
+    fn type_definition_resolves_named_value_type() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "\
+let Box[T] := data {
+  value : T;
+};
+let boxedName : Box[String] := {
+  value := \"Nora\"
+};
+boxedName.value;
+";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let location = type_definition_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            7,
+            3,
+        )
+        .expect("type definition should resolve");
+
+        assert_eq!(location.path, test_dir.path().join("index.ms"));
+        assert_eq!(location.range.start_line, 1);
+        assert_eq!(location.range.start_col, 5);
+        assert_eq!(location.range.end_col, 8);
     }
 
     #[test]

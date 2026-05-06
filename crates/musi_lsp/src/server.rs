@@ -28,11 +28,11 @@ use async_lsp::lsp_types::{
     SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, SignatureHelp,
     SignatureHelpOptions, SignatureHelpParams, TextDocumentContentChangeEvent, TextDocumentItem,
     TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TextEdit, Url,
-    WillSaveTextDocumentParams, WorkDoneProgressOptions, WorkspaceDiagnosticParams,
-    WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
-    WorkspaceEdit, WorkspaceFullDocumentDiagnosticReport, WorkspaceSymbolParams,
-    WorkspaceSymbolResponse, notification::PublishDiagnostics,
+    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TextEdit,
+    TypeDefinitionProviderCapability, Url, WillSaveTextDocumentParams, WorkDoneProgressOptions,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult,
+    WorkspaceDocumentDiagnosticReport, WorkspaceEdit, WorkspaceFullDocumentDiagnosticReport,
+    WorkspaceSymbolParams, WorkspaceSymbolResponse, notification::PublishDiagnostics,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
 use musi_fmt::{FormatOptions, format_text_for_path};
@@ -45,7 +45,8 @@ use musi_tooling::{
     inlay_hints_for_project_file_with_overlay, prepare_rename_for_project_file_with_overlay,
     references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
     selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
-    signature_help_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
+    signature_help_for_project_file_with_overlay, type_definition_for_project_file_with_overlay,
+    workspace_symbols_for_project_file_with_overlay,
 };
 
 mod config;
@@ -102,6 +103,7 @@ impl MusiLanguageServer {
                 }),
                 declaration_provider: Some(DeclarationCapability::Simple(true)),
                 definition_provider: Some(OneOf::Left(true)),
+                type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
                 references_provider: Some(OneOf::Left(true)),
                 linked_editing_range_provider: Some(LinkedEditingRangeServerCapabilities::Simple(
                     true,
@@ -318,6 +320,27 @@ impl MusiLanguageServer {
             .get(&text_document.uri)
             .map(String::as_str);
         let location = definition_for_project_file_with_overlay(
+            &path,
+            overlay,
+            usize::try_from(position.line).ok()?.saturating_add(1),
+            usize::try_from(position.character).ok()?.saturating_add(1),
+        )
+        .and_then(to_lsp_location)?;
+        Some(GotoDefinitionResponse::Scalar(location))
+    }
+
+    fn type_definition_at(&self, params: GotoDefinitionParams) -> Option<GotoDefinitionResponse> {
+        let text_document = params.text_document_position_params.text_document;
+        let position = params.text_document_position_params.position;
+        let path = text_document.uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let overlay = self
+            .open_documents
+            .get(&text_document.uri)
+            .map(String::as_str);
+        let location = type_definition_for_project_file_with_overlay(
             &path,
             overlay,
             usize::try_from(position.line).ok()?.saturating_add(1),
@@ -999,6 +1022,14 @@ impl LanguageServer for MusiLanguageServer {
     ) -> ServerFuture<Option<GotoDefinitionResponse>> {
         let declaration_response = self.definition_at(params);
         Box::pin(async move { Ok(declaration_response) })
+    }
+
+    fn type_definition(
+        &mut self,
+        params: GotoDefinitionParams,
+    ) -> ServerFuture<Option<GotoDefinitionResponse>> {
+        let type_definition_response = self.type_definition_at(params);
+        Box::pin(async move { Ok(type_definition_response) })
     }
 
     fn references(&mut self, params: ReferenceParams) -> ServerFuture<Option<Vec<Location>>> {

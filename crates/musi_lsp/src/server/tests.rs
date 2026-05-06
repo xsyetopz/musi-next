@@ -13,9 +13,9 @@ use async_lsp::lsp_types::{
     InlayHintKind, LinkedEditingRangeParams, PartialResultParams, Position, SelectionRangeParams,
     SemanticToken, SignatureHelpParams, TextDocumentIdentifier, TextDocumentPositionParams,
     TextDocumentSaveReason, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, WillSaveTextDocumentParams,
-    WorkDoneProgressParams, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
-    WorkspaceDocumentDiagnosticReport,
+    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability,
+    WillSaveTextDocumentParams, WorkDoneProgressParams, WorkspaceDiagnosticParams,
+    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -113,6 +113,10 @@ mod success {
         assert_eq!(
             initialize_result.capabilities.definition_provider,
             Some(OneOf::Left(true))
+        );
+        assert_eq!(
+            initialize_result.capabilities.type_definition_provider,
+            Some(TypeDefinitionProviderCapability::Simple(true))
         );
         assert_eq!(
             initialize_result.capabilities.references_provider,
@@ -598,6 +602,52 @@ let other := value;
         };
         assert_eq!(location.range.start, Position::new(0, 4));
         assert_eq!(location.range.end, Position::new(0, 9));
+    }
+
+    #[test]
+    fn type_definition_resolves_named_value_type() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "\
+let Box[T] := data {
+  value : T;
+};
+let boxedName : Box[String] := {
+  value := \"Nora\"
+};
+boxedName.value;
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let response = server
+            .type_definition_at(GotoDefinitionParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(6, 2),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("type definition should resolve");
+        let GotoDefinitionResponse::Scalar(location) = response else {
+            panic!("scalar location expected");
+        };
+
+        assert_eq!(location.range.start, Position::new(0, 4));
+        assert_eq!(location.range.end, Position::new(0, 7));
     }
 
     #[test]
