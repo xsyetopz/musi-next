@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
+use std::fs;
 use std::future::Future;
 use std::hash::{Hash, Hasher};
 use std::ops::ControlFlow;
@@ -942,7 +943,7 @@ impl MusiLanguageServer {
             return None;
         }
         let mut changes = HashMap::<Url, Vec<TextEdit>>::new();
-        for document_path in self.workspace_diagnostic_paths() {
+        for document_path in self.workspace_source_paths() {
             if document_path
                 .file_name()
                 .is_some_and(|name| name == "musi.json")
@@ -1119,6 +1120,14 @@ impl MusiLanguageServer {
                 .keys()
                 .filter_map(|uri| uri.to_file_path().ok()),
         );
+        sort_dedup_paths(paths)
+    }
+
+    fn workspace_source_paths(&self) -> Vec<PathBuf> {
+        let mut paths = self.workspace_diagnostic_paths();
+        for root in &self.workspace_roots {
+            collect_workspace_source_paths(root, &mut paths);
+        }
         sort_dedup_paths(paths)
     }
 
@@ -1443,6 +1452,31 @@ fn workspace_module_paths(root: &Path) -> Vec<PathBuf> {
             .filter(|package| matches!(package.source, PackageSource::Workspace))
             .flat_map(|package| package.module_keys.values().cloned())
             .collect(),
+    )
+}
+
+fn collect_workspace_source_paths(root: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = fs::read_dir(root) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.components().any(is_ignored_workspace_component) {
+            continue;
+        }
+        if path.is_dir() {
+            collect_workspace_source_paths(&path, out);
+        } else if path.extension().and_then(|extension| extension.to_str()) == Some("ms") {
+            out.push(path);
+        }
+    }
+}
+
+fn is_ignored_workspace_component(component: Component<'_>) -> bool {
+    let text = component.as_os_str().to_string_lossy();
+    matches!(
+        text.as_ref(),
+        ".git" | ".cache" | ".musi" | "musi_modules" | "node_modules" | "target"
     )
 }
 

@@ -1750,7 +1750,6 @@ let other := value + 2;
         let next_path = root.join("src/renamed.ms");
         fs::write(&index_path, "let dep := import \"./dep\";\n").expect("index should be written");
         fs::write(&dep_path, "export let value := 1;\n").expect("dep should be written");
-        let index_uri = Url::from_file_path(&index_path).expect("index URI should build");
         let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
         #[allow(deprecated)]
         server.configure(&InitializeParams {
@@ -1768,10 +1767,6 @@ let other := value + 2;
             locale: None,
             work_done_progress_params: WorkDoneProgressParams::default(),
         });
-        let _ = server.open_documents.insert(
-            index_uri.clone(),
-            "let dep := import \"./dep\";\n".to_owned(),
-        );
 
         let edit = server
             .will_rename_files_edit(&RenameFilesParams {
@@ -1787,7 +1782,12 @@ let other := value + 2;
             .expect("rename should produce import edit");
 
         let changes = edit.changes.expect("edit should use plain changes");
-        let edits = changes.get(&index_uri).expect("index edit should exist");
+        assert_eq!(changes.len(), 1);
+        let (edit_uri, edits) = changes.iter().next().expect("index edit should exist");
+        let edit_path = edit_uri
+            .to_file_path()
+            .expect("edit URI should be a file path");
+        assert!(paths_match(&edit_path, &index_path));
         assert_eq!(edits.len(), 1);
         assert_eq!(edits[0].range.start, Position::new(0, 18));
         assert_eq!(edits[0].range.end, Position::new(0, 25));
