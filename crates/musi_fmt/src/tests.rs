@@ -1189,6 +1189,33 @@ let testing := import "@std/testing";
     }
 
     #[test]
+    fn attached_import_block_comments_move_with_sorted_imports() {
+        let source = r#"/--
+testing helpers
+-/
+let testing := import "@std/testing";
+/-
+io helpers
+-/
+let io := import "@std/io";
+"#;
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            r#"/-
+io helpers
+-/ let io := import "@std/io";
+/--
+testing helpers
+-/
+let testing := import "@std/testing";
+"#
+        );
+    }
+
+    #[test]
     fn standalone_comments_split_import_sort_groups() {
         let source = r#"let testing := import "@std/testing";
 

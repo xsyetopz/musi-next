@@ -154,7 +154,16 @@ fn attached_statement_start(source: &str, token_start: usize) -> usize {
             .get(previous_start..attach_start)
             .unwrap_or_default()
             .trim_end_matches(['\r', '\n']);
-        if !previous_line.trim_start().starts_with("--") {
+        if is_attached_import_line_comment(previous_line) {
+            attach_start = previous_start;
+            continue;
+        }
+        if let Some(block_start) = attached_block_comment_start(source, attach_start, previous_line)
+        {
+            attach_start = block_start;
+            continue;
+        }
+        if !is_attached_import_block_comment_start(previous_line) {
             break;
         }
         attach_start = previous_start;
@@ -163,6 +172,26 @@ fn attached_statement_start(source: &str, token_start: usize) -> usize {
         return attach_start;
     }
     token_start
+}
+
+fn is_attached_import_line_comment(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    trimmed.starts_with("--")
+}
+
+fn is_attached_import_block_comment_start(line: &str) -> bool {
+    line.trim_start().starts_with("/-")
+}
+
+fn attached_block_comment_start(
+    source: &str,
+    attach_start: usize,
+    previous_line: &str,
+) -> Option<usize> {
+    if !previous_line.trim_end().ends_with("-/") {
+        return None;
+    }
+    source.get(..attach_start)?.rfind("/-")
 }
 
 fn previous_line_start(source: &str, line_start: usize) -> Option<usize> {
