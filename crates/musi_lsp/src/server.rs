@@ -28,7 +28,9 @@ use async_lsp::lsp_types::{
     TextDocumentContentChangeEvent, TextDocumentItem, TextDocumentPositionParams,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
     TextDocumentSyncSaveOptions, TextEdit, Url, WillSaveTextDocumentParams,
-    WorkDoneProgressOptions, WorkspaceEdit, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    WorkDoneProgressOptions, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
+    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport, WorkspaceEdit,
+    WorkspaceFullDocumentDiagnosticReport, WorkspaceSymbolParams, WorkspaceSymbolResponse,
     notification::PublishDiagnostics,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
@@ -110,7 +112,7 @@ impl MusiLanguageServer {
                     DiagnosticOptions {
                         identifier: Some("musi".to_owned()),
                         inter_file_dependencies: true,
-                        workspace_diagnostics: false,
+                        workspace_diagnostics: true,
                         work_done_progress_options: WorkDoneProgressOptions {
                             work_done_progress: None,
                         },
@@ -638,6 +640,39 @@ impl MusiLanguageServer {
         full_document_diagnostic_report(diagnostics)
     }
 
+    fn workspace_diagnostics(
+        &self,
+        _params: WorkspaceDiagnosticParams,
+    ) -> WorkspaceDiagnosticReportResult {
+        let items = self
+            .open_documents
+            .keys()
+            .filter_map(|uri| {
+                let path = uri.to_file_path().ok()?;
+                if path.file_name().is_some_and(|name| name == "musi.json") {
+                    return None;
+                }
+                let overlay = self.open_documents.get(uri).map(String::as_str);
+                let diagnostics = collect_project_diagnostics_with_overlay(&path, overlay)
+                    .into_iter()
+                    .filter(|diag| diagnostic_matches_path(&path, diag))
+                    .map(to_lsp_diagnostic)
+                    .collect();
+                Some(WorkspaceDocumentDiagnosticReport::Full(
+                    WorkspaceFullDocumentDiagnosticReport {
+                        uri: uri.clone(),
+                        version: None,
+                        full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                            result_id: None,
+                            items: diagnostics,
+                        },
+                    },
+                ))
+            })
+            .collect();
+        WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items })
+    }
+
     fn semantic_tokens_for_uri(&self, uri: &Url, range: Option<Range>) -> Option<SemanticTokens> {
         let path = uri.to_file_path().ok()?;
         if path.file_name().is_some_and(|name| name == "musi.json") {
@@ -892,6 +927,14 @@ impl LanguageServer for MusiLanguageServer {
         params: DocumentDiagnosticParams,
     ) -> ServerFuture<DocumentDiagnosticReportResult> {
         let report = self.document_diagnostics(params);
+        Box::pin(async move { Ok(report) })
+    }
+
+    fn workspace_diagnostic(
+        &mut self,
+        params: WorkspaceDiagnosticParams,
+    ) -> ServerFuture<WorkspaceDiagnosticReportResult> {
+        let report = self.workspace_diagnostics(params);
         Box::pin(async move { Ok(report) })
     }
 
