@@ -124,7 +124,7 @@ impl MusiLanguageServer {
                     },
                 }),
                 code_lens_provider: Some(CodeLensOptions {
-                    resolve_provider: Some(false),
+                    resolve_provider: Some(true),
                 }),
                 execute_command_provider: Some(ExecuteCommandOptions {
                     commands: vec![REFERENCES_COMMAND.to_owned()],
@@ -518,7 +518,7 @@ impl MusiLanguageServer {
         let overlay = self.open_documents.get(&uri).map(String::as_str);
         let mut lenses = Vec::new();
         for symbol in document_symbols_for_project_file_with_overlay(&path, overlay) {
-            self.push_reference_lenses(&path, overlay, &symbol, &mut lenses);
+            self.push_reference_lenses(&path, &symbol, &mut lenses);
         }
         Some(lenses)
     }
@@ -526,31 +526,51 @@ impl MusiLanguageServer {
     fn push_reference_lenses(
         &self,
         path: &Path,
-        overlay: Option<&str>,
         symbol: &ToolDocumentSymbol,
         lenses: &mut Vec<CodeLens>,
     ) {
-        let references = references_for_project_file_with_overlay(
-            path,
-            overlay,
-            symbol.selection_range.start_line,
-            symbol.selection_range.start_col,
-            false,
-        );
-        if !references.is_empty() {
+        if let Some(data) = reference_lens_data(path, symbol) {
             lenses.push(CodeLens {
                 range: to_tool_range(&symbol.selection_range),
-                command: Some(Command::new(
-                    reference_lens_title(references.len()),
-                    REFERENCES_COMMAND.to_owned(),
-                    reference_command_arguments(path, symbol),
-                )),
-                data: None,
+                command: None,
+                data: Some(data),
             });
         }
         for child in &symbol.children {
-            self.push_reference_lenses(path, overlay, child, lenses);
+            self.push_reference_lenses(path, child, lenses);
         }
+    }
+
+    fn resolve_code_lens(&self, mut lens: CodeLens) -> CodeLens {
+        if lens.command.is_some() {
+            return lens;
+        }
+        let Some(data) = lens.data.as_ref() else {
+            return lens;
+        };
+        let Some((uri, line, character)) = reference_lens_data_parts(data) else {
+            return lens;
+        };
+        let Ok(path) = uri.to_file_path() else {
+            return lens;
+        };
+        let overlay = self.open_documents.get(&uri).map(String::as_str);
+        let references = references_for_project_file_with_overlay(
+            &path,
+            overlay,
+            line.saturating_add(1),
+            character.saturating_add(1),
+            false,
+        );
+        if references.is_empty() {
+            return lens;
+        }
+        lens.command = Some(Command::new(
+            reference_lens_title(references.len()),
+            REFERENCES_COMMAND.to_owned(),
+            Some(vec![data.clone()]),
+        ));
+        lens
     }
 
     fn code_actions(&self, params: CodeActionParams) -> Option<CodeActionResponse> {
@@ -1016,12 +1036,19 @@ fn reference_lens_title(count: usize) -> String {
     }
 }
 
-fn reference_command_arguments(path: &Path, symbol: &ToolDocumentSymbol) -> Option<Vec<Value>> {
-    Some(vec![json!({
+fn reference_lens_data(path: &Path, symbol: &ToolDocumentSymbol) -> Option<Value> {
+    Some(json!({
         "uri": Url::from_file_path(path).ok()?.as_str(),
         "line": symbol.selection_range.start_line.saturating_sub(1),
         "character": symbol.selection_range.start_col.saturating_sub(1),
-    })])
+    }))
+}
+
+fn reference_lens_data_parts(data: &Value) -> Option<(Url, usize, usize)> {
+    let uri = data.get("uri")?.as_str()?;
+    let line = usize::try_from(data.get("line")?.as_u64()?).ok()?;
+    let character = usize::try_from(data.get("character")?.as_u64()?).ok()?;
+    Some((Url::parse(uri).ok()?, line, character))
 }
 
 #[allow(deprecated)]
@@ -1284,6 +1311,11 @@ impl LanguageServer for MusiLanguageServer {
     fn code_lens(&mut self, params: CodeLensParams) -> ServerFuture<Option<Vec<CodeLens>>> {
         let code_lenses = self.code_lenses(params);
         Box::pin(async move { Ok(code_lenses) })
+    }
+
+    fn code_lens_resolve(&mut self, params: CodeLens) -> ServerFuture<CodeLens> {
+        let code_lens = self.resolve_code_lens(params);
+        Box::pin(async move { Ok(code_lens) })
     }
 
     fn execute_command(&mut self, params: ExecuteCommandParams) -> ServerFuture<Option<Value>> {

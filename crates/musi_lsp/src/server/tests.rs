@@ -158,7 +158,11 @@ mod success {
             .document_link_provider
             .expect("document link provider");
         assert_eq!(document_link.resolve_provider, Some(true));
-        assert!(initialize_result.capabilities.code_lens_provider.is_some());
+        let code_lens = initialize_result
+            .capabilities
+            .code_lens_provider
+            .expect("code lens provider");
+        assert_eq!(code_lens.resolve_provider, Some(true));
         assert_eq!(
             initialize_result.capabilities.diagnostic_provider,
             Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
@@ -1171,6 +1175,11 @@ let other := value + value;
             .iter()
             .find(|lens| lens.range.start == Position::new(0, 4))
             .expect("value reference lens should exist");
+        assert_eq!(value_lens.command, None);
+        assert!(value_lens.data.is_some());
+
+        let value_lens = server.resolve_code_lens(value_lens.clone());
+
         let command = value_lens.command.as_ref().expect("lens command");
         assert_eq!(command.title, "2 references");
         assert_eq!(command.command, "musi.references");
