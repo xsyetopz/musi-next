@@ -17,6 +17,7 @@ use musi_tooling::{
     ToolSemanticModifier, ToolSemanticToken, ToolSemanticTokenKind, ToolSignatureHelp,
     ToolSignatureInformation, ToolSymbolKind, ToolWorkspaceEdit, ToolWorkspaceSymbol,
 };
+use serde_json::{Value, json};
 
 pub(super) fn to_lsp_completion(completion: ToolCompletion) -> CompletionItem {
     let text = completion
@@ -65,12 +66,36 @@ pub(super) fn to_lsp_folding_range(range: ToolFoldingRange) -> FoldingRange {
 }
 
 pub(super) fn to_lsp_document_link(link: ToolDocumentLink) -> Option<DocumentLink> {
+    let target = Url::from_file_path(link.target).ok()?;
     Some(DocumentLink {
         range: to_tool_range(&link.range),
-        target: Some(Url::from_file_path(link.target).ok()?),
-        tooltip: link.tooltip,
-        data: None,
+        target: None,
+        tooltip: None,
+        data: Some(json!({
+            "target": target.as_str(),
+            "tooltip": link.tooltip,
+        })),
     })
+}
+
+pub(super) fn resolve_lsp_document_link(mut link: DocumentLink) -> DocumentLink {
+    if link.target.is_some() {
+        return link;
+    }
+    let Some(Value::Object(data)) = link.data.as_ref() else {
+        return link;
+    };
+    if let Some(target) = data
+        .get("target")
+        .and_then(Value::as_str)
+        .and_then(|target| Url::parse(target).ok())
+    {
+        link.target = Some(target);
+    }
+    if let Some(tooltip) = data.get("tooltip").and_then(Value::as_str) {
+        link.tooltip = Some(tooltip.to_owned());
+    }
+    link
 }
 
 pub(super) fn to_lsp_selection_range(range: ToolSelectionRange) -> SelectionRange {

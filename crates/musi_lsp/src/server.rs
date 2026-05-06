@@ -58,10 +58,11 @@ mod convert;
 use config::LspConfig;
 use convert::{
     diagnostic_matches_path, encode_semantic_tokens, full_document_range, position_in_range,
-    semantic_tokens_legend, to_lsp_completion, to_lsp_diagnostic, to_lsp_document_highlight,
-    to_lsp_document_link, to_lsp_document_symbol, to_lsp_folding_range, to_lsp_inlay_hint,
-    to_lsp_location, to_lsp_selection_range, to_lsp_signature_help, to_lsp_symbol_information,
-    to_lsp_workspace_edit, to_tool_range, tool_location_matches_path, truncate_hover_contents,
+    resolve_lsp_document_link, semantic_tokens_legend, to_lsp_completion, to_lsp_diagnostic,
+    to_lsp_document_highlight, to_lsp_document_link, to_lsp_document_symbol, to_lsp_folding_range,
+    to_lsp_inlay_hint, to_lsp_location, to_lsp_selection_range, to_lsp_signature_help,
+    to_lsp_symbol_information, to_lsp_workspace_edit, to_tool_range, tool_location_matches_path,
+    truncate_hover_contents,
 };
 
 type ServerFuture<T> = Pin<Box<dyn Future<Output = Result<T, ResponseError>> + Send + 'static>>;
@@ -117,7 +118,7 @@ impl MusiLanguageServer {
                 document_highlight_provider: Some(OneOf::Left(true)),
                 document_symbol_provider: Some(OneOf::Left(true)),
                 document_link_provider: Some(DocumentLinkOptions {
-                    resolve_provider: Some(false),
+                    resolve_provider: Some(true),
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: None,
                     },
@@ -502,6 +503,10 @@ impl MusiLanguageServer {
             .filter_map(to_lsp_document_link)
             .collect();
         Some(links)
+    }
+
+    fn resolve_document_link(&self, link: DocumentLink) -> DocumentLink {
+        resolve_lsp_document_link(link)
     }
 
     fn code_lenses(&self, params: CodeLensParams) -> Option<Vec<CodeLens>> {
@@ -1269,6 +1274,11 @@ impl LanguageServer for MusiLanguageServer {
     ) -> ServerFuture<Option<Vec<DocumentLink>>> {
         let document_links = self.document_links(params);
         Box::pin(async move { Ok(document_links) })
+    }
+
+    fn document_link_resolve(&mut self, params: DocumentLink) -> ServerFuture<DocumentLink> {
+        let document_link = self.resolve_document_link(params);
+        Box::pin(async move { Ok(document_link) })
     }
 
     fn code_lens(&mut self, params: CodeLensParams) -> ServerFuture<Option<Vec<CodeLens>>> {

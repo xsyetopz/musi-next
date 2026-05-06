@@ -153,12 +153,11 @@ mod success {
             initialize_result.capabilities.document_symbol_provider,
             Some(OneOf::Left(true))
         );
-        assert!(
-            initialize_result
-                .capabilities
-                .document_link_provider
-                .is_some()
-        );
+        let document_link = initialize_result
+            .capabilities
+            .document_link_provider
+            .expect("document link provider");
+        assert_eq!(document_link.resolve_provider, Some(true));
         assert!(initialize_result.capabilities.code_lens_provider.is_some());
         assert_eq!(
             initialize_result.capabilities.diagnostic_provider,
@@ -1046,7 +1045,7 @@ let other := value + value;
     }
 
     #[test]
-    fn document_link_returns_static_import_targets() {
+    fn document_link_resolves_static_import_targets() {
         let root = temp_project();
         fs::write(
             root.join("musi.json"),
@@ -1078,14 +1077,25 @@ let other := value + value;
         assert_eq!(links.len(), 1);
         assert_eq!(links[0].range.start, Position::new(0, 18));
         assert_eq!(links[0].range.end, Position::new(0, 25));
+        assert_eq!(links[0].target, None);
+        assert_eq!(links[0].tooltip, None);
+        assert!(links[0].data.is_some());
+
+        let link = server.resolve_document_link(links[0].clone());
+
         assert_eq!(
-            links[0].target.as_ref(),
+            link.target.as_ref(),
             Some(
                 &Url::from_file_path(
                     fs::canonicalize(dep_path).expect("dep path should canonicalize")
                 )
                 .expect("dep URI should build")
             )
+        );
+        assert!(
+            link.tooltip
+                .as_deref()
+                .is_some_and(|tooltip| tooltip.starts_with("Open `"))
         );
     }
 
