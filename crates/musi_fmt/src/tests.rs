@@ -1205,12 +1205,32 @@ let io := import "@std/io";
             formatted_result.text,
             r#"/-
 io helpers
--/ let io := import "@std/io";
+-/
+let io := import "@std/io";
 /--
 testing helpers
 -/
 let testing := import "@std/testing";
 "#
+        );
+    }
+
+    #[test]
+    fn keeps_leading_regular_block_comment_on_own_line() {
+        let source = r"/-
+explains value
+-/
+let value:=1;";
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            r"/-
+explains value
+-/
+let value := 1;
+"
         );
     }
 

@@ -480,6 +480,7 @@ impl<'a> CstFormatter<'a> {
         let is_doc = is_item_doc || is_module_doc;
         let is_line = kind.is_line_comment();
         let is_same_line = self.trivia_starts_on_previous_token_line(span);
+        let is_leading_line = self.at_line_start;
         if !is_same_line {
             self.preserve_blank_separator_if_needed(span);
         }
@@ -492,7 +493,7 @@ impl<'a> CstFormatter<'a> {
         }
         self.write_indent_if_needed();
         self.out.push_str(text.trim_end());
-        if is_line || is_doc {
+        if is_line || is_doc || is_leading_line {
             self.newline();
         } else {
             self.push_space();
