@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use music_seam::{Instruction, Opcode};
 
 use crate::VmValueKind;
@@ -56,7 +58,7 @@ impl Vm {
         self.push_value(value)
     }
 
-    pub(crate) fn compare_ord(&mut self, op: impl FnOnce(std::cmp::Ordering) -> bool) -> VmResult {
+    pub(crate) fn compare_ord(&mut self, op: impl FnOnce(Ordering) -> bool) -> VmResult {
         let right_value = self.pop_value()?;
         let left_value = self.pop_value()?;
         let ordering = match (&left_value, &right_value) {
@@ -65,7 +67,7 @@ impl Vm {
             (Value::Nat(left), Value::Int(right)) => {
                 let Ok(right) = u64::try_from(*right) else {
                     let module_slot = self.current_module_slot()?;
-                    let value = self.bool_value(module_slot, op(std::cmp::Ordering::Greater))?;
+                    let value = self.bool_value(module_slot, op(Ordering::Greater))?;
                     self.push_value(value)?;
                     return Ok(());
                 };
@@ -74,7 +76,7 @@ impl Vm {
             (Value::Int(left), Value::Nat(right)) => {
                 let Ok(left) = u64::try_from(*left) else {
                     let module_slot = self.current_module_slot()?;
-                    let value = self.bool_value(module_slot, op(std::cmp::Ordering::Less))?;
+                    let value = self.bool_value(module_slot, op(Ordering::Less))?;
                     self.push_value(value)?;
                     return Ok(());
                 };
@@ -117,11 +119,11 @@ impl Vm {
                 Ok(StepOutcome::Continue)
             }
             Opcode::CltS => {
-                self.compare_ord(std::cmp::Ordering::is_lt)?;
+                self.compare_ord(Ordering::is_lt)?;
                 Ok(StepOutcome::Continue)
             }
             Opcode::CgtS => {
-                self.compare_ord(std::cmp::Ordering::is_gt)?;
+                self.compare_ord(Ordering::is_gt)?;
                 Ok(StepOutcome::Continue)
             }
             Opcode::CleS => {
