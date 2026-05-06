@@ -26,12 +26,12 @@ use async_lsp::lsp_types::{
     MarkupContent, MarkupKind, OneOf, Position, PrepareRenameResponse, PublishDiagnosticsParams,
     Range, ReferenceParams, RelatedFullDocumentDiagnosticReport, RenameOptions, RenameParams,
     SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability, SemanticToken,
-    SemanticTokens, SemanticTokensDeltaParams, SemanticTokensFullDeltaResult,
-    SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
-    SemanticTokensRangeParams, SemanticTokensRangeResult, SemanticTokensResult,
-    SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, SignatureHelp,
-    SignatureHelpOptions, SignatureHelpParams, TextDocumentContentChangeEvent, TextDocumentItem,
-    TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind,
+    SemanticTokens, SemanticTokensDelta, SemanticTokensDeltaParams, SemanticTokensEdit,
+    SemanticTokensFullDeltaResult, SemanticTokensFullOptions, SemanticTokensOptions,
+    SemanticTokensParams, SemanticTokensRangeParams, SemanticTokensRangeResult,
+    SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
+    SignatureHelp, SignatureHelpOptions, SignatureHelpParams, TextDocumentContentChangeEvent,
+    TextDocumentItem, TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind,
     TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TextEdit,
     TypeDefinitionProviderCapability, Url, WillSaveTextDocumentParams, WorkDoneProgressOptions,
     WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult,
@@ -78,8 +78,15 @@ const REFERENCES_COMMAND: &str = "musi.references";
 pub struct MusiLanguageServer {
     client: ClientSocket,
     open_documents: HashMap<Url, String>,
+    semantic_token_cache: HashMap<Url, SemanticTokenSnapshot>,
     workspace_roots: Vec<PathBuf>,
     config: LspConfig,
+}
+
+#[derive(Debug, Clone)]
+struct SemanticTokenSnapshot {
+    result_id: String,
+    data: Vec<SemanticToken>,
 }
 
 impl MusiLanguageServer {
@@ -88,6 +95,7 @@ impl MusiLanguageServer {
         Self {
             client,
             open_documents: HashMap::new(),
+            semantic_token_cache: HashMap::new(),
             workspace_roots: Vec::new(),
             config: LspConfig::default(),
         }
@@ -249,6 +257,7 @@ impl MusiLanguageServer {
 
     fn did_close_document(&mut self, uri: &Url) {
         let _ = self.open_documents.remove(uri);
+        let _ = self.semantic_token_cache.remove(uri);
         drop(
             self.client
                 .notify::<PublishDiagnostics>(PublishDiagnosticsParams {
@@ -811,12 +820,46 @@ impl MusiLanguageServer {
         self.semantic_tokens_for_uri(&params.text_document.uri, Some(params.range))
     }
 
+    fn semantic_tokens_full_response(
+        &mut self,
+        params: &SemanticTokensParams,
+    ) -> Option<SemanticTokens> {
+        let uri = &params.text_document.uri;
+        let tokens = self.semantic_tokens(params)?;
+        let result_id = tokens.result_id.clone()?;
+        let snapshot = SemanticTokenSnapshot {
+            result_id,
+            data: tokens.data.clone(),
+        };
+        let _ = self.semantic_token_cache.insert(uri.clone(), snapshot);
+        Some(tokens)
+    }
+
     fn semantic_token_delta(
-        &self,
+        &mut self,
         params: &SemanticTokensDeltaParams,
     ) -> Option<SemanticTokensFullDeltaResult> {
-        self.semantic_tokens_for_uri(&params.text_document.uri, None)
-            .map(SemanticTokensFullDeltaResult::Tokens)
+        let uri = &params.text_document.uri;
+        let tokens = self.semantic_tokens_for_uri(uri, None)?;
+        let result_id = tokens.result_id.clone()?;
+        let next = SemanticTokenSnapshot {
+            result_id,
+            data: tokens.data.clone(),
+        };
+        let response = self
+            .semantic_token_cache
+            .get(uri)
+            .filter(|previous| previous.result_id == params.previous_result_id)
+            .map_or_else(
+                || SemanticTokensFullDeltaResult::Tokens(tokens),
+                |previous| {
+                    SemanticTokensFullDeltaResult::TokensDelta(semantic_tokens_delta(
+                        previous, &next,
+                    ))
+                },
+            );
+        let _ = self.semantic_token_cache.insert(uri.clone(), next);
+        Some(response)
     }
 
     fn inlay_hints(&self, params: &InlayHintParams) -> Option<Vec<InlayHint>> {
@@ -1114,6 +1157,40 @@ fn semantic_tokens_result_id(tokens: &[SemanticToken]) -> String {
         token.token_modifiers_bitset.hash(&mut hasher);
     }
     format!("{:016x}", hasher.finish())
+}
+
+fn semantic_tokens_delta(
+    previous: &SemanticTokenSnapshot,
+    next: &SemanticTokenSnapshot,
+) -> SemanticTokensDelta {
+    let mut prefix_len = 0usize;
+    while prefix_len < previous.data.len()
+        && prefix_len < next.data.len()
+        && previous.data.get(prefix_len) == next.data.get(prefix_len)
+    {
+        prefix_len = prefix_len.saturating_add(1);
+    }
+    let mut suffix_len = 0usize;
+    while suffix_len < previous.data.len().saturating_sub(prefix_len)
+        && suffix_len < next.data.len().saturating_sub(prefix_len)
+        && previous.data[previous.data.len() - suffix_len - 1]
+            == next.data[next.data.len() - suffix_len - 1]
+    {
+        suffix_len = suffix_len.saturating_add(1);
+    }
+    let inserted = next.data[prefix_len..next.data.len() - suffix_len].to_vec();
+    SemanticTokensDelta {
+        result_id: Some(next.result_id.clone()),
+        edits: vec![SemanticTokensEdit {
+            start: len_to_u32(prefix_len),
+            delete_count: len_to_u32(previous.data.len() - prefix_len - suffix_len),
+            data: (!inserted.is_empty()).then_some(inserted),
+        }],
+    }
+}
+
+fn len_to_u32(value: usize) -> u32 {
+    u32::try_from(value).expect("semantic token vector length should fit u32")
 }
 
 #[allow(deprecated)]
@@ -1480,7 +1557,7 @@ impl LanguageServer for MusiLanguageServer {
         params: SemanticTokensParams,
     ) -> ServerFuture<Option<SemanticTokensResult>> {
         let semantic_tokens_response = self
-            .semantic_tokens(&params)
+            .semantic_tokens_full_response(&params)
             .map(SemanticTokensResult::Tokens);
         Box::pin(async move { Ok(semantic_tokens_response) })
     }

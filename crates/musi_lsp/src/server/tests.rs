@@ -1619,7 +1619,7 @@ let other := value + 2;
     }
 
     #[test]
-    fn semantic_token_delta_returns_full_tokens_with_result_id() {
+    fn semantic_token_delta_returns_edits_for_cached_result_id() {
         let root = temp_project();
         fs::write(
             root.join("musi.json"),
@@ -1638,20 +1638,35 @@ let other := value + 2;
         let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
         let _ = server.open_documents.insert(uri.clone(), source.to_owned());
 
+        let full = server
+            .semantic_tokens_full_response(&SemanticTokensParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("full semantic tokens should run");
+        let previous_result_id = full
+            .result_id
+            .expect("full tokens should include result id");
+        let _ = server.open_documents.insert(
+            uri.clone(),
+            "let value := 1;\nlet other := value;\n".to_owned(),
+        );
+
         let response = server
             .semantic_token_delta(&SemanticTokensDeltaParams {
                 text_document: TextDocumentIdentifier { uri },
-                previous_result_id: "old".to_owned(),
+                previous_result_id,
                 work_done_progress_params: WorkDoneProgressParams::default(),
                 partial_result_params: PartialResultParams::default(),
             })
             .expect("semantic token delta should run");
 
-        let SemanticTokensFullDeltaResult::Tokens(tokens) = response else {
-            panic!("full token fallback expected");
+        let SemanticTokensFullDeltaResult::TokensDelta(delta) = response else {
+            panic!("semantic token delta expected");
         };
-        assert!(tokens.result_id.is_some());
-        assert!(!tokens.data.is_empty());
+        assert!(delta.result_id.is_some());
+        assert_eq!(delta.edits.len(), 1);
     }
 
     #[test]
