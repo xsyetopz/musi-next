@@ -3,16 +3,17 @@ use std::path::{Component, Path, PathBuf};
 
 use async_lsp::lsp_types::{
     CompletionItem, CompletionItemKind, CompletionTextEdit, Diagnostic,
-    DiagnosticRelatedInformation, DiagnosticSeverity, DocumentSymbol, Documentation, InlayHint,
-    InlayHintKind, InlayHintLabel, InlayHintTooltip, Location, NumberOrString, Position, Range,
-    SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend,
-    SymbolInformation, SymbolKind, TextEdit, Url, WorkspaceEdit,
+    DiagnosticRelatedInformation, DiagnosticSeverity, DocumentHighlight, DocumentHighlightKind,
+    DocumentSymbol, Documentation, FoldingRange, FoldingRangeKind, InlayHint, InlayHintKind,
+    InlayHintLabel, InlayHintTooltip, Location, NumberOrString, Position, Range, SemanticToken,
+    SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend, SymbolInformation, SymbolKind,
+    TextEdit, Url, WorkspaceEdit,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolCompletion, ToolCompletionKind,
-    ToolDocumentSymbol, ToolInlayHint, ToolInlayHintKind, ToolLocation, ToolPosition, ToolRange,
-    ToolSemanticModifier, ToolSemanticToken, ToolSemanticTokenKind, ToolSymbolKind,
-    ToolWorkspaceEdit, ToolWorkspaceSymbol,
+    ToolDocumentSymbol, ToolFoldingRange, ToolFoldingRangeKind, ToolInlayHint, ToolInlayHintKind,
+    ToolLocation, ToolPosition, ToolRange, ToolSemanticModifier, ToolSemanticToken,
+    ToolSemanticTokenKind, ToolSymbolKind, ToolWorkspaceEdit, ToolWorkspaceSymbol,
 };
 
 pub(super) fn to_lsp_completion(completion: ToolCompletion) -> CompletionItem {
@@ -40,6 +41,25 @@ pub(super) fn to_lsp_location(location: ToolLocation) -> Option<Location> {
         uri: Url::from_file_path(location.path).ok()?,
         range: to_tool_range(&location.range),
     })
+}
+
+pub(super) fn to_lsp_document_highlight(location: ToolLocation) -> DocumentHighlight {
+    DocumentHighlight {
+        range: to_tool_range(&location.range),
+        kind: Some(DocumentHighlightKind::TEXT),
+    }
+}
+
+pub(super) fn to_lsp_folding_range(range: ToolFoldingRange) -> FoldingRange {
+    let lsp_range = to_tool_range(&range.range);
+    FoldingRange {
+        start_line: lsp_range.start.line,
+        start_character: Some(lsp_range.start.character),
+        end_line: lsp_range.end.line,
+        end_character: Some(lsp_range.end.character),
+        kind: range.kind.map(to_folding_range_kind),
+        collapsed_text: None,
+    }
 }
 
 pub(super) fn to_lsp_document_symbol(symbol: ToolDocumentSymbol) -> DocumentSymbol {
@@ -123,6 +143,14 @@ const fn to_symbol_kind(kind: ToolSymbolKind) -> SymbolKind {
         ToolSymbolKind::Alias => SymbolKind::CONSTANT,
         ToolSymbolKind::Property => SymbolKind::PROPERTY,
         ToolSymbolKind::EnumMember => SymbolKind::ENUM_MEMBER,
+    }
+}
+
+const fn to_folding_range_kind(kind: ToolFoldingRangeKind) -> FoldingRangeKind {
+    match kind {
+        ToolFoldingRangeKind::Comment => FoldingRangeKind::Comment,
+        ToolFoldingRangeKind::Imports => FoldingRangeKind::Imports,
+        ToolFoldingRangeKind::Region => FoldingRangeKind::Region,
     }
 }
 
@@ -240,6 +268,10 @@ pub(super) fn diagnostic_matches_path(path: &Path, diagnostic: &CliDiagnostic) -
         return false;
     };
     normalized_path(Path::new(file)) == normalized_path(path)
+}
+
+pub(super) fn tool_location_matches_path(path: &Path, location: &ToolLocation) -> bool {
+    normalized_path(&location.path) == normalized_path(path)
 }
 
 pub(super) fn to_lsp_diagnostic(diagnostic: CliDiagnostic) -> Diagnostic {

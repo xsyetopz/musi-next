@@ -11,7 +11,9 @@ use std::io::Error as IoError;
 use std::path::PathBuf;
 
 pub use markdown::format_markdown;
-pub use paths::{FormatPathChange, FormatPathSummary, format_file, format_paths};
+pub use paths::{
+    FormatPathChange, FormatPathSummary, format_file, format_paths, format_text_for_path,
+};
 pub use source::{FormatResult, format_source};
 
 use musi_project::manifest::{

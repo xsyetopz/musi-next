@@ -4,9 +4,10 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use async_lsp::lsp_types::{
-    CompletionItemKind, CompletionTextEdit, DiagnosticSeverity, InlayHintKind, PartialResultParams,
-    Position, SemanticToken, TextDocumentIdentifier, TextDocumentPositionParams,
-    WorkDoneProgressParams,
+    CodeActionContext, CodeActionKind, CodeActionOrCommand, CodeActionParams, CompletionItemKind,
+    CompletionTextEdit, DiagnosticSeverity, DocumentHighlightKind, FoldingRangeKind,
+    FoldingRangeParams, InlayHintKind, PartialResultParams, Position, SemanticToken,
+    TextDocumentIdentifier, TextDocumentPositionParams, WorkDoneProgressParams,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -71,8 +72,24 @@ mod success {
             Some(OneOf::Left(true))
         );
         assert_eq!(
+            initialize_result.capabilities.document_highlight_provider,
+            Some(OneOf::Left(true))
+        );
+        assert_eq!(
             initialize_result.capabilities.document_symbol_provider,
             Some(OneOf::Left(true))
+        );
+        assert!(
+            initialize_result
+                .capabilities
+                .folding_range_provider
+                .is_some()
+        );
+        assert!(
+            initialize_result
+                .capabilities
+                .code_action_provider
+                .is_some()
         );
         assert_eq!(
             initialize_result.capabilities.workspace_symbol_provider,
@@ -176,6 +193,34 @@ mod success {
         assert_eq!(
             edits[0].new_text,
             "export let describe (\n  target : Ordering\n) : String :=\n  match target (\n  | .Less                  => \"less\"\n  | .GreaterThanEverything => \"greater\"\n  | _                      => \"same\"\n  );\n"
+        );
+    }
+
+    #[test]
+    fn document_formatting_formats_musi_fences_in_markdown_documents() {
+        let root = temp_project();
+        let path = root.join("README.md");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let source = "# Example\n\n```musi\nlet testing:=import \"@std/testing\";\nlet io:=import \"@std/io\";\n```\n";
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let edits = server
+            .document_formatting(DocumentFormattingParams {
+                text_document: TextDocumentIdentifier { uri },
+                options: FormattingOptions {
+                    tab_size: 2,
+                    insert_spaces: true,
+                    ..FormattingOptions::default()
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("formatting should run");
+
+        assert_eq!(edits.len(), 1);
+        assert_eq!(
+            edits[0].new_text,
+            "# Example\n\n```musi\nlet io := import \"@std/io\";\nlet testing := import \"@std/testing\";\n```\n"
         );
     }
 
@@ -289,6 +334,134 @@ point.
             items
                 .iter()
                 .all(|item| item.kind == Some(CompletionItemKind::PROPERTY))
+        );
+    }
+
+    #[test]
+    fn document_highlight_returns_declaration_and_same_file_references() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = r"let value := 1;
+let other := value + value;
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let highlights = server
+            .document_highlights(DocumentHighlightParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 15),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("document highlight response should exist");
+
+        assert_eq!(highlights.len(), 3);
+        assert!(
+            highlights
+                .iter()
+                .all(|highlight| highlight.kind == Some(DocumentHighlightKind::TEXT))
+        );
+        assert!(
+            highlights
+                .iter()
+                .any(|highlight| highlight.range.start == Position::new(0, 4))
+        );
+        assert!(
+            highlights
+                .iter()
+                .filter(|highlight| highlight.range.start.line == 1)
+                .count()
+                == 2
+        );
+    }
+
+    #[test]
+    fn code_action_returns_source_organize_imports_edit() {
+        let root = temp_project();
+        let path = root.join("index.ms");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let source = "let testing:=import \"@std/testing\";\nlet io:=import \"@std/io\";\n";
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let actions = server
+            .code_actions(CodeActionParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                range: full_document_range(source),
+                context: CodeActionContext {
+                    diagnostics: Vec::new(),
+                    only: Some(vec![CodeActionKind::SOURCE_ORGANIZE_IMPORTS]),
+                    trigger_kind: None,
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("code action response should exist");
+
+        assert_eq!(actions.len(), 1);
+        let CodeActionOrCommand::CodeAction(action) = &actions[0] else {
+            panic!("organize imports should be returned as code action");
+        };
+        assert_eq!(action.kind, Some(CodeActionKind::SOURCE_ORGANIZE_IMPORTS));
+        assert_eq!(action.is_preferred, Some(true));
+        let edit = action.edit.as_ref().expect("action should provide edit");
+        let changes = edit.changes.as_ref().expect("edit should include changes");
+        let edits = changes.get(&uri).expect("edit should target document URI");
+        assert_eq!(edits.len(), 1);
+        assert_eq!(
+            edits[0].new_text,
+            "let io := import \"@std/io\";\nlet testing := import \"@std/testing\";\n"
+        );
+    }
+
+    #[test]
+    fn folding_range_returns_multiline_node_and_comment_ranges() {
+        let root = temp_project();
+        let path = root.join("index.ms");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let source = "\
+/-- docs
+    more docs -/
+let Pair := data {
+  left : Int;
+  right : Int;
+};
+";
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let ranges = server
+            .folding_ranges(FoldingRangeParams {
+                text_document: TextDocumentIdentifier { uri },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("folding range response should exist");
+
+        assert!(ranges.iter().any(|range| {
+            range.kind == Some(FoldingRangeKind::Comment)
+                && range.start_line == 0
+                && range.end_line == 1
+        }));
+        assert!(
+            ranges
+                .iter()
+                .any(|range| range.start_line == 2 && range.end_line == 5)
         );
     }
 

@@ -404,8 +404,7 @@ mod success {
     fn wraps_compact_receiver_method_signature_after_spacing_expands_it() {
         let mut options = options();
         options.line_width = 80;
-        let source =
-            "export let(self:Expect[T,E]).mapFail[T,E,F](f:E->F):Expect[T,F,]:=mapFail[T,E,F](self,f);";
+        let source = "export let(self:Expect[T,E]).mapFail[T,E,F](f:E->F):Expect[T,F,]:=mapFail[T,E,F](self,f);";
 
         let formatted_result = format_source(source, &options).unwrap();
 
@@ -1190,6 +1189,19 @@ let io := import "@std/io";
         let markdown = "# Example\n\n```musi\nlet testing:=import \"@std/testing\";\nlet io:=import \"@std/io\";\n```\n";
 
         let formatted_result = format_markdown(markdown, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "# Example\n\n```musi\nlet io := import \"@std/io\";\nlet testing := import \"@std/testing\";\n```\n"
+        );
+    }
+
+    #[test]
+    fn format_text_for_path_uses_markdown_formatter_for_markdown_files() {
+        let markdown = "# Example\n\n```musi\nlet testing:=import \"@std/testing\";\nlet io:=import \"@std/io\";\n```\n";
+
+        let formatted_result =
+            format_text_for_path(Path::new("README.md"), markdown, &options()).unwrap();
 
         assert_eq!(
             formatted_result.text,

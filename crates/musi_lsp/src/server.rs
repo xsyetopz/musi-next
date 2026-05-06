@@ -5,31 +5,34 @@ use std::path::Path;
 use std::pin::Pin;
 
 use async_lsp::lsp_types::{
-    CompletionList, CompletionOptions, CompletionParams, CompletionResponse,
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, DocumentFormattingParams, DocumentSymbolParams,
-    DocumentSymbolResponse, FormattingOptions, GotoDefinitionParams, GotoDefinitionResponse, Hover,
-    HoverContents, HoverParams, HoverProviderCapability, InitializeParams, InitializeResult,
-    InitializedParams, InlayHint, InlayHintOptions, InlayHintParams, InlayHintServerCapabilities,
-    Location, MarkupContent, MarkupKind, OneOf, PrepareRenameResponse, PublishDiagnosticsParams,
-    Range, ReferenceParams, RenameOptions, RenameParams, SemanticTokens, SemanticTokensFullOptions,
-    SemanticTokensOptions, SemanticTokensParams, SemanticTokensRangeParams,
-    SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
-    ServerCapabilities, ServerInfo, TextDocumentContentChangeEvent, TextDocumentItem,
-    TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url,
-    WorkDoneProgressOptions, WorkspaceEdit, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    CodeAction, CodeActionKind, CodeActionOptions, CodeActionOrCommand, CodeActionParams,
+    CodeActionProviderCapability, CodeActionResponse, CompletionList, CompletionOptions,
+    CompletionParams, CompletionResponse, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentFormattingParams,
+    DocumentHighlight, DocumentHighlightParams, DocumentSymbolParams, DocumentSymbolResponse,
+    FoldingRange, FoldingRangeParams, FoldingRangeProviderCapability, FormattingOptions,
+    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
+    HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, InlayHint,
+    InlayHintOptions, InlayHintParams, InlayHintServerCapabilities, Location, MarkupContent,
+    MarkupKind, OneOf, PrepareRenameResponse, PublishDiagnosticsParams, Range, ReferenceParams,
+    RenameOptions, RenameParams, SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions,
+    SemanticTokensParams, SemanticTokensRangeParams, SemanticTokensRangeResult,
+    SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
+    TextDocumentContentChangeEvent, TextDocumentItem, TextDocumentPositionParams,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url, WorkDoneProgressOptions,
+    WorkspaceEdit, WorkspaceSymbolParams, WorkspaceSymbolResponse,
     notification::PublishDiagnostics,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
-use musi_fmt::{FormatOptions, format_source};
+use musi_fmt::{FormatOptions, format_text_for_path};
 use musi_project::{ProjectOptions, load_project_ancestor};
 use musi_tooling::{
     collect_project_diagnostics_with_overlay, completions_for_project_file_with_overlay,
     definition_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
-    hover_for_project_file_with_overlay, inlay_hints_for_project_file_with_overlay,
-    prepare_rename_for_project_file_with_overlay, references_for_project_file_with_overlay,
-    rename_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
-    workspace_symbols_for_project_file_with_overlay,
+    folding_ranges_for_project_file_with_overlay, hover_for_project_file_with_overlay,
+    inlay_hints_for_project_file_with_overlay, prepare_rename_for_project_file_with_overlay,
+    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
+    semantic_tokens_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
 };
 
 mod config;
@@ -38,9 +41,10 @@ mod convert;
 use config::LspConfig;
 use convert::{
     diagnostic_matches_path, encode_semantic_tokens, full_document_range, position_in_range,
-    semantic_tokens_legend, to_lsp_completion, to_lsp_diagnostic, to_lsp_document_symbol,
-    to_lsp_inlay_hint, to_lsp_location, to_lsp_symbol_information, to_lsp_workspace_edit,
-    to_tool_range, truncate_hover_contents,
+    semantic_tokens_legend, to_lsp_completion, to_lsp_diagnostic, to_lsp_document_highlight,
+    to_lsp_document_symbol, to_lsp_folding_range, to_lsp_inlay_hint, to_lsp_location,
+    to_lsp_symbol_information, to_lsp_workspace_edit, to_tool_range, tool_location_matches_path,
+    truncate_hover_contents,
 };
 
 type ServerFuture<T> = Pin<Box<dyn Future<Output = Result<T, ResponseError>> + Send + 'static>>;
@@ -72,8 +76,19 @@ impl MusiLanguageServer {
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
+                document_highlight_provider: Some(OneOf::Left(true)),
                 document_symbol_provider: Some(OneOf::Left(true)),
+                folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
                 workspace_symbol_provider: Some(OneOf::Left(true)),
+                code_action_provider: Some(CodeActionProviderCapability::Options(
+                    CodeActionOptions {
+                        code_action_kinds: Some(vec![CodeActionKind::SOURCE_ORGANIZE_IMPORTS]),
+                        work_done_progress_options: WorkDoneProgressOptions {
+                            work_done_progress: None,
+                        },
+                        resolve_provider: Some(false),
+                    },
+                )),
                 rename_provider: Some(OneOf::Right(RenameOptions {
                     prepare_provider: Some(true),
                     work_done_progress_options: WorkDoneProgressOptions {
@@ -257,6 +272,34 @@ impl MusiLanguageServer {
         Some(locations)
     }
 
+    fn document_highlights(
+        &self,
+        params: DocumentHighlightParams,
+    ) -> Option<Vec<DocumentHighlight>> {
+        let text_document = params.text_document_position_params.text_document;
+        let position = params.text_document_position_params.position;
+        let path = text_document.uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let overlay = self
+            .open_documents
+            .get(&text_document.uri)
+            .map(String::as_str);
+        let highlights = references_for_project_file_with_overlay(
+            &path,
+            overlay,
+            usize::try_from(position.line).ok()?.saturating_add(1),
+            usize::try_from(position.character).ok()?.saturating_add(1),
+            true,
+        )
+        .into_iter()
+        .filter(|location| tool_location_matches_path(&path, location))
+        .map(to_lsp_document_highlight)
+        .collect();
+        Some(highlights)
+    }
+
     fn document_symbols(&self, params: DocumentSymbolParams) -> Option<DocumentSymbolResponse> {
         let uri = params.text_document.uri;
         let path = uri.to_file_path().ok()?;
@@ -269,6 +312,62 @@ impl MusiLanguageServer {
             .map(to_lsp_document_symbol)
             .collect();
         Some(DocumentSymbolResponse::Nested(symbols))
+    }
+
+    fn code_actions(&self, params: CodeActionParams) -> Option<CodeActionResponse> {
+        if !code_action_kind_requested(
+            params.context.only.as_deref(),
+            &CodeActionKind::SOURCE_ORGANIZE_IMPORTS,
+        ) {
+            return Some(Vec::new());
+        }
+        let uri = params.text_document.uri;
+        let text = self.open_documents.get(&uri)?;
+        let path = uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let options = load_project_ancestor(&path, ProjectOptions::default())
+            .ok()
+            .map_or_else(FormatOptions::default, |project| {
+                FormatOptions::from_manifest(project.manifest().fmt.as_ref())
+            });
+        let formatted = format_text_for_path(&path, text, &options).ok()?;
+        if !formatted.changed {
+            return Some(Vec::new());
+        }
+        let edit = WorkspaceEdit {
+            changes: Some(HashMap::from([(
+                uri,
+                vec![TextEdit::new(full_document_range(text), formatted.text)],
+            )])),
+            document_changes: None,
+            change_annotations: None,
+        };
+        Some(vec![CodeActionOrCommand::CodeAction(CodeAction {
+            title: "Organize imports".to_owned(),
+            kind: Some(CodeActionKind::SOURCE_ORGANIZE_IMPORTS),
+            diagnostics: None,
+            edit: Some(edit),
+            command: None,
+            is_preferred: Some(true),
+            disabled: None,
+            data: None,
+        })])
+    }
+
+    fn folding_ranges(&self, params: FoldingRangeParams) -> Option<Vec<FoldingRange>> {
+        let uri = params.text_document.uri;
+        let path = uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let overlay = self.open_documents.get(&uri).map(String::as_str);
+        let ranges = folding_ranges_for_project_file_with_overlay(&path, overlay)
+            .into_iter()
+            .map(to_lsp_folding_range)
+            .collect();
+        Some(ranges)
     }
 
     fn workspace_symbols(&self, params: &WorkspaceSymbolParams) -> Option<WorkspaceSymbolResponse> {
@@ -382,7 +481,7 @@ impl MusiLanguageServer {
                 FormatOptions::from_manifest(project.manifest().fmt.as_ref())
             });
         apply_document_formatting_options(&mut options, &params.options);
-        let formatted = format_source(text, &options).ok()?;
+        let formatted = format_text_for_path(&path, text, &options).ok()?;
         if !formatted.changed {
             return Some(Vec::new());
         }
@@ -419,6 +518,18 @@ fn apply_document_formatting_options(
 ) {
     options.indent_width = usize::try_from(formatting_options.tab_size).unwrap_or(2);
     options.use_tabs = !formatting_options.insert_spaces;
+}
+
+fn code_action_kind_requested(only: Option<&[CodeActionKind]>, target: &CodeActionKind) -> bool {
+    only.is_none_or(|kinds| {
+        kinds.iter().any(|kind| {
+            kind == target
+                || target
+                    .as_str()
+                    .strip_prefix(kind.as_str())
+                    .is_some_and(|suffix| suffix.starts_with('.'))
+        })
+    })
 }
 
 impl LanguageServer for MusiLanguageServer {
@@ -481,12 +592,36 @@ impl LanguageServer for MusiLanguageServer {
         Box::pin(async move { Ok(reference_locations) })
     }
 
+    fn document_highlight(
+        &mut self,
+        params: DocumentHighlightParams,
+    ) -> ServerFuture<Option<Vec<DocumentHighlight>>> {
+        let document_highlights = self.document_highlights(params);
+        Box::pin(async move { Ok(document_highlights) })
+    }
+
     fn document_symbol(
         &mut self,
         params: DocumentSymbolParams,
     ) -> ServerFuture<Option<DocumentSymbolResponse>> {
         let document_symbols = self.document_symbols(params);
         Box::pin(async move { Ok(document_symbols) })
+    }
+
+    fn code_action(
+        &mut self,
+        params: CodeActionParams,
+    ) -> ServerFuture<Option<CodeActionResponse>> {
+        let code_actions = self.code_actions(params);
+        Box::pin(async move { Ok(code_actions) })
+    }
+
+    fn folding_range(
+        &mut self,
+        params: FoldingRangeParams,
+    ) -> ServerFuture<Option<Vec<FoldingRange>>> {
+        let folding_ranges = self.folding_ranges(params);
+        Box::pin(async move { Ok(folding_ranges) })
     }
 
     fn symbol(

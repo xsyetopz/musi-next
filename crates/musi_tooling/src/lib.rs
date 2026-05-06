@@ -7,6 +7,7 @@ mod diag;
 mod diagnostics;
 mod direct;
 mod errors;
+mod folding;
 mod navigation;
 mod semantic;
 
@@ -29,6 +30,10 @@ pub use diagnostics::{
 };
 pub use direct::{DirectGraph, load_direct_graph};
 pub use errors::{ToolingError, ToolingResult};
+pub use folding::{
+    ToolFoldingRange, ToolFoldingRangeKind, folding_ranges_for_project_file,
+    folding_ranges_for_project_file_with_overlay,
+};
 pub use navigation::{
     ToolDocumentSymbol, ToolLocation, ToolTextEdit, ToolWorkspaceEdit, ToolWorkspaceSymbol,
     definition_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
