@@ -36,7 +36,7 @@ use async_lsp::lsp_types::{
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
 use musi_fmt::{FormatOptions, format_text_for_path};
-use musi_project::{ProjectOptions, load_project_ancestor};
+use musi_project::{PackageSource, ProjectOptions, load_project, load_project_ancestor};
 use musi_tooling::{
     ToolDocumentSymbol, collect_project_diagnostics_with_overlay,
     completions_for_project_file_with_overlay, definition_for_project_file_with_overlay,
@@ -772,15 +772,19 @@ impl MusiLanguageServer {
         &self,
         _params: WorkspaceDiagnosticParams,
     ) -> WorkspaceDiagnosticReportResult {
-        let items = self
-            .open_documents
-            .keys()
-            .filter_map(|uri| {
-                let path = uri.to_file_path().ok()?;
+        let paths = self.workspace_diagnostic_paths();
+        let items = paths
+            .into_iter()
+            .filter_map(|path| {
                 if path.file_name().is_some_and(|name| name == "musi.json") {
                     return None;
                 }
-                let overlay = self.open_documents.get(uri).map(String::as_str);
+                let open_document = self.open_document_for_path(&path);
+                let uri = open_document.map_or_else(
+                    || Url::from_file_path(&path).ok(),
+                    |(uri, _)| Some(uri.clone()),
+                )?;
+                let overlay = open_document.map(|(_, text)| text);
                 let diagnostics = collect_project_diagnostics_with_overlay(&path, overlay)
                     .into_iter()
                     .filter(|diag| diagnostic_matches_path(&path, diag))
@@ -799,6 +803,27 @@ impl MusiLanguageServer {
             })
             .collect();
         WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items })
+    }
+
+    fn workspace_diagnostic_paths(&self) -> Vec<PathBuf> {
+        let mut paths = self
+            .workspace_roots
+            .iter()
+            .flat_map(|root| workspace_module_paths(root))
+            .collect::<Vec<_>>();
+        paths.extend(
+            self.open_documents
+                .keys()
+                .filter_map(|uri| uri.to_file_path().ok()),
+        );
+        sort_dedup_paths(paths)
+    }
+
+    fn open_document_for_path(&self, path: &Path) -> Option<(&Url, &str)> {
+        self.open_documents.iter().find_map(|(uri, text)| {
+            let open_path = uri.to_file_path().ok()?;
+            paths_match(&open_path, path).then_some((uri, text.as_str()))
+        })
     }
 
     fn semantic_tokens_for_uri(&self, uri: &Url, range: Option<Range>) -> Option<SemanticTokens> {
@@ -981,10 +1006,33 @@ fn workspace_roots(params: &InitializeParams) -> Vec<PathBuf> {
     roots
 }
 
+fn workspace_module_paths(root: &Path) -> Vec<PathBuf> {
+    let Ok(project) = load_project(root, ProjectOptions::default()) else {
+        return Vec::new();
+    };
+    sort_dedup_paths(
+        project
+            .workspace()
+            .packages
+            .values()
+            .filter(|package| matches!(package.source, PackageSource::Workspace))
+            .flat_map(|package| package.module_keys.values().cloned())
+            .collect(),
+    )
+}
+
+fn sort_dedup_paths(mut paths: Vec<PathBuf>) -> Vec<PathBuf> {
+    paths.sort_by_key(|path| canonical_path(path));
+    paths.dedup_by(|left, right| paths_match(left, right));
+    paths
+}
+
 fn paths_match(left: &Path, right: &Path) -> bool {
-    let left = left.canonicalize().unwrap_or_else(|_| left.to_path_buf());
-    let right = right.canonicalize().unwrap_or_else(|_| right.to_path_buf());
-    left == right
+    canonical_path(left) == canonical_path(right)
+}
+
+fn canonical_path(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
 fn full_document_diagnostic_report(

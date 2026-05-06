@@ -1259,8 +1259,123 @@ let other := value + 2;
         let WorkspaceDocumentDiagnosticReport::Full(item) = &report.items[0] else {
             panic!("workspace diagnostics should use full reports");
         };
-        assert_eq!(item.uri, uri);
+        let report_path = item
+            .uri
+            .to_file_path()
+            .expect("report URI should be file path");
+        assert!(paths_match(&report_path, &path));
         assert_eq!(item.version, None);
+    }
+
+    #[test]
+    fn workspace_diagnostic_uses_initialize_workspace_roots_without_open_documents() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        fs::write(&path, "let value : Int := \"bad\";\n").expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        #[allow(deprecated)]
+        server.configure(&InitializeParams {
+            process_id: None,
+            root_path: None,
+            root_uri: None,
+            initialization_options: None,
+            capabilities: ClientCapabilities::default(),
+            trace: None,
+            workspace_folders: Some(vec![WorkspaceFolder {
+                uri: Url::from_file_path(&root).expect("workspace URI should build"),
+                name: "app".to_owned(),
+            }]),
+            client_info: None,
+            locale: None,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        });
+
+        let report = server.workspace_diagnostics(WorkspaceDiagnosticParams {
+            identifier: Some("musi".to_owned()),
+            previous_result_ids: Vec::new(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        });
+
+        let WorkspaceDiagnosticReportResult::Report(report) = report else {
+            panic!("workspace diagnostics should return a report");
+        };
+        assert_eq!(report.items.len(), 1);
+        let WorkspaceDocumentDiagnosticReport::Full(item) = &report.items[0] else {
+            panic!("workspace diagnostics should use full reports");
+        };
+        let report_path = item
+            .uri
+            .to_file_path()
+            .expect("report URI should be file path");
+        assert!(paths_match(&report_path, &path));
+        assert!(!item.full_document_diagnostic_report.items.is_empty());
+    }
+
+    #[test]
+    fn workspace_diagnostic_uses_open_document_overlay_for_open_files() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        fs::write(&path, "let value : Int := 1;\n").expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        #[allow(deprecated)]
+        server.configure(&InitializeParams {
+            process_id: None,
+            root_path: None,
+            root_uri: None,
+            initialization_options: None,
+            capabilities: ClientCapabilities::default(),
+            trace: None,
+            workspace_folders: Some(vec![WorkspaceFolder {
+                uri: Url::from_file_path(&root).expect("workspace URI should build"),
+                name: "app".to_owned(),
+            }]),
+            client_info: None,
+            locale: None,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        });
+        let _ = server
+            .open_documents
+            .insert(uri.clone(), "let value : Int := \"bad\";\n".to_owned());
+
+        let report = server.workspace_diagnostics(WorkspaceDiagnosticParams {
+            identifier: Some("musi".to_owned()),
+            previous_result_ids: Vec::new(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        });
+
+        let WorkspaceDiagnosticReportResult::Report(report) = report else {
+            panic!("workspace diagnostics should return a report");
+        };
+        assert_eq!(report.items.len(), 1);
+        let WorkspaceDocumentDiagnosticReport::Full(item) = &report.items[0] else {
+            panic!("workspace diagnostics should use full reports");
+        };
+        assert_eq!(item.uri, uri);
+        assert!(!item.full_document_diagnostic_report.items.is_empty());
     }
 
     #[test]
