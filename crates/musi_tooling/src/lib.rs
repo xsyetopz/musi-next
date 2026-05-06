@@ -45,7 +45,7 @@ pub use navigation::{
     definition_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
     prepare_rename_for_project_file_with_overlay, references_for_project_file_with_overlay,
     rename_for_project_file_with_overlay, type_definition_for_project_file_with_overlay,
-    workspace_symbols_for_project_file_with_overlay,
+    workspace_symbols_for_project_file_with_overlay, workspace_symbols_for_project_root,
 };
 pub use selection::{
     ToolSelectionRange, selection_ranges_for_project_file,

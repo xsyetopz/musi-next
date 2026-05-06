@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use musi_project::{ProjectOptions, load_project_ancestor};
+use musi_project::{PackageSource, ProjectOptions, load_project, load_project_ancestor};
 use music_base::{Source, SourceId};
 use music_hir::{HirExprKind, HirTyId, HirTyKind};
 use music_module::ModuleKey;
@@ -106,6 +106,38 @@ pub fn workspace_symbols_for_project_file_with_overlay(
         return Vec::new();
     };
     context.workspace_symbols(query)
+}
+
+#[must_use]
+pub fn workspace_symbols_for_project_root(root: &Path, query: &str) -> Vec<ToolWorkspaceSymbol> {
+    let Ok(project) = load_project(root, ProjectOptions::default()) else {
+        return Vec::new();
+    };
+    let mut symbols = project
+        .workspace()
+        .packages
+        .values()
+        .filter(|package| matches!(package.source, PackageSource::Workspace))
+        .flat_map(|package| package.module_keys.values())
+        .flat_map(|path| workspace_symbols_for_project_file_with_overlay(path, None, query))
+        .collect::<Vec<_>>();
+    symbols.sort_by_key(|symbol| {
+        (
+            symbol.name.clone(),
+            symbol.location.path.clone(),
+            symbol.location.range.start_line,
+            symbol.location.range.start_col,
+        )
+    });
+    symbols.dedup_by_key(|symbol| {
+        (
+            symbol.name.clone(),
+            symbol.location.path.clone(),
+            symbol.location.range.start_line,
+            symbol.location.range.start_col,
+        )
+    });
+    symbols
 }
 
 #[must_use]

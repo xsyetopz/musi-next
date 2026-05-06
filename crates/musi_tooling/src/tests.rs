@@ -28,6 +28,7 @@ use crate::{
     selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
     session_error_report, signature_help_for_project_file_with_overlay, tooling_error_report,
     type_definition_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
+    workspace_symbols_for_project_root,
 };
 
 static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(0);
@@ -378,6 +379,35 @@ boxedName.value;
                 .iter()
                 .any(|symbol| symbol.name == "before")
         );
+    }
+
+    #[test]
+    fn workspace_symbols_from_project_root_include_workspace_modules_without_open_file() {
+        let test_dir = TempDir::new();
+        write_file(
+            test_dir.path(),
+            "musi.json",
+            "{\n  \"name\": \"app\",\n  \"version\": \"0.1.0\",\n  \"entry\": \"src/index.ms\"\n}\n",
+        );
+        write_file(
+            test_dir.path(),
+            "src/index.ms",
+            "let extra := import \"./extra\";\nlet entryValue := extra.extraValue;\n",
+        );
+        write_file(
+            test_dir.path(),
+            "src/extra.ms",
+            "export let extraValue := 2;\n",
+        );
+
+        let symbols = workspace_symbols_for_project_root(test_dir.path(), "Value");
+        let names = symbols
+            .iter()
+            .map(|symbol| symbol.name.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(names.contains(&"entryValue"));
+        assert!(names.contains(&"extraValue"));
     }
 
     #[test]

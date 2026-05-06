@@ -4,18 +4,20 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use async_lsp::lsp_types::{
-    CodeActionContext, CodeActionKind, CodeActionOrCommand, CodeActionParams, CodeLensParams,
-    CompletionItemKind, CompletionTextEdit, DeclarationCapability, DiagnosticOptions,
-    DiagnosticServerCapabilities, DiagnosticSeverity, DocumentDiagnosticParams,
+    ClientCapabilities, CodeActionContext, CodeActionKind, CodeActionOrCommand, CodeActionParams,
+    CodeLensParams, CompletionItemKind, CompletionTextEdit, DeclarationCapability,
+    DiagnosticOptions, DiagnosticServerCapabilities, DiagnosticSeverity, DocumentDiagnosticParams,
     DocumentDiagnosticReport, DocumentDiagnosticReportResult, DocumentHighlightKind,
     DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
     ExecuteCommandParams, FoldingRangeKind, FoldingRangeParams, GotoDefinitionParams,
-    GotoDefinitionResponse, InlayHintKind, LinkedEditingRangeParams, PartialResultParams, Position,
-    SelectionRangeParams, SemanticToken, SignatureHelpParams, TextDocumentIdentifier,
-    TextDocumentPositionParams, TextDocumentSaveReason, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
-    TypeDefinitionProviderCapability, WillSaveTextDocumentParams, WorkDoneProgressParams,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
+    GotoDefinitionResponse, InitializeParams, InlayHintKind, LinkedEditingRangeParams,
+    PartialResultParams, Position, SelectionRangeParams, SemanticToken, SignatureHelpParams,
+    TextDocumentIdentifier, TextDocumentPositionParams, TextDocumentSaveReason,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability, WillSaveTextDocumentParams,
+    WorkDoneProgressParams, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
+    WorkspaceDocumentDiagnosticReport, WorkspaceFolder, WorkspaceSymbolParams,
+    WorkspaceSymbolResponse,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -567,6 +569,121 @@ render(8080, 1 = 1);
         assert_eq!(help.active_signature, Some(0));
         assert_eq!(help.active_parameter, Some(1));
         assert_eq!(help.signatures[0].label, "render(Int, Bool) -> Int");
+    }
+
+    #[test]
+    fn workspace_symbols_use_initialize_workspace_roots_without_open_documents() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "src/index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        fs::create_dir_all(root.join("src")).expect("src dir should be created");
+        fs::write(
+            root.join("src/index.ms"),
+            "let extra := import \"./extra\";\nlet entryValue := extra.extraValue;\n",
+        )
+        .expect("entry should be written");
+        fs::write(root.join("src/extra.ms"), "export let extraValue := 2;\n")
+            .expect("extra should be written");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        #[allow(deprecated)]
+        server.configure(&InitializeParams {
+            process_id: None,
+            root_path: None,
+            root_uri: None,
+            initialization_options: None,
+            capabilities: ClientCapabilities::default(),
+            trace: None,
+            workspace_folders: Some(vec![WorkspaceFolder {
+                uri: Url::from_file_path(&root).expect("workspace URI should build"),
+                name: "app".to_owned(),
+            }]),
+            client_info: None,
+            locale: None,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        });
+
+        let response = server
+            .workspace_symbols(&WorkspaceSymbolParams {
+                query: "Value".to_owned(),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("workspace symbols should run");
+        let WorkspaceSymbolResponse::Flat(symbols) = response else {
+            panic!("flat workspace symbols expected");
+        };
+        let names = symbols
+            .iter()
+            .map(|symbol| symbol.name.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(names.contains(&"entryValue"));
+        assert!(names.contains(&"extraValue"));
+    }
+
+    #[test]
+    fn workspace_symbols_use_open_document_overlay_for_open_files() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "src/index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        fs::create_dir_all(root.join("src")).expect("src dir should be created");
+        let path = root.join("src/index.ms");
+        fs::write(&path, "let entryValue := 1;\n").expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("entry URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        #[allow(deprecated)]
+        server.configure(&InitializeParams {
+            process_id: None,
+            root_path: None,
+            root_uri: None,
+            initialization_options: None,
+            capabilities: ClientCapabilities::default(),
+            trace: None,
+            workspace_folders: Some(vec![WorkspaceFolder {
+                uri: Url::from_file_path(&root).expect("workspace URI should build"),
+                name: "app".to_owned(),
+            }]),
+            client_info: None,
+            locale: None,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        });
+        let _ = server
+            .open_documents
+            .insert(uri, "let unsavedValue := 1;\n".to_owned());
+
+        let response = server
+            .workspace_symbols(&WorkspaceSymbolParams {
+                query: "Value".to_owned(),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("workspace symbols should run");
+        let WorkspaceSymbolResponse::Flat(symbols) = response else {
+            panic!("flat workspace symbols expected");
+        };
+        let names = symbols
+            .iter()
+            .map(|symbol| symbol.name.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(names.contains(&"unsavedValue"), "{names:?}");
+        assert!(!names.contains(&"entryValue"), "{names:?}");
     }
 
     #[test]

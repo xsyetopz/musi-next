@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::ops::ControlFlow;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 
 use async_lsp::lsp_types::{
@@ -46,7 +46,7 @@ use musi_tooling::{
     references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
     selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
     signature_help_for_project_file_with_overlay, type_definition_for_project_file_with_overlay,
-    workspace_symbols_for_project_file_with_overlay,
+    workspace_symbols_for_project_file_with_overlay, workspace_symbols_for_project_root,
 };
 use serde_json::{Value, json};
 
@@ -70,6 +70,7 @@ const REFERENCES_COMMAND: &str = "musi.references";
 pub struct MusiLanguageServer {
     client: ClientSocket,
     open_documents: HashMap<Url, String>,
+    workspace_roots: Vec<PathBuf>,
     config: LspConfig,
 }
 
@@ -79,6 +80,7 @@ impl MusiLanguageServer {
         Self {
             client,
             open_documents: HashMap::new(),
+            workspace_roots: Vec::new(),
             config: LspConfig::default(),
         }
     }
@@ -201,6 +203,7 @@ impl MusiLanguageServer {
 
     fn configure(&mut self, params: &InitializeParams) {
         self.config = LspConfig::from_initialize_params(params);
+        self.workspace_roots = workspace_roots(params);
     }
 
     fn did_open_document(&mut self, item: TextDocumentItem) {
@@ -618,13 +621,54 @@ impl MusiLanguageServer {
     }
 
     fn workspace_symbols(&self, params: &WorkspaceSymbolParams) -> Option<WorkspaceSymbolResponse> {
-        let (uri, text) = self.open_documents.iter().next()?;
-        let path = uri.to_file_path().ok()?;
-        let symbols =
-            workspace_symbols_for_project_file_with_overlay(&path, Some(text), &params.query)
-                .into_iter()
-                .filter_map(to_lsp_symbol_information)
-                .collect();
+        let open_paths = self
+            .open_documents
+            .keys()
+            .filter_map(|uri| uri.to_file_path().ok())
+            .collect::<Vec<_>>();
+        let mut symbols = self
+            .workspace_roots
+            .iter()
+            .flat_map(|root| workspace_symbols_for_project_root(root, &params.query))
+            .filter(|symbol| {
+                !open_paths
+                    .iter()
+                    .any(|path| paths_match(path, &symbol.location.path))
+            })
+            .collect::<Vec<_>>();
+        symbols.extend(
+            self.open_documents
+                .iter()
+                .filter_map(|(uri, text)| {
+                    let path = uri.to_file_path().ok()?;
+                    Some(workspace_symbols_for_project_file_with_overlay(
+                        &path,
+                        Some(text),
+                        &params.query,
+                    ))
+                })
+                .flatten(),
+        );
+        symbols.sort_by_key(|symbol| {
+            (
+                symbol.name.clone(),
+                symbol.location.path.clone(),
+                symbol.location.range.start_line,
+                symbol.location.range.start_col,
+            )
+        });
+        symbols.dedup_by_key(|symbol| {
+            (
+                symbol.name.clone(),
+                symbol.location.path.clone(),
+                symbol.location.range.start_line,
+                symbol.location.range.start_col,
+            )
+        });
+        let symbols = symbols
+            .into_iter()
+            .filter_map(to_lsp_symbol_information)
+            .collect();
         Some(WorkspaceSymbolResponse::Flat(symbols))
     }
 
@@ -916,6 +960,31 @@ fn reference_command_arguments(path: &Path, symbol: &ToolDocumentSymbol) -> Opti
         "line": symbol.selection_range.start_line.saturating_sub(1),
         "character": symbol.selection_range.start_col.saturating_sub(1),
     })])
+}
+
+#[allow(deprecated)]
+fn workspace_roots(params: &InitializeParams) -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    if let Some(folders) = &params.workspace_folders {
+        roots.extend(
+            folders
+                .iter()
+                .filter_map(|folder| folder.uri.to_file_path().ok()),
+        );
+    }
+    if roots.is_empty()
+        && let Some(root_uri) = &params.root_uri
+        && let Ok(path) = root_uri.to_file_path()
+    {
+        roots.push(path);
+    }
+    roots
+}
+
+fn paths_match(left: &Path, right: &Path) -> bool {
+    let left = left.canonicalize().unwrap_or_else(|_| left.to_path_buf());
+    let right = right.canonicalize().unwrap_or_else(|_| right.to_path_buf());
+    left == right
 }
 
 fn full_document_diagnostic_report(
