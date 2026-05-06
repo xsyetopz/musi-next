@@ -6,9 +6,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use async_lsp::lsp_types::{
     CodeActionContext, CodeActionKind, CodeActionOrCommand, CodeActionParams, CompletionItemKind,
     CompletionTextEdit, DiagnosticSeverity, DocumentHighlightKind, DocumentLinkParams,
-    DocumentRangeFormattingParams, FoldingRangeKind, FoldingRangeParams, InlayHintKind,
-    PartialResultParams, Position, SelectionRangeParams, SemanticToken, TextDocumentIdentifier,
-    TextDocumentPositionParams, WorkDoneProgressParams,
+    DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, FoldingRangeKind,
+    FoldingRangeParams, InlayHintKind, PartialResultParams, Position, SelectionRangeParams,
+    SemanticToken, TextDocumentIdentifier, TextDocumentPositionParams, WorkDoneProgressParams,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -61,6 +61,15 @@ mod success {
                 .capabilities
                 .document_range_formatting_provider,
             Some(OneOf::Left(true))
+        );
+        let on_type_formatting = initialize_result
+            .capabilities
+            .document_on_type_formatting_provider
+            .expect("on type formatting provider");
+        assert_eq!(on_type_formatting.first_trigger_character, ";");
+        assert_eq!(
+            on_type_formatting.more_trigger_character.as_deref(),
+            Some(&[")".to_owned(), "]".to_owned(), "}".to_owned()][..])
         );
         assert!(
             initialize_result
@@ -276,6 +285,59 @@ let value:=1;
             edits[0].new_text,
             "let io := import \"@std/io\";\nlet testing := import \"@std/testing\";\n"
         );
+    }
+
+    #[test]
+    fn document_on_type_formatting_formats_open_document_on_trigger() {
+        let uri = Url::parse("file:///tmp/index.ms").expect("uri should parse");
+        let source = "let x:=1;";
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let edits = server
+            .document_on_type_formatting(DocumentOnTypeFormattingParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(0, 9),
+                },
+                ch: ";".to_owned(),
+                options: FormattingOptions {
+                    tab_size: 2,
+                    insert_spaces: true,
+                    ..FormattingOptions::default()
+                },
+            })
+            .expect("on type formatting should run");
+
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].range, full_document_range(source));
+        assert_eq!(edits[0].new_text, "let x := 1;\n");
+    }
+
+    #[test]
+    fn document_on_type_formatting_ignores_non_trigger_characters() {
+        let uri = Url::parse("file:///tmp/index.ms").expect("uri should parse");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server
+            .open_documents
+            .insert(uri.clone(), "let x:=1;".to_owned());
+
+        let edits = server
+            .document_on_type_formatting(DocumentOnTypeFormattingParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(0, 5),
+                },
+                ch: "x".to_owned(),
+                options: FormattingOptions {
+                    tab_size: 2,
+                    insert_spaces: true,
+                    ..FormattingOptions::default()
+                },
+            })
+            .expect("on type formatting should run");
+
+        assert!(edits.is_empty());
     }
 
     #[test]

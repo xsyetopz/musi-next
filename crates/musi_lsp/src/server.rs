@@ -10,19 +10,20 @@ use async_lsp::lsp_types::{
     CompletionParams, CompletionResponse, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentFormattingParams,
     DocumentHighlight, DocumentHighlightParams, DocumentLink, DocumentLinkOptions,
-    DocumentLinkParams, DocumentRangeFormattingParams, DocumentSymbolParams,
-    DocumentSymbolResponse, FoldingRange, FoldingRangeParams, FoldingRangeProviderCapability,
-    FormattingOptions, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents,
-    HoverParams, HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams,
-    InlayHint, InlayHintOptions, InlayHintParams, InlayHintServerCapabilities, Location,
-    MarkupContent, MarkupKind, OneOf, PrepareRenameResponse, PublishDiagnosticsParams, Range,
-    ReferenceParams, RenameOptions, RenameParams, SelectionRange, SelectionRangeParams,
-    SelectionRangeProviderCapability, SemanticTokens, SemanticTokensFullOptions,
-    SemanticTokensOptions, SemanticTokensParams, SemanticTokensRangeParams,
-    SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
-    ServerCapabilities, ServerInfo, TextDocumentContentChangeEvent, TextDocumentItem,
-    TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url,
-    WorkDoneProgressOptions, WorkspaceEdit, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    DocumentLinkParams, DocumentOnTypeFormattingOptions, DocumentOnTypeFormattingParams,
+    DocumentRangeFormattingParams, DocumentSymbolParams, DocumentSymbolResponse, FoldingRange,
+    FoldingRangeParams, FoldingRangeProviderCapability, FormattingOptions, GotoDefinitionParams,
+    GotoDefinitionResponse, Hover, HoverContents, HoverParams, HoverProviderCapability,
+    InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintOptions,
+    InlayHintParams, InlayHintServerCapabilities, Location, MarkupContent, MarkupKind, OneOf,
+    PrepareRenameResponse, PublishDiagnosticsParams, Range, ReferenceParams, RenameOptions,
+    RenameParams, SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability,
+    SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
+    SemanticTokensRangeParams, SemanticTokensRangeResult, SemanticTokensResult,
+    SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
+    TextDocumentContentChangeEvent, TextDocumentItem, TextDocumentPositionParams,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url, WorkDoneProgressOptions,
+    WorkspaceEdit, WorkspaceSymbolParams, WorkspaceSymbolResponse,
     notification::PublishDiagnostics,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
@@ -107,6 +108,14 @@ impl MusiLanguageServer {
                 })),
                 document_formatting_provider: Some(OneOf::Left(true)),
                 document_range_formatting_provider: Some(OneOf::Left(true)),
+                document_on_type_formatting_provider: Some(DocumentOnTypeFormattingOptions {
+                    first_trigger_character: ";".to_owned(),
+                    more_trigger_character: Some(vec![
+                        ")".to_owned(),
+                        "]".to_owned(),
+                        "}".to_owned(),
+                    ]),
+                }),
                 completion_provider: Some(CompletionOptions {
                     resolve_provider: Some(false),
                     trigger_characters: Some(vec![".".to_owned()]),
@@ -540,6 +549,35 @@ impl MusiLanguageServer {
         )])
     }
 
+    fn document_on_type_formatting(
+        &self,
+        params: DocumentOnTypeFormattingParams,
+    ) -> Option<Vec<TextEdit>> {
+        if !on_type_formatting_trigger(&params.ch) {
+            return Some(Vec::new());
+        }
+        let uri = params.text_document_position.text_document.uri;
+        let text = self.open_documents.get(&uri)?;
+        let path = uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let mut options = load_project_ancestor(&path, ProjectOptions::default())
+            .ok()
+            .map_or_else(FormatOptions::default, |project| {
+                FormatOptions::from_manifest(project.manifest().fmt.as_ref())
+            });
+        apply_document_formatting_options(&mut options, &params.options);
+        let formatted = format_text_for_path(&path, text, &options).ok()?;
+        if !formatted.changed {
+            return Some(Vec::new());
+        }
+        Some(vec![TextEdit::new(
+            full_document_range(text),
+            formatted.text,
+        )])
+    }
+
     fn document_range_formatting(
         &self,
         params: DocumentRangeFormattingParams,
@@ -592,6 +630,10 @@ fn apply_document_formatting_options(
 ) {
     options.indent_width = usize::try_from(formatting_options.tab_size).unwrap_or(2);
     options.use_tabs = !formatting_options.insert_spaces;
+}
+
+fn on_type_formatting_trigger(ch: &str) -> bool {
+    matches!(ch, ";" | ")" | "]" | "}")
 }
 
 fn lsp_range_offsets(text: &str, range: Range) -> Option<(usize, usize)> {
@@ -773,6 +815,14 @@ impl LanguageServer for MusiLanguageServer {
         params: DocumentRangeFormattingParams,
     ) -> ServerFuture<Option<Vec<TextEdit>>> {
         let formatting_response = self.document_range_formatting(params);
+        Box::pin(async move { Ok(formatting_response) })
+    }
+
+    fn on_type_formatting(
+        &mut self,
+        params: DocumentOnTypeFormattingParams,
+    ) -> ServerFuture<Option<Vec<TextEdit>>> {
+        let formatting_response = self.document_on_type_formatting(params);
         Box::pin(async move { Ok(formatting_response) })
     }
 
