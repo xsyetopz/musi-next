@@ -174,12 +174,18 @@ mod success {
         let will_rename = file_operations
             .will_rename
             .expect("will rename registration");
-        assert_eq!(will_rename.filters.len(), 1);
+        assert_eq!(will_rename.filters.len(), 2);
         assert_eq!(will_rename.filters[0].scheme.as_deref(), Some("file"));
         assert_eq!(will_rename.filters[0].pattern.glob, "**/*.ms");
         assert_eq!(
             will_rename.filters[0].pattern.matches,
             Some(FileOperationPatternKind::File)
+        );
+        assert_eq!(will_rename.filters[1].scheme.as_deref(), Some("file"));
+        assert_eq!(will_rename.filters[1].pattern.glob, "**");
+        assert_eq!(
+            will_rename.filters[1].pattern.matches,
+            Some(FileOperationPatternKind::Folder)
         );
         assert_eq!(
             initialize_result.capabilities.document_highlight_provider,
@@ -1792,6 +1798,69 @@ let other := value + 2;
         assert_eq!(edits[0].range.start, Position::new(0, 18));
         assert_eq!(edits[0].range.end, Position::new(0, 25));
         assert_eq!(edits[0].new_text, "\"./renamed\"");
+    }
+
+    #[test]
+    fn will_rename_files_updates_imports_for_renamed_folders() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "src/index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        fs::create_dir_all(root.join("src/lib")).expect("lib dir should be created");
+        let index_path = root.join("src/index.ms");
+        let old_dir = root.join("src/lib");
+        let new_dir = root.join("src/moved");
+        fs::write(&index_path, "let dep := import \"./lib/dep\";\n")
+            .expect("index should be written");
+        fs::write(old_dir.join("dep.ms"), "export let value := 1;\n")
+            .expect("dep should be written");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        #[allow(deprecated)]
+        server.configure(&InitializeParams {
+            process_id: None,
+            root_path: None,
+            root_uri: None,
+            initialization_options: None,
+            capabilities: ClientCapabilities::default(),
+            trace: None,
+            workspace_folders: Some(vec![WorkspaceFolder {
+                uri: Url::from_file_path(&root).expect("workspace URI should build"),
+                name: "app".to_owned(),
+            }]),
+            client_info: None,
+            locale: None,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        });
+
+        let edit = server
+            .will_rename_files_edit(&RenameFilesParams {
+                files: vec![FileRename {
+                    old_uri: Url::from_file_path(&old_dir)
+                        .expect("old URI should build")
+                        .to_string(),
+                    new_uri: Url::from_file_path(&new_dir)
+                        .expect("new URI should build")
+                        .to_string(),
+                }],
+            })
+            .expect("folder rename should produce import edit");
+
+        let changes = edit.changes.expect("edit should use plain changes");
+        assert_eq!(changes.len(), 1);
+        let (edit_uri, edits) = changes.iter().next().expect("index edit should exist");
+        let edit_path = edit_uri
+            .to_file_path()
+            .expect("edit URI should be a file path");
+        assert!(paths_match(&edit_path, &index_path));
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].new_text, "\"./moved/dep\"");
     }
 
     #[test]

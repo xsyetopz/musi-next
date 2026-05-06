@@ -161,14 +161,24 @@ impl MusiLanguageServer {
                     }),
                     file_operations: Some(WorkspaceFileOperationsServerCapabilities {
                         will_rename: Some(FileOperationRegistrationOptions {
-                            filters: vec![FileOperationFilter {
-                                scheme: Some("file".to_owned()),
-                                pattern: FileOperationPattern {
-                                    glob: "**/*.ms".to_owned(),
-                                    matches: Some(FileOperationPatternKind::File),
-                                    options: None,
+                            filters: vec![
+                                FileOperationFilter {
+                                    scheme: Some("file".to_owned()),
+                                    pattern: FileOperationPattern {
+                                        glob: "**/*.ms".to_owned(),
+                                        matches: Some(FileOperationPatternKind::File),
+                                        options: None,
+                                    },
                                 },
-                            }],
+                                FileOperationFilter {
+                                    scheme: Some("file".to_owned()),
+                                    pattern: FileOperationPattern {
+                                        glob: "**".to_owned(),
+                                        matches: Some(FileOperationPatternKind::Folder),
+                                        options: None,
+                                    },
+                                },
+                            ],
                         }),
                         ..WorkspaceFileOperationsServerCapabilities::default()
                     }),
@@ -1496,11 +1506,13 @@ fn canonical_path(path: &Path) -> PathBuf {
 
 fn renamed_target_path(renames: &[(PathBuf, PathBuf)], target: &Path) -> Option<PathBuf> {
     renames.iter().find_map(|(old_path, new_path)| {
-        if paths_match(target, old_path) {
+        let target_key = canonical_path(target);
+        let old_key = canonical_path(old_path);
+        if target_key == old_key {
             return Some(new_path.clone());
         }
-        target
-            .strip_prefix(old_path)
+        target_key
+            .strip_prefix(old_key)
             .ok()
             .map(|relative| new_path.join(relative))
     })
@@ -1519,15 +1531,24 @@ fn import_specifier_for_target(importer_path: &Path, target_path: &Path) -> Opti
 }
 
 fn canonical_target_path(path: &Path) -> PathBuf {
-    path.canonicalize().unwrap_or_else(|_| {
-        path.parent().map(canonical_path).map_or_else(
-            || path.to_path_buf(),
-            |parent| {
-                path.file_name()
-                    .map_or_else(|| parent.clone(), |file_name| parent.join(file_name))
-            },
-        )
-    })
+    if let Ok(path) = path.canonicalize() {
+        return path;
+    }
+    let mut missing = Vec::new();
+    let mut current = path;
+    while let Some(parent) = current.parent() {
+        if let Some(file_name) = current.file_name() {
+            missing.push(file_name.to_owned());
+        }
+        if let Ok(mut base) = parent.canonicalize() {
+            for component in missing.iter().rev() {
+                base.push(component);
+            }
+            return base;
+        }
+        current = parent;
+    }
+    path.to_path_buf()
 }
 
 fn relative_path(from_dir: &Path, target_path: &Path) -> Option<PathBuf> {
