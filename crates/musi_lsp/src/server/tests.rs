@@ -1946,6 +1946,40 @@ let other := value + 2;
             .related_information
             .expect("related information should exist");
         assert_eq!(related[0].location.uri.scheme(), "file");
+        assert_eq!(
+            converted
+                .data
+                .as_ref()
+                .and_then(|data| data.get("phase"))
+                .and_then(serde_json::Value::as_str),
+            None
+        );
+    }
+
+    #[test]
+    fn lsp_diagnostic_preserves_hint_and_notes_in_data() {
+        let diagnostic = CliDiagnostic::new("sema", "error", "return value expected `Int`")
+            .with_hint(Some("return integer value".to_owned()))
+            .with_notes(vec!["function body returned `String`".to_owned()]);
+
+        let converted = to_lsp_diagnostic(diagnostic);
+        let data = converted.data.expect("diagnostic data should exist");
+
+        assert_eq!(
+            data.get("phase").and_then(serde_json::Value::as_str),
+            Some("sema")
+        );
+        assert_eq!(
+            data.get("hint").and_then(serde_json::Value::as_str),
+            Some("return integer value")
+        );
+        assert_eq!(
+            data.get("notes")
+                .and_then(serde_json::Value::as_array)
+                .and_then(|notes| notes.first())
+                .and_then(serde_json::Value::as_str),
+            Some("function body returned `String`")
+        );
     }
 
     #[test]

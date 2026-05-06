@@ -429,6 +429,7 @@ pub(super) fn tool_location_matches_path(path: &Path, location: &ToolLocation) -
 }
 
 pub(super) fn to_lsp_diagnostic(diagnostic: CliDiagnostic) -> Diagnostic {
+    let data = diagnostic_data(&diagnostic);
     Diagnostic {
         range: diagnostic
             .range
@@ -441,8 +442,18 @@ pub(super) fn to_lsp_diagnostic(diagnostic: CliDiagnostic) -> Diagnostic {
         message: diagnostic.message,
         related_information: related_information(&diagnostic.labels),
         tags: None,
-        data: None,
+        data,
     }
+}
+
+fn diagnostic_data(diagnostic: &CliDiagnostic) -> Option<Value> {
+    (diagnostic.hint.is_some() || !diagnostic.notes.is_empty()).then(|| {
+        json!({
+            "phase": diagnostic.phase,
+            "hint": diagnostic.hint,
+            "notes": diagnostic.notes,
+        })
+    })
 }
 
 pub(super) fn to_severity(value: &str) -> DiagnosticSeverity {
