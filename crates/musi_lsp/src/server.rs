@@ -26,22 +26,22 @@ use async_lsp::lsp_types::{
     HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, InlayHint,
     InlayHintOptions, InlayHintParams, InlayHintServerCapabilities, LinkedEditingRangeParams,
     LinkedEditingRangeServerCapabilities, LinkedEditingRanges, Location, MarkupContent, MarkupKind,
-    OneOf, Position, PrepareRenameResponse, PublishDiagnosticsParams, Range, ReferenceParams,
-    RelatedFullDocumentDiagnosticReport, RenameOptions, RenameParams, SelectionRange,
-    SelectionRangeParams, SelectionRangeProviderCapability, SemanticToken, SemanticTokens,
-    SemanticTokensDelta, SemanticTokensDeltaParams, SemanticTokensEdit,
+    Moniker, MonikerParams, OneOf, Position, PrepareRenameResponse, PublishDiagnosticsParams,
+    Range, ReferenceParams, RelatedFullDocumentDiagnosticReport, RenameOptions, RenameParams,
+    SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability, SemanticToken,
+    SemanticTokens, SemanticTokensDelta, SemanticTokensDeltaParams, SemanticTokensEdit,
     SemanticTokensFullDeltaResult, SemanticTokensFullOptions, SemanticTokensOptions,
     SemanticTokensParams, SemanticTokensRangeParams, SemanticTokensRangeResult,
     SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
     SignatureHelp, SignatureHelpOptions, SignatureHelpParams, TextDocumentContentChangeEvent,
     TextDocumentItem, TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind,
     TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TextEdit,
-    TypeDefinitionProviderCapability, Url, WillSaveTextDocumentParams, WorkDoneProgressOptions,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult,
-    WorkspaceDocumentDiagnosticReport, WorkspaceEdit, WorkspaceFoldersServerCapabilities,
-    WorkspaceFullDocumentDiagnosticReport, WorkspaceServerCapabilities, WorkspaceSymbol,
-    WorkspaceSymbolOptions, WorkspaceSymbolParams, WorkspaceSymbolResponse,
-    notification::PublishDiagnostics,
+    TypeDefinitionProviderCapability, UniquenessLevel, Url, WillSaveTextDocumentParams,
+    WorkDoneProgressOptions, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
+    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport, WorkspaceEdit,
+    WorkspaceFoldersServerCapabilities, WorkspaceFullDocumentDiagnosticReport,
+    WorkspaceServerCapabilities, WorkspaceSymbol, WorkspaceSymbolOptions, WorkspaceSymbolParams,
+    WorkspaceSymbolResponse, notification::PublishDiagnostics,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
 use musi_fmt::{FormatOptions, format_text_for_path};
@@ -129,6 +129,7 @@ impl MusiLanguageServer {
                 definition_provider: Some(OneOf::Left(true)),
                 type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
                 references_provider: Some(OneOf::Left(true)),
+                moniker_provider: Some(OneOf::Left(true)),
                 call_hierarchy_provider: Some(CallHierarchyServerCapability::Simple(true)),
                 linked_editing_range_provider: Some(LinkedEditingRangeServerCapabilities::Simple(
                     true,
@@ -444,6 +445,37 @@ impl MusiLanguageServer {
         .filter_map(to_lsp_location)
         .collect();
         Some(locations)
+    }
+
+    fn monikers_at(&self, params: MonikerParams) -> Option<Vec<Moniker>> {
+        let text_document = params.text_document_position_params.text_document;
+        let position = params.text_document_position_params.position;
+        let path = text_document.uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let overlay = self
+            .open_documents
+            .get(&text_document.uri)
+            .map(String::as_str);
+        let location = definition_for_project_file_with_overlay(
+            &path,
+            overlay,
+            usize::try_from(position.line).ok()?.saturating_add(1),
+            usize::try_from(position.character).ok()?.saturating_add(1),
+        )?;
+        let uri = Url::from_file_path(location.path).ok()?;
+        Some(vec![Moniker {
+            scheme: "musi".to_owned(),
+            identifier: format!(
+                "{}#{}:{}",
+                uri.as_str(),
+                location.range.start_line,
+                location.range.start_col
+            ),
+            unique: UniquenessLevel::Project,
+            kind: None,
+        }])
     }
 
     fn document_highlights(
@@ -1541,6 +1573,11 @@ impl LanguageServer for MusiLanguageServer {
     fn references(&mut self, params: ReferenceParams) -> ServerFuture<Option<Vec<Location>>> {
         let reference_locations = self.references_at(params);
         Box::pin(async move { Ok(reference_locations) })
+    }
+
+    fn moniker(&mut self, params: MonikerParams) -> ServerFuture<Option<Vec<Moniker>>> {
+        let monikers = self.monikers_at(params);
+        Box::pin(async move { Ok(monikers) })
     }
 
     fn document_highlight(

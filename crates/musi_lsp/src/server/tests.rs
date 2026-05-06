@@ -140,6 +140,10 @@ mod success {
             Some(OneOf::Left(true))
         );
         assert_eq!(
+            initialize_result.capabilities.moniker_provider,
+            Some(OneOf::Left(true))
+        );
+        assert_eq!(
             initialize_result.capabilities.call_hierarchy_provider,
             Some(CallHierarchyServerCapability::Simple(true))
         );
@@ -1039,6 +1043,44 @@ let other := value + value;
             linked.word_pattern.as_deref(),
             Some("[A-Za-z_][A-Za-z0-9_]*")
         );
+    }
+
+    #[test]
+    fn moniker_returns_project_unique_definition_identifier() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let value := 1;\nlet other := value;\n";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let monikers = server
+            .monikers_at(MonikerParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: uri.clone() },
+                    position: Position::new(1, 15),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("moniker should resolve");
+
+        assert_eq!(monikers.len(), 1);
+        assert_eq!(monikers[0].scheme, "musi");
+        assert_eq!(monikers[0].unique, UniquenessLevel::Project);
+        assert_eq!(monikers[0].kind, None);
+        assert_eq!(monikers[0].identifier, format!("{}#1:5", uri.as_str()));
     }
 
     #[test]
