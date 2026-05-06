@@ -6,9 +6,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use async_lsp::lsp_types::{
     CodeActionContext, CodeActionKind, CodeActionOrCommand, CodeActionParams, CompletionItemKind,
     CompletionTextEdit, DiagnosticSeverity, DocumentHighlightKind, DocumentLinkParams,
-    FoldingRangeKind, FoldingRangeParams, InlayHintKind, PartialResultParams, Position,
-    SelectionRangeParams, SemanticToken, TextDocumentIdentifier, TextDocumentPositionParams,
-    WorkDoneProgressParams,
+    DocumentRangeFormattingParams, FoldingRangeKind, FoldingRangeParams, InlayHintKind,
+    PartialResultParams, Position, SelectionRangeParams, SemanticToken, TextDocumentIdentifier,
+    TextDocumentPositionParams, WorkDoneProgressParams,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -54,6 +54,12 @@ mod success {
         );
         assert_eq!(
             initialize_result.capabilities.document_formatting_provider,
+            Some(OneOf::Left(true))
+        );
+        assert_eq!(
+            initialize_result
+                .capabilities
+                .document_range_formatting_provider,
             Some(OneOf::Left(true))
         );
         assert!(
@@ -234,6 +240,41 @@ mod success {
         assert_eq!(
             edits[0].new_text,
             "# Example\n\n```musi\nlet io := import \"@std/io\";\nlet testing := import \"@std/testing\";\n```\n"
+        );
+    }
+
+    #[test]
+    fn document_range_formatting_formats_selected_source_range() {
+        let uri = Url::parse("file:///tmp/index.ms").expect("uri should parse");
+        let source = r#"let testing:=import "@std/testing";
+let io:=import "@std/io";
+let value:=1;
+"#;
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let edits = server
+            .document_range_formatting(DocumentRangeFormattingParams {
+                text_document: TextDocumentIdentifier { uri },
+                range: Range {
+                    start: Position::new(0, 0),
+                    end: Position::new(2, 0),
+                },
+                options: FormattingOptions {
+                    tab_size: 2,
+                    insert_spaces: true,
+                    ..FormattingOptions::default()
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("range formatting should run");
+
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].range.start, Position::new(0, 0));
+        assert_eq!(edits[0].range.end, Position::new(2, 0));
+        assert_eq!(
+            edits[0].new_text,
+            "let io := import \"@std/io\";\nlet testing := import \"@std/testing\";\n"
         );
     }
 

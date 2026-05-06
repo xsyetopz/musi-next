@@ -10,19 +10,19 @@ use async_lsp::lsp_types::{
     CompletionParams, CompletionResponse, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentFormattingParams,
     DocumentHighlight, DocumentHighlightParams, DocumentLink, DocumentLinkOptions,
-    DocumentLinkParams, DocumentSymbolParams, DocumentSymbolResponse, FoldingRange,
-    FoldingRangeParams, FoldingRangeProviderCapability, FormattingOptions, GotoDefinitionParams,
-    GotoDefinitionResponse, Hover, HoverContents, HoverParams, HoverProviderCapability,
-    InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintOptions,
-    InlayHintParams, InlayHintServerCapabilities, Location, MarkupContent, MarkupKind, OneOf,
-    PrepareRenameResponse, PublishDiagnosticsParams, Range, ReferenceParams, RenameOptions,
-    RenameParams, SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability,
-    SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
-    SemanticTokensRangeParams, SemanticTokensRangeResult, SemanticTokensResult,
-    SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
-    TextDocumentContentChangeEvent, TextDocumentItem, TextDocumentPositionParams,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url, WorkDoneProgressOptions,
-    WorkspaceEdit, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    DocumentLinkParams, DocumentRangeFormattingParams, DocumentSymbolParams,
+    DocumentSymbolResponse, FoldingRange, FoldingRangeParams, FoldingRangeProviderCapability,
+    FormattingOptions, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents,
+    HoverParams, HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams,
+    InlayHint, InlayHintOptions, InlayHintParams, InlayHintServerCapabilities, Location,
+    MarkupContent, MarkupKind, OneOf, PrepareRenameResponse, PublishDiagnosticsParams, Range,
+    ReferenceParams, RenameOptions, RenameParams, SelectionRange, SelectionRangeParams,
+    SelectionRangeProviderCapability, SemanticTokens, SemanticTokensFullOptions,
+    SemanticTokensOptions, SemanticTokensParams, SemanticTokensRangeParams,
+    SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
+    ServerCapabilities, ServerInfo, TextDocumentContentChangeEvent, TextDocumentItem,
+    TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url,
+    WorkDoneProgressOptions, WorkspaceEdit, WorkspaceSymbolParams, WorkspaceSymbolResponse,
     notification::PublishDiagnostics,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
@@ -106,6 +106,7 @@ impl MusiLanguageServer {
                     },
                 })),
                 document_formatting_provider: Some(OneOf::Left(true)),
+                document_range_formatting_provider: Some(OneOf::Left(true)),
                 completion_provider: Some(CompletionOptions {
                     resolve_provider: Some(false),
                     trigger_characters: Some(vec![".".to_owned()]),
@@ -539,6 +540,31 @@ impl MusiLanguageServer {
         )])
     }
 
+    fn document_range_formatting(
+        &self,
+        params: DocumentRangeFormattingParams,
+    ) -> Option<Vec<TextEdit>> {
+        let uri = params.text_document.uri;
+        let text = self.open_documents.get(&uri)?;
+        let path = uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let (start, end) = lsp_range_offsets(text, params.range)?;
+        let selected = text.get(start..end)?;
+        let mut options = load_project_ancestor(&path, ProjectOptions::default())
+            .ok()
+            .map_or_else(FormatOptions::default, |project| {
+                FormatOptions::from_manifest(project.manifest().fmt.as_ref())
+            });
+        apply_document_formatting_options(&mut options, &params.options);
+        let formatted = format_text_for_path(&path, selected, &options).ok()?;
+        if !formatted.changed {
+            return Some(Vec::new());
+        }
+        Some(vec![TextEdit::new(params.range, formatted.text)])
+    }
+
     fn publish_document_diagnostics(&self, uri: &Url, path: &Path) {
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return;
@@ -566,6 +592,31 @@ fn apply_document_formatting_options(
 ) {
     options.indent_width = usize::try_from(formatting_options.tab_size).unwrap_or(2);
     options.use_tabs = !formatting_options.insert_spaces;
+}
+
+fn lsp_range_offsets(text: &str, range: Range) -> Option<(usize, usize)> {
+    let start = lsp_position_offset(text, range.start)?;
+    let end = lsp_position_offset(text, range.end)?;
+    (start <= end).then_some((start, end))
+}
+
+fn lsp_position_offset(text: &str, position: async_lsp::lsp_types::Position) -> Option<usize> {
+    let target_line = usize::try_from(position.line).ok()?;
+    let target_character = usize::try_from(position.character).ok()?;
+    let mut line = 0usize;
+    let mut character = 0usize;
+    for (offset, ch) in text.char_indices() {
+        if line == target_line && character == target_character {
+            return Some(offset);
+        }
+        if ch == '\n' {
+            line = line.saturating_add(1);
+            character = 0;
+        } else {
+            character = character.saturating_add(1);
+        }
+    }
+    (line == target_line && character == target_character).then_some(text.len())
 }
 
 fn code_action_kind_requested(only: Option<&[CodeActionKind]>, target: &CodeActionKind) -> bool {
@@ -714,6 +765,14 @@ impl LanguageServer for MusiLanguageServer {
         params: DocumentFormattingParams,
     ) -> ServerFuture<Option<Vec<TextEdit>>> {
         let formatting_response = self.document_formatting(params);
+        Box::pin(async move { Ok(formatting_response) })
+    }
+
+    fn range_formatting(
+        &mut self,
+        params: DocumentRangeFormattingParams,
+    ) -> ServerFuture<Option<Vec<TextEdit>>> {
+        let formatting_response = self.document_range_formatting(params);
         Box::pin(async move { Ok(formatting_response) })
     }
 
