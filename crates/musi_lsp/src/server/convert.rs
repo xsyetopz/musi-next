@@ -2,7 +2,7 @@ use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
 
 use async_lsp::lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionTextEdit, Diagnostic,
+    CallHierarchyItem, CompletionItem, CompletionItemKind, CompletionTextEdit, Diagnostic,
     DiagnosticRelatedInformation, DiagnosticSeverity, DocumentHighlight, DocumentHighlightKind,
     DocumentLink, DocumentSymbol, Documentation, FoldingRange, FoldingRangeKind, InlayHint,
     InlayHintKind, InlayHintLabel, InlayHintTooltip, Location, NumberOrString, OneOf,
@@ -163,7 +163,7 @@ pub(super) fn to_lsp_document_symbol(symbol: ToolDocumentSymbol) -> DocumentSymb
     DocumentSymbol {
         name: symbol.name,
         detail: None,
-        kind: to_symbol_kind(symbol.kind),
+        kind: to_lsp_symbol_kind(symbol.kind),
         tags: None,
         deprecated: None,
         range: to_tool_range(&symbol.range),
@@ -181,7 +181,7 @@ pub(super) fn to_lsp_document_symbol(symbol: ToolDocumentSymbol) -> DocumentSymb
 pub(super) fn to_lsp_workspace_symbol(symbol: ToolWorkspaceSymbol) -> Option<WorkspaceSymbol> {
     Some(WorkspaceSymbol {
         name: symbol.name,
-        kind: to_symbol_kind(symbol.kind),
+        kind: to_lsp_symbol_kind(symbol.kind),
         tags: None,
         container_name: None,
         location: OneOf::Right(WorkspaceLocation {
@@ -191,6 +191,26 @@ pub(super) fn to_lsp_workspace_symbol(symbol: ToolWorkspaceSymbol) -> Option<Wor
             "range": to_tool_range(&symbol.location.range),
         })),
     })
+}
+
+pub(super) fn to_lsp_call_hierarchy_item(
+    uri: &Url,
+    symbol: &ToolDocumentSymbol,
+) -> CallHierarchyItem {
+    CallHierarchyItem {
+        name: symbol.name.clone(),
+        kind: to_lsp_symbol_kind(symbol.kind),
+        tags: None,
+        detail: None,
+        uri: uri.clone(),
+        range: to_tool_range(&symbol.range),
+        selection_range: to_tool_range(&symbol.selection_range),
+        data: Some(json!({
+            "uri": uri.as_str(),
+            "line": symbol.selection_range.start_line.saturating_sub(1),
+            "character": symbol.selection_range.start_col.saturating_sub(1),
+        })),
+    }
 }
 
 pub(super) fn resolve_lsp_workspace_symbol(mut symbol: WorkspaceSymbol) -> WorkspaceSymbol {
@@ -252,7 +272,7 @@ const fn to_completion_item_kind(kind: ToolCompletionKind) -> CompletionItemKind
     }
 }
 
-const fn to_symbol_kind(kind: ToolSymbolKind) -> SymbolKind {
+pub(super) const fn to_lsp_symbol_kind(kind: ToolSymbolKind) -> SymbolKind {
     match kind {
         ToolSymbolKind::Function | ToolSymbolKind::Procedure => SymbolKind::FUNCTION,
         ToolSymbolKind::Variable | ToolSymbolKind::Parameter => SymbolKind::VARIABLE,

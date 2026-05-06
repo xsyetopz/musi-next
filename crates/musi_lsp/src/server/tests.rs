@@ -16,7 +16,7 @@ use async_lsp::lsp_types::{
     GotoDefinitionResponse, InitializeParams, InlayHintKind, InlayHintServerCapabilities,
     InlayHintTooltip, LinkedEditingRangeParams, PartialResultParams, Position,
     SelectionRangeParams, SemanticToken, SemanticTokensDeltaParams, SemanticTokensFullDeltaResult,
-    SignatureHelpParams, TextDocumentIdentifier, TextDocumentPositionParams,
+    SignatureHelpParams, SymbolKind, TextDocumentIdentifier, TextDocumentPositionParams,
     TextDocumentSaveReason, TextDocumentSyncCapability, TextDocumentSyncKind,
     TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability,
     WillSaveTextDocumentParams, WorkDoneProgressParams, WorkspaceDiagnosticParams,
@@ -138,6 +138,10 @@ mod success {
         assert_eq!(
             initialize_result.capabilities.references_provider,
             Some(OneOf::Left(true))
+        );
+        assert_eq!(
+            initialize_result.capabilities.call_hierarchy_provider,
+            Some(CallHierarchyServerCapability::Simple(true))
         );
         assert!(
             initialize_result
@@ -1035,6 +1039,119 @@ let other := value + value;
             linked.word_pattern.as_deref(),
             Some("[A-Za-z_][A-Za-z0-9_]*")
         );
+    }
+
+    #[test]
+    fn call_hierarchy_prepare_returns_symbol_under_cursor() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let value := 1;\nlet caller := value;\n";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let items = server
+            .prepare_call_hierarchy_at(CallHierarchyPrepareParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: uri.clone() },
+                    position: Position::new(0, 5),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("call hierarchy item should exist");
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].name, "value");
+        assert_eq!(items[0].uri, uri);
+        assert_eq!(items[0].selection_range.start, Position::new(0, 4));
+        assert!(items[0].data.is_some());
+    }
+
+    #[test]
+    fn call_hierarchy_incoming_calls_group_references_by_caller_symbol() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let value := 1;\nlet caller := value;\n";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+        let item = server
+            .prepare_call_hierarchy_at(CallHierarchyPrepareParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: uri.clone() },
+                    position: Position::new(0, 5),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("call hierarchy item should exist")
+            .remove(0);
+
+        let calls = server
+            .call_hierarchy_incoming_calls(&CallHierarchyIncomingCallsParams {
+                item,
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("incoming calls should run");
+
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].from.name, "caller");
+        assert_eq!(calls[0].from.uri, uri);
+        assert_eq!(calls[0].from_ranges.len(), 1);
+        assert_eq!(calls[0].from_ranges[0].start, Position::new(1, 14));
+        assert_eq!(calls[0].from_ranges[0].end, Position::new(1, 19));
+    }
+
+    #[test]
+    fn call_hierarchy_outgoing_calls_remain_empty_without_call_graph() {
+        let root = temp_project();
+        let path = root.join("index.ms");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let source = "let value := 1;\n";
+        fs::write(&path, source).expect("entry should be written");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri, source.to_owned());
+        let item = CallHierarchyItem {
+            name: "value".to_owned(),
+            kind: SymbolKind::VARIABLE,
+            tags: None,
+            detail: None,
+            uri: Url::from_file_path(&path).expect("file URI should build"),
+            range: Range::new(Position::new(0, 4), Position::new(0, 9)),
+            selection_range: Range::new(Position::new(0, 4), Position::new(0, 9)),
+            data: None,
+        };
+
+        let calls =
+            MusiLanguageServer::call_hierarchy_outgoing_calls(&CallHierarchyOutgoingCallsParams {
+                item,
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            });
+
+        assert!(calls.is_empty());
     }
 
     #[test]

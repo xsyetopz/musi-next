@@ -7,26 +7,29 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 
 use async_lsp::lsp_types::{
-    CodeAction, CodeActionKind, CodeActionOptions, CodeActionOrCommand, CodeActionParams,
-    CodeActionProviderCapability, CodeActionResponse, CodeLens, CodeLensOptions, CodeLensParams,
-    Command, CompletionItem, CompletionList, CompletionOptions, CompletionParams,
-    CompletionResponse, DeclarationCapability, Diagnostic, DiagnosticOptions,
-    DiagnosticServerCapabilities, DidChangeConfigurationParams, DidChangeTextDocumentParams,
-    DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, DocumentDiagnosticParams, DocumentDiagnosticReport,
-    DocumentDiagnosticReportResult, DocumentFormattingParams, DocumentHighlight,
-    DocumentHighlightParams, DocumentLink, DocumentLinkOptions, DocumentLinkParams,
-    DocumentOnTypeFormattingOptions, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
-    DocumentSymbolParams, DocumentSymbolResponse, ExecuteCommandOptions, ExecuteCommandParams,
-    FoldingRange, FoldingRangeParams, FoldingRangeProviderCapability, FormattingOptions,
-    FullDocumentDiagnosticReport, GotoDefinitionParams, GotoDefinitionResponse, Hover,
-    HoverContents, HoverParams, HoverProviderCapability, InitializeParams, InitializeResult,
-    InitializedParams, InlayHint, InlayHintOptions, InlayHintParams, InlayHintServerCapabilities,
-    LinkedEditingRangeParams, LinkedEditingRangeServerCapabilities, LinkedEditingRanges, Location,
-    MarkupContent, MarkupKind, OneOf, Position, PrepareRenameResponse, PublishDiagnosticsParams,
-    Range, ReferenceParams, RelatedFullDocumentDiagnosticReport, RenameOptions, RenameParams,
-    SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability, SemanticToken,
-    SemanticTokens, SemanticTokensDelta, SemanticTokensDeltaParams, SemanticTokensEdit,
+    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
+    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
+    CallHierarchyServerCapability, CodeAction, CodeActionKind, CodeActionOptions,
+    CodeActionOrCommand, CodeActionParams, CodeActionProviderCapability, CodeActionResponse,
+    CodeLens, CodeLensOptions, CodeLensParams, Command, CompletionItem, CompletionList,
+    CompletionOptions, CompletionParams, CompletionResponse, DeclarationCapability, Diagnostic,
+    DiagnosticOptions, DiagnosticServerCapabilities, DidChangeConfigurationParams,
+    DidChangeTextDocumentParams, DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentDiagnosticParams,
+    DocumentDiagnosticReport, DocumentDiagnosticReportResult, DocumentFormattingParams,
+    DocumentHighlight, DocumentHighlightParams, DocumentLink, DocumentLinkOptions,
+    DocumentLinkParams, DocumentOnTypeFormattingOptions, DocumentOnTypeFormattingParams,
+    DocumentRangeFormattingParams, DocumentSymbolParams, DocumentSymbolResponse,
+    ExecuteCommandOptions, ExecuteCommandParams, FoldingRange, FoldingRangeParams,
+    FoldingRangeProviderCapability, FormattingOptions, FullDocumentDiagnosticReport,
+    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
+    HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, InlayHint,
+    InlayHintOptions, InlayHintParams, InlayHintServerCapabilities, LinkedEditingRangeParams,
+    LinkedEditingRangeServerCapabilities, LinkedEditingRanges, Location, MarkupContent, MarkupKind,
+    OneOf, Position, PrepareRenameResponse, PublishDiagnosticsParams, Range, ReferenceParams,
+    RelatedFullDocumentDiagnosticReport, RenameOptions, RenameParams, SelectionRange,
+    SelectionRangeParams, SelectionRangeProviderCapability, SemanticToken, SemanticTokens,
+    SemanticTokensDelta, SemanticTokensDeltaParams, SemanticTokensEdit,
     SemanticTokensFullDeltaResult, SemanticTokensFullOptions, SemanticTokensOptions,
     SemanticTokensParams, SemanticTokensRangeParams, SemanticTokensRangeResult,
     SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
@@ -63,11 +66,11 @@ use config::LspConfig;
 use convert::{
     diagnostic_matches_path, encode_semantic_tokens, full_document_range, position_in_range,
     resolve_lsp_completion, resolve_lsp_document_link, resolve_lsp_inlay_hint,
-    resolve_lsp_workspace_symbol, semantic_tokens_legend, to_lsp_completion, to_lsp_diagnostic,
-    to_lsp_document_highlight, to_lsp_document_link, to_lsp_document_symbol, to_lsp_folding_range,
-    to_lsp_inlay_hint, to_lsp_location, to_lsp_selection_range, to_lsp_signature_help,
-    to_lsp_workspace_edit, to_lsp_workspace_symbol, to_tool_range, tool_location_matches_path,
-    truncate_hover_contents,
+    resolve_lsp_workspace_symbol, semantic_tokens_legend, to_lsp_call_hierarchy_item,
+    to_lsp_completion, to_lsp_diagnostic, to_lsp_document_highlight, to_lsp_document_link,
+    to_lsp_document_symbol, to_lsp_folding_range, to_lsp_inlay_hint, to_lsp_location,
+    to_lsp_selection_range, to_lsp_signature_help, to_lsp_workspace_edit, to_lsp_workspace_symbol,
+    to_tool_range, tool_location_matches_path, truncate_hover_contents,
 };
 
 type ServerFuture<T> = Pin<Box<dyn Future<Output = Result<T, ResponseError>> + Send + 'static>>;
@@ -126,6 +129,7 @@ impl MusiLanguageServer {
                 definition_provider: Some(OneOf::Left(true)),
                 type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
                 references_provider: Some(OneOf::Left(true)),
+                call_hierarchy_provider: Some(CallHierarchyServerCapability::Simple(true)),
                 linked_editing_range_provider: Some(LinkedEditingRangeServerCapabilities::Simple(
                     true,
                 )),
@@ -513,6 +517,72 @@ impl MusiLanguageServer {
             .map(to_lsp_document_symbol)
             .collect();
         Some(DocumentSymbolResponse::Nested(symbols))
+    }
+
+    fn prepare_call_hierarchy_at(
+        &self,
+        params: CallHierarchyPrepareParams,
+    ) -> Option<Vec<CallHierarchyItem>> {
+        let text_document = params.text_document_position_params.text_document;
+        let position = params.text_document_position_params.position;
+        let path = text_document.uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let overlay = self
+            .open_documents
+            .get(&text_document.uri)
+            .map(String::as_str);
+        let symbols = document_symbols_for_project_file_with_overlay(&path, overlay);
+        let symbol = symbol_at_position(&symbols, position)?;
+        Some(vec![to_lsp_call_hierarchy_item(&text_document.uri, symbol)])
+    }
+
+    fn call_hierarchy_incoming_calls(
+        &self,
+        params: &CallHierarchyIncomingCallsParams,
+    ) -> Option<Vec<CallHierarchyIncomingCall>> {
+        let (uri, line, character) = call_hierarchy_item_data_parts(&params.item)?;
+        let path = uri.to_file_path().ok()?;
+        let overlay = self.open_documents.get(&uri).map(String::as_str);
+        let mut calls = Vec::<CallHierarchyIncomingCall>::new();
+        for location in references_for_project_file_with_overlay(
+            &path,
+            overlay,
+            line.saturating_add(1),
+            character.saturating_add(1),
+            false,
+        ) {
+            let Some(reference_uri) = Url::from_file_path(&location.path).ok() else {
+                continue;
+            };
+            let reference_overlay = self.open_documents.get(&reference_uri).map(String::as_str);
+            let symbols =
+                document_symbols_for_project_file_with_overlay(&location.path, reference_overlay);
+            let Some(symbol) = caller_symbol_for_reference(&symbols, &location.range) else {
+                continue;
+            };
+            let from = to_lsp_call_hierarchy_item(&reference_uri, symbol);
+            let from_range = to_tool_range(&location.range);
+            if let Some(call) = calls
+                .iter_mut()
+                .find(|call| call_hierarchy_items_match(&call.from, &from))
+            {
+                call.from_ranges.push(from_range);
+            } else {
+                calls.push(CallHierarchyIncomingCall {
+                    from,
+                    from_ranges: vec![from_range],
+                });
+            }
+        }
+        Some(calls)
+    }
+
+    const fn call_hierarchy_outgoing_calls(
+        _: &CallHierarchyOutgoingCallsParams,
+    ) -> Vec<CallHierarchyOutgoingCall> {
+        Vec::new()
     }
 
     fn document_links(&self, params: DocumentLinkParams) -> Option<Vec<DocumentLink>> {
@@ -1132,6 +1202,61 @@ fn push_reference_lenses(path: &Path, symbol: &ToolDocumentSymbol, lenses: &mut 
     }
 }
 
+fn symbol_at_position(
+    symbols: &[ToolDocumentSymbol],
+    position: Position,
+) -> Option<&ToolDocumentSymbol> {
+    symbols.iter().find_map(|symbol| {
+        let selection_range = to_tool_range(&symbol.selection_range);
+        if position_in_lsp_range(position, selection_range) {
+            return Some(symbol);
+        }
+        symbol_at_position(&symbol.children, position)
+    })
+}
+
+fn caller_symbol_for_reference<'a>(
+    symbols: &'a [ToolDocumentSymbol],
+    range: &musi_tooling::ToolRange,
+) -> Option<&'a ToolDocumentSymbol> {
+    symbols
+        .iter()
+        .flat_map(flatten_symbols)
+        .filter(|symbol| {
+            symbol.selection_range.start_line == range.start_line
+                && symbol.selection_range.start_col < range.start_col
+        })
+        .max_by_key(|symbol| symbol.selection_range.start_col)
+}
+
+fn flatten_symbols(symbol: &ToolDocumentSymbol) -> Vec<&ToolDocumentSymbol> {
+    let mut symbols = vec![symbol];
+    for child in &symbol.children {
+        symbols.extend(flatten_symbols(child));
+    }
+    symbols
+}
+
+fn call_hierarchy_item_data_parts(item: &CallHierarchyItem) -> Option<(Url, usize, usize)> {
+    let data = item.data.as_ref()?;
+    let uri = data.get("uri")?.as_str()?;
+    let line = usize::try_from(data.get("line")?.as_u64()?).ok()?;
+    let character = usize::try_from(data.get("character")?.as_u64()?).ok()?;
+    Some((Url::parse(uri).ok()?, line, character))
+}
+
+fn call_hierarchy_items_match(left: &CallHierarchyItem, right: &CallHierarchyItem) -> bool {
+    left.uri == right.uri && left.selection_range == right.selection_range
+}
+
+const fn position_in_lsp_range(position: Position, range: Range) -> bool {
+    !position_lt(position, range.start) && position_lt(position, range.end)
+}
+
+const fn position_lt(left: Position, right: Position) -> bool {
+    left.line < right.line || (left.line == right.line && left.character < right.character)
+}
+
 fn reference_lens_data(path: &Path, symbol: &ToolDocumentSymbol) -> Option<Value> {
     Some(json!({
         "uri": Url::from_file_path(path).ok()?.as_str(),
@@ -1440,6 +1565,30 @@ impl LanguageServer for MusiLanguageServer {
     ) -> ServerFuture<Option<DocumentSymbolResponse>> {
         let document_symbols = self.document_symbols(params);
         Box::pin(async move { Ok(document_symbols) })
+    }
+
+    fn prepare_call_hierarchy(
+        &mut self,
+        params: CallHierarchyPrepareParams,
+    ) -> ServerFuture<Option<Vec<CallHierarchyItem>>> {
+        let call_hierarchy_items = self.prepare_call_hierarchy_at(params);
+        Box::pin(async move { Ok(call_hierarchy_items) })
+    }
+
+    fn incoming_calls(
+        &mut self,
+        params: CallHierarchyIncomingCallsParams,
+    ) -> ServerFuture<Option<Vec<CallHierarchyIncomingCall>>> {
+        let incoming_calls = self.call_hierarchy_incoming_calls(&params);
+        Box::pin(async move { Ok(incoming_calls) })
+    }
+
+    fn outgoing_calls(
+        &mut self,
+        params: CallHierarchyOutgoingCallsParams,
+    ) -> ServerFuture<Option<Vec<CallHierarchyOutgoingCall>>> {
+        let outgoing_calls = Self::call_hierarchy_outgoing_calls(&params);
+        Box::pin(async move { Ok(Some(outgoing_calls)) })
     }
 
     fn document_link(
