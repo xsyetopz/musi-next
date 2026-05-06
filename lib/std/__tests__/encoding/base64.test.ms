@@ -10,11 +10,11 @@ export let test () :=
     );
     testing.it("'isValid' accepts base64 string", base64.isValid("aGk="),);
     testing.it(
-      "'decode' returns some for valid input",
+      "'decode' returns Some for valid input",
       base64.decode("aGk=").isSome(),
     );
     testing.it(
-      "'decode' returns none for invalid input",
+      "'decode' returns None for invalid input",
       base64.decode("bad").isNone(),
     );
     testing.endDescribe()

@@ -61,7 +61,7 @@ This avoids modifier soup with `let rec` and keeps parameters, fields, and let-b
 
 `Option` and `Result` are ordinary library types. The source language gives them short type sugar because absence and failure are common semantic consequences.
 
-- `?T` means `Option[T]`.
+- `?T` means `Maybe[T]`.
 - `E!T` means `Result[T, E]`.
 
 Bare `!T` is not core syntax. It may be introduced only if the standard library defines a default error type and the spec defines `!T` as an alias for `Error!T`.

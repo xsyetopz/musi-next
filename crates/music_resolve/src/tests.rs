@@ -403,7 +403,7 @@ mod success {
     #[test]
     fn data_declarations_do_not_report_variant_or_field_names_as_unbound() {
         let src = r"
-        let Option[T] := data { | Some(T) | None | };
+        let Maybe[T] := data { | Some(T) | None | };
         let Pair[T] := data { left : T; right : T; };
     ";
         let source_id = SourceId::from_raw(6);

@@ -155,7 +155,7 @@ mod success {
 	match x (| _ => 0);
 	native "c" let puts (msg : CString) : Int;
 	export let y := 2;
-	let Option[T] := data { | Some(T) | None };
+	let Maybe[T] := data { | Some(T) | None };
 	let Console := effect { let write (text : String) : Unit; };
 	let Write := shape { let write (text : String) : Unit; };
 	given Write { let write (text : String) : Unit := (); };

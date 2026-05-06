@@ -230,10 +230,10 @@ impl CheckPass<'_, '_, '_> {
             .map(|param| param.name.name)
             .collect::<Vec<_>>()
             .into_boxed_slice();
-        let params = self.lower_params(params);
+        let params = self.lower_native_params(params);
         let return_ty = sig.map_or(builtins.unknown, |sig| {
             let origin = self.expr(sig).origin;
-            self.lower_type_expr(sig, origin)
+            self.lower_native_type_expr(sig, origin)
         });
         let params = self.alloc_ty_list(params.iter().copied());
         let ty = self.alloc_ty(HirTyKind::Arrow {

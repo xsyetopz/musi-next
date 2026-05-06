@@ -1,4 +1,4 @@
---- Ordering result for comparisons.
+--- Ordering expect for comparisons.
 export opaque let Ordering := data {
   | Less
   | Equal
@@ -70,13 +70,17 @@ export let compareInt (left : Int, right : Int) : Ordering :=
   | _ => equal()
   );
 
+native "musi" let compareFloatTotalIntrinsic (left : Float, right : Float) : Int;
+
 --- Core operation for `compareFloat`.
 export let compareFloat (left : Float, right : Float) : Ordering :=
-  match () (
-  | _ if left < right => less()
-  | _ if left > right => greater()
-  | _ => equal()
-  );
+  match unsafe {
+  compareFloatTotalIntrinsic(left, right);
+} (
+| value if value < 0 => less()
+| value if value > 0 => greater()
+| _ => equal()
+);
 
 --- Core operation for `compareString`.
 export let compareString (left : String, right : String) : Ordering :=

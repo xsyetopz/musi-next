@@ -1,3 +1,4 @@
+let ascii := import "@std/ascii";
 let textHost := import "musi:text";
 
 --- Return byte length.
@@ -42,25 +43,10 @@ let textFromByte (value : Int) : String := textHost.fromByte(value);
 --- Build one-byte text from byte value.
 export let fromByte (value : Int) : String := textFromByte(value);
 
-let both (left : Bool, right : Bool) : Bool :=
-  match left (
-  | ok if ok => right
-  | _ => 0 = 1
-  );
-
-let isWhitespaceByte (value : Int) : Bool :=
-  match value (
-  | 9 => 0 = 0
-  | 10 => 0 = 0
-  | 13 => 0 = 0
-  | 32 => 0 = 0
-  | _ => 0 = 1
-  );
-
 let rec trimStartIndex (target : String, index : Int, end : Int) : Int :=
   match () (
   | _ if index >= end => end
-  | _ if isWhitespaceByte(textByteAt(target, index)) => trimStartIndex(
+  | _ if ascii.isWhitespace(textByteAt(target, index)) => trimStartIndex(
     target,
     index + 1,
     end,
@@ -71,7 +57,7 @@ let rec trimStartIndex (target : String, index : Int, end : Int) : Int :=
 let rec trimEndIndex (target : String, start : Int, end : Int) : Int :=
   match () (
   | _ if end <= start => start
-  | _ if isWhitespaceByte(textByteAt(target, end - 1)) => trimEndIndex(
+  | _ if ascii.isWhitespace(textByteAt(target, end - 1)) => trimEndIndex(
     target,
     start,
     end - 1,
@@ -90,18 +76,6 @@ let textTrim (target : String) : String :=
 --- Core operation for `trim`.
 export let trim (target : String) : String := textTrim(target);
 
-let lowerByte (value : Int) : Int :=
-  match () (
-  | _ if both(value >= 65, value <= 90) => value + 32
-  | _ => value
-  );
-
-let upperByte (value : Int) : Int :=
-  match () (
-  | _ if both(value >= 97, value <= 122) => value - 32
-  | _ => value
-  );
-
 let rec transformAscii (
   target : String,
   index : Int,
@@ -118,14 +92,14 @@ let rec transformAscii (
 
 --- Core operation for `toLowerCase`.
 let textToLowerCase (target : String) : String :=
-  transformAscii(target, 0, textLength(target), lowerByte);
+  transformAscii(target, 0, textLength(target), ascii.toLower);
 
 --- Core operation for `toLowerCase`.
 export let toLowerCase (target : String) : String := textToLowerCase(target);
 
 --- Core operation for `toUpperCase`.
 let textToUpperCase (target : String) : String :=
-  transformAscii(target, 0, textLength(target), upperByte);
+  transformAscii(target, 0, textLength(target), ascii.toUpper);
 
 --- Core operation for `toUpperCase`.
 export let toUpperCase (target : String) : String := textToUpperCase(target);

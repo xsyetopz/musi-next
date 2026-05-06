@@ -1,12 +1,12 @@
-let option := import "@std/option";
+let maybe := import "@std/maybe";
 let both (left : Bool, right : Bool) : Bool :=
   match left (
-  | ok if ok => right
+  | success if success => right
   | _ => 0 = 1
   );
 
 let text := import "@std/text";
-let Option := option.Option;
+let Maybe := maybe.Maybe;
 
 let hexDigit (value : Int) : String :=
   match value (
@@ -79,10 +79,10 @@ let rec decodeFrom (source : String, index : Int, end : Int) : String :=
 );
 
 --- Decode a value from this format.
-export let decode (source : String) : Option[String] :=
+export let decode (source : String) : Maybe[String] :=
   match isValid(source) (
-  | valid if valid => option.someOf[String](
+  | valid if valid => maybe.Some[String](
     decodeFrom(source, 0, source.length())
   )
-  | _ => option.noneOf[String]()
+  | _ => maybe.None[String]()
   );

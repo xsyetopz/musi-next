@@ -399,12 +399,43 @@ impl CheckPass<'_, '_, '_> {
         let ctx = self;
         let builtins = ctx.builtins();
         let ty = match ctx.lit_kind(lit) {
-            HirLitKind::Int { .. } => builtins.int_,
+            HirLitKind::Int { raw } => ctx.expected_ty().map_or(builtins.int_, |expected| {
+                ctx.int_lit_ty_for_expected(raw.as_ref(), expected)
+                    .unwrap_or(builtins.int_)
+            }),
             HirLitKind::Rune { .. } => builtins.rune,
-            HirLitKind::Float { .. } => builtins.float_,
-            HirLitKind::String { .. } => builtins.string_,
+            HirLitKind::Float { .. } => {
+                ctx.expected_ty()
+                    .map_or(builtins.float_, |expected| match ctx.ty(expected).kind {
+                        HirTyKind::Float32 | HirTyKind::Float64 | HirTyKind::Float => expected,
+                        _ => builtins.float_,
+                    })
+            }
+            HirLitKind::String { .. } => {
+                ctx.expected_ty()
+                    .map_or(builtins.string_, |expected| match ctx.ty(expected).kind {
+                        HirTyKind::CString | HirTyKind::String => expected,
+                        _ => builtins.string_,
+                    })
+            }
         };
         ExprFacts::new(ty, EffectRow::empty())
+    }
+
+    fn int_lit_ty_for_expected(&self, raw: &str, expected: HirTyId) -> Option<HirTyId> {
+        let value = raw.parse::<i128>().ok()?;
+        let ok = match self.ty(expected).kind {
+            HirTyKind::Int8 => i8::try_from(value).is_ok(),
+            HirTyKind::Int16 => i16::try_from(value).is_ok(),
+            HirTyKind::Int32 => i32::try_from(value).is_ok(),
+            HirTyKind::Int64 | HirTyKind::Int => i64::try_from(value).is_ok(),
+            HirTyKind::Nat8 => u8::try_from(value).is_ok(),
+            HirTyKind::Nat16 => u16::try_from(value).is_ok(),
+            HirTyKind::Nat32 => u32::try_from(value).is_ok(),
+            HirTyKind::Nat64 | HirTyKind::Nat => u64::try_from(value).is_ok(),
+            _ => false,
+        };
+        ok.then_some(expected)
     }
 
     fn check_template_expr(&mut self, parts: SliceRange<HirTemplatePart>) -> ExprFacts {
@@ -475,7 +506,11 @@ impl CheckPass<'_, '_, '_> {
         }
         let ret_origin = ctx.expr(ret).origin;
         let ret_ty = ctx.lower_type_expr(ret, ret_origin);
-        let params = ctx.alloc_ty_list([param_ty]);
+        let params = if ctx.pi_binder_is_empty_tuple_expr(binder_ty) {
+            ctx.alloc_ty_list([])
+        } else {
+            ctx.alloc_ty_list([param_ty])
+        };
         let ty = ctx.alloc_ty(HirTyKind::Arrow {
             params,
             ret: ret_ty,
@@ -515,6 +550,14 @@ impl CheckPass<'_, '_, '_> {
             is_effectful: !body_facts.effects.is_pure(),
         });
         ExprFacts::new(ty, EffectRow::empty())
+    }
+
+    fn pi_binder_is_empty_tuple_expr(&self, expr: HirExprId) -> bool {
+        matches!(
+            self.expr(expr).kind,
+            HirExprKind::Tuple { items } | HirExprKind::Sequence { exprs: items }
+                if self.expr_ids(items).is_empty()
+        )
     }
 }
 

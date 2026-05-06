@@ -172,6 +172,9 @@ impl IrRangeKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IrIntrinsicKind {
     FloatTotalCompare,
+    FloatIsNan,
+    FloatIsInfinite,
+    FloatIsFinite,
     FfiPtrNull,
     FfiPtrIsNull,
     FfiPtrOffset,

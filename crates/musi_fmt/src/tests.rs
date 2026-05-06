@@ -256,13 +256,13 @@ mod success {
 
     #[test]
     fn keeps_call_arguments_on_one_line_when_they_fit_width() {
-        let source = "let ok := testing.it(\"adds values\", testing.toBeTrue(add(1, 2)));";
+        let source = "let success := testing.it(\"adds values\", testing.toBeTrue(add(1, 2)));";
 
         let formatted_result = format_source(source, &options()).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            "let ok := testing.it(\"adds values\", testing.toBeTrue(add(1, 2)));\n"
+            "let success := testing.it(\"adds values\", testing.toBeTrue(add(1, 2)));\n"
         );
         assert!(
             formatted_result
@@ -310,7 +310,7 @@ mod success {
     fn keeps_bind_operator_attached_to_broken_receiver_signature() {
         let mut options = options();
         options.line_width = 64;
-        let source = r"export let(self : Option[T]).fold [T, U] (onNone : U, onSome : T -> U) : U
+        let source = r"export let(self : Maybe[T]).fold [T, U] (onNone : U, onSome : T -> U) : U
   :=
   fold[T, U](self, onNone, onSome);
 ";
@@ -319,7 +319,7 @@ mod success {
 
         assert_eq!(
             formatted_result.text,
-            r"export let (self : Option[T]).fold [T, U] (
+            r"export let (self : Maybe[T]).fold [T, U] (
   onNone : U,
   onSome : T -> U
 ) : U := fold[T, U](self, onNone, onSome);
@@ -337,24 +337,85 @@ mod success {
 
     #[test]
     fn keeps_fitting_rhs_after_multiline_receiver_signature() {
-        let source = r"export let (self : Result[T, E]).fold [T, E, U] (
-  onOk : T -> U,
-  onErr : E -> U
+        let source = r"export let (self : Expect[T, E]).fold [T, E, U] (
+  onSuccess : T -> U,
+  onFailure : E -> U
 ) : U :=
-  fold[T, E, U](self, onOk, onErr);
+  fold[T, E, U](self, onSuccess, onFailure);
 ";
 
         let formatted_result = format_source(source, &options()).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            r"export let (self : Result[T, E]).fold [T, E, U] (
-  onOk : T -> U,
-  onErr : E -> U
-) : U := fold[T, E, U](self, onOk, onErr);
+            r"export let (
+  self : Expect[T, E]
+).fold [T, E, U] (onSuccess : T -> U, onFailure : E -> U) : U :=
+  fold[T, E, U](self, onSuccess, onFailure);
 "
         );
         let second = format_source(&formatted_result.text, &options()).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
+    fn wraps_long_receiver_method_signature_with_generics_and_single_param() {
+        let mut options = options();
+        options.line_width = 80;
+        let source = "export let (self : Expect[T, E]).mapFail [T, E, F] (f : E -> F) : Expect[T, F,] := mapFail[T, E, F](self, f);";
+
+        let formatted_result = format_source(source, &options).unwrap();
+        std::fs::write("/private/tmp/musi_fmt_out.txt", &formatted_result.text).unwrap();
+
+        assert!(
+            formatted_result
+                .text
+                .lines()
+                .all(|line| line.chars().count() <= options.line_width)
+        );
+        let second = format_source(&formatted_result.text, &options).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
+    fn wraps_long_multiline_receiver_method_signature_before_bind_operator() {
+        let mut options = options();
+        options.line_width = 80;
+        let source = r"export let (
+  self : Expect[T, E]
+).mapFail [T, E, F] (f : E -> F) : Expect[T, F,]
+:=
+  mapFail[T, E, F](self, f);
+";
+
+        let formatted_result = format_source(source, &options).unwrap();
+
+        assert!(
+            formatted_result
+                .text
+                .lines()
+                .all(|line| line.chars().count() <= options.line_width)
+        );
+        let second = format_source(&formatted_result.text, &options).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
+    fn wraps_compact_receiver_method_signature_after_spacing_expands_it() {
+        let mut options = options();
+        options.line_width = 80;
+        let source =
+            "export let(self:Expect[T,E]).mapFail[T,E,F](f:E->F):Expect[T,F,]:=mapFail[T,E,F](self,f);";
+
+        let formatted_result = format_source(source, &options).unwrap();
+
+        assert!(
+            formatted_result
+                .text
+                .lines()
+                .all(|line| line.chars().count() <= options.line_width)
+        );
+        let second = format_source(&formatted_result.text, &options).unwrap();
         assert_eq!(second.text, formatted_result.text);
     }
 
@@ -452,13 +513,13 @@ mod success {
 
     #[test]
     fn keeps_fitting_instance_members_inline_and_spaced() {
-        let source = "export let intRangeable := given Rangeable[Int] { let next (value : Int) : Option[Int] := someOf[Int](value + 1); };";
+        let source = "export let intRangeable := given Rangeable[Int] { let next (value : Int) : Maybe[Int] := Some[Int](value + 1); };";
 
         let formatted_result = format_source(source, &options()).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            "export let intRangeable :=\n  given Rangeable[Int] {\n  let next (value : Int) : Option[Int] := someOf[Int](value + 1);\n};\n"
+            "export let intRangeable :=\n  given Rangeable[Int] {\n  let next (value : Int) : Maybe[Int] := Some[Int](value + 1);\n};\n"
         );
     }
 
@@ -550,10 +611,10 @@ mod success {
 
     #[test]
     fn formats_match_arms_pipe_aligned_by_default() {
-        let source = r"export let readNonEmptyLine () : Option[String] :=
+        let source = r"export let readNonEmptyLine () : Maybe[String] :=
   match readTrimmedLine() (
-    | value if value.isEmpty() => option.noneOf[String]()
-    | value => option.someOf[String](value)
+    | value if value.isEmpty() => maybe.None[String]()
+    | value => maybe.Some[String](value)
   );
 ";
 
@@ -561,10 +622,10 @@ mod success {
 
         assert_eq!(
             formatted_result.text,
-            r"export let readNonEmptyLine () : Option[String] :=
+            r"export let readNonEmptyLine () : Maybe[String] :=
   match readTrimmedLine() (
-  | value if value.isEmpty() => option.noneOf[String]()
-  | value => option.someOf[String](value)
+  | value if value.isEmpty() => maybe.None[String]()
+  | value => maybe.Some[String](value)
   );
 "
         );
@@ -829,10 +890,10 @@ mod success {
     fn formats_match_arms_with_block_indent_when_configured() {
         let mut options = options();
         options.match_arm_indent = MatchArmIndent::Block;
-        let source = r"export let readNonEmptyLine () : Option[String] :=
+        let source = r"export let readNonEmptyLine () : Maybe[String] :=
   match readTrimmedLine() (
-  | value if value.isEmpty() => option.noneOf[String]()
-  | value => option.someOf[String](value)
+  | value if value.isEmpty() => maybe.None[String]()
+  | value => maybe.Some[String](value)
   );
 ";
 
@@ -840,10 +901,10 @@ mod success {
 
         assert_eq!(
             formatted_result.text,
-            r"export let readNonEmptyLine () : Option[String] :=
+            r"export let readNonEmptyLine () : Maybe[String] :=
   match readTrimmedLine() (
-    | value if value.isEmpty() => option.noneOf[String]()
-    | value => option.someOf[String](value)
+    | value if value.isEmpty() => maybe.None[String]()
+    | value => maybe.Some[String](value)
   );
 "
         );
@@ -1381,7 +1442,7 @@ export let test () :=
             .canonicalize()
             .unwrap();
         let mut files = Vec::new();
-        collect_musi_files(repo.join("packages/std"), &mut files);
+        collect_musi_files(repo.join("lib/std"), &mut files);
         collect_musi_files(repo.join("crates/musi_foundation/modules"), &mut files);
 
         for path in files {
@@ -1397,7 +1458,7 @@ export let test () :=
             .canonicalize()
             .unwrap();
         let mut files = Vec::new();
-        collect_musi_files(repo.join("packages/std"), &mut files);
+        collect_musi_files(repo.join("lib/std"), &mut files);
         collect_musi_files(repo.join("crates/musi_foundation/modules"), &mut files);
 
         for path in files {

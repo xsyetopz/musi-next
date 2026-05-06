@@ -129,7 +129,7 @@ export let (self : Path).dirName () : Path := pathDirName(self);
 --- Base file name.
 export let (self : Path).baseName () : String := pathBaseName(self);
 
---- Extension name, including leading `.` when present.
+--- Extension name, including leading `.` when Some.
 export let (self : Path).extName () : String := pathExtName(self);
 
 --- Returns true for absolute paths.

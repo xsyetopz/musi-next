@@ -133,7 +133,7 @@ fn split_long_let_signature(line: &str, options: &FormatOptions) -> Option<Strin
     let open = line.rfind(" (")?.saturating_add(1);
     let close = matching_close_paren(line, open)?;
     let inner = line.get(open + 1..close)?;
-    if inner.trim().is_empty() || !inner.contains(',') {
+    if inner.trim().is_empty() {
         return None;
     }
     let indent = line

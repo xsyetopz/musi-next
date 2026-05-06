@@ -571,7 +571,7 @@ impl Vm {
         let stepped = self.call_value(step.clone(), from_ref(current))?;
         let Some(next) = self.option_payload(stepped)? else {
             return Err(VmError::new(VmErrorKind::InvalidRangeStep {
-                detail: "step returned .None before terminal".into(),
+                detail: "step result `.None` before terminal".into(),
             }));
         };
         let progress = self.compare_range_values(compare, &next, current)?;
@@ -591,7 +591,7 @@ impl Vm {
     fn option_payload(&self, value: Value) -> VmResult<Option<Value>> {
         let data = Self::expect_data(value).map_err(|_| {
             VmError::new(VmErrorKind::InvalidRangeStep {
-                detail: "step must return Option-like data".into(),
+                detail: "step must return Maybe data".into(),
             })
         })?;
         let data = self.heap.data(data)?;
@@ -617,7 +617,7 @@ impl Vm {
             "None" => Ok(None),
             "Some" => Ok(data.fields.first().cloned()),
             _ => Err(VmError::new(VmErrorKind::InvalidRangeStep {
-                detail: "step result must use None/Some variants".into(),
+                detail: "step result variant expected `None` or `Some`".into(),
             })),
         }
     }

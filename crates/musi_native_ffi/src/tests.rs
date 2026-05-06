@@ -21,6 +21,20 @@ mod success {
     }
 
     #[test]
+    fn math_link_uses_platform_candidates() {
+        let candidates = library_candidates("m");
+        #[cfg(target_os = "macos")]
+        assert_eq!(
+            candidates,
+            vec!["libSystem.B.dylib", "libm.dylib", "libm.so"]
+        );
+        #[cfg(target_os = "linux")]
+        assert_eq!(candidates, vec!["libm.so.6", "libm.so"]);
+        #[cfg(target_os = "windows")]
+        assert_eq!(candidates, vec!["ucrtbase.dll", "msvcrt.dll"]);
+    }
+
+    #[test]
     fn generic_library_name_keeps_default_candidates() {
         assert_eq!(
             library_candidates("sqlite3"),

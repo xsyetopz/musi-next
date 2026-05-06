@@ -84,7 +84,7 @@ fn assert_manifest_validation_error(
     write_file(
         test_dir.path(),
         "index.ms",
-        r"export let result : Int := 42;",
+        r"export let expect : Int := 42;",
     );
 
     let error = Project::load(test_dir.path(), ProjectOptions::default()).expect_err(load_note);
@@ -102,7 +102,7 @@ fn write_option_prelude_entry(root: &Path) {
         root,
         "index.ms",
         r"
-export let result () : Option[Int] := someOf[Int](1);
+export let expect () : Maybe[Int] := Some[Int](1);
 ",
     );
 }
@@ -222,7 +222,7 @@ mod success {
         write_file(
             test_dir.path(),
             "index.ms",
-            r#"import "util"; export let result : Int := 42;"#,
+            r#"import "util"; export let expect : Int := 42;"#,
         );
         write_file(
             test_dir.path(),
@@ -245,7 +245,7 @@ mod success {
 
         assert!(output.artifact.validate().is_ok());
         assert!(output.text.contains("@util@0.1.0/index.ms::base"));
-        assert!(output.text.contains("@app@1.0.0/index.ms::result"));
+        assert!(output.text.contains("@app@1.0.0/index.ms::expect"));
         assert!(project.package("util").is_some());
         assert_eq!(project.workspace().members.len(), 1);
     }
@@ -264,7 +264,7 @@ mod success {
         write_file(
             test_dir.path(),
             "index.ms",
-            "export let result : Int := 42;",
+            "export let expect : Int := 42;",
         );
         write_file(
             test_dir.path(),
@@ -305,7 +305,7 @@ mod success {
         write_file(
             test_dir.path(),
             "index.ms",
-            r#"import "ext"; export let result : Int := 42;"#,
+            r#"import "ext"; export let expect : Int := 42;"#,
         );
         write_file(
             &registry_root,
@@ -319,7 +319,7 @@ mod success {
         write_file(
             &registry_root,
             "ext/1.2.0/index.ms",
-            r"export let ext_result : Int := 7;",
+            r"export let ext_expect : Int := 7;",
         );
 
         let project = Project::load(
@@ -436,7 +436,7 @@ mod success {
   "exports": "./index.ms"
 }"#,
         );
-        write_file(&git_root, "index.ms", r"export let ext_result : Int := 7;");
+        write_file(&git_root, "index.ms", r"export let ext_expect : Int := 7;");
         run_git(&git_root, &["init", "--initial-branch=main"]);
         run_git(&git_root, &["add", "."]);
         run_git(
@@ -575,7 +575,7 @@ mod success {
         write_file(
             test_dir.path(),
             "index.ms",
-            r"export let result : Int := 42;",
+            r"export let expect : Int := 42;",
         );
 
         let project =
@@ -605,7 +605,7 @@ mod success {
         write_file(
             test_dir.path(),
             "index.ms",
-            r#"import "alias"; export let result : Int := 42;"#,
+            r#"import "alias"; export let expect : Int := 42;"#,
         );
         write_file(
             test_dir.path(),
@@ -647,7 +647,7 @@ mod success {
             test_dir.path(),
             "features/root.ms",
             r##"let Internal := import "#internal";
-export let result : Int := Internal.value;
+export let expect : Int := Internal.value;
 "##,
         );
         write_file(
@@ -674,17 +674,17 @@ export let result : Int := Internal.value;
   "name": "app",
   "version": "1.0.0",
   "dependencies": { "@std": "*" },
-  "workspace": ["packages/std"]
+  "workspace": ["lib/std"]
 }"#,
         );
         write_file(
             test_dir.path(),
             "index.ms",
-            r"export let result : Int := 42;",
+            r"export let expect : Int := 42;",
         );
         write_file(
             test_dir.path(),
-            "packages/std/musi.json",
+            "lib/std/musi.json",
             r#"{
   "name": "@std",
   "version": "0.1.0",
@@ -694,14 +694,14 @@ export let result : Int := Internal.value;
         );
         write_file(
             test_dir.path(),
-            "packages/std/std.ms",
+            "lib/std/std.ms",
             r#"
 export let version := "0.1.0";
 "#,
         );
         write_file(
             test_dir.path(),
-            "packages/std/testing.ms",
+            "lib/std/testing.ms",
             r#"
 export let pass := { passed := .True, message := "" };
 export let describe (_name, _body) : Unit ~> Unit := _body();
@@ -710,7 +710,7 @@ export let it (_name, _body) : Unit ~> Unit := _body();
         );
         write_file(
             test_dir.path(),
-            "packages/std/__tests__/math.test.ms",
+            "lib/std/__tests__/math.test.ms",
             r"
 export let test () : Unit := 0;
 ",
@@ -819,7 +819,7 @@ export let test () := 0;
             .join("../..")
             .canonicalize()
             .expect("repo root should resolve");
-        let std_root = repo_root.join("packages/std");
+        let std_root = repo_root.join("lib/std");
         let mut missing = Vec::<String>::new();
         collect_missing_std_export_docs(&std_root, &std_root, &mut missing);
 
@@ -836,7 +836,7 @@ export let test () := 0;
             .join("../..")
             .canonicalize()
             .expect("repo root should resolve");
-        let manifest = fs::read_to_string(repo_root.join("packages/std/musi.json"))
+        let manifest = fs::read_to_string(repo_root.join("lib/std/musi.json"))
             .expect("std manifest should be readable");
 
         for removed_path in [
@@ -885,7 +885,7 @@ export let test () := 0;
             test_dir.path(),
             "index.ms",
             r#"let Sys := import "@std/sys";
-export let result : Int := 1;
+export let expect : Int := 1;
 "#,
         );
 
@@ -916,7 +916,7 @@ export let result : Int := 1;
             "index.ms",
             r#"
 let Hub := import "hub";
-export let result () : Bool := Hub.Dep.equals([1, 2], [1, 2]);
+export let expect () : Bool := Hub.Dep.equals([1, 2], [1, 2]);
 "#,
         );
         write_file(
@@ -992,9 +992,9 @@ export let equals (left : []Int, right : []Int) : Bool := left = right;
         let math = surface
             .exported_value("math")
             .expect("math export should exist");
-        let option = surface
-            .exported_value("option")
-            .expect("option export should exist");
+        let maybe = surface
+            .exported_value("maybe")
+            .expect("maybe export should exist");
 
         assert_eq!(
             bytes.import_record_target.as_ref(),
@@ -1009,8 +1009,8 @@ export let equals (left : []Int, right : []Int) : Bool := left = right;
             Some(&ModuleKey::new("@@std@0.1.0/math.ms"))
         );
         assert_eq!(
-            option.import_record_target.as_ref(),
-            Some(&ModuleKey::new("@@std@0.1.0/option.ms"))
+            maybe.import_record_target.as_ref(),
+            Some(&ModuleKey::new("@@std@0.1.0/maybe.ms"))
         );
     }
 
@@ -1046,7 +1046,7 @@ export let equals (left : []Int, right : []Int) : Bool := left = right;
   "name": "app",
   "version": "1.0.0",
   "dependencies": { "@std": "*" },
-  "workspace": ["packages/std"]
+  "workspace": ["lib/std"]
 }"#,
         );
         write_file(
@@ -1059,7 +1059,7 @@ export let bytes := Std.bytes;
         );
         write_file(
             test_dir.path(),
-            "packages/std/musi.json",
+            "lib/std/musi.json",
             r#"{
   "name": "@std",
   "version": "0.1.0",
@@ -1072,14 +1072,14 @@ export let bytes := Std.bytes;
         );
         write_file(
             test_dir.path(),
-            "packages/std/std.ms",
+            "lib/std/std.ms",
             r#"
 export let bytes := import "@std/bytes";
 "#,
         );
         write_file(
             test_dir.path(),
-            "packages/std/bytes.ms",
+            "lib/std/bytes.ms",
             r"
 export let equals (left : []Int, right : []Int) : Bool := left = right;
 ",
@@ -1113,13 +1113,13 @@ export let equals (left : []Int, right : []Int) : Bool := left = right;
   "name": "app",
   "version": "1.0.0",
   "dependencies": { "@std": "*" },
-  "workspace": ["packages/std"]
+  "workspace": ["lib/std"]
 }"#,
         );
         write_option_prelude_entry(test_dir.path());
         write_file(
             test_dir.path(),
-            "packages/std/musi.json",
+            "lib/std/musi.json",
             r#"{
   "name": "@std",
   "version": "0.1.0",
@@ -1127,39 +1127,39 @@ export let equals (left : []Int, right : []Int) : Bool := left = right;
   "exports": {
     ".": "./std.ms",
     "./prelude": "./prelude.ms",
-    "./option": "./option.ms"
+    "./maybe": "./maybe.ms"
   }
 }"#,
         );
         write_file(
             test_dir.path(),
-            "packages/std/std.ms",
+            "lib/std/std.ms",
             r#"
 export let Prelude := import "@std/prelude";
-export let Option := import "@std/option";
+export let Maybe := import "@std/maybe";
 "#,
         );
         write_file(
             test_dir.path(),
-            "packages/std/prelude.ms",
+            "lib/std/prelude.ms",
             r#"
-let OptionPkg := import "@std/option";
+let MaybePkg := import "@std/maybe";
 export let Int := Int;
-export opaque let Option := OptionPkg.Option;
-export let someOf := OptionPkg.someOf;
-export let none := OptionPkg.none;
+export opaque let Maybe := MaybePkg.Maybe;
+export let Some := MaybePkg.Some;
+export let none := MaybePkg.none;
 "#,
         );
         write_file(
             test_dir.path(),
-            "packages/std/option.ms",
+            "lib/std/maybe.ms",
             r"
-export opaque let Option[T] := data {
+export opaque let Maybe[T] := data {
   | Some(T)
   | None
 };
-export let someOf[T] (value : T) : Option[T] := .Some(value);
-export let none[T] () : Option[T] := .None;
+export let Some[T] (value : T) : Maybe[T] := .Some(value);
+export let none[T] () : Maybe[T] := .None;
 ",
         );
 
@@ -1251,7 +1251,7 @@ mod failure {
         write_file(
             test_dir.path(),
             "index.ms",
-            r"export let result : Int := 42;",
+            r"export let expect : Int := 42;",
         );
 
         let error = Project::load(test_dir.path(), ProjectOptions::default())
@@ -1445,7 +1445,7 @@ mod failure {
         write_file(
             test_dir.path(),
             "index.ms",
-            "let Missing := import \"missing\";\nexport let result : Int := 42;\n",
+            "let Missing := import \"missing\";\nexport let expect : Int := 42;\n",
         );
 
         let error = Project::load(test_dir.path(), ProjectOptions::default())
@@ -1491,7 +1491,7 @@ mod failure {
         write_file(
             test_dir.path(),
             "index.ms",
-            "export let result : Int := 42;\n",
+            "export let expect : Int := 42;\n",
         );
 
         let project =

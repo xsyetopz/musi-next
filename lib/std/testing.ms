@@ -5,7 +5,7 @@ let Bool := core.Bool;
 let String := core.String;
 let Unit := core.Unit;
 
---- Successful test result.
+--- Successful test expect.
 export let pass : Bool := assert.passValue;
 
 --- Failed assertion value with message output.

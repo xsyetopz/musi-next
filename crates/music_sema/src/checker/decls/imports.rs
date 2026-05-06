@@ -7,15 +7,17 @@ use music_names::{Ident, NameBindingId, Symbol};
 
 use super::super::pats::{bind_pat, bound_name_from_pat};
 use super::super::surface::import_surface_ty;
-use super::super::{CheckPass, DataDef, DataVariantDef, DiagKind, EffectDef, EffectOpDef};
+use super::super::{
+    CheckPass, DataDef, DataVariantDef, DiagKind, EffectDef, EffectOpDef, PassBase,
+};
 use crate::api::{
     ConstraintFacts, ConstraintSurface, ExportedValue, LawFacts, LawParamFacts, LawSurface,
     ModuleSurface, PatFacts, ShapeFacts, ShapeMemberFacts,
 };
 use crate::api::{DataSurface, EffectSurface, ExprFacts, ShapeSurface};
 
-type ImportRecordTargetCtx<'a, 'ctx, 'interner, 'env> = &'a CheckPass<'ctx, 'interner, 'env>;
-type ImportRecordExportCtx<'a, 'ctx, 'interner, 'env> = &'a CheckPass<'ctx, 'interner, 'env>;
+type ImportRecordTargetCtx<'a, 'ctx, 'interner, 'env> = &'a PassBase<'ctx, 'interner, 'env>;
+type ImportRecordExportCtx<'a, 'ctx, 'interner, 'env> = &'a PassBase<'ctx, 'interner, 'env>;
 type StructuralTargetCtx<'a, 'ctx, 'interner, 'env> = &'a CheckPass<'ctx, 'interner, 'env>;
 type ImportRecordPatternCtx<'a, 'ctx, 'interner, 'env> = &'a mut CheckPass<'ctx, 'interner, 'env>;
 type StructuralAliasCtx<'a, 'ctx, 'interner, 'env> = &'a mut CheckPass<'ctx, 'interner, 'env>;
@@ -279,6 +281,7 @@ impl CheckPass<'_, '_, '_> {
             HirExprKind::Name { name } => {
                 let alias_text: Box<str> = self.resolve_symbol(alias.name).into();
                 let source_text: Box<str> = self.resolve_symbol(name.name).into();
+                self.bind_builtin_type_alias(alias.name, name.name);
                 if let Some(data) = self.data_def(source_text.as_ref()).cloned() {
                     self.insert_data_def(alias_text.clone(), data);
                 }
@@ -293,6 +296,14 @@ impl CheckPass<'_, '_, '_> {
         }
     }
 
+    fn bind_builtin_type_alias(&mut self, alias: Symbol, source: Symbol) {
+        let source_name = self.resolve_symbol(source);
+        let Some(ty) = self.builtin_type_alias_for_name(source_name) else {
+            return;
+        };
+        self.insert_type_alias(alias, ty);
+    }
+
     fn bind_imported_record_member(
         &mut self,
         alias: Ident,
@@ -300,6 +311,8 @@ impl CheckPass<'_, '_, '_> {
         export: &ExportedValue,
     ) {
         self.import_exported_value_binding(alias, surface, export);
+        let export_name = self.intern(export.name.as_ref());
+        self.bind_builtin_type_alias(alias.name, export_name);
         if let Some(binding) = self.binding_id_for_decl(alias)
             && let Some(target) = export.import_record_target.clone()
         {

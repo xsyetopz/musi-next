@@ -46,7 +46,7 @@ Null is never an ambient inhabitant of reference-like types.
 Rules:
 
 - `Ref[T]`, `MutRef[T]`, `Slice[T]`, and `Ptr[T]` are non-null
-- nullable address results use `Option[...]`
+- nullable address results use `Maybe[...]`
 - C-facing nulls are translated explicitly at the interop boundary
 
 ## Ownership And Aliasing

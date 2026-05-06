@@ -7,7 +7,7 @@ export let test () :=
     testing.it("'encode' keeps ordinary utf8 string", utf8.encode("hi") = "hi",);
     testing.it("'isValid' accepts valid utf8 string", utf8.isValid("hi"),);
     testing.it(
-      "'decode' returns some for valid input",
+      "'decode' returns Some for valid input",
       utf8.decode("hi").isSome(),
     );
     testing.endDescribe()

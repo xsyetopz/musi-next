@@ -7,9 +7,9 @@ export let test () :=
     let currentOs := os.targetOs(os.current);
     let currentArch := os.targetArch(os.current);
     let currentFamily := os.targetFamily(os.current);
-    testing.it("current OS is present", currentOs.toString() /= "",);
-    testing.it("current arch is present", currentArch.toString() /= "",);
-    testing.it("current family is present", currentFamily.toString() /= "",);
+    testing.it("current OS is Some", currentOs.toString() /= "",);
+    testing.it("current arch is Some", currentArch.toString() /= "",);
+    testing.it("current family is Some", currentFamily.toString() /= "",);
     testing.it(
       "pointer width is supported",
       os.targetPointerWidth(os.current) > 0,

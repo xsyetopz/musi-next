@@ -10,7 +10,7 @@ export let test () :=
     );
     testing.it("'isValid' accepts hex string", hex.isValid("6869"),);
     testing.it(
-      "'decode' returns some for valid input",
+      "'decode' returns Some for valid input",
       hex.decode("6869").isSome(),
     );
     testing.it(
@@ -18,7 +18,7 @@ export let test () :=
       hex.decode("6869").unwrapOr("") = "hi",
     );
     testing.it(
-      "'decode' returns none for invalid input",
+      "'decode' returns None for invalid input",
       hex.decode("zz").isNone(),
     );
     testing.endDescribe()

@@ -636,6 +636,22 @@ mod success {
     }
 
     #[test]
+    fn lowers_foreign_type_aliases_to_canonical_type_names() {
+        let ir = lower(
+            r#"
+        let CInt := Int32;
+        let CStringAlias := CString;
+        native "c" let strerror (code : CInt) : CStringAlias;
+    "#,
+        );
+
+        let foreign = &ir.foreigns()[0];
+        assert_eq!(foreign.param_tys.len(), 1);
+        assert_eq!(foreign.param_tys[0].as_ref(), "Int32");
+        assert_eq!(foreign.result_ty.as_ref(), "CString");
+    }
+
+    #[test]
     fn lowers_array_cat_for_runtime_spread() {
         assert_global_tail_matches(
             r"

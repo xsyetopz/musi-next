@@ -1,5 +1,5 @@
-let option := import "@std/option";
-let Option := option.Option;
+let maybe := import "@std/maybe";
+let Maybe := maybe.Maybe;
 let path := import "@std/path";
 let Path := path.Path;
 let processHost := import "musi:process";
@@ -36,10 +36,10 @@ export let (self : ExitCode).toInt () : Int :=
 export let argsCount () : Int := processHost.argCount();
 
 --- Process arg by index.
-export let argAt (index : Int) : Option[String] :=
+export let argAt (index : Int) : Maybe[String] :=
   match processHost.argAt(index) (
-  | value if value = "" => option.noneOf[String]()
-  | value => option.someOf[String](value)
+  | value if value = "" => maybe.None[String]()
+  | value => maybe.Some[String](value)
   );
 
 --- Current working directory.

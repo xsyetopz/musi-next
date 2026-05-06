@@ -1,6 +1,6 @@
 use music_hir::HirTyId;
 use music_module::ModuleKey;
-use music_names::NameBindingId;
+use music_names::{NameBindingId, Symbol};
 
 use crate::api::{ComptimeValue, ConstraintKey, DefinitionKey, ForeignLinkInfo};
 use crate::checker::schemes::BindingScheme;
@@ -15,6 +15,14 @@ impl PassBase<'_, '_, '_> {
 
     pub fn insert_binding_type(&mut self, id: NameBindingId, ty: HirTyId) {
         let _prev = self.typing.binding_types.insert(id, ty);
+    }
+
+    pub fn type_alias(&self, symbol: Symbol) -> Option<HirTyId> {
+        self.typing.type_aliases.get(&symbol).copied()
+    }
+
+    pub fn insert_type_alias(&mut self, symbol: Symbol, ty: HirTyId) {
+        let _prev = self.typing.type_aliases.insert(symbol, ty);
     }
 
     pub fn binding_effects(&self, id: NameBindingId) -> Option<EffectRow> {

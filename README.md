@@ -154,7 +154,7 @@ Use `musi` inside package roots. Use `music` when you want one source graph or o
 Prefer focused stdlib imports:
 
 ```musi
-let option := import "@std/option";
+let maybe := import "@std/maybe";
 let testing := import "@std/testing";
 ```
 
@@ -162,7 +162,7 @@ Root import also works:
 
 ```musi
 let std := import "@std";
-let option := std.option;
+let maybe := std.maybe;
 let testing := std.testing;
 let os := std.os;
 ```

@@ -132,19 +132,25 @@ impl Vm {
         if let Some(result) = self.call_sys_intrinsic(module_slot, foreign, args) {
             return Some(result);
         }
-        self.call_data_intrinsic(foreign, args)
+        self.call_data_intrinsic(module_slot, foreign, args)
             .or_else(|| self.call_range_intrinsic(module_slot, foreign, args))
             .or_else(|| self.call_pointer_intrinsic(module_slot, foreign, args))
     }
 
     fn call_data_intrinsic(
-        &self,
+        &mut self,
+        module_slot: usize,
         foreign: &ForeignCall,
         args: &[Value],
     ) -> Option<VmResult<Value>> {
         match foreign.symbol() {
             "data.tag" => self.data_tag(foreign, args),
             "cmp.float.total_compare" => Self::float_total_compare(foreign, args),
+            "float.is_nan" => self.float_predicate(module_slot, foreign, args, f64::is_nan),
+            "float.is_infinite" => {
+                self.float_predicate(module_slot, foreign, args, f64::is_infinite)
+            }
+            "float.is_finite" => self.float_predicate(module_slot, foreign, args, f64::is_finite),
             _ => return None,
         }
         .into()
@@ -271,6 +277,17 @@ impl Vm {
             Greater => 1,
         };
         Ok(Value::Int(ordering))
+    }
+
+    fn float_predicate(
+        &mut self,
+        module_slot: usize,
+        foreign: &ForeignCall,
+        args: &[Value],
+        op: impl FnOnce(f64) -> bool,
+    ) -> VmResult<Value> {
+        let value = Self::float_arg(foreign, args, 0)?;
+        self.bool_value(module_slot, op(value))
     }
 
     fn sys_match(
@@ -403,6 +420,19 @@ fn pointer_storage_suffix(type_name: &str) -> Option<&'static str> {
         ("CDouble", "f64"),
         ("Float64", "f64"),
         ("Float", "f64"),
+        ("char", "i8"),
+        ("int8_t", "i8"),
+        ("uint8_t", "u8"),
+        ("int16_t", "i16"),
+        ("uint16_t", "u16"),
+        ("int32_t", "i32"),
+        ("uint32_t", "u32"),
+        ("int64_t", "i64"),
+        ("uint64_t", "u64"),
+        ("intptr_t", "i64"),
+        ("uintptr_t", "u64"),
+        ("size_t", "u64"),
+        ("ptrdiff_t", "i64"),
         ("CPtr", "ptr"),
     ];
     POINTER_STORAGE_SUFFIXES

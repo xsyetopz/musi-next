@@ -1,5 +1,5 @@
-let option := import "@std/option";
-let Option := option.Option;
+let maybe := import "@std/maybe";
+let Maybe := maybe.Maybe;
 let envHost := import "musi:env";
 
 --- Environment variable key.
@@ -40,10 +40,10 @@ export let (self : Var).toString () : String := varText(self);
 export let has (target : Key) : Bool := envHost.has(keyText(target)) > 0;
 
 --- Read an environment variable.
-export let get (target : Key) : Option[Var] :=
+export let get (target : Key) : Maybe[Var] :=
   match has(target) (
-  | ok if ok => option.someOf[Var](var(envHost.get(keyText(target))))
-  | _ => option.noneOf[Var]()
+  | success if success => maybe.Some[Var](var(envHost.get(keyText(target))))
+  | _ => maybe.None[Var]()
   );
 
 --- Set an environment variable.

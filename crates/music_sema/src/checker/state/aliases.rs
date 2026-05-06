@@ -27,6 +27,7 @@ pub type ImportTargetMap = HashMap<Span, ModuleKey>;
 pub type BindingTypeMap = HashMap<NameBindingId, HirTyId>;
 pub type BindingEffectsMap = HashMap<NameBindingId, EffectRow>;
 pub type BindingSchemeMap = HashMap<NameBindingId, BindingScheme>;
+pub type TypeAliasMap = HashMap<Symbol, HirTyId>;
 pub type TypeParamKindScope = HashMap<Symbol, HirTyId>;
 pub type TypeParamKindScopeList = Vec<TypeParamKindScope>;
 pub type BindingConstraintKeyMap = HashMap<NameBindingId, Box<[ConstraintKey]>>;

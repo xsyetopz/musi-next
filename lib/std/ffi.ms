@@ -39,6 +39,34 @@ export let CSizeDiff := core.Int;
 export let CFloat := core.Float32;
 --- C double ABI type.
 export let CDouble := core.Float64;
+--- C char ABI typedef.
+export let char := core.Int8;
+--- C bool ABI typedef.
+export let bool := core.Bool;
+--- C int8_t ABI typedef.
+export let int8_t := core.Int8;
+--- C int16_t ABI typedef.
+export let int16_t := core.Int16;
+--- C int32_t ABI typedef.
+export let int32_t := core.Int32;
+--- C int64_t ABI typedef.
+export let int64_t := core.Int64;
+--- C uint8_t ABI typedef.
+export let uint8_t := core.Nat8;
+--- C uint16_t ABI typedef.
+export let uint16_t := core.Nat16;
+--- C uint32_t ABI typedef.
+export let uint32_t := core.Nat32;
+--- C uint64_t ABI typedef.
+export let uint64_t := core.Nat64;
+--- C intptr_t ABI typedef.
+export let intptr_t := core.Int;
+--- C uintptr_t ABI typedef.
+export let uintptr_t := core.Nat;
+--- C size_t ABI typedef.
+export let size_t := core.Nat;
+--- C ptrdiff_t ABI typedef.
+export let ptrdiff_t := core.Int;
 
 --- Typed view over a raw C pointer.
 export opaque let Ptr [T] := data {

@@ -139,7 +139,7 @@ Rust comparison: Rust blocks accept semicolon-terminated statement sequences and
 
 Optional and fallible type sugar:
 
-- `?T` means `Option[T]`.
+- `?T` means `Maybe[T]`.
 - `E!T` means `Result[T, E]`.
 
 Compound expression tokens:

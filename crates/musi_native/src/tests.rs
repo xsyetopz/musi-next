@@ -198,18 +198,63 @@ mod success {
     #[test]
     fn native_abi_support_link_smoke() {
         let source = r#"
-        @link(name := "c", symbol := "strerror")
-        native "c" let strerror (code : Int) : CString;
         @link(name := "c", symbol := "strlen")
-        native "c" let strlen (value : CString) : Int;
-        export let result () : Int := unsafe { strlen(strerror(2)); };
+        native "c" let strlen (value : CString) : Nat;
+        export let result () : Nat := unsafe { strlen("musi"); };
     "#;
         let value = call_export_with_host(NativeHost::default(), source)
             .expect("linked native call should succeed");
-        let Value::Int(len) = value else {
-            panic!("expected `Int` result");
+        let Value::Nat(len) = value else {
+            panic!("expected `Nat` result");
         };
         assert!(len > 0);
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn native_abi_float_pair_call_roundtrips() {
+        let source = r#"
+        @link(name := "m", symbol := "pow")
+        native "c" let pow (base : Float, exponent : Float) : Float;
+        export let result () : Float := unsafe { pow(2.0, 5.0); };
+    "#;
+        let value = call_export_with_host(NativeHost::default(), source)
+            .expect("linked native float pair call should succeed");
+        let Value::Float(actual) = value else {
+            panic!("expected `Float` result");
+        };
+        assert_eq!(actual, 32.0);
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn native_abi_float_pair_wrapper_keeps_argument_order() {
+        let source = r#"
+        @link(name := "m", symbol := "pow")
+        native "c" let cPow (base : Float, exponent : Float) : Float;
+        let pow (base : Float, exponent : Float) : Float := unsafe { cPow(base, exponent); };
+        export let result () : Float := pow(2.0, 5.0);
+    "#;
+        let value = call_export_with_host(NativeHost::default(), source)
+            .expect("linked native float pair wrapper should succeed");
+        let Value::Float(actual) = value else {
+            panic!("expected `Float` result");
+        };
+        assert_eq!(actual, 32.0);
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
+    #[test]
+    fn native_abi_cstring_pair_call_roundtrips() {
+        let source = r#"
+        @link(name := "c", symbol := "strcmp")
+        native "c" let strcmp (left : CString, right : CString) : Int32;
+        export let result () : Int32 :=
+          unsafe { strcmp("musi", "musi"); };
+    "#;
+        let value = call_export_with_host(NativeHost::default(), source)
+            .expect("linked native CString pair call should succeed");
+        assert_eq!(value, Value::Int(0));
     }
 
     #[cfg(target_os = "macos")]

@@ -1,9 +1,9 @@
 let bytes := import "@std/bytes";
 let cmp := import "@std/cmp";
 let collections := import "@std/collections";
-let option := import "@std/option";
+let expect := import "@std/expect";
+let maybe := import "@std/maybe";
 let path := import "@std/path";
-let result := import "@std/result";
 let core := import "musi:core";
 
 -- --- Type universe ---
@@ -65,10 +65,10 @@ export let CString := core.CString;
 export let CPtr := core.CPtr;
 
 -- --- Common named data types ---
---- Prelude optional value type.
-export let Option := option.Option;
---- Prelude recoverable result type.
-export let Result := result.Result;
+--- Prelude maybe value type.
+export let Maybe := maybe.Maybe;
+--- Prelude expected success or failure type.
+export let Expect := expect.Expect;
 --- Prelude comparison ordering type.
 export let Ordering := cmp.Ordering;
 --- Prelude list type.
@@ -79,14 +79,16 @@ export let Path := path.Path;
 export let Bytes := bytes.Bytes;
 
 -- --- Common constructors ---
---- Build a present option.
-export let someOf [T] (value : T) : Option[T] := option.someOf[T](value);
---- Build an absent option.
-export let noneOf [T] () : Option[T] := option.noneOf[T]();
---- Build a successful result.
-export let ok [T, E] (value : T) : Result[T, E] := result.ok[T, E](value);
---- Build a failed result.
-export let err [T, E] (error : E) : Result[T, E] := result.err[T, E](error);
+--- Build Some maybe value.
+export let Some [T] (value : T) : Maybe[T] := maybe.Some[T](value);
+--- Build None maybe value.
+export let None [T] () : Maybe[T] := maybe.None[T]();
+--- Build successful expected value.
+export let Success [T, E] (value : T) : Expect[T, E] :=
+  expect.Success[T, E](value);
+--- Build failed expected value.
+export let Failure [T, E] (error : E) : Expect[T, E] :=
+  expect.Failure[T, E](error);
 --- Abort current computation.
 export let abort () : Empty := core.abort();
 

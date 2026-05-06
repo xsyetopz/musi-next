@@ -1232,7 +1232,7 @@ mod success {
             .set_module_text(
                 &ModuleKey::new("main"),
                 r"
-            let Option[T] := data { | Some(Int) | None };
+            let Maybe[T] := data { | Some(Int) | None };
 
             let Eq[T] := shape { };
             let eqInt := given Eq[Int] { };
@@ -1244,7 +1244,7 @@ mod success {
             export let tupId (x : (Int, String)) : (Int, String) := x;
             export let arrId (x : [2]Int) : [2]Int := x;
             export let mutArrId (x : mut [2]Int) : mut [2]Int := x;
-            export let noneInt () : Option[Int] := .None;
+            export let noneInt () : Maybe[Int] := .None;
         ",
             )
             .unwrap();
@@ -1306,7 +1306,7 @@ mod success {
                     && key == "value.ty"
                     && values
                         .first()
-                        .is_some_and(|value| value.contains("Option[Int]"))
+                        .is_some_and(|value| value.contains("Maybe[Int]"))
             }),
             "{meta:?}"
         );

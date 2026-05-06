@@ -590,7 +590,7 @@ export let Unit := Core.Unit;
             r#"
 	export let bytes := import "@std/bytes";
 	export let math := import "@std/math";
-	export let option := import "@std/option";
+	export let maybe := import "@std/maybe";
 	export let testing := import "@std/testing";
 "#,
         );
@@ -615,16 +615,16 @@ export let clamp (value : Int, low : Int, high : Int) : Int :=
         );
         register_runtime_module(
             &mut runtime,
-            "@std/option",
+            "@std/maybe",
             r"
-export opaque let Option[T] := data {
+export opaque let Maybe[T] := data {
     | Some(T)
     | None
 };
 
-export let none [T] () : Option[T] := .None;
+export let None [T] () : Maybe[T] := .None;
 
-export let unwrapOr [T] (value : Option[T], fallback : T) : T :=
+export let unwrapOr [T] (value : Maybe[T], fallback : T) : T :=
     match value (
         | .Some(item) => item
         | .None => fallback
@@ -655,14 +655,14 @@ export let it (name : String, passed : Bool) :=
 let Testing := import "@std/testing";
 let Bytes := import "@std/bytes";
 let Math := import "@std/math";
-let Option := import "@std/option";
+let Maybe := import "@std/maybe";
 
 export let test () :=
     (
       Testing.describe("std root");
       Testing.it("bytes chain", Testing.toBeTrue(Bytes.equals([1, 2], [1, 2])));
       Testing.it("math chain", Testing.toBe(Math.clamp(9, 0, 4), 4));
-      Testing.it("option chain", Testing.toBe(Option.unwrapOr[Int](Option.none[Int](), 5), 5));
+      Testing.it("maybe chain", Testing.toBe(Maybe.unwrapOr[Int](Maybe.None[Int](), 5), 5));
       Testing.endDescribe()
     );
 "#,

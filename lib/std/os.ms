@@ -214,7 +214,7 @@ export let targetJit (target : Target) : Jit :=
     jitBackend := backend,
     jitIsa := isa,
   ) => match supported (
-  | ok if ok > 0 =>.Supported(backend := backend, isa := isa)
+  | success if success > 0 =>.Supported(backend := backend, isa := isa)
   | _ =>.Unsupported
   )
   );

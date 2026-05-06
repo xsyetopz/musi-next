@@ -1,8 +1,8 @@
 let io := import "@std/io";
-let option := import "@std/option";
+let maybe := import "@std/maybe";
 let text := import "@std/text";
 
-let Option := option.Option;
+let Maybe := maybe.Maybe;
 
 --- Prompt and read one line.
 export let prompt (message : String) : String :=
@@ -18,15 +18,15 @@ export let readTrimmedLine () : String := io.readLine().trim();
 export let promptTrimmed (message : String) : String := prompt(message).trim();
 
 --- Read a non-empty trimmed line.
-export let readNonEmptyLine () : Option[String] :=
+export let readNonEmptyLine () : Maybe[String] :=
   match readTrimmedLine() (
-  | value if value.isEmpty() => option.noneOf[String]()
-  | value => option.someOf[String](value)
+  | value if value.isEmpty() => maybe.None[String]()
+  | value => maybe.Some[String](value)
   );
 
 --- Prompt for a non-empty trimmed line.
-export let promptNonEmpty (message : String) : Option[String] :=
+export let promptNonEmpty (message : String) : Maybe[String] :=
   match promptTrimmed(message) (
-  | value if value.isEmpty() => option.noneOf[String]()
-  | value => option.someOf[String](value)
+  | value if value.isEmpty() => maybe.None[String]()
+  | value => maybe.Some[String](value)
   );

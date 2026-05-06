@@ -20,7 +20,7 @@ use args::{
 };
 use comptime::lower_comptime_call_expr;
 use dot::{lower_dot_callable_call_expr, resolve_dot_callable_call_target};
-use intrinsics::{lower_ffi_pointer_intrinsic, lower_std_cmp_intrinsic};
+use intrinsics::{lower_ffi_pointer_intrinsic, lower_std_cmp_intrinsic, lower_std_libm_intrinsic};
 pub(crate) fn lower_call_expr(
     ctx: &mut LowerCtx<'_>,
     callee: HirExprId,
@@ -35,6 +35,9 @@ pub(crate) fn lower_call_expr(
         sema.module().store.args.get(args.clone()),
     );
     if let Some(intrinsic) = lower_std_cmp_intrinsic(ctx, callee, &arg_nodes) {
+        return intrinsic;
+    }
+    if let Some(intrinsic) = lower_std_libm_intrinsic(ctx, callee, &arg_nodes) {
         return intrinsic;
     }
     if let Some(intrinsic) = lower_ffi_pointer_intrinsic(ctx, callee, &arg_nodes) {

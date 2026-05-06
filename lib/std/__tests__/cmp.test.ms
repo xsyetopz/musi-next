@@ -28,6 +28,18 @@ export let test () :=
       cmp.compareString("é", "z").isGreater(),
     );
     testing.it(
+      "'compareFloat' returns less",
+      cmp.compareFloat(1.25, 2.5).isLess(),
+    );
+    testing.it(
+      "'compareFloat' returns equal",
+      cmp.compareFloat(4.5, 4.5).isEqual(),
+    );
+    testing.it(
+      "'compareFloat' returns greater",
+      cmp.compareFloat(5.75, 4.5).isGreater(),
+    );
+    testing.it(
       "'clampInt' clamps values",
       testing.toBe(cmp.clampInt(11, 0, 10), 10),
     );

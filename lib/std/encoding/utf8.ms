@@ -1,6 +1,6 @@
-let option := import "@std/option";
+let maybe := import "@std/maybe";
 let encodingHost := import "musi:encoding";
-let Option := option.Option;
+let Maybe := maybe.Maybe;
 
 --- Encode a value into this format.
 export let encode (source : String) : String := encodingHost.utf8Encode(source);
@@ -10,8 +10,8 @@ export let isValid (bytes : String) : Bool :=
   encodingHost.utf8IsValid(bytes) > 0;
 
 --- Decode a value from this format.
-export let decode (bytes : String) : Option[String] :=
+export let decode (bytes : String) : Maybe[String] :=
   match isValid(bytes) (
-  | valid if valid => option.someOf[String](encodingHost.utf8Decode(bytes))
-  | _ => option.noneOf[String]()
+  | valid if valid => maybe.Some[String](encodingHost.utf8Decode(bytes))
+  | _ => maybe.None[String]()
   );

@@ -3,10 +3,12 @@ export let version := "0.1.0";
 
 --- Commonly imported standard library surface.
 export let prelude := import "@std/prelude";
---- Optional value helpers surface.
-export let option := import "@std/option";
---- Recoverable result helpers surface.
-export let result := import "@std/result";
+--- ASCII byte classification and conversion surface.
+export let ascii := import "@std/ascii";
+--- Maybe value helpers surface.
+export let maybe := import "@std/maybe";
+--- Expected success or failure helpers surface.
+export let expect := import "@std/expect";
 --- Comparison helpers surface.
 export let cmp := import "@std/cmp";
 --- Collections namespace.
@@ -21,6 +23,10 @@ export let encoding := import "@std/encoding";
 export let json := import "@std/json";
 --- Math helpers surface.
 export let math := import "@std/math";
+--- C math library helpers surface.
+export let libm := import "@std/libm";
+--- C runtime library helpers surface.
+export let libc := import "@std/libc";
 --- Fixed-width bit-vector helpers surface.
 export let bits := import "@std/bits";
 --- Formatting helpers surface.
@@ -46,20 +52,21 @@ export let env := import "@std/env";
 export let process := import "@std/process";
 let osRecord := import "@std/os";
 --- Typed operating system target helpers surface.
-export let os := {
-  current := osRecord.current,
-  currentJit := osRecord.currentJit,
-  targetOs := osRecord.targetOs,
-  targetArch := osRecord.targetArch,
-  targetFamily := osRecord.targetFamily,
-  targetPointerWidth := osRecord.targetPointerWidth,
-  targetEndian := osRecord.targetEndian,
-  targetJit := osRecord.targetJit,
-  matchesOs := osRecord.matchesOs,
-  matchesArch := osRecord.matchesArch,
-  matchesFamily := osRecord.matchesFamily,
-  supportsJit := osRecord.supportsJit,
-};
+export let os :=
+  {
+    current := osRecord.current,
+    currentJit := osRecord.currentJit,
+    targetOs := osRecord.targetOs,
+    targetArch := osRecord.targetArch,
+    targetFamily := osRecord.targetFamily,
+    targetPointerWidth := osRecord.targetPointerWidth,
+    targetEndian := osRecord.targetEndian,
+    targetJit := osRecord.targetJit,
+    matchesOs := osRecord.matchesOs,
+    matchesArch := osRecord.matchesArch,
+    matchesFamily := osRecord.matchesFamily,
+    supportsJit := osRecord.supportsJit,
+  };
 --- Logging helpers surface.
 export let log := import "@std/log";
 --- Foreign function interface helpers surface.

@@ -13,8 +13,8 @@ use super::aliases::{
     EffectDefMap, ExprCallableEffectsMap, ExprComptimeValueMap, ExprConstraintAnswerMap,
     ExprDotCallableBindingMap, ExprFactsList, ExprImportRecordTargetMap, ExprMemberFactMap,
     ForeignLinkMap, GatedBindingSet, GivenFactsMap, PatFactsList, ResumeCtxList, SealedShapeSet,
-    ShapeFactsByNameMap, ShapeFactsMap, ShapeIndexMap, TypeParamKindScopeList, TypeTestTargetMap,
-    UnsafeBindingSet,
+    ShapeFactsByNameMap, ShapeFactsMap, ShapeIndexMap, TypeAliasMap, TypeParamKindScopeList,
+    TypeTestTargetMap, UnsafeBindingSet,
 };
 
 use super::{DataDef, EffectDef};
@@ -35,6 +35,7 @@ impl ResumeCtx {
 #[derive(Default)]
 pub struct TypingState {
     pub binding_types: BindingTypeMap,
+    pub type_aliases: TypeAliasMap,
     pub binding_effects: BindingEffectsMap,
     pub binding_schemes: BindingSchemeMap,
     pub type_param_kind_scopes: TypeParamKindScopeList,

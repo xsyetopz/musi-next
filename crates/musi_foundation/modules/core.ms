@@ -82,28 +82,28 @@ export let CString := CString;
 @musi.builtin(name := "CPtr")
 export let CPtr := CPtr;
 
-export opaque let Option [T] := data {
+export opaque let Maybe [T] := data {
   | Some(T)
   | None
 };
 
-export let someOf [T] (value : T) : Option[T] := .Some(value);
+export let Some [T] (value : T) : Maybe[T] := .Some(value);
 
-export let noneOf [T] () : Option[T] := .None;
+export let None [T] () : Maybe[T] := .None;
 
-export let isSome [T] (value : Option[T]) : Bool :=
+export let isSome [T] (value : Maybe[T]) : Bool :=
   match value (
   | .Some(item) => 0 = 0
   | .None => 0 = 1
   );
 
-export let isNone [T] (value : Option[T]) : Bool :=
+export let isNone [T] (value : Maybe[T]) : Bool :=
   match value (
   | .Some(item) => 0 = 1
   | .None => 0 = 0
   );
 
-export let unwrapOr [T] (value : Option[T], fallback : T) : T :=
+export let unwrapOr [T] (value : Maybe[T], fallback : T) : T :=
   match value (
   | .Some(item) => item
   | .None => fallback
@@ -117,8 +117,8 @@ export let abort () : Empty := ask Abort.abort();
 
 export opaque let Rangeable [T] := shape {
   let compare (left : T, right : T) : Int;
-  let next (value : T) : Option[T];
-  let prev (value : T) : Option[T];
+  let next (value : T) : Maybe[T];
+  let prev (value : T) : Maybe[T];
 };
 
 export opaque let RangeBounds [T] := shape {
@@ -128,8 +128,8 @@ export opaque let RangeBounds [T] := shape {
 
 export given Rangeable[Int] {
   let compare (left : Int, right : Int) : Int := left - right;
-  let next (value : Int) : Option[Int] := someOf[Int](value + 1);
-  let prev (value : Int) : Option[Int] := someOf[Int](value - 1);
+  let next (value : Int) : Maybe[Int] := Some[Int](value + 1);
+  let prev (value : Int) : Maybe[Int] := Some[Int](value - 1);
 };
 
 export given RangeBounds[Int] {

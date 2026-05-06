@@ -87,6 +87,9 @@ pub fn library_candidates(link: &str) -> Vec<String> {
     if link == "c" {
         return c_runtime_library_candidates();
     }
+    if link == "m" {
+        return math_library_candidates();
+    }
     let mut out = vec![link.to_owned()];
     if !link.contains('/') {
         out.push(format!("lib{link}.dylib"));
@@ -117,6 +120,30 @@ fn c_runtime_library_candidates() -> Vec<String> {
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
 fn c_runtime_library_candidates() -> Vec<String> {
     vec!["c".to_owned()]
+}
+
+#[cfg(target_os = "macos")]
+fn math_library_candidates() -> Vec<String> {
+    vec![
+        "libSystem.B.dylib".to_owned(),
+        "libm.dylib".to_owned(),
+        "libm.so".to_owned(),
+    ]
+}
+
+#[cfg(target_os = "linux")]
+fn math_library_candidates() -> Vec<String> {
+    vec!["libm.so.6".to_owned(), "libm.so".to_owned()]
+}
+
+#[cfg(target_os = "windows")]
+fn math_library_candidates() -> Vec<String> {
+    c_runtime_library_candidates()
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+fn math_library_candidates() -> Vec<String> {
+    vec!["m".to_owned()]
 }
 
 fn dlerror_text() -> Box<str> {

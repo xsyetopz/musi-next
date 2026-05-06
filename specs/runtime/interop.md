@@ -56,7 +56,7 @@ Properties:
 
 - usable only inside `unsafe (...)`
 - no ambient null
-- nullable raw pointers use `Option[Ptr[T]]`
+- nullable raw pointers use `Maybe[Ptr[T]]`
 - no infix pointer arithmetic
 - no raw pointer indexing syntax
 

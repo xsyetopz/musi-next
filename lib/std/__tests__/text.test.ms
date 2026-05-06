@@ -11,6 +11,10 @@ export let test () :=
     testing.it("'isEmpty' detects empty string", "".isEmpty(),);
     testing.it("'trim' strips surrounding spaces", "  trim  ".trim() = "trim",);
     testing.it(
+      "'trim' strips ASCII control whitespace",
+      text.concat(text.concat(text.fromByte(12), "trim"), text.fromByte(13)).trim() = "trim",
+    );
+    testing.it(
       "'concat' joins strings",
       text.concat("hello", " world") = "hello world",
     );

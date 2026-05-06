@@ -10,7 +10,7 @@ export let parse (source : String) : Version := .VersionText(value := source);
 
 let both (left : Bool, right : Bool) : Bool :=
   match left (
-  | ok if ok => right
+  | success if success => right
   | _ => 0 = 1
   );
 
@@ -50,12 +50,12 @@ export let compare (left : Version, right : Version) : Int :=
   (
     let major := compareByte(leftText, rightText, 0);
     match major (
-    | result if result /= 0 => result
+    | expect if expect /= 0 => expect
     | _ =>
       (
         let minor := compareByte(leftText, rightText, 2);
         match minor (
-        | result if result /= 0 => result
+        | expect if expect /= 0 => expect
         | _ => compareByte(leftText, rightText, 4)
         )
       )

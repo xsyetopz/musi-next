@@ -410,6 +410,28 @@ mod success {
     }
 
     #[test]
+    fn empty_tuple_arrow_type_accepts_zero_param_lambda() {
+        let sema = check(
+            r"
+        let fallback : () -> Int := \() => 9;
+        fallback();
+    ",
+        );
+        assert!(matches!(
+            sema.ty(sema
+                .try_expr_ty(sema.module().root)
+                .expect("root expr type missing"))
+                .kind,
+            HirTyKind::Int
+        ));
+        assert!(
+            !has_diag(&sema, SemaDiagKind::TypeMismatch),
+            "{:?}",
+            sema.diags()
+        );
+    }
+
+    #[test]
     fn import_record_field_access_records_member_fact() {
         let import_env = TestImportEnv::default().with_module("std/io", "std/io");
         let io = check_module_src(
@@ -1616,6 +1638,64 @@ mod success {
             &module,
             SemaDiagKind::UnsafeCallRequiresUnsafeBlock
         ));
+    }
+
+    #[test]
+    fn native_signatures_accept_imported_primitive_aliases() {
+        let (_module_a, module_b) = check_with_imported_surface(
+            1,
+            r"
+        export let Int32 := Int32;
+        export let CString := CString;
+        export let CInt := Int32;
+        export let char := Int8;
+        export let bool := Bool;
+        export let int32_t := Int32;
+        export let uint32_t := Nat32;
+        export let size_t := Nat;
+        export let uintptr_t := Nat;
+    ",
+            r#"
+        let Core := import "a";
+        let CInt := Core.Int32;
+        let CStringAlias := Core.CString;
+        native "c" let strerror (
+          code : CInt,
+          directCode : Core.CInt,
+          ch : Core.char,
+          flag : Core.bool,
+          signed : Core.int32_t,
+          unsigned : Core.uint32_t,
+          size : Core.size_t,
+          pointer : Core.uintptr_t
+        ) : CStringAlias;
+    "#,
+        );
+
+        assert!(
+            !has_diag(&module_b, SemaDiagKind::InvalidFfiType),
+            "{:?}",
+            module_b.diags()
+        );
+    }
+
+    #[test]
+    fn type_arguments_accept_imported_primitive_aliases() {
+        let (_module_a, module_b) = check_with_imported_surface(
+            1,
+            r"
+        export let CInt := Int32;
+        export let int32_t := Int32;
+    ",
+            r#"
+        let Core := import "a";
+        let ignore [T] () : Int := 0;
+        let direct := ignore[Core.CInt]();
+        let typedef := ignore[Core.int32_t]();
+    "#,
+        );
+
+        assert!(module_b.diags().is_empty(), "{:?}", module_b.diags());
     }
 
     #[test]

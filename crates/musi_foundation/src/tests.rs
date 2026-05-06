@@ -77,7 +77,7 @@ mod success {
         assert!(
             module_source("musi:core")
                 .unwrap()
-                .contains("export opaque let Option [T] := data")
+                .contains("export opaque let Maybe [T] := data")
         );
         assert!(
             module_source("musi:env")

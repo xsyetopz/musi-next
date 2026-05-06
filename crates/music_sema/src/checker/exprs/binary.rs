@@ -25,7 +25,31 @@ impl CheckPass<'_, '_, '_> {
         }
         let builtins = self.builtins();
         let left_facts = super::check_expr(self, left);
+        if matches!(
+            op,
+            HirBinaryOp::Eq
+                | HirBinaryOp::TypeEq
+                | HirBinaryOp::Ne
+                | HirBinaryOp::Lt
+                | HirBinaryOp::Gt
+                | HirBinaryOp::Le
+                | HirBinaryOp::Ge
+        ) {
+            self.push_expected_ty(left_facts.ty);
+        }
         let right_facts = super::check_expr(self, right);
+        if matches!(
+            op,
+            HirBinaryOp::Eq
+                | HirBinaryOp::TypeEq
+                | HirBinaryOp::Ne
+                | HirBinaryOp::Lt
+                | HirBinaryOp::Gt
+                | HirBinaryOp::Le
+                | HirBinaryOp::Ge
+        ) {
+            let _ = self.pop_expected_ty();
+        }
         let mut effects = left_facts.effects.clone();
         effects.union_with(&right_facts.effects);
         if matches!(op, HirBinaryOp::Range { .. }) {

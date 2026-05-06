@@ -759,25 +759,21 @@ export let test () :=
         write_file(
             test_dir.path(),
             "musi.json",
-            "{\n  \"workspace\": { \"members\": [\"packages/std\"] }\n}\n",
+            "{\n  \"workspace\": { \"members\": [\"lib/std\"] }\n}\n",
         );
         write_file(
             test_dir.path(),
-            "packages/std/musi.json",
+            "lib/std/musi.json",
             "{\n  \"name\": \"@std\",\n  \"version\": \"0.1.0\"\n}\n",
         );
+        write_file(test_dir.path(), "lib/std/index.ms", "let value := 1;\n");
         write_file(
             test_dir.path(),
-            "packages/std/index.ms",
-            "let value := 1;\n",
-        );
-        write_file(
-            test_dir.path(),
-            "packages/std/__tests__/std.test.ms",
+            "lib/std/__tests__/std.test.ms",
             "export let test () := ();\n",
         );
 
-        let output = run_musi(&["test", "packages/std"], test_dir.path());
+        let output = run_musi(&["test", "lib/std"], test_dir.path());
 
         assert_success(&output);
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -790,28 +786,21 @@ export let test () :=
         write_file(
             test_dir.path(),
             "musi.json",
-            "{\n  \"workspace\": { \"members\": [\"packages/std\"] }\n}\n",
+            "{\n  \"workspace\": { \"members\": [\"lib/std\"] }\n}\n",
         );
         write_file(
             test_dir.path(),
-            "packages/std/musi.json",
+            "lib/std/musi.json",
             "{\n  \"name\": \"@std\",\n  \"version\": \"0.1.0\"\n}\n",
         );
+        write_file(test_dir.path(), "lib/std/index.ms", "let value := 1;\n");
         write_file(
             test_dir.path(),
-            "packages/std/index.ms",
-            "let value := 1;\n",
-        );
-        write_file(
-            test_dir.path(),
-            "packages/std/__tests__/std.test.ms",
+            "lib/std/__tests__/std.test.ms",
             "export let test () := ();\n",
         );
 
-        let output = run_musi(
-            &["test", "packages/std/__tests__/std.test.ms"],
-            test_dir.path(),
-        );
+        let output = run_musi(&["test", "lib/std/__tests__/std.test.ms"], test_dir.path());
 
         assert_success(&output);
         let stdout = String::from_utf8_lossy(&output.stdout);
