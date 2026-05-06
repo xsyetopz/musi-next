@@ -8,19 +8,21 @@ use async_lsp::lsp_types::{
     CodeAction, CodeActionKind, CodeActionOptions, CodeActionOrCommand, CodeActionParams,
     CodeActionProviderCapability, CodeActionResponse, CodeLens, CodeLensOptions, CodeLensParams,
     Command, CompletionList, CompletionOptions, CompletionParams, CompletionResponse,
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, DocumentFormattingParams, DocumentHighlight,
-    DocumentHighlightParams, DocumentLink, DocumentLinkOptions, DocumentLinkParams,
-    DocumentOnTypeFormattingOptions, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
-    DocumentSymbolParams, DocumentSymbolResponse, FoldingRange, FoldingRangeParams,
-    FoldingRangeProviderCapability, FormattingOptions, GotoDefinitionParams,
-    GotoDefinitionResponse, Hover, HoverContents, HoverParams, HoverProviderCapability,
-    InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintOptions,
-    InlayHintParams, InlayHintServerCapabilities, LinkedEditingRangeParams,
-    LinkedEditingRangeServerCapabilities, LinkedEditingRanges, Location, MarkupContent, MarkupKind,
-    OneOf, PrepareRenameResponse, PublishDiagnosticsParams, Range, ReferenceParams, RenameOptions,
-    RenameParams, SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability,
-    SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
+    DiagnosticOptions, DiagnosticServerCapabilities, DidChangeTextDocumentParams,
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
+    DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
+    DocumentFormattingParams, DocumentHighlight, DocumentHighlightParams, DocumentLink,
+    DocumentLinkOptions, DocumentLinkParams, DocumentOnTypeFormattingOptions,
+    DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, DocumentSymbolParams,
+    DocumentSymbolResponse, FoldingRange, FoldingRangeParams, FoldingRangeProviderCapability,
+    FormattingOptions, FullDocumentDiagnosticReport, GotoDefinitionParams, GotoDefinitionResponse,
+    Hover, HoverContents, HoverParams, HoverProviderCapability, InitializeParams, InitializeResult,
+    InitializedParams, InlayHint, InlayHintOptions, InlayHintParams, InlayHintServerCapabilities,
+    LinkedEditingRangeParams, LinkedEditingRangeServerCapabilities, LinkedEditingRanges, Location,
+    MarkupContent, MarkupKind, OneOf, PrepareRenameResponse, PublishDiagnosticsParams, Range,
+    ReferenceParams, RelatedFullDocumentDiagnosticReport, RenameOptions, RenameParams,
+    SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability, SemanticTokens,
+    SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
     SemanticTokensRangeParams, SemanticTokensRangeResult, SemanticTokensResult,
     SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
     TextDocumentContentChangeEvent, TextDocumentItem, TextDocumentPositionParams,
@@ -104,6 +106,16 @@ impl MusiLanguageServer {
                 code_lens_provider: Some(CodeLensOptions {
                     resolve_provider: Some(false),
                 }),
+                diagnostic_provider: Some(DiagnosticServerCapabilities::Options(
+                    DiagnosticOptions {
+                        identifier: Some("musi".to_owned()),
+                        inter_file_dependencies: true,
+                        workspace_diagnostics: false,
+                        work_done_progress_options: WorkDoneProgressOptions {
+                            work_done_progress: None,
+                        },
+                    },
+                )),
                 folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
                 selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
                 workspace_symbol_provider: Some(OneOf::Left(true)),
@@ -604,6 +616,28 @@ impl MusiLanguageServer {
         Some(hints)
     }
 
+    fn document_diagnostics(
+        &self,
+        params: DocumentDiagnosticParams,
+    ) -> DocumentDiagnosticReportResult {
+        let Some(path) = params.text_document.uri.to_file_path().ok() else {
+            return full_document_diagnostic_report(Vec::new());
+        };
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return full_document_diagnostic_report(Vec::new());
+        }
+        let overlay = self
+            .open_documents
+            .get(&params.text_document.uri)
+            .map(String::as_str);
+        let diagnostics = collect_project_diagnostics_with_overlay(&path, overlay)
+            .into_iter()
+            .filter(|diag| diagnostic_matches_path(&path, diag))
+            .map(to_lsp_diagnostic)
+            .collect();
+        full_document_diagnostic_report(diagnostics)
+    }
+
     fn semantic_tokens_for_uri(&self, uri: &Url, range: Option<Range>) -> Option<SemanticTokens> {
         let path = uri.to_file_path().ok()?;
         if path.file_name().is_some_and(|name| name == "musi.json") {
@@ -757,6 +791,20 @@ fn reference_lens_title(count: usize) -> String {
     }
 }
 
+fn full_document_diagnostic_report(
+    diagnostics: Vec<async_lsp::lsp_types::Diagnostic>,
+) -> DocumentDiagnosticReportResult {
+    DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(
+        RelatedFullDocumentDiagnosticReport {
+            related_documents: None,
+            full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                result_id: None,
+                items: diagnostics,
+            },
+        },
+    ))
+}
+
 fn lsp_range_offsets(text: &str, range: Range) -> Option<(usize, usize)> {
     let start = lsp_position_offset(text, range.start)?;
     let end = lsp_position_offset(text, range.end)?;
@@ -837,6 +885,14 @@ impl LanguageServer for MusiLanguageServer {
     ) -> ServerFuture<Option<Vec<TextEdit>>> {
         let formatting_response = self.will_save_formatting(params);
         Box::pin(async move { Ok(formatting_response) })
+    }
+
+    fn document_diagnostic(
+        &mut self,
+        params: DocumentDiagnosticParams,
+    ) -> ServerFuture<DocumentDiagnosticReportResult> {
+        let report = self.document_diagnostics(params);
+        Box::pin(async move { Ok(report) })
     }
 
     fn completion(&mut self, params: CompletionParams) -> ServerFuture<Option<CompletionResponse>> {

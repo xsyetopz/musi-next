@@ -5,13 +5,15 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use async_lsp::lsp_types::{
     CodeActionContext, CodeActionKind, CodeActionOrCommand, CodeActionParams, CodeLensParams,
-    CompletionItemKind, CompletionTextEdit, DiagnosticSeverity, DocumentHighlightKind,
-    DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
-    FoldingRangeKind, FoldingRangeParams, InlayHintKind, LinkedEditingRangeParams,
-    PartialResultParams, Position, SelectionRangeParams, SemanticToken, TextDocumentIdentifier,
-    TextDocumentPositionParams, TextDocumentSaveReason, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
-    WillSaveTextDocumentParams, WorkDoneProgressParams,
+    CompletionItemKind, CompletionTextEdit, DiagnosticOptions, DiagnosticServerCapabilities,
+    DiagnosticSeverity, DocumentDiagnosticParams, DocumentDiagnosticReport,
+    DocumentDiagnosticReportResult, DocumentHighlightKind, DocumentLinkParams,
+    DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, FoldingRangeKind,
+    FoldingRangeParams, InlayHintKind, LinkedEditingRangeParams, PartialResultParams, Position,
+    SelectionRangeParams, SemanticToken, TextDocumentIdentifier, TextDocumentPositionParams,
+    TextDocumentSaveReason, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, WillSaveTextDocumentParams,
+    WorkDoneProgressParams,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -119,6 +121,17 @@ mod success {
                 .is_some()
         );
         assert!(initialize_result.capabilities.code_lens_provider.is_some());
+        assert_eq!(
+            initialize_result.capabilities.diagnostic_provider,
+            Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
+                identifier: Some("musi".to_owned()),
+                inter_file_dependencies: true,
+                workspace_diagnostics: false,
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: None,
+                },
+            }))
+        );
         assert!(
             initialize_result
                 .capabilities
@@ -807,6 +820,41 @@ let other := value + 2;
 
         let _ = params;
         let _ = handler;
+    }
+
+    #[test]
+    fn document_diagnostic_returns_full_report_for_open_document() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let value := 1;\n";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let report = server.document_diagnostics(DocumentDiagnosticParams {
+            text_document: TextDocumentIdentifier { uri },
+            identifier: Some("musi".to_owned()),
+            previous_result_id: None,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        });
+
+        let DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(report)) = report
+        else {
+            panic!("document diagnostics should return a full report");
+        };
+        assert_eq!(report.full_document_diagnostic_report.result_id, None);
     }
 
     #[test]
