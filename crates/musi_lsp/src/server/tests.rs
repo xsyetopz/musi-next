@@ -15,12 +15,13 @@ use async_lsp::lsp_types::{
     ExecuteCommandParams, FoldingRangeKind, FoldingRangeParams, GotoDefinitionParams,
     GotoDefinitionResponse, InitializeParams, InlayHintKind, InlayHintServerCapabilities,
     InlayHintTooltip, LinkedEditingRangeParams, PartialResultParams, Position,
-    SelectionRangeParams, SemanticToken, SignatureHelpParams, TextDocumentIdentifier,
-    TextDocumentPositionParams, TextDocumentSaveReason, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
-    TypeDefinitionProviderCapability, WillSaveTextDocumentParams, WorkDoneProgressParams,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
-    WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    SelectionRangeParams, SemanticToken, SemanticTokensDeltaParams, SemanticTokensFullDeltaResult,
+    SignatureHelpParams, TextDocumentIdentifier, TextDocumentPositionParams,
+    TextDocumentSaveReason, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability,
+    WillSaveTextDocumentParams, WorkDoneProgressParams, WorkspaceDiagnosticParams,
+    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport, WorkspaceFolder,
+    WorkspaceFoldersChangeEvent, WorkspaceSymbolParams, WorkspaceSymbolResponse,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -1615,6 +1616,42 @@ let other := value + 2;
                 },
             ]
         );
+    }
+
+    #[test]
+    fn semantic_token_delta_returns_full_tokens_with_result_id() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let value := 1;\n";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let response = server
+            .semantic_token_delta(&SemanticTokensDeltaParams {
+                text_document: TextDocumentIdentifier { uri },
+                previous_result_id: "old".to_owned(),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("semantic token delta should run");
+
+        let SemanticTokensFullDeltaResult::Tokens(tokens) = response else {
+            panic!("full token fallback expected");
+        };
+        assert!(tokens.result_id.is_some());
+        assert!(!tokens.data.is_empty());
     }
 
     #[test]

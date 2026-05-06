@@ -1,5 +1,7 @@
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
 use std::future::Future;
+use std::hash::{Hash, Hasher};
 use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
@@ -23,7 +25,8 @@ use async_lsp::lsp_types::{
     LinkedEditingRangeParams, LinkedEditingRangeServerCapabilities, LinkedEditingRanges, Location,
     MarkupContent, MarkupKind, OneOf, Position, PrepareRenameResponse, PublishDiagnosticsParams,
     Range, ReferenceParams, RelatedFullDocumentDiagnosticReport, RenameOptions, RenameParams,
-    SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability, SemanticTokens,
+    SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability, SemanticToken,
+    SemanticTokens, SemanticTokensDeltaParams, SemanticTokensFullDeltaResult,
     SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
     SemanticTokensRangeParams, SemanticTokensRangeResult, SemanticTokensResult,
     SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, SignatureHelp,
@@ -206,7 +209,7 @@ impl MusiLanguageServer {
                             },
                             legend: semantic_tokens_legend(),
                             range: Some(true),
-                            full: Some(SemanticTokensFullOptions::Bool(true)),
+                            full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
                         },
                     ),
                 ),
@@ -808,6 +811,14 @@ impl MusiLanguageServer {
         self.semantic_tokens_for_uri(&params.text_document.uri, Some(params.range))
     }
 
+    fn semantic_token_delta(
+        &self,
+        params: &SemanticTokensDeltaParams,
+    ) -> Option<SemanticTokensFullDeltaResult> {
+        self.semantic_tokens_for_uri(&params.text_document.uri, None)
+            .map(SemanticTokensFullDeltaResult::Tokens)
+    }
+
     fn inlay_hints(&self, params: &InlayHintParams) -> Option<Vec<InlayHint>> {
         if !self.config.inlay_hints.enabled {
             return Some(Vec::new());
@@ -918,9 +929,10 @@ impl MusiLanguageServer {
         }
         let overlay = self.open_documents.get(uri).map(String::as_str);
         let tokens = semantic_tokens_for_project_file_with_overlay(&path, overlay);
+        let data = encode_semantic_tokens(&tokens, range.as_ref());
         Some(SemanticTokens {
-            result_id: None,
-            data: encode_semantic_tokens(&tokens, range.as_ref()),
+            result_id: range.is_none().then(|| semantic_tokens_result_id(&data)),
+            data,
         })
     }
 
@@ -1090,6 +1102,18 @@ fn reference_lens_data_parts(data: &Value) -> Option<(Url, usize, usize)> {
     let line = usize::try_from(data.get("line")?.as_u64()?).ok()?;
     let character = usize::try_from(data.get("character")?.as_u64()?).ok()?;
     Some((Url::parse(uri).ok()?, line, character))
+}
+
+fn semantic_tokens_result_id(tokens: &[SemanticToken]) -> String {
+    let mut hasher = DefaultHasher::new();
+    for token in tokens {
+        token.delta_line.hash(&mut hasher);
+        token.delta_start.hash(&mut hasher);
+        token.length.hash(&mut hasher);
+        token.token_type.hash(&mut hasher);
+        token.token_modifiers_bitset.hash(&mut hasher);
+    }
+    format!("{:016x}", hasher.finish())
 }
 
 #[allow(deprecated)]
@@ -1458,6 +1482,14 @@ impl LanguageServer for MusiLanguageServer {
         let semantic_tokens_response = self
             .semantic_tokens(&params)
             .map(SemanticTokensResult::Tokens);
+        Box::pin(async move { Ok(semantic_tokens_response) })
+    }
+
+    fn semantic_tokens_full_delta(
+        &mut self,
+        params: SemanticTokensDeltaParams,
+    ) -> ServerFuture<Option<SemanticTokensFullDeltaResult>> {
+        let semantic_tokens_response = self.semantic_token_delta(&params);
         Box::pin(async move { Ok(semantic_tokens_response) })
     }
 
