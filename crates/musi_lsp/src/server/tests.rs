@@ -12,16 +12,17 @@ use async_lsp::lsp_types::{
     DidChangeConfigurationParams, DidChangeWorkspaceFoldersParams, DocumentDiagnosticParams,
     DocumentDiagnosticReport, DocumentDiagnosticReportResult, DocumentHighlightKind,
     DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
-    ExecuteCommandParams, FoldingRangeKind, FoldingRangeParams, GotoDefinitionParams,
-    GotoDefinitionResponse, InitializeParams, InlayHintKind, InlayHintServerCapabilities,
-    InlayHintTooltip, LinkedEditingRangeParams, PartialResultParams, Position,
-    SelectionRangeParams, SemanticToken, SemanticTokensDeltaParams, SemanticTokensFullDeltaResult,
-    SignatureHelpParams, SymbolKind, TextDocumentIdentifier, TextDocumentPositionParams,
-    TextDocumentSaveReason, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability,
-    WillSaveTextDocumentParams, WorkDoneProgressParams, WorkspaceDiagnosticParams,
-    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport, WorkspaceFolder,
-    WorkspaceFoldersChangeEvent, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    ExecuteCommandParams, FileOperationPatternKind, FileRename, FoldingRangeKind,
+    FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse, InitializeParams,
+    InlayHintKind, InlayHintServerCapabilities, InlayHintTooltip, LinkedEditingRangeParams,
+    PartialResultParams, Position, RenameFilesParams, SelectionRangeParams, SemanticToken,
+    SemanticTokensDeltaParams, SemanticTokensFullDeltaResult, SignatureHelpParams, SymbolKind,
+    TextDocumentIdentifier, TextDocumentPositionParams, TextDocumentSaveReason,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability, WillSaveTextDocumentParams,
+    WorkDoneProgressParams, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
+    WorkspaceDocumentDiagnosticReport, WorkspaceFolder, WorkspaceFoldersChangeEvent,
+    WorkspaceSymbolParams, WorkspaceSymbolResponse,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -167,6 +168,19 @@ mod success {
             .expect("workspace folder capabilities");
         assert_eq!(folders.supported, Some(true));
         assert_eq!(folders.change_notifications, Some(OneOf::Left(true)));
+        let file_operations = workspace
+            .file_operations
+            .expect("file operation capabilities");
+        let will_rename = file_operations
+            .will_rename
+            .expect("will rename registration");
+        assert_eq!(will_rename.filters.len(), 1);
+        assert_eq!(will_rename.filters[0].scheme.as_deref(), Some("file"));
+        assert_eq!(will_rename.filters[0].pattern.glob, "**/*.ms");
+        assert_eq!(
+            will_rename.filters[0].pattern.matches,
+            Some(FileOperationPatternKind::File)
+        );
         assert_eq!(
             initialize_result.capabilities.document_highlight_provider,
             Some(OneOf::Left(true))
@@ -1715,6 +1729,69 @@ let other := value + 2;
         };
         assert_eq!(item.uri, uri);
         assert!(!item.full_document_diagnostic_report.items.is_empty());
+    }
+
+    #[test]
+    fn will_rename_files_updates_static_import_specifiers() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "src/index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        fs::create_dir_all(root.join("src")).expect("src dir should be created");
+        let index_path = root.join("src/index.ms");
+        let dep_path = root.join("src/dep.ms");
+        let next_path = root.join("src/renamed.ms");
+        fs::write(&index_path, "let dep := import \"./dep\";\n").expect("index should be written");
+        fs::write(&dep_path, "export let value := 1;\n").expect("dep should be written");
+        let index_uri = Url::from_file_path(&index_path).expect("index URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        #[allow(deprecated)]
+        server.configure(&InitializeParams {
+            process_id: None,
+            root_path: None,
+            root_uri: None,
+            initialization_options: None,
+            capabilities: ClientCapabilities::default(),
+            trace: None,
+            workspace_folders: Some(vec![WorkspaceFolder {
+                uri: Url::from_file_path(&root).expect("workspace URI should build"),
+                name: "app".to_owned(),
+            }]),
+            client_info: None,
+            locale: None,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        });
+        let _ = server.open_documents.insert(
+            index_uri.clone(),
+            "let dep := import \"./dep\";\n".to_owned(),
+        );
+
+        let edit = server
+            .will_rename_files_edit(&RenameFilesParams {
+                files: vec![FileRename {
+                    old_uri: Url::from_file_path(&dep_path)
+                        .expect("old URI should build")
+                        .to_string(),
+                    new_uri: Url::from_file_path(&next_path)
+                        .expect("new URI should build")
+                        .to_string(),
+                }],
+            })
+            .expect("rename should produce import edit");
+
+        let changes = edit.changes.expect("edit should use plain changes");
+        let edits = changes.get(&index_uri).expect("index edit should exist");
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].range.start, Position::new(0, 18));
+        assert_eq!(edits[0].range.end, Position::new(0, 25));
+        assert_eq!(edits[0].new_text, "\"./renamed\"");
     }
 
     #[test]

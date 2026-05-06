@@ -3,7 +3,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::future::Future;
 use std::hash::{Hash, Hasher};
 use std::ops::ControlFlow;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::pin::Pin;
 
 use async_lsp::lsp_types::{
@@ -20,28 +20,30 @@ use async_lsp::lsp_types::{
     DocumentHighlight, DocumentHighlightParams, DocumentLink, DocumentLinkOptions,
     DocumentLinkParams, DocumentOnTypeFormattingOptions, DocumentOnTypeFormattingParams,
     DocumentRangeFormattingParams, DocumentSymbolParams, DocumentSymbolResponse,
-    ExecuteCommandOptions, ExecuteCommandParams, FoldingRange, FoldingRangeParams,
+    ExecuteCommandOptions, ExecuteCommandParams, FileOperationFilter, FileOperationPattern,
+    FileOperationPatternKind, FileOperationRegistrationOptions, FoldingRange, FoldingRangeParams,
     FoldingRangeProviderCapability, FormattingOptions, FullDocumentDiagnosticReport,
     GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
     HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, InlayHint,
     InlayHintOptions, InlayHintParams, InlayHintServerCapabilities, LinkedEditingRangeParams,
     LinkedEditingRangeServerCapabilities, LinkedEditingRanges, Location, MarkupContent, MarkupKind,
     Moniker, MonikerParams, OneOf, Position, PrepareRenameResponse, PublishDiagnosticsParams,
-    Range, ReferenceParams, RelatedFullDocumentDiagnosticReport, RenameOptions, RenameParams,
-    SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability, SemanticToken,
-    SemanticTokens, SemanticTokensDelta, SemanticTokensDeltaParams, SemanticTokensEdit,
-    SemanticTokensFullDeltaResult, SemanticTokensFullOptions, SemanticTokensOptions,
-    SemanticTokensParams, SemanticTokensRangeParams, SemanticTokensRangeResult,
-    SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
-    SignatureHelp, SignatureHelpOptions, SignatureHelpParams, TextDocumentContentChangeEvent,
-    TextDocumentItem, TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TextEdit,
-    TypeDefinitionProviderCapability, UniquenessLevel, Url, WillSaveTextDocumentParams,
-    WorkDoneProgressOptions, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
-    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport, WorkspaceEdit,
-    WorkspaceFoldersServerCapabilities, WorkspaceFullDocumentDiagnosticReport,
-    WorkspaceServerCapabilities, WorkspaceSymbol, WorkspaceSymbolOptions, WorkspaceSymbolParams,
-    WorkspaceSymbolResponse, notification::PublishDiagnostics,
+    Range, ReferenceParams, RelatedFullDocumentDiagnosticReport, RenameFilesParams, RenameOptions,
+    RenameParams, SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability,
+    SemanticToken, SemanticTokens, SemanticTokensDelta, SemanticTokensDeltaParams,
+    SemanticTokensEdit, SemanticTokensFullDeltaResult, SemanticTokensFullOptions,
+    SemanticTokensOptions, SemanticTokensParams, SemanticTokensRangeParams,
+    SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
+    ServerCapabilities, ServerInfo, SignatureHelp, SignatureHelpOptions, SignatureHelpParams,
+    TextDocumentContentChangeEvent, TextDocumentItem, TextDocumentPositionParams,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions, TextEdit, TypeDefinitionProviderCapability, UniquenessLevel, Url,
+    WillSaveTextDocumentParams, WorkDoneProgressOptions, WorkspaceDiagnosticParams,
+    WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
+    WorkspaceEdit, WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
+    WorkspaceFullDocumentDiagnosticReport, WorkspaceServerCapabilities, WorkspaceSymbol,
+    WorkspaceSymbolOptions, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    notification::PublishDiagnostics,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
 use musi_fmt::{FormatOptions, format_text_for_path};
@@ -156,7 +158,19 @@ impl MusiLanguageServer {
                         supported: Some(true),
                         change_notifications: Some(OneOf::Left(true)),
                     }),
-                    file_operations: None,
+                    file_operations: Some(WorkspaceFileOperationsServerCapabilities {
+                        will_rename: Some(FileOperationRegistrationOptions {
+                            filters: vec![FileOperationFilter {
+                                scheme: Some("file".to_owned()),
+                                pattern: FileOperationPattern {
+                                    glob: "**/*.ms".to_owned(),
+                                    matches: Some(FileOperationPatternKind::File),
+                                    options: None,
+                                },
+                            }],
+                        }),
+                        ..WorkspaceFileOperationsServerCapabilities::default()
+                    }),
                 }),
                 diagnostic_provider: Some(DiagnosticServerCapabilities::Options(
                     DiagnosticOptions {
@@ -914,6 +928,54 @@ impl MusiLanguageServer {
         .map(to_lsp_workspace_edit)
     }
 
+    fn will_rename_files_edit(&self, params: &RenameFilesParams) -> Option<WorkspaceEdit> {
+        let renames = params
+            .files
+            .iter()
+            .filter_map(|file| {
+                let old_uri = Url::parse(&file.old_uri).ok()?;
+                let new_uri = Url::parse(&file.new_uri).ok()?;
+                Some((old_uri.to_file_path().ok()?, new_uri.to_file_path().ok()?))
+            })
+            .collect::<Vec<_>>();
+        if renames.is_empty() {
+            return None;
+        }
+        let mut changes = HashMap::<Url, Vec<TextEdit>>::new();
+        for document_path in self.workspace_diagnostic_paths() {
+            if document_path
+                .file_name()
+                .is_some_and(|name| name == "musi.json")
+            {
+                continue;
+            }
+            let open_document = self.open_document_for_path(&document_path);
+            let uri = open_document.map_or_else(
+                || Url::from_file_path(&document_path).ok(),
+                |(uri, _)| Some(uri.clone()),
+            )?;
+            let overlay = open_document.map(|(_, text)| text);
+            for link in document_links_for_project_file_with_overlay(&document_path, overlay) {
+                let Some(new_target) = renamed_target_path(&renames, &link.target) else {
+                    continue;
+                };
+                let Some(specifier) = import_specifier_for_target(&document_path, &new_target)
+                else {
+                    continue;
+                };
+                changes.entry(uri.clone()).or_default().push(TextEdit::new(
+                    to_tool_range(&link.range),
+                    format!("\"{specifier}\""),
+                ));
+            }
+        }
+        (!changes.is_empty()).then_some(WorkspaceEdit {
+            changes: Some(changes),
+            document_changes: None,
+            change_annotations: None,
+        })
+    }
+
     fn semantic_tokens(&self, params: &SemanticTokensParams) -> Option<SemanticTokens> {
         self.semantic_tokens_for_uri(&params.text_document.uri, None)
     }
@@ -1398,6 +1460,84 @@ fn canonical_path(path: &Path) -> PathBuf {
     path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
+fn renamed_target_path(renames: &[(PathBuf, PathBuf)], target: &Path) -> Option<PathBuf> {
+    renames.iter().find_map(|(old_path, new_path)| {
+        if paths_match(target, old_path) {
+            return Some(new_path.clone());
+        }
+        target
+            .strip_prefix(old_path)
+            .ok()
+            .map(|relative| new_path.join(relative))
+    })
+}
+
+fn import_specifier_for_target(importer_path: &Path, target_path: &Path) -> Option<String> {
+    let importer_dir = canonical_path(importer_path.parent()?);
+    let target_path = canonical_target_path(target_path);
+    let relative = relative_path(&importer_dir, &target_path)?;
+    let relative = strip_musi_extension(relative);
+    let mut specifier = relative.to_string_lossy().replace('\\', "/");
+    if !specifier.starts_with('.') {
+        specifier = format!("./{specifier}");
+    }
+    Some(specifier)
+}
+
+fn canonical_target_path(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| {
+        path.parent().map(canonical_path).map_or_else(
+            || path.to_path_buf(),
+            |parent| {
+                path.file_name()
+                    .map_or_else(|| parent.clone(), |file_name| parent.join(file_name))
+            },
+        )
+    })
+}
+
+fn relative_path(from_dir: &Path, target_path: &Path) -> Option<PathBuf> {
+    let from_components = normal_components(from_dir);
+    let target_components = normal_components(target_path);
+    if from_components.first() != target_components.first() {
+        return None;
+    }
+    let mut common = 0usize;
+    while from_components.get(common) == target_components.get(common)
+        && common < from_components.len()
+        && common < target_components.len()
+    {
+        common = common.saturating_add(1);
+    }
+    let mut relative = PathBuf::new();
+    for _ in common..from_components.len() {
+        relative.push("..");
+    }
+    for component in &target_components[common..] {
+        relative.push(component);
+    }
+    Some(relative)
+}
+
+fn normal_components(path: &Path) -> Vec<String> {
+    path.components()
+        .filter_map(|component| match component {
+            Component::CurDir => None,
+            Component::Normal(part) => Some(part.to_string_lossy().into_owned()),
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                Some(component.as_os_str().to_string_lossy().into_owned())
+            }
+        })
+        .collect()
+}
+
+fn strip_musi_extension(mut path: PathBuf) -> PathBuf {
+    if path.extension().and_then(|extension| extension.to_str()) == Some("ms") {
+        let _ = path.set_extension("");
+    }
+    path
+}
+
 const fn full_document_diagnostic_report(
     diagnostics: Vec<Diagnostic>,
 ) -> DocumentDiagnosticReportResult {
@@ -1497,6 +1637,14 @@ impl LanguageServer for MusiLanguageServer {
     ) -> NotifyResult {
         self.update_workspace_folders(params);
         ControlFlow::Continue(())
+    }
+
+    fn will_rename_files(
+        &mut self,
+        params: RenameFilesParams,
+    ) -> ServerFuture<Option<WorkspaceEdit>> {
+        let edit = self.will_rename_files_edit(&params);
+        Box::pin(async move { Ok(edit) })
     }
 
     fn will_save_wait_until(
