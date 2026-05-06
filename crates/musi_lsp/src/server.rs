@@ -33,8 +33,9 @@ use async_lsp::lsp_types::{
     TypeDefinitionProviderCapability, Url, WillSaveTextDocumentParams, WorkDoneProgressOptions,
     WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult,
     WorkspaceDocumentDiagnosticReport, WorkspaceEdit, WorkspaceFoldersServerCapabilities,
-    WorkspaceFullDocumentDiagnosticReport, WorkspaceServerCapabilities, WorkspaceSymbolParams,
-    WorkspaceSymbolResponse, notification::PublishDiagnostics,
+    WorkspaceFullDocumentDiagnosticReport, WorkspaceServerCapabilities, WorkspaceSymbol,
+    WorkspaceSymbolOptions, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    notification::PublishDiagnostics,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
 use musi_fmt::{FormatOptions, format_text_for_path};
@@ -59,10 +60,11 @@ use config::LspConfig;
 use convert::{
     diagnostic_matches_path, encode_semantic_tokens, full_document_range, position_in_range,
     resolve_lsp_completion, resolve_lsp_document_link, resolve_lsp_inlay_hint,
-    semantic_tokens_legend, to_lsp_completion, to_lsp_diagnostic, to_lsp_document_highlight,
-    to_lsp_document_link, to_lsp_document_symbol, to_lsp_folding_range, to_lsp_inlay_hint,
-    to_lsp_location, to_lsp_selection_range, to_lsp_signature_help, to_lsp_symbol_information,
-    to_lsp_workspace_edit, to_tool_range, tool_location_matches_path, truncate_hover_contents,
+    resolve_lsp_workspace_symbol, semantic_tokens_legend, to_lsp_completion, to_lsp_diagnostic,
+    to_lsp_document_highlight, to_lsp_document_link, to_lsp_document_symbol, to_lsp_folding_range,
+    to_lsp_inlay_hint, to_lsp_location, to_lsp_selection_range, to_lsp_signature_help,
+    to_lsp_workspace_edit, to_lsp_workspace_symbol, to_tool_range, tool_location_matches_path,
+    truncate_hover_contents,
 };
 
 type ServerFuture<T> = Pin<Box<dyn Future<Output = Result<T, ResponseError>> + Send + 'static>>;
@@ -151,7 +153,12 @@ impl MusiLanguageServer {
                 )),
                 folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
                 selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
-                workspace_symbol_provider: Some(OneOf::Left(true)),
+                workspace_symbol_provider: Some(OneOf::Right(WorkspaceSymbolOptions {
+                    work_done_progress_options: WorkDoneProgressOptions {
+                        work_done_progress: None,
+                    },
+                    resolve_provider: Some(true),
+                })),
                 code_action_provider: Some(CodeActionProviderCapability::Options(
                     CodeActionOptions {
                         code_action_kinds: Some(vec![CodeActionKind::SOURCE_ORGANIZE_IMPORTS]),
@@ -754,9 +761,13 @@ impl MusiLanguageServer {
         });
         let symbols = symbols
             .into_iter()
-            .filter_map(to_lsp_symbol_information)
+            .filter_map(to_lsp_workspace_symbol)
             .collect();
-        Some(WorkspaceSymbolResponse::Flat(symbols))
+        Some(WorkspaceSymbolResponse::Nested(symbols))
+    }
+
+    fn resolve_workspace_symbol(&self, symbol: WorkspaceSymbol) -> WorkspaceSymbol {
+        resolve_lsp_workspace_symbol(symbol)
     }
 
     fn prepare_rename_at(
@@ -1397,6 +1408,14 @@ impl LanguageServer for MusiLanguageServer {
     ) -> ServerFuture<Option<WorkspaceSymbolResponse>> {
         let workspace_symbols = self.workspace_symbols(&params);
         Box::pin(async move { Ok(workspace_symbols) })
+    }
+
+    fn workspace_symbol_resolve(
+        &mut self,
+        params: WorkspaceSymbol,
+    ) -> ServerFuture<WorkspaceSymbol> {
+        let workspace_symbol = self.resolve_workspace_symbol(params);
+        Box::pin(async move { Ok(workspace_symbol) })
     }
 
     fn prepare_rename(

@@ -205,10 +205,14 @@ mod success {
             panic!("code action options expected");
         };
         assert_eq!(code_action.resolve_provider, Some(true));
-        assert_eq!(
-            initialize_result.capabilities.workspace_symbol_provider,
-            Some(OneOf::Left(true))
-        );
+        let workspace_symbol = initialize_result
+            .capabilities
+            .workspace_symbol_provider
+            .expect("workspace symbol provider");
+        let OneOf::Right(workspace_symbol) = workspace_symbol else {
+            panic!("workspace symbol options expected");
+        };
+        assert_eq!(workspace_symbol.resolve_provider, Some(true));
         assert!(initialize_result.capabilities.rename_provider.is_some());
     }
 
@@ -692,8 +696,8 @@ render(8080, 1 = 1);
                 partial_result_params: PartialResultParams::default(),
             })
             .expect("workspace symbols should run");
-        let WorkspaceSymbolResponse::Flat(symbols) = response else {
-            panic!("flat workspace symbols expected");
+        let WorkspaceSymbolResponse::Nested(symbols) = response else {
+            panic!("workspace symbols expected");
         };
         let names = symbols
             .iter()
@@ -702,6 +706,14 @@ render(8080, 1 = 1);
 
         assert!(names.contains(&"entryValue"));
         assert!(names.contains(&"extraValue"));
+        let entry = symbols
+            .iter()
+            .find(|symbol| symbol.name == "entryValue")
+            .expect("entry symbol should exist");
+        assert!(matches!(entry.location, OneOf::Right(_)));
+        assert!(entry.data.is_some());
+        let entry = server.resolve_workspace_symbol(entry.clone());
+        assert!(matches!(entry.location, OneOf::Left(_)));
     }
 
     #[test]
@@ -749,8 +761,8 @@ render(8080, 1 = 1);
                 partial_result_params: PartialResultParams::default(),
             })
             .expect("workspace symbols should run");
-        let WorkspaceSymbolResponse::Flat(symbols) = response else {
-            panic!("flat workspace symbols expected");
+        let WorkspaceSymbolResponse::Nested(symbols) = response else {
+            panic!("workspace symbols expected");
         };
         let names = symbols
             .iter()
@@ -826,8 +838,8 @@ render(8080, 1 = 1);
                 partial_result_params: PartialResultParams::default(),
             })
             .expect("workspace symbols should run");
-        let WorkspaceSymbolResponse::Flat(symbols) = response else {
-            panic!("flat workspace symbols expected");
+        let WorkspaceSymbolResponse::Nested(symbols) = response else {
+            panic!("workspace symbols expected");
         };
         let names = symbols
             .iter()

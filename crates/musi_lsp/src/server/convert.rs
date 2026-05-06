@@ -5,10 +5,11 @@ use async_lsp::lsp_types::{
     CompletionItem, CompletionItemKind, CompletionTextEdit, Diagnostic,
     DiagnosticRelatedInformation, DiagnosticSeverity, DocumentHighlight, DocumentHighlightKind,
     DocumentLink, DocumentSymbol, Documentation, FoldingRange, FoldingRangeKind, InlayHint,
-    InlayHintKind, InlayHintLabel, InlayHintTooltip, Location, NumberOrString,
+    InlayHintKind, InlayHintLabel, InlayHintTooltip, Location, NumberOrString, OneOf,
     ParameterInformation, ParameterLabel, Position, Range, SelectionRange, SemanticToken,
     SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend, SignatureHelp,
-    SignatureInformation, SymbolInformation, SymbolKind, TextEdit, Url, WorkspaceEdit,
+    SignatureInformation, SymbolKind, TextEdit, Url, WorkspaceEdit, WorkspaceLocation,
+    WorkspaceSymbol,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolCompletion, ToolCompletionKind,
@@ -177,16 +178,39 @@ pub(super) fn to_lsp_document_symbol(symbol: ToolDocumentSymbol) -> DocumentSymb
     }
 }
 
-pub(super) fn to_lsp_symbol_information(symbol: ToolWorkspaceSymbol) -> Option<SymbolInformation> {
-    #[allow(deprecated)]
-    Some(SymbolInformation {
+pub(super) fn to_lsp_workspace_symbol(symbol: ToolWorkspaceSymbol) -> Option<WorkspaceSymbol> {
+    Some(WorkspaceSymbol {
         name: symbol.name,
         kind: to_symbol_kind(symbol.kind),
         tags: None,
-        deprecated: None,
-        location: to_lsp_location(symbol.location)?,
         container_name: None,
+        location: OneOf::Right(WorkspaceLocation {
+            uri: Url::from_file_path(symbol.location.path).ok()?,
+        }),
+        data: Some(json!({
+            "range": to_tool_range(&symbol.location.range),
+        })),
     })
+}
+
+pub(super) fn resolve_lsp_workspace_symbol(mut symbol: WorkspaceSymbol) -> WorkspaceSymbol {
+    let OneOf::Right(location) = &symbol.location else {
+        return symbol;
+    };
+    let Some(range) = symbol
+        .data
+        .as_ref()
+        .and_then(|data| data.get("range"))
+        .cloned()
+        .and_then(|range| serde_json::from_value::<Range>(range).ok())
+    else {
+        return symbol;
+    };
+    symbol.location = OneOf::Left(Location {
+        uri: location.uri.clone(),
+        range,
+    });
+    symbol
 }
 
 pub(super) fn to_lsp_workspace_edit(edit: ToolWorkspaceEdit) -> WorkspaceEdit {
