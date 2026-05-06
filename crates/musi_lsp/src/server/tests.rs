@@ -6,18 +6,18 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use async_lsp::lsp_types::{
     ClientCapabilities, CodeActionContext, CodeActionKind, CodeActionOrCommand, CodeActionParams,
     CodeLensParams, CompletionItemKind, CompletionTextEdit, DeclarationCapability,
-    DiagnosticOptions, DiagnosticServerCapabilities, DiagnosticSeverity, DocumentDiagnosticParams,
-    DocumentDiagnosticReport, DocumentDiagnosticReportResult, DocumentHighlightKind,
-    DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
-    ExecuteCommandParams, FoldingRangeKind, FoldingRangeParams, GotoDefinitionParams,
-    GotoDefinitionResponse, InitializeParams, InlayHintKind, LinkedEditingRangeParams,
-    PartialResultParams, Position, SelectionRangeParams, SemanticToken, SignatureHelpParams,
-    TextDocumentIdentifier, TextDocumentPositionParams, TextDocumentSaveReason,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability, WillSaveTextDocumentParams,
-    WorkDoneProgressParams, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
-    WorkspaceDocumentDiagnosticReport, WorkspaceFolder, WorkspaceSymbolParams,
-    WorkspaceSymbolResponse,
+    DiagnosticOptions, DiagnosticServerCapabilities, DiagnosticSeverity,
+    DidChangeWorkspaceFoldersParams, DocumentDiagnosticParams, DocumentDiagnosticReport,
+    DocumentDiagnosticReportResult, DocumentHighlightKind, DocumentLinkParams,
+    DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, ExecuteCommandParams,
+    FoldingRangeKind, FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse,
+    InitializeParams, InlayHintKind, LinkedEditingRangeParams, PartialResultParams, Position,
+    SelectionRangeParams, SemanticToken, SignatureHelpParams, TextDocumentIdentifier,
+    TextDocumentPositionParams, TextDocumentSaveReason, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
+    TypeDefinitionProviderCapability, WillSaveTextDocumentParams, WorkDoneProgressParams,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
+    WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceSymbolParams, WorkspaceSymbolResponse,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -135,6 +135,15 @@ mod success {
             .execute_command_provider
             .expect("execute command provider");
         assert_eq!(execute_command.commands, ["musi.references"]);
+        let workspace = initialize_result
+            .capabilities
+            .workspace
+            .expect("workspace capabilities");
+        let folders = workspace
+            .workspace_folders
+            .expect("workspace folder capabilities");
+        assert_eq!(folders.supported, Some(true));
+        assert_eq!(folders.change_notifications, Some(OneOf::Left(true)));
         assert_eq!(
             initialize_result.capabilities.document_highlight_provider,
             Some(OneOf::Left(true))
@@ -684,6 +693,83 @@ render(8080, 1 = 1);
 
         assert!(names.contains(&"unsavedValue"), "{names:?}");
         assert!(!names.contains(&"entryValue"), "{names:?}");
+    }
+
+    #[test]
+    fn workspace_folder_changes_update_workspace_symbol_roots() {
+        let old_root = temp_project();
+        fs::write(
+            old_root.join("musi.json"),
+            r#"{
+  "name": "old",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("old manifest should be written");
+        fs::write(old_root.join("index.ms"), "let oldValue := 1;\n")
+            .expect("old entry should be written");
+        let new_root = temp_project();
+        fs::write(
+            new_root.join("musi.json"),
+            r#"{
+  "name": "new",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("new manifest should be written");
+        fs::write(new_root.join("index.ms"), "let newValue := 1;\n")
+            .expect("new entry should be written");
+        let old_folder = WorkspaceFolder {
+            uri: Url::from_file_path(&old_root).expect("old workspace URI should build"),
+            name: "old".to_owned(),
+        };
+        let new_folder = WorkspaceFolder {
+            uri: Url::from_file_path(&new_root).expect("new workspace URI should build"),
+            name: "new".to_owned(),
+        };
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        #[allow(deprecated)]
+        server.configure(&InitializeParams {
+            process_id: None,
+            root_path: None,
+            root_uri: None,
+            initialization_options: None,
+            capabilities: ClientCapabilities::default(),
+            trace: None,
+            workspace_folders: Some(vec![old_folder.clone()]),
+            client_info: None,
+            locale: None,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        });
+
+        server.update_workspace_folders(DidChangeWorkspaceFoldersParams {
+            event: WorkspaceFoldersChangeEvent {
+                added: vec![new_folder],
+                removed: vec![old_folder],
+            },
+        });
+
+        let response = server
+            .workspace_symbols(&WorkspaceSymbolParams {
+                query: "Value".to_owned(),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("workspace symbols should run");
+        let WorkspaceSymbolResponse::Flat(symbols) = response else {
+            panic!("flat workspace symbols expected");
+        };
+        let names = symbols
+            .iter()
+            .map(|symbol| symbol.name.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(names.contains(&"newValue"), "{names:?}");
+        assert!(!names.contains(&"oldValue"), "{names:?}");
     }
 
     #[test]
