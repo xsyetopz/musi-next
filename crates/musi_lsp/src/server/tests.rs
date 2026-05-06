@@ -197,12 +197,14 @@ mod success {
                 .selection_range_provider
                 .is_some()
         );
-        assert!(
-            initialize_result
-                .capabilities
-                .code_action_provider
-                .is_some()
-        );
+        let code_action = initialize_result
+            .capabilities
+            .code_action_provider
+            .expect("code action provider");
+        let CodeActionProviderCapability::Options(code_action) = code_action else {
+            panic!("code action options expected");
+        };
+        assert_eq!(code_action.resolve_provider, Some(true));
         assert_eq!(
             initialize_result.capabilities.workspace_symbol_provider,
             Some(OneOf::Left(true))
@@ -1055,6 +1057,9 @@ let other := value + value;
         };
         assert_eq!(action.kind, Some(CodeActionKind::SOURCE_ORGANIZE_IMPORTS));
         assert_eq!(action.is_preferred, Some(true));
+        assert!(action.edit.is_none());
+        assert!(action.data.is_some());
+        let action = server.resolve_code_action(action.clone());
         let edit = action.edit.as_ref().expect("action should provide edit");
         let changes = edit.changes.as_ref().expect("edit should include changes");
         let edits = changes.get(&uri).expect("edit should target document URI");

@@ -158,7 +158,7 @@ impl MusiLanguageServer {
                         work_done_progress_options: WorkDoneProgressOptions {
                             work_done_progress: None,
                         },
-                        resolve_provider: Some(false),
+                        resolve_provider: Some(true),
                     },
                 )),
                 rename_provider: Some(OneOf::Right(RenameOptions {
@@ -585,38 +585,64 @@ impl MusiLanguageServer {
             return Some(Vec::new());
         }
         let uri = params.text_document.uri;
-        let text = self.open_documents.get(&uri)?;
         let path = uri.to_file_path().ok()?;
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
+        if self.organize_imports_edit(&uri).is_none() {
+            return Some(Vec::new());
+        }
+        Some(vec![CodeActionOrCommand::CodeAction(CodeAction {
+            title: "Organize imports".to_owned(),
+            kind: Some(CodeActionKind::SOURCE_ORGANIZE_IMPORTS),
+            diagnostics: None,
+            edit: None,
+            command: None,
+            is_preferred: Some(true),
+            disabled: None,
+            data: Some(json!({
+                "uri": uri.as_str(),
+            })),
+        })])
+    }
+
+    fn resolve_code_action(&self, mut action: CodeAction) -> CodeAction {
+        if action.edit.is_some() {
+            return action;
+        }
+        if action.kind.as_ref() != Some(&CodeActionKind::SOURCE_ORGANIZE_IMPORTS) {
+            return action;
+        }
+        let Some(uri) = action
+            .data
+            .as_ref()
+            .and_then(|data| data.get("uri"))
+            .and_then(Value::as_str)
+            .and_then(|uri| Url::parse(uri).ok())
+        else {
+            return action;
+        };
+        action.edit = self.organize_imports_edit(&uri);
+        action
+    }
+
+    fn organize_imports_edit(&self, uri: &Url) -> Option<WorkspaceEdit> {
+        let text = self.open_documents.get(uri)?;
+        let path = uri.to_file_path().ok()?;
         let options = load_project_ancestor(&path, ProjectOptions::default())
             .ok()
             .map_or_else(FormatOptions::default, |project| {
                 FormatOptions::from_manifest(project.manifest().fmt.as_ref())
             });
         let formatted = format_text_for_path(&path, text, &options).ok()?;
-        if !formatted.changed {
-            return Some(Vec::new());
-        }
-        let edit = WorkspaceEdit {
+        formatted.changed.then(|| WorkspaceEdit {
             changes: Some(HashMap::from([(
-                uri,
+                uri.clone(),
                 vec![TextEdit::new(full_document_range(text), formatted.text)],
             )])),
             document_changes: None,
             change_annotations: None,
-        };
-        Some(vec![CodeActionOrCommand::CodeAction(CodeAction {
-            title: "Organize imports".to_owned(),
-            kind: Some(CodeActionKind::SOURCE_ORGANIZE_IMPORTS),
-            diagnostics: None,
-            edit: Some(edit),
-            command: None,
-            is_preferred: Some(true),
-            disabled: None,
-            data: None,
-        })])
+        })
     }
 
     fn execute_command_request(&self, params: ExecuteCommandParams) -> Option<Value> {
@@ -1342,6 +1368,11 @@ impl LanguageServer for MusiLanguageServer {
     ) -> ServerFuture<Option<CodeActionResponse>> {
         let code_actions = self.code_actions(params);
         Box::pin(async move { Ok(code_actions) })
+    }
+
+    fn code_action_resolve(&mut self, params: CodeAction) -> ServerFuture<CodeAction> {
+        let code_action = self.resolve_code_action(params);
+        Box::pin(async move { Ok(code_action) })
     }
 
     fn folding_range(
