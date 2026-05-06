@@ -160,11 +160,17 @@ impl<'a> Fence<'a> {
     }
 
     fn is_closing(self, line: &str) -> bool {
-        line.trim_start()
+        let trimmed = line.trim_start();
+        let marker_len = trimmed
             .chars()
             .take_while(|char| *char == self.marker)
-            .count()
-            >= self.marker_len
+            .count();
+        if marker_len < self.marker_len {
+            return false;
+        }
+        trimmed
+            .get(marker_len..)
+            .is_some_and(|rest| rest.trim().is_empty())
     }
 
     fn is_musi(self) -> bool {
