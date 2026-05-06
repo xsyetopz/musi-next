@@ -115,7 +115,11 @@ mod success {
             panic!("inlay hint options expected");
         };
         assert_eq!(inlay_hint.resolve_provider, Some(true));
-        assert!(initialize_result.capabilities.completion_provider.is_some());
+        let completion = initialize_result
+            .capabilities
+            .completion_provider
+            .expect("completion provider");
+        assert_eq!(completion.resolve_provider, Some(true));
         assert_eq!(
             initialize_result.capabilities.declaration_provider,
             Some(DeclarationCapability::Simple(true))
@@ -487,6 +491,12 @@ let current := bef;
 
         assert!(items.iter().any(|item| item.label == "let"));
         assert_eq!(before.kind, Some(CompletionItemKind::VARIABLE));
+        assert_eq!(before.detail, None);
+        assert_eq!(before.documentation, None);
+        assert!(before.data.is_some());
+        let before = server.resolve_completion(before.clone());
+        assert_eq!(before.detail.as_deref(), Some("binding"));
+        assert_eq!(before.documentation, None);
         let edit = before
             .text_edit
             .as_ref()

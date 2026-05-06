@@ -7,8 +7,8 @@ use std::pin::Pin;
 use async_lsp::lsp_types::{
     CodeAction, CodeActionKind, CodeActionOptions, CodeActionOrCommand, CodeActionParams,
     CodeActionProviderCapability, CodeActionResponse, CodeLens, CodeLensOptions, CodeLensParams,
-    Command, CompletionList, CompletionOptions, CompletionParams, CompletionResponse,
-    DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
+    Command, CompletionItem, CompletionList, CompletionOptions, CompletionParams,
+    CompletionResponse, DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
     DidChangeConfigurationParams, DidChangeTextDocumentParams, DidChangeWorkspaceFoldersParams,
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
     DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
@@ -58,11 +58,11 @@ mod convert;
 use config::LspConfig;
 use convert::{
     diagnostic_matches_path, encode_semantic_tokens, full_document_range, position_in_range,
-    resolve_lsp_document_link, resolve_lsp_inlay_hint, semantic_tokens_legend, to_lsp_completion,
-    to_lsp_diagnostic, to_lsp_document_highlight, to_lsp_document_link, to_lsp_document_symbol,
-    to_lsp_folding_range, to_lsp_inlay_hint, to_lsp_location, to_lsp_selection_range,
-    to_lsp_signature_help, to_lsp_symbol_information, to_lsp_workspace_edit, to_tool_range,
-    tool_location_matches_path, truncate_hover_contents,
+    resolve_lsp_completion, resolve_lsp_document_link, resolve_lsp_inlay_hint,
+    semantic_tokens_legend, to_lsp_completion, to_lsp_diagnostic, to_lsp_document_highlight,
+    to_lsp_document_link, to_lsp_document_symbol, to_lsp_folding_range, to_lsp_inlay_hint,
+    to_lsp_location, to_lsp_selection_range, to_lsp_signature_help, to_lsp_symbol_information,
+    to_lsp_workspace_edit, to_tool_range, tool_location_matches_path, truncate_hover_contents,
 };
 
 type ServerFuture<T> = Pin<Box<dyn Future<Output = Result<T, ResponseError>> + Send + 'static>>;
@@ -178,7 +178,7 @@ impl MusiLanguageServer {
                     ]),
                 }),
                 completion_provider: Some(CompletionOptions {
-                    resolve_provider: Some(false),
+                    resolve_provider: Some(true),
                     trigger_characters: Some(vec![".".to_owned()]),
                     ..CompletionOptions::default()
                 }),
@@ -303,6 +303,10 @@ impl MusiLanguageServer {
             is_incomplete: false,
             items,
         }))
+    }
+
+    fn resolve_completion(&self, completion: CompletionItem) -> CompletionItem {
+        resolve_lsp_completion(completion)
     }
 
     fn hover_at(&self, params: HoverParams) -> Option<Hover> {
@@ -1231,6 +1235,11 @@ impl LanguageServer for MusiLanguageServer {
     fn completion(&mut self, params: CompletionParams) -> ServerFuture<Option<CompletionResponse>> {
         let completion_response = self.completions(params);
         Box::pin(async move { Ok(completion_response) })
+    }
+
+    fn completion_item_resolve(&mut self, params: CompletionItem) -> ServerFuture<CompletionItem> {
+        let completion = self.resolve_completion(params);
+        Box::pin(async move { Ok(completion) })
     }
 
     fn hover(&mut self, params: HoverParams) -> ServerFuture<Option<Hover>> {

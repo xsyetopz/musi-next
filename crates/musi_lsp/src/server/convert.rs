@@ -27,16 +27,36 @@ pub(super) fn to_lsp_completion(completion: ToolCompletion) -> CompletionItem {
     CompletionItem {
         label: completion.label,
         kind: Some(to_completion_item_kind(completion.kind)),
-        detail: completion.detail,
-        documentation: completion.documentation.map(Documentation::String),
+        detail: None,
+        documentation: None,
         sort_text: completion.sort_text,
         filter_text: completion.filter_text,
         text_edit: Some(CompletionTextEdit::Edit(TextEdit::new(
             to_tool_range(&completion.replace_range),
             text,
         ))),
+        data: Some(json!({
+            "detail": completion.detail,
+            "documentation": completion.documentation,
+        })),
         ..CompletionItem::default()
     }
+}
+
+pub(super) fn resolve_lsp_completion(mut completion: CompletionItem) -> CompletionItem {
+    if completion.detail.is_some() || completion.documentation.is_some() {
+        return completion;
+    }
+    let Some(Value::Object(data)) = completion.data.as_ref() else {
+        return completion;
+    };
+    if let Some(detail) = data.get("detail").and_then(Value::as_str) {
+        completion.detail = Some(detail.to_owned());
+    }
+    if let Some(documentation) = data.get("documentation").and_then(Value::as_str) {
+        completion.documentation = Some(Documentation::String(documentation.to_owned()));
+    }
+    completion
 }
 
 pub(super) fn to_lsp_location(location: ToolLocation) -> Option<Location> {
