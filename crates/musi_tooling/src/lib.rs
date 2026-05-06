@@ -12,6 +12,7 @@ mod folding;
 mod navigation;
 mod selection;
 mod semantic;
+mod signature;
 
 pub use analysis::{
     ToolHover, ToolInlayHint, ToolInlayHintKind, ToolPosition, ToolRange, ToolSymbolKind,
@@ -53,6 +54,10 @@ pub use semantic::{
     ToolSemanticModifier, ToolSemanticModifierList, ToolSemanticToken, ToolSemanticTokenKind,
     ToolSemanticTokenList, semantic_tokens_for_project_file,
     semantic_tokens_for_project_file_with_overlay,
+};
+pub use signature::{
+    ToolParameterInformation, ToolSignatureHelp, ToolSignatureInformation,
+    signature_help_for_project_file_with_overlay,
 };
 
 #[cfg(test)]

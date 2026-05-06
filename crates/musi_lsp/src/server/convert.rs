@@ -5,16 +5,17 @@ use async_lsp::lsp_types::{
     CompletionItem, CompletionItemKind, CompletionTextEdit, Diagnostic,
     DiagnosticRelatedInformation, DiagnosticSeverity, DocumentHighlight, DocumentHighlightKind,
     DocumentLink, DocumentSymbol, Documentation, FoldingRange, FoldingRangeKind, InlayHint,
-    InlayHintKind, InlayHintLabel, InlayHintTooltip, Location, NumberOrString, Position, Range,
-    SelectionRange, SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend,
-    SymbolInformation, SymbolKind, TextEdit, Url, WorkspaceEdit,
+    InlayHintKind, InlayHintLabel, InlayHintTooltip, Location, NumberOrString,
+    ParameterInformation, ParameterLabel, Position, Range, SelectionRange, SemanticToken,
+    SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend, SignatureHelp,
+    SignatureInformation, SymbolInformation, SymbolKind, TextEdit, Url, WorkspaceEdit,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolCompletion, ToolCompletionKind,
     ToolDocumentLink, ToolDocumentSymbol, ToolFoldingRange, ToolFoldingRangeKind, ToolInlayHint,
     ToolInlayHintKind, ToolLocation, ToolPosition, ToolRange, ToolSelectionRange,
-    ToolSemanticModifier, ToolSemanticToken, ToolSemanticTokenKind, ToolSymbolKind,
-    ToolWorkspaceEdit, ToolWorkspaceSymbol,
+    ToolSemanticModifier, ToolSemanticToken, ToolSemanticTokenKind, ToolSignatureHelp,
+    ToolSignatureInformation, ToolSymbolKind, ToolWorkspaceEdit, ToolWorkspaceSymbol,
 };
 
 pub(super) fn to_lsp_completion(completion: ToolCompletion) -> CompletionItem {
@@ -78,6 +79,36 @@ pub(super) fn to_lsp_selection_range(range: ToolSelectionRange) -> SelectionRang
         parent: range
             .parent
             .map(|parent| Box::new(to_lsp_selection_range(*parent))),
+    }
+}
+
+pub(super) fn to_lsp_signature_help(help: ToolSignatureHelp) -> SignatureHelp {
+    SignatureHelp {
+        signatures: help
+            .signatures
+            .into_iter()
+            .map(to_lsp_signature_information)
+            .collect(),
+        active_signature: Some(usize_to_u32(help.active_signature)),
+        active_parameter: Some(usize_to_u32(help.active_parameter)),
+    }
+}
+
+fn to_lsp_signature_information(signature: ToolSignatureInformation) -> SignatureInformation {
+    SignatureInformation {
+        label: signature.label,
+        documentation: None,
+        parameters: Some(
+            signature
+                .parameters
+                .into_iter()
+                .map(|parameter| ParameterInformation {
+                    label: ParameterLabel::Simple(parameter.label),
+                    documentation: None,
+                })
+                .collect(),
+        ),
+        active_parameter: None,
     }
 }
 

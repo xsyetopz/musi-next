@@ -176,11 +176,12 @@ fn attached_statement_start(source: &str, token_start: usize) -> usize {
 
 fn is_attached_import_line_comment(line: &str) -> bool {
     let trimmed = line.trim_start();
-    trimmed.starts_with("--")
+    trimmed.starts_with("--") && !trimmed.starts_with("--!")
 }
 
 fn is_attached_import_block_comment_start(line: &str) -> bool {
-    line.trim_start().starts_with("/-")
+    let trimmed = line.trim_start();
+    trimmed.starts_with("/-") && !trimmed.starts_with("/-!")
 }
 
 fn attached_block_comment_start(
@@ -191,7 +192,9 @@ fn attached_block_comment_start(
     if !previous_line.trim_end().ends_with("-/") {
         return None;
     }
-    source.get(..attach_start)?.rfind("/-")
+    let block_start = source.get(..attach_start)?.rfind("/-")?;
+    let block_opener = source.get(block_start..block_start.saturating_add(3))?;
+    (!block_opener.starts_with("/-!")).then_some(block_start)
 }
 
 fn previous_line_start(source: &str, line_start: usize) -> Option<usize> {

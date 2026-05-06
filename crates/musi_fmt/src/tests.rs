@@ -1216,6 +1216,24 @@ let testing := import "@std/testing";
     }
 
     #[test]
+    fn module_docs_stay_before_sorted_imports() {
+        let source = r#"--! module docs
+let testing := import "@std/testing";
+let io := import "@std/io";
+"#;
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            r#"--! module docs
+let io := import "@std/io";
+let testing := import "@std/testing";
+"#
+        );
+    }
+
+    #[test]
     fn standalone_comments_split_import_sort_groups() {
         let source = r#"let testing := import "@std/testing";
 

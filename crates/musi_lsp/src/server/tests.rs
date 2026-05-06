@@ -11,10 +11,11 @@ use async_lsp::lsp_types::{
     DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
     FoldingRangeKind, FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse,
     InlayHintKind, LinkedEditingRangeParams, PartialResultParams, Position, SelectionRangeParams,
-    SemanticToken, TextDocumentIdentifier, TextDocumentPositionParams, TextDocumentSaveReason,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextDocumentSyncSaveOptions, WillSaveTextDocumentParams, WorkDoneProgressParams,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
+    SemanticToken, SignatureHelpParams, TextDocumentIdentifier, TextDocumentPositionParams,
+    TextDocumentSaveReason, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, WillSaveTextDocumentParams,
+    WorkDoneProgressParams, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
+    WorkspaceDocumentDiagnosticReport,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -65,6 +66,18 @@ mod success {
         assert_eq!(
             initialize_result.capabilities.hover_provider,
             Some(HoverProviderCapability::Simple(true))
+        );
+        let signature_help = initialize_result
+            .capabilities
+            .signature_help_provider
+            .expect("signature help provider");
+        assert_eq!(
+            signature_help.trigger_characters.as_deref(),
+            Some(&["(".to_owned(), ",".to_owned()][..])
+        );
+        assert_eq!(
+            signature_help.retrigger_characters.as_deref(),
+            Some(&[",".to_owned()][..])
         );
         assert_eq!(
             initialize_result.capabilities.document_formatting_provider,
@@ -506,6 +519,45 @@ point.
                 .iter()
                 .all(|item| item.kind == Some(CompletionItemKind::PROPERTY))
         );
+    }
+
+    #[test]
+    fn signature_help_returns_active_callable_parameter() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "\
+let render (port : Int, secure : Bool) : Int := port;
+render(8080, 1 = 1);
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let help = server
+            .signature_help_at(SignatureHelpParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 13),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                context: None,
+            })
+            .expect("signature help should exist");
+
+        assert_eq!(help.active_signature, Some(0));
+        assert_eq!(help.active_parameter, Some(1));
+        assert_eq!(help.signatures[0].label, "render(Int, Bool) -> Int");
     }
 
     #[test]

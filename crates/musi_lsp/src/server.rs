@@ -25,14 +25,14 @@ use async_lsp::lsp_types::{
     SelectionRangeParams, SelectionRangeProviderCapability, SemanticTokens,
     SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
     SemanticTokensRangeParams, SemanticTokensRangeResult, SemanticTokensResult,
-    SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
-    TextDocumentContentChangeEvent, TextDocumentItem, TextDocumentPositionParams,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextDocumentSyncSaveOptions, TextEdit, Url, WillSaveTextDocumentParams,
-    WorkDoneProgressOptions, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
-    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport, WorkspaceEdit,
-    WorkspaceFullDocumentDiagnosticReport, WorkspaceSymbolParams, WorkspaceSymbolResponse,
-    notification::PublishDiagnostics,
+    SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, SignatureHelp,
+    SignatureHelpOptions, SignatureHelpParams, TextDocumentContentChangeEvent, TextDocumentItem,
+    TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TextEdit, Url,
+    WillSaveTextDocumentParams, WorkDoneProgressOptions, WorkspaceDiagnosticParams,
+    WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
+    WorkspaceEdit, WorkspaceFullDocumentDiagnosticReport, WorkspaceSymbolParams,
+    WorkspaceSymbolResponse, notification::PublishDiagnostics,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
 use musi_fmt::{FormatOptions, format_text_for_path};
@@ -45,7 +45,7 @@ use musi_tooling::{
     inlay_hints_for_project_file_with_overlay, prepare_rename_for_project_file_with_overlay,
     references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
     selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
-    workspace_symbols_for_project_file_with_overlay,
+    signature_help_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
 };
 
 mod config;
@@ -56,8 +56,8 @@ use convert::{
     diagnostic_matches_path, encode_semantic_tokens, full_document_range, position_in_range,
     semantic_tokens_legend, to_lsp_completion, to_lsp_diagnostic, to_lsp_document_highlight,
     to_lsp_document_link, to_lsp_document_symbol, to_lsp_folding_range, to_lsp_inlay_hint,
-    to_lsp_location, to_lsp_selection_range, to_lsp_symbol_information, to_lsp_workspace_edit,
-    to_tool_range, tool_location_matches_path, truncate_hover_contents,
+    to_lsp_location, to_lsp_selection_range, to_lsp_signature_help, to_lsp_symbol_information,
+    to_lsp_workspace_edit, to_tool_range, tool_location_matches_path, truncate_hover_contents,
 };
 
 type ServerFuture<T> = Pin<Box<dyn Future<Output = Result<T, ResponseError>> + Send + 'static>>;
@@ -93,6 +93,13 @@ impl MusiLanguageServer {
                     },
                 )),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
+                signature_help_provider: Some(SignatureHelpOptions {
+                    trigger_characters: Some(vec!["(".to_owned(), ",".to_owned()]),
+                    retrigger_characters: Some(vec![",".to_owned()]),
+                    work_done_progress_options: WorkDoneProgressOptions {
+                        work_done_progress: None,
+                    },
+                }),
                 declaration_provider: Some(DeclarationCapability::Simple(true)),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
@@ -277,6 +284,26 @@ impl MusiLanguageServer {
             }),
             range: Some(to_tool_range(&hover.range)),
         })
+    }
+
+    fn signature_help_at(&self, params: SignatureHelpParams) -> Option<SignatureHelp> {
+        let text_document = params.text_document_position_params.text_document;
+        let position = params.text_document_position_params.position;
+        let path = text_document.uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let overlay = self
+            .open_documents
+            .get(&text_document.uri)
+            .map(String::as_str);
+        signature_help_for_project_file_with_overlay(
+            &path,
+            overlay,
+            usize::try_from(position.line).ok()?.saturating_add(1),
+            usize::try_from(position.character).ok()?.saturating_add(1),
+        )
+        .map(to_lsp_signature_help)
     }
 
     fn definition_at(&self, params: GotoDefinitionParams) -> Option<GotoDefinitionResponse> {
@@ -948,6 +975,14 @@ impl LanguageServer for MusiLanguageServer {
     fn hover(&mut self, params: HoverParams) -> ServerFuture<Option<Hover>> {
         let hover_response = self.hover_at(params);
         Box::pin(async move { Ok(hover_response) })
+    }
+
+    fn signature_help(
+        &mut self,
+        params: SignatureHelpParams,
+    ) -> ServerFuture<Option<SignatureHelp>> {
+        let signature_help_response = self.signature_help_at(params);
+        Box::pin(async move { Ok(signature_help_response) })
     }
 
     fn definition(

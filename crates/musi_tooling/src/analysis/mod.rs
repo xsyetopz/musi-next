@@ -16,7 +16,7 @@ mod diagnostics;
 mod docs;
 mod inlay;
 mod model;
-mod type_render;
+pub(crate) mod type_render;
 
 use docs::{leading_doc_text, module_doc_text};
 use type_render::render_hir_ty;

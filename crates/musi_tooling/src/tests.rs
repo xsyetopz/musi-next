@@ -26,7 +26,8 @@ use crate::{
     prepare_rename_for_project_file_with_overlay, project_error_report,
     references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
     selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
-    session_error_report, tooling_error_report, workspace_symbols_for_project_file_with_overlay,
+    session_error_report, signature_help_for_project_file_with_overlay, tooling_error_report,
+    workspace_symbols_for_project_file_with_overlay,
 };
 
 static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(0);
@@ -443,6 +444,32 @@ let other := value + 2;
                 .is_some_and(|parent| parent.range.start_line == 2
                     && parent.range.end_col >= selection.range.end_col)
         );
+    }
+
+    #[test]
+    fn signature_help_returns_callable_signature_and_active_parameter() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "\
+let render (port : Int, secure : Bool) : Int := port;
+render(8080, 1 = 1);
+";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let help = signature_help_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            2,
+            14,
+        )
+        .expect("signature help should exist inside call");
+
+        assert_eq!(help.active_signature, 0);
+        assert_eq!(help.active_parameter, 1);
+        assert_eq!(help.signatures.len(), 1);
+        assert_eq!(help.signatures[0].label, "render(Int, Bool) -> Int");
+        assert_eq!(help.signatures[0].parameters[0].label, "Int");
+        assert_eq!(help.signatures[0].parameters[1].label, "Bool");
     }
 
     #[test]
