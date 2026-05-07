@@ -381,6 +381,72 @@ let boolEq :=
     }
 
     #[test]
+    fn implementation_resolves_workspace_shape_givens() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let shape_source = "\
+export let Eq [T] := shape {
+  let equals (left : T, right : T) : Bool;
+};
+";
+        let given_source = "\
+let shapes := import \"./shapes\";
+let Eq := shapes.Eq;
+let intEq :=
+  given Eq[Int] {
+  let equals (left : Int, right : Int) : Bool := left = right;
+  };
+";
+        let other_given_source = "\
+let shapes := import \"./shapes\";
+let Eq := shapes.Eq;
+let boolEq :=
+  given Eq[Bool] {
+  let equals (left : Bool, right : Bool) : Bool := left = right;
+  };
+";
+        write_file(test_dir.path(), "index.ms", "import \"./shapes\";\n");
+        write_file(test_dir.path(), "shapes.ms", shape_source);
+        write_file(test_dir.path(), "impls.ms", given_source);
+        write_file(test_dir.path(), "more_impls.ms", other_given_source);
+
+        let diagnostics = collect_project_diagnostics_with_overlay(
+            &test_dir.path().join("impls.ms"),
+            Some(given_source),
+        );
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+
+        let implementations = implementation_for_project_file_with_overlay(
+            &test_dir.path().join("shapes.ms"),
+            Some(shape_source),
+            1,
+            12,
+        );
+
+        assert_eq!(implementations.len(), 2);
+        assert_eq!(
+            implementations[0].path,
+            test_dir
+                .path()
+                .join("impls.ms")
+                .canonicalize()
+                .expect("impls path should canonicalize")
+        );
+        assert_eq!(implementations[0].range.start_line, 3);
+        assert_eq!(implementations[0].range.start_col, 1);
+        assert_eq!(
+            implementations[1].path,
+            test_dir
+                .path()
+                .join("more_impls.ms")
+                .canonicalize()
+                .expect("more impls path should canonicalize")
+        );
+        assert_eq!(implementations[1].range.start_line, 3);
+        assert_eq!(implementations[1].range.start_col, 1);
+    }
+
+    #[test]
     fn references_include_definition_when_requested() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
