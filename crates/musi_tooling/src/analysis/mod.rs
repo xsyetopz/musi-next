@@ -3,6 +3,7 @@ use std::path::Path;
 use music_arena::SliceRange;
 use music_base::{Source, Span};
 use music_hir::{HirDim, HirExprKind, HirTyField, HirTyId, HirTyKind, simple_hir_ty_display_name};
+use music_module::ModuleKey;
 use music_names::{NameBinding, NameBindingId, NameBindingKind};
 use music_sema::{ExprMemberFact, ExprMemberKind, SemaModule};
 use music_session::Session;
@@ -119,17 +120,21 @@ fn member_hover_at_offset(
         .exprs
         .iter()
         .find_map(|(expr_id, expr)| {
-            let HirExprKind::Field { name, .. } = expr.kind else {
+            let HirExprKind::Field { base, name, .. } = expr.kind else {
                 return None;
             };
             if !name.span.contains(offset) {
                 return None;
             }
             let fact = sema.expr_member_fact(expr_id)?;
+            let import_record_target = fact
+                .import_record_target
+                .as_ref()
+                .or_else(|| sema.expr_import_record_target(base));
             Some(ToolHover::new(
                 name.span,
                 tool_range(source, name.span),
-                member_hover_contents(session, sema, fact),
+                member_hover_contents(session, sema, fact, import_record_target),
             ))
         })
 }
@@ -182,11 +187,17 @@ fn syntax_hover_kind_at_offset(source: &Source, offset: u32) -> Option<ToolSymbo
         })
 }
 
-fn member_hover_contents(session: &Session, sema: &SemaModule, fact: &ExprMemberFact) -> String {
+fn member_hover_contents(
+    session: &Session,
+    sema: &SemaModule,
+    fact: &ExprMemberFact,
+    import_record_target: Option<&ModuleKey>,
+) -> String {
     let name = session.resolve_symbol(fact.name);
     let kind = member_symbol_kind(sema, fact);
     let kind_label = kind.label();
-    let ty = render_hir_ty(sema, session, fact.ty);
+    let ty = imported_member_ty_label(session, sema, fact, import_record_target)
+        .unwrap_or_else(|| render_hir_ty(sema, session, fact.ty));
     let mut lines = vec![format!("```musi\n({kind_label}) {name} : {ty}\n```")];
     if let Some(binding_id) = fact.binding {
         let binding = sema.resolved().names.bindings.get(binding_id);
@@ -199,6 +210,56 @@ fn member_hover_contents(session: &Session, sema: &SemaModule, fact: &ExprMember
         }
     }
     lines.join("\n")
+}
+
+fn imported_member_ty_label(
+    session: &Session,
+    sema: &SemaModule,
+    fact: &ExprMemberFact,
+    import_record_target: Option<&ModuleKey>,
+) -> Option<String> {
+    if !matches!(fact.kind, ExprMemberKind::ImportRecordExport) {
+        return None;
+    }
+    let export_name = session.resolve_symbol(fact.name);
+    let target = import_record_target?;
+    let imported = session.sema_module_cached(target).ok().flatten()?;
+    let export = imported
+        .surface()
+        .exported_values()
+        .iter()
+        .find(|export| export.name.as_ref() == export_name)?;
+    if export.param_names.is_empty() {
+        return None;
+    }
+    callable_ty_with_param_names(session, sema, fact.ty, &export.param_names)
+}
+
+fn callable_ty_with_param_names(
+    session: &Session,
+    sema: &SemaModule,
+    ty: HirTyId,
+    param_names: &[Box<str>],
+) -> Option<String> {
+    let HirTyKind::Arrow { params, ret, .. } = sema.ty(ty).kind.clone() else {
+        return None;
+    };
+    let args = sema
+        .module()
+        .store
+        .ty_ids
+        .get(params)
+        .iter()
+        .enumerate()
+        .map(|(index, param)| {
+            let rendered = render_hir_ty(sema, session, *param);
+            param_names
+                .get(index)
+                .map_or_else(|| rendered.clone(), |name| format!("{name} : {rendered}"))
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    Some(format!("({args}) -> {}", render_hir_ty(sema, session, ret)))
 }
 
 fn member_symbol_kind(sema: &SemaModule, fact: &ExprMemberFact) -> ToolSymbolKind {

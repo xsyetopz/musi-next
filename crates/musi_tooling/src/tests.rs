@@ -1280,6 +1280,38 @@ one.inc(2);
     }
 
     #[test]
+    fn hover_names_imported_member_parameters() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        write_file(
+            test_dir.path(),
+            "dep.ms",
+            "export let add (left : Int, right : Int) : Int := left + right;\n",
+        );
+        let source = "\
+let dep := import \"./dep\";
+dep.add(1, 2);
+";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let hover = hover_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            2,
+            5,
+        )
+        .expect("imported member hover should resolve");
+
+        assert!(
+            hover
+                .contents
+                .starts_with("```musi\n(function) add : (left : Int, right : Int) -> Int\n```"),
+            "{}",
+            hover.contents
+        );
+    }
+
+    #[test]
     fn semantic_tokens_use_member_facts_for_properties_and_dot_callables() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
