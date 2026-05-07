@@ -448,6 +448,9 @@ impl MusiLanguageServer {
             .open_documents
             .get(&text_document.uri)
             .map(String::as_str);
+        if let Some(location) = import_definition_at(&path, overlay, position) {
+            return Some(GotoDefinitionResponse::Scalar(location));
+        }
         let location = definition_for_project_file_with_overlay(
             &path,
             overlay,
@@ -1392,6 +1395,20 @@ fn call_hierarchy_item_data_parts(item: &CallHierarchyItem) -> Option<(Url, usiz
 
 fn call_hierarchy_items_match(left: &CallHierarchyItem, right: &CallHierarchyItem) -> bool {
     left.uri == right.uri && left.selection_range == right.selection_range
+}
+
+fn import_definition_at(
+    path: &Path,
+    overlay: Option<&str>,
+    position: Position,
+) -> Option<Location> {
+    let link = document_links_for_project_file_with_overlay(path, overlay)
+        .into_iter()
+        .find(|link| position_in_lsp_range(position, to_tool_range(&link.range)))?;
+    Some(Location {
+        uri: Url::from_file_path(link.target).ok()?,
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
+    })
 }
 
 const fn position_in_lsp_range(position: Position, range: Range) -> bool {

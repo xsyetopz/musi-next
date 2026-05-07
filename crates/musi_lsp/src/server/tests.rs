@@ -1025,6 +1025,56 @@ let other := value;
     }
 
     #[test]
+    fn definition_on_import_string_opens_target_module() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let dep_path = root.join("dep.ms");
+        let source = "let dep := import \"./dep\";\n";
+        fs::write(&path, source).expect("entry should be written");
+        fs::write(&dep_path, "export let value := 1;\n").expect("dep should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let definition = server
+            .definition_at(GotoDefinitionParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(0, 21),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("import definition should exist");
+
+        let GotoDefinitionResponse::Scalar(location) = definition else {
+            panic!("definition should return scalar location");
+        };
+        let location_path = location
+            .uri
+            .to_file_path()
+            .expect("location URI should be a file path");
+        assert_eq!(
+            location_path,
+            fs::canonicalize(dep_path).expect("dep path should canonicalize")
+        );
+        assert_eq!(
+            location.range,
+            Range::new(Position::new(0, 0), Position::new(0, 0))
+        );
+    }
+
+    #[test]
     fn type_definition_resolves_named_value_type() {
         let root = temp_project();
         fs::write(
