@@ -962,6 +962,45 @@ render(8080, 1 = 1);
     }
 
     #[test]
+    fn signature_help_uses_utf16_positions() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "\
+let render (port : Int, secure : Bool) : Int := port;
+let icon := \"\u{1F600}\"; render(8080, 1 = 1);
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let help = server
+            .signature_help_at(SignatureHelpParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 34),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                context: None,
+            })
+            .expect("signature help should exist");
+
+        assert_eq!(help.active_signature, Some(0));
+        assert_eq!(help.active_parameter, Some(1));
+        assert_eq!(help.signatures[0].label, "render(Int, Bool) -> Int");
+    }
+
+    #[test]
     fn signature_help_returns_dot_callable_signature() {
         let root = temp_project();
         fs::write(
