@@ -274,6 +274,7 @@ const fn to_completion_item_kind(kind: ToolCompletionKind) -> CompletionItemKind
 
 pub(super) const fn to_lsp_symbol_kind(kind: ToolSymbolKind) -> SymbolKind {
     match kind {
+        ToolSymbolKind::Module => SymbolKind::MODULE,
         ToolSymbolKind::Function | ToolSymbolKind::Procedure => SymbolKind::FUNCTION,
         ToolSymbolKind::Variable | ToolSymbolKind::Parameter => SymbolKind::VARIABLE,
         ToolSymbolKind::TypeParameter => SymbolKind::TYPE_PARAMETER,

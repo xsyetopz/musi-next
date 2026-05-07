@@ -9,6 +9,7 @@ pub struct ToolHover {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToolSymbolKind {
+    Module,
     Function,
     Procedure,
     Variable,
@@ -33,6 +34,7 @@ impl ToolSymbolKind {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
+            Self::Module => "module",
             Self::Function => "function",
             Self::Procedure => "procedure",
             Self::Variable => "variable",

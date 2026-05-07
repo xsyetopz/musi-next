@@ -121,6 +121,7 @@ pub fn workspace_symbols_for_project_root(root: &Path, query: &str) -> Vec<ToolW
         .flat_map(|package| package.module_keys.values())
         .flat_map(|path| workspace_symbols_for_project_file_with_overlay(path, None, query))
         .collect::<Vec<_>>();
+    symbols.extend(workspace_module_symbols(&project, query));
     symbols.sort_by_key(|symbol| {
         (
             symbol.name.clone(),
@@ -138,6 +139,46 @@ pub fn workspace_symbols_for_project_root(root: &Path, query: &str) -> Vec<ToolW
         )
     });
     symbols
+}
+
+fn workspace_module_symbols(
+    project: &musi_project::Project,
+    query: &str,
+) -> Vec<ToolWorkspaceSymbol> {
+    let query = query.to_ascii_lowercase();
+    project
+        .workspace()
+        .packages
+        .values()
+        .filter(|package| matches!(package.source, PackageSource::Workspace))
+        .flat_map(|package| {
+            package.module_keys.values().filter_map(|path| {
+                let name = module_symbol_name(package.root_dir.as_path(), path)?;
+                if !query.is_empty() && !name.to_ascii_lowercase().contains(&query) {
+                    return None;
+                }
+                Some(ToolWorkspaceSymbol {
+                    name,
+                    kind: ToolSymbolKind::Module,
+                    location: ToolLocation {
+                        path: path.clone(),
+                        range: ToolRange::new(1, 1, 1, 1),
+                    },
+                })
+            })
+        })
+        .collect()
+}
+
+fn module_symbol_name(package_root: &Path, module_path: &Path) -> Option<String> {
+    let mut relative = module_path.strip_prefix(package_root).ok()?.to_path_buf();
+    if relative
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("ms"))
+    {
+        let _ = relative.set_extension("");
+    }
+    Some(relative.to_string_lossy().replace('\\', "/"))
 }
 
 #[must_use]

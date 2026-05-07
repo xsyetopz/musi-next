@@ -443,9 +443,13 @@ boxedName.value;
             .iter()
             .map(|symbol| symbol.name.as_str())
             .collect::<Vec<_>>();
+        let module_symbols = workspace_symbols_for_project_root(test_dir.path(), "src/extra");
 
         assert!(names.contains(&"entryValue"));
         assert!(names.contains(&"extraValue"));
+        assert!(module_symbols.iter().any(|symbol| {
+            symbol.name == "src/extra" && symbol.kind == crate::ToolSymbolKind::Module
+        }));
     }
 
     #[test]

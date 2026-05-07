@@ -804,6 +804,19 @@ render(8080, 1 = 1);
 
         assert!(names.contains(&"entryValue"));
         assert!(names.contains(&"extraValue"));
+        let module_response = server.workspace_symbols(&WorkspaceSymbolParams {
+            query: "src/extra".to_owned(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        });
+        let WorkspaceSymbolResponse::Nested(module_symbols) = module_response else {
+            panic!("workspace module symbols expected");
+        };
+        let module_symbol = module_symbols
+            .iter()
+            .find(|symbol| symbol.name == "src/extra")
+            .expect("module workspace symbol should exist");
+        assert_eq!(module_symbol.kind, SymbolKind::MODULE);
         let entry = symbols
             .iter()
             .find(|symbol| symbol.name == "entryValue")
