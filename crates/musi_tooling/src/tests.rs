@@ -398,6 +398,27 @@ boxedName.value;
     }
 
     #[test]
+    fn prepare_rename_on_reference_returns_reference_range() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "let before := 1;\nlet after := before;\n";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let prepared = prepare_rename_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            2,
+            14,
+        )
+        .expect("rename should prepare");
+
+        assert_eq!(prepared.1, "before");
+        assert_eq!(prepared.0.start_line, 2);
+        assert_eq!(prepared.0.start_col, 14);
+        assert_eq!(prepared.0.end_col, 20);
+    }
+
+    #[test]
     fn moniker_marks_project_local_bindings() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);

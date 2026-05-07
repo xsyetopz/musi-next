@@ -15,14 +15,14 @@ use async_lsp::lsp_types::{
     Documentation, ExecuteCommandParams, FileOperationPatternKind, FileRename, FoldingRangeKind,
     FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse, InitializeParams,
     InlayHintKind, InlayHintServerCapabilities, InlayHintTooltip, LinkedEditingRangeParams,
-    MonikerKind, PartialResultParams, Position, ReferenceContext, RenameFilesParams,
-    SelectionRangeParams, SemanticToken, SemanticTokensDeltaParams, SemanticTokensFullDeltaResult,
-    SignatureHelpParams, SymbolKind, TextDocumentIdentifier, TextDocumentPositionParams,
-    TextDocumentSaveReason, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability,
-    WillSaveTextDocumentParams, WorkDoneProgressParams, WorkspaceDiagnosticParams,
-    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport, WorkspaceFolder,
-    WorkspaceFoldersChangeEvent, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    MonikerKind, PartialResultParams, Position, PrepareRenameResponse, ReferenceContext,
+    RenameFilesParams, SelectionRangeParams, SemanticToken, SemanticTokensDeltaParams,
+    SemanticTokensFullDeltaResult, SignatureHelpParams, SymbolKind, TextDocumentIdentifier,
+    TextDocumentPositionParams, TextDocumentSaveReason, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
+    TypeDefinitionProviderCapability, WillSaveTextDocumentParams, WorkDoneProgressParams,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
+    WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceSymbolParams, WorkspaceSymbolResponse,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -1278,6 +1278,41 @@ boxedName.value;
 
         assert_eq!(location.range.start, Position::new(0, 4));
         assert_eq!(location.range.end, Position::new(0, 7));
+    }
+
+    #[test]
+    fn prepare_rename_on_reference_returns_reference_range() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let before := 1;\nlet after := before;\n";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let prepared = server
+            .prepare_rename_at(TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri },
+                position: Position::new(1, 13),
+            })
+            .expect("rename should prepare");
+        let PrepareRenameResponse::RangeWithPlaceholder { range, placeholder } = prepared else {
+            panic!("rename should return range with placeholder");
+        };
+
+        assert_eq!(placeholder, "before");
+        assert_eq!(range.start, Position::new(1, 13));
+        assert_eq!(range.end, Position::new(1, 19));
     }
 
     #[test]

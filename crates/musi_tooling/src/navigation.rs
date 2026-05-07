@@ -277,13 +277,13 @@ pub fn prepare_rename_for_project_file_with_overlay(
     character: usize,
 ) -> Option<(ToolRange, String)> {
     let context = SymbolAnalysis::new(path, overlay_text)?;
-    let binding_id = context.binding_at(line, character)?;
+    let (binding_id, site) = context.binding_site_at(line, character)?;
     let binding = context.resolved()?.bindings.get(binding_id);
     if !context.can_rename_binding(binding) {
         return None;
     }
     Some((
-        tool_range(context.source_for_site(binding.site)?, binding.site.span),
+        tool_range(context.source_for_site(site)?, site.span),
         context.session.resolve_symbol(binding.name).to_owned(),
     ))
 }
@@ -385,19 +385,25 @@ impl SymbolAnalysis {
     }
 
     fn binding_at(&self, line: usize, character: usize) -> Option<NameBindingId> {
+        self.binding_site_at(line, character)
+            .map(|(binding_id, _)| binding_id)
+    }
+
+    fn binding_site_at(&self, line: usize, character: usize) -> Option<(NameBindingId, NameSite)> {
         let source = self.source()?;
         let offset = source.offset(line, character)?;
         if let Some(sema) = self.sema()
             && let Some(binding_id) = member_binding_at_offset(sema, offset)
         {
-            return Some(binding_id);
+            let binding = self.resolved()?.bindings.get(binding_id);
+            return Some((binding_id, binding.site));
         }
         let resolved = self.resolved()?;
         resolved
             .refs
             .iter()
             .find(|(site, _)| site.source_id == self.source_id && site.span.contains(offset))
-            .map(|(_, binding_id)| *binding_id)
+            .map(|(site, binding_id)| (*binding_id, *site))
             .or_else(|| {
                 resolved
                     .bindings
@@ -406,7 +412,7 @@ impl SymbolAnalysis {
                         binding.site.source_id == self.source_id
                             && binding.site.span.contains(offset)
                     })
-                    .map(|(binding_id, _)| binding_id)
+                    .map(|(binding_id, binding)| (binding_id, binding.site))
             })
     }
 
