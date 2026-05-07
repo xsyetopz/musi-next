@@ -1122,6 +1122,48 @@ import "@std/testing";
     }
 
     #[test]
+    fn import_destructure_field_comments_do_not_break_formatting() {
+        let source = r#"let {
+  -- writes one line
+  writeLine,
+  readText,
+} := import "@std/io";"#;
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            r#"let {
+  -- writes one line
+  writeLine,
+  readText,
+} := import "@std/io";
+"#
+        );
+    }
+
+    #[test]
+    fn import_destructure_field_block_comments_do_not_break_formatting() {
+        let source = r#"let {
+  /- reads text -/
+  readText,
+  writeLine,
+} := import "@std/io";"#;
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            r#"let {
+  /- reads text -/
+  readText,
+  writeLine,
+} := import "@std/io";
+"#
+        );
+    }
+
+    #[test]
     fn does_not_sort_dynamic_or_exported_imports() {
         let source = r#"let z := import path;
 let a := import "@std/io";

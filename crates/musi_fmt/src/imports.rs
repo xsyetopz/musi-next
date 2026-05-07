@@ -349,6 +349,16 @@ fn sort_brace_fields(
             .unwrap_or_default()
             .to_owned();
     }
+    if fields.iter().any(|range| {
+        source
+            .get(range.clone())
+            .is_some_and(field_contains_comment)
+    }) {
+        return source
+            .get(open.start..close.end)
+            .unwrap_or_default()
+            .to_owned();
+    }
 
     let mut sortable = fields
         .into_iter()
@@ -396,6 +406,10 @@ fn collect_field_ranges(
         .into_iter()
         .filter(|range| range.start < range.end)
         .collect()
+}
+
+fn field_contains_comment(field: &str) -> bool {
+    field.contains("--") || field.contains("/-")
 }
 
 fn sort_nested_record_fields(field: &str) -> String {
