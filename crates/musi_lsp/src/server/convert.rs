@@ -428,7 +428,7 @@ pub(super) fn full_document_range(text: &str) -> Range {
             line = line.saturating_add(1);
             character = 0;
         } else {
-            character = character.saturating_add(1);
+            character = character.saturating_add(ch.len_utf16());
         }
     }
     Range {

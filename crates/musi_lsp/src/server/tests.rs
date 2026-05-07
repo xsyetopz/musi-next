@@ -276,6 +276,17 @@ mod success {
     }
 
     #[test]
+    fn full_document_range_uses_utf16_characters() {
+        assert_eq!(
+            full_document_range("let icon := \"\u{1F600}\";"),
+            Range {
+                start: Position::new(0, 0),
+                end: Position::new(0, 17),
+            }
+        );
+    }
+
+    #[test]
     fn formatting_options_override_manifest_indentation() {
         let mut options = FormatOptions {
             use_tabs: true,
@@ -326,6 +337,34 @@ mod success {
 
         assert_eq!(edits.len(), 1);
         assert_eq!(edits[0].new_text, expected);
+    }
+
+    #[test]
+    fn range_formatting_uses_utf16_positions() {
+        let uri = Url::parse("file:///tmp/index.ms").expect("uri should parse");
+        let prefix = "let icon := \"\u{1F600}\"; ";
+        let source = format!("{prefix}let x:=1;");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source);
+
+        let edits = server
+            .document_range_formatting(DocumentRangeFormattingParams {
+                text_document: TextDocumentIdentifier { uri },
+                range: Range {
+                    start: Position::new(0, 18),
+                    end: Position::new(0, 27),
+                },
+                options: FormattingOptions {
+                    tab_size: 2,
+                    insert_spaces: true,
+                    ..FormattingOptions::default()
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("range formatting should run");
+
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].new_text, "let x := 1;\n");
     }
 
     #[test]

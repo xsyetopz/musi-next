@@ -175,7 +175,7 @@ fn lsp_position_offset(text: &str, position: Position) -> Option<usize> {
             line = line.saturating_add(1);
             character = 0;
         } else {
-            character = character.saturating_add(1);
+            character = character.saturating_add(ch.len_utf16());
         }
     }
     (line == target_line && character == target_character).then_some(text.len())
