@@ -784,6 +784,46 @@ render(8080, 1 = 1);
     }
 
     #[test]
+    fn signature_help_returns_dot_callable_signature() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "\
+let inc (self : Int, by : Int) : Int := self + by;
+let one : Int := 1;
+one.inc(2);
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let help = server
+            .signature_help_at(SignatureHelpParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(2, 9),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                context: None,
+            })
+            .expect("signature help should exist");
+
+        assert_eq!(help.active_signature, Some(0));
+        assert_eq!(help.active_parameter, Some(0));
+        assert_eq!(help.signatures[0].label, "one.inc(Int) -> Int");
+    }
+
+    #[test]
     fn did_change_configuration_updates_hover_settings() {
         let root = temp_project();
         fs::write(
@@ -1346,6 +1386,49 @@ let other := value;
     }
 
     #[test]
+    fn references_on_member_reference_include_dot_callable_uses() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "\
+let inc (self : Int, by : Int) : Int := self + by;
+let one : Int := 1;
+let result := one.inc(2);
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let locations = server
+            .references_at(ReferenceParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(2, 19),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+                context: ReferenceContext {
+                    include_declaration: true,
+                },
+            })
+            .expect("member references should resolve");
+
+        assert_eq!(locations.len(), 2);
+        assert_eq!(locations[0].range.start, Position::new(0, 4));
+        assert_eq!(locations[1].range.start, Position::new(2, 18));
+    }
+
+    #[test]
     fn document_highlight_on_import_string_marks_matching_imports() {
         let root = temp_project();
         fs::write(
@@ -1509,6 +1592,45 @@ boxedName.value;
         assert_eq!(placeholder, "before");
         assert_eq!(range.start, Position::new(1, 13));
         assert_eq!(range.end, Position::new(1, 19));
+    }
+
+    #[test]
+    fn prepare_rename_on_member_reference_returns_member_range() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "\
+let inc (self : Int, by : Int) : Int := self + by;
+let one : Int := 1;
+let result := one.inc(2);
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let prepared = server
+            .prepare_rename_at(TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri },
+                position: Position::new(2, 19),
+            })
+            .expect("rename should prepare");
+        let PrepareRenameResponse::RangeWithPlaceholder { range, placeholder } = prepared else {
+            panic!("rename should return range with placeholder");
+        };
+
+        assert_eq!(placeholder, "inc");
+        assert_eq!(range.start, Position::new(2, 18));
+        assert_eq!(range.end, Position::new(2, 21));
     }
 
     #[test]

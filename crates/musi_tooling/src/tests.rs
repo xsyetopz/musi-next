@@ -419,6 +419,71 @@ boxedName.value;
     }
 
     #[test]
+    fn member_references_include_dot_callable_uses() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "\
+let inc (self : Int, by : Int) : Int := self + by;
+let one : Int := 1;
+let result := one.inc(2);
+";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let references = references_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            3,
+            20,
+            true,
+        );
+
+        assert_eq!(references.len(), 2);
+        assert_eq!(references[0].range.start_line, 1);
+        assert_eq!(references[0].range.start_col, 5);
+        assert_eq!(references[1].range.start_line, 3);
+        assert_eq!(references[1].range.start_col, 19);
+    }
+
+    #[test]
+    fn prepare_rename_on_member_reference_returns_member_range() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "\
+let inc (self : Int, by : Int) : Int := self + by;
+let one : Int := 1;
+let result := one.inc(2);
+";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let prepared = prepare_rename_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            3,
+            20,
+        )
+        .expect("rename should prepare");
+        let edit = rename_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            3,
+            20,
+            "increase",
+        )
+        .expect("rename should produce edits");
+        let edits = edit
+            .changes
+            .get(&test_dir.path().join("index.ms"))
+            .expect("file edits should exist");
+
+        assert_eq!(prepared.1, "inc");
+        assert_eq!(prepared.0.start_line, 3);
+        assert_eq!(prepared.0.start_col, 19);
+        assert_eq!(prepared.0.end_col, 22);
+        assert_eq!(edits.len(), 2);
+        assert!(edits.iter().all(|edit| edit.new_text == "increase"));
+    }
+
+    #[test]
     fn moniker_marks_project_local_bindings() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
@@ -744,6 +809,32 @@ render(8080, 1 = 1);
         assert_eq!(help.signatures[0].label, "render(Int, Bool) -> Int");
         assert_eq!(help.signatures[0].parameters[0].label, "Int");
         assert_eq!(help.signatures[0].parameters[1].label, "Bool");
+    }
+
+    #[test]
+    fn signature_help_returns_dot_callable_signature() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "\
+let inc (self : Int, by : Int) : Int := self + by;
+let one : Int := 1;
+one.inc(2);
+";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let help = signature_help_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            3,
+            10,
+        )
+        .expect("signature help should exist inside dot call");
+
+        assert_eq!(help.active_signature, 0);
+        assert_eq!(help.active_parameter, 0);
+        assert_eq!(help.signatures.len(), 1);
+        assert_eq!(help.signatures[0].label, "one.inc(Int) -> Int");
+        assert_eq!(help.signatures[0].parameters[0].label, "Int");
     }
 
     #[test]

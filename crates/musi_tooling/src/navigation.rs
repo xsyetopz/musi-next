@@ -420,10 +420,9 @@ impl SymbolAnalysis {
         let source = self.source()?;
         let offset = source.offset(line, character)?;
         if let Some(sema) = self.sema()
-            && let Some(binding_id) = member_binding_at_offset(sema, offset)
+            && let Some((binding_id, site)) = member_binding_site_at_offset(sema, offset)
         {
-            let binding = self.resolved()?.bindings.get(binding_id);
-            return Some((binding_id, binding.site));
+            return Some((binding_id, site));
         }
         let resolved = self.resolved()?;
         resolved
@@ -481,6 +480,27 @@ impl SymbolAnalysis {
         self.site_location(binding.site)
     }
 
+    fn member_references(&self, binding_id: NameBindingId) -> Vec<ToolLocation> {
+        let Some(sema) = self.sema() else {
+            return Vec::new();
+        };
+        sema.module()
+            .store
+            .exprs
+            .iter()
+            .filter_map(|(expr_id, expr)| {
+                let HirExprKind::Field { name, .. } = expr.kind else {
+                    return None;
+                };
+                let fact = sema.expr_member_fact(expr_id)?;
+                if fact.binding != Some(binding_id) {
+                    return None;
+                }
+                self.site_location(NameSite::new(expr.origin.source_id, name.span))
+            })
+            .collect()
+    }
+
     fn references(
         &self,
         binding_id: NameBindingId,
@@ -500,11 +520,21 @@ impl SymbolAnalysis {
                 .filter(|(_, target)| **target == binding_id)
                 .filter_map(|(site, _)| self.site_location(*site)),
         );
+        locations.extend(self.member_references(binding_id));
         locations.sort_by_key(|location| {
             (
                 location.path.clone(),
                 location.range.start_line,
                 location.range.start_col,
+            )
+        });
+        locations.dedup_by_key(|location| {
+            (
+                location.path.clone(),
+                location.range.start_line,
+                location.range.start_col,
+                location.range.end_line,
+                location.range.end_col,
             )
         });
         locations
@@ -731,7 +761,10 @@ fn expr_ty_at_offset(sema: &SemaModule, source_id: SourceId, offset: u32) -> Opt
         .and_then(|(expr_id, _)| sema.try_expr_ty(expr_id))
 }
 
-fn member_binding_at_offset(sema: &SemaModule, offset: u32) -> Option<NameBindingId> {
+fn member_binding_site_at_offset(
+    sema: &SemaModule,
+    offset: u32,
+) -> Option<(NameBindingId, NameSite)> {
     sema.module()
         .store
         .exprs
@@ -743,7 +776,8 @@ fn member_binding_at_offset(sema: &SemaModule, offset: u32) -> Option<NameBindin
             if !name.span.contains(offset) {
                 return None;
             }
-            sema.expr_member_fact(expr_id)?.binding
+            let binding_id = sema.expr_member_fact(expr_id)?.binding?;
+            Some((binding_id, NameSite::new(expr.origin.source_id, name.span)))
         })
 }
 
