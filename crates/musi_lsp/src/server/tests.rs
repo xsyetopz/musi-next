@@ -1773,6 +1773,46 @@ let other := value + value;
     }
 
     #[test]
+    fn call_hierarchy_outgoing_calls_return_member_callees() {
+        let root = temp_project();
+        let path = root.join("index.ms");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let source = "\
+let inc (self : Int, by : Int) : Int := self + by;
+let one : Int := 1;
+let caller () := one.inc(2);
+";
+        fs::write(&path, source).expect("entry should be written");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+        let item = server
+            .prepare_call_hierarchy_at(CallHierarchyPrepareParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(2, 5),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("call hierarchy should prepare")
+            .pop()
+            .expect("caller item should exist");
+
+        let calls = server
+            .call_hierarchy_outgoing_calls(&CallHierarchyOutgoingCallsParams {
+                item,
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("outgoing calls should run");
+
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].to.name, "inc");
+        assert_eq!(calls[0].from_ranges.len(), 1);
+        assert_eq!(calls[0].from_ranges[0].start, Position::new(2, 21));
+        assert_eq!(calls[0].from_ranges[0].end, Position::new(2, 24));
+    }
+
+    #[test]
     fn code_action_returns_source_organize_imports_edit() {
         let root = temp_project();
         let path = root.join("index.ms");

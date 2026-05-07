@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use musi_project::{PackageSource, ProjectOptions, load_project, load_project_ancestor};
 use music_base::{Source, SourceId, Span};
-use music_hir::{HirExpr, HirExprKind, HirTyId, HirTyKind};
+use music_hir::{HirExpr, HirExprId, HirExprKind, HirTyId, HirTyKind};
 use music_module::ModuleKey;
 use music_names::{NameBinding, NameBindingId, NameBindingKind, NameResolution, NameSite, Symbol};
 use music_sema::SemaModule;
@@ -553,24 +553,23 @@ impl SymbolAnalysis {
             let HirExprKind::Call { callee, .. } = expr.kind else {
                 continue;
             };
-            let callee = sema.module().store.exprs.get(callee);
-            let Some(site) = callee_name_site(self.source_id, callee) else {
+            let callee_expr = sema.module().store.exprs.get(callee);
+            let Some((callee_binding_id, callee_span)) =
+                call_target(self.source_id, resolved, sema, callee, callee_expr)
+            else {
                 continue;
             };
-            let range = tool_range(source, site.span);
+            let range = tool_range(source, callee_span);
             if !tool_range_contains_range(&container_range, &range) {
                 continue;
             }
-            let Some(binding_id) = resolved.refs.get(&site).copied() else {
-                continue;
-            };
-            let binding = resolved.bindings.get(binding_id);
-            let Some(location) = self.binding_location(binding_id) else {
+            let binding = resolved.bindings.get(callee_binding_id);
+            let Some(location) = self.binding_location(callee_binding_id) else {
                 continue;
             };
             let to = ToolCallHierarchyItem {
                 name: self.session.resolve_symbol(binding.name).to_owned(),
-                kind: binding_symbol_kind(binding_id, binding, Some(sema)),
+                kind: binding_symbol_kind(callee_binding_id, binding, Some(sema)),
                 location,
             };
             if let Some(call) = calls.iter_mut().find(|call| call.to == to) {
@@ -661,6 +660,31 @@ impl SymbolAnalysis {
             })
             .cloned()
     }
+}
+
+fn call_target(
+    source_id: SourceId,
+    resolved: &NameResolution,
+    sema: &SemaModule,
+    callee_id: HirExprId,
+    callee: &HirExpr,
+) -> Option<(NameBindingId, Span)> {
+    if let Some(site) = callee_name_site(source_id, callee) {
+        return resolved
+            .refs
+            .get(&site)
+            .copied()
+            .map(|binding_id| (binding_id, site.span));
+    }
+    let HirExprKind::Field { name, .. } = callee.kind else {
+        return None;
+    };
+    if callee.origin.source_id != source_id {
+        return None;
+    }
+    sema.expr_member_fact(callee_id)
+        .and_then(|fact| fact.binding)
+        .map(|binding_id| (binding_id, name.span))
 }
 
 fn expr_ty_at_offset(sema: &SemaModule, source_id: SourceId, offset: u32) -> Option<HirTyId> {

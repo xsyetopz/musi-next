@@ -535,6 +535,32 @@ boxedName.value;
     }
 
     #[test]
+    fn outgoing_calls_include_member_callees() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "\
+let inc (self : Int, by : Int) : Int := self + by;
+let one : Int := 1;
+let caller () := one.inc(2);
+";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let calls = outgoing_calls_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            3,
+            5,
+        );
+
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].to.name, "inc");
+        assert_eq!(calls[0].from_ranges.len(), 1);
+        assert_eq!(calls[0].from_ranges[0].start_line, 3);
+        assert_eq!(calls[0].from_ranges[0].start_col, 22);
+        assert_eq!(calls[0].from_ranges[0].end_col, 25);
+    }
+
+    #[test]
     fn workspace_symbols_from_project_root_include_workspace_modules_without_open_file() {
         let test_dir = TempDir::new();
         write_file(
