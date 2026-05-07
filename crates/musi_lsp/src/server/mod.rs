@@ -1,58 +1,47 @@
 use std::collections::HashMap;
-use std::collections::hash_map::DefaultHasher;
-use std::fs;
 use std::future::Future;
-use std::hash::{Hash, Hasher};
 use std::ops::ControlFlow;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 
 use async_lsp::lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
     CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    CallHierarchyServerCapability, CodeAction, CodeActionKind, CodeActionOptions,
-    CodeActionOrCommand, CodeActionParams, CodeActionProviderCapability, CodeActionResponse,
-    CodeLens, CodeLensOptions, CodeLensParams, Command, CompletionItem, CompletionList,
-    CompletionOptions, CompletionParams, CompletionResponse, DeclarationCapability, Diagnostic,
-    DiagnosticOptions, DiagnosticServerCapabilities, DidChangeConfigurationParams,
-    DidChangeTextDocumentParams, DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentDiagnosticParams,
-    DocumentDiagnosticReport, DocumentDiagnosticReportResult, DocumentFormattingParams,
-    DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, DocumentLink,
-    DocumentLinkOptions, DocumentLinkParams, DocumentOnTypeFormattingOptions,
-    DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, DocumentSymbolParams,
-    DocumentSymbolResponse, ExecuteCommandOptions, ExecuteCommandParams, FileOperationFilter,
-    FileOperationPattern, FileOperationPatternKind, FileOperationRegistrationOptions, FoldingRange,
-    FoldingRangeParams, FoldingRangeProviderCapability, FormattingOptions,
-    FullDocumentDiagnosticReport, GotoDefinitionParams, GotoDefinitionResponse, Hover,
-    HoverContents, HoverParams, HoverProviderCapability, InitializeParams, InitializeResult,
-    InitializedParams, InlayHint, InlayHintOptions, InlayHintParams, InlayHintServerCapabilities,
-    LinkedEditingRangeParams, LinkedEditingRangeServerCapabilities, LinkedEditingRanges, Location,
-    MarkupContent, MarkupKind, Moniker, MonikerKind, MonikerParams, OneOf, PartialResultParams,
-    Position, PrepareRenameResponse, PublishDiagnosticsParams, Range, ReferenceContext,
-    ReferenceParams, RelatedFullDocumentDiagnosticReport, RenameFilesParams, RenameOptions,
-    RenameParams, SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability,
-    SemanticToken, SemanticTokens, SemanticTokensDelta, SemanticTokensDeltaParams,
-    SemanticTokensEdit, SemanticTokensFullDeltaResult, SemanticTokensFullOptions,
-    SemanticTokensOptions, SemanticTokensParams, SemanticTokensRangeParams,
-    SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
-    ServerCapabilities, ServerInfo, SignatureHelp, SignatureHelpOptions, SignatureHelpParams,
-    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
-    TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TextEdit,
-    TypeDefinitionProviderCapability, UniquenessLevel, Url, WillSaveTextDocumentParams,
-    WorkDoneProgressOptions, WorkDoneProgressParams, WorkspaceDiagnosticParams,
-    WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
-    WorkspaceEdit, WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
-    WorkspaceFullDocumentDiagnosticReport, WorkspaceServerCapabilities, WorkspaceSymbol,
-    WorkspaceSymbolOptions, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, CodeActionResponse,
+    CodeLens, CodeLensParams, Command, CompletionItem, CompletionList, CompletionParams,
+    CompletionResponse, Diagnostic, DidChangeConfigurationParams, DidChangeTextDocumentParams,
+    DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams, DocumentDiagnosticParams, DocumentDiagnosticReport,
+    DocumentDiagnosticReportResult, DocumentFormattingParams, DocumentHighlight,
+    DocumentHighlightParams, DocumentLink, DocumentLinkParams, DocumentOnTypeFormattingParams,
+    DocumentRangeFormattingParams, DocumentSymbolParams, DocumentSymbolResponse,
+    ExecuteCommandParams, FoldingRange, FoldingRangeParams, FullDocumentDiagnosticReport,
+    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
+    InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintParams,
+    LinkedEditingRangeParams, LinkedEditingRanges, Location, MarkupContent, MarkupKind, Moniker,
+    MonikerKind, MonikerParams, PartialResultParams, Position, PrepareRenameResponse,
+    PublishDiagnosticsParams, Range, ReferenceContext, ReferenceParams,
+    RelatedFullDocumentDiagnosticReport, RenameFilesParams, RenameParams, SelectionRange,
+    SelectionRangeParams, SemanticTokens, SemanticTokensDeltaParams, SemanticTokensFullDeltaResult,
+    SemanticTokensParams, SemanticTokensRangeParams, SemanticTokensRangeResult,
+    SemanticTokensResult, SignatureHelp, SignatureHelpParams, TextDocumentContentChangeEvent,
+    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit,
+    UniquenessLevel, Url, WillSaveTextDocumentParams, WorkDoneProgressParams,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult,
+    WorkspaceDocumentDiagnosticReport, WorkspaceEdit, WorkspaceFullDocumentDiagnosticReport,
+    WorkspaceSymbol, WorkspaceSymbolParams, WorkspaceSymbolResponse,
     notification::PublishDiagnostics,
+};
+#[cfg(test)]
+use async_lsp::lsp_types::{
+    CallHierarchyServerCapability, CodeActionProviderCapability, FormattingOptions,
+    HoverProviderCapability, OneOf, WorkDoneProgressOptions,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
 use musi_fmt::{FormatOptions, format_source, format_text_for_path, organize_imports};
-use musi_project::{PackageSource, ProjectOptions, load_project, load_project_ancestor};
+use musi_project::{ProjectOptions, load_project_ancestor};
 use musi_tooling::{
-    ToolDocumentSymbol, ToolMonikerKind, ToolSymbolKind, collect_project_diagnostics_with_overlay,
+    ToolMonikerKind, ToolSymbolKind, collect_project_diagnostics_with_overlay,
     completions_for_project_file_with_overlay, definition_for_project_file_with_overlay,
     document_links_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
     folding_ranges_for_project_file_with_overlay, hover_for_project_file_with_overlay,
@@ -66,18 +55,38 @@ use musi_tooling::{
 };
 use serde_json::{Value, json};
 
+mod capabilities;
 mod config;
 mod convert;
+mod formatting;
+mod navigation;
+mod semantic;
+mod workspace;
 
 use config::LspConfig;
 use convert::{
     diagnostic_matches_path, encode_semantic_tokens, full_document_range, position_in_range,
     resolve_lsp_completion, resolve_lsp_document_link, resolve_lsp_inlay_hint,
-    resolve_lsp_workspace_symbol, semantic_tokens_legend, to_lsp_call_hierarchy_item,
-    to_lsp_completion, to_lsp_diagnostic, to_lsp_document_highlight, to_lsp_document_link,
-    to_lsp_document_symbol, to_lsp_folding_range, to_lsp_inlay_hint, to_lsp_location,
-    to_lsp_selection_range, to_lsp_signature_help, to_lsp_symbol_kind, to_lsp_workspace_edit,
-    to_lsp_workspace_symbol, to_tool_range, tool_location_matches_path, truncate_hover_contents,
+    resolve_lsp_workspace_symbol, to_lsp_call_hierarchy_item, to_lsp_completion, to_lsp_diagnostic,
+    to_lsp_document_highlight, to_lsp_document_link, to_lsp_document_symbol, to_lsp_folding_range,
+    to_lsp_inlay_hint, to_lsp_location, to_lsp_selection_range, to_lsp_signature_help,
+    to_lsp_symbol_kind, to_lsp_workspace_edit, to_lsp_workspace_symbol, to_tool_range,
+    tool_location_matches_path, truncate_hover_contents,
+};
+use formatting::{
+    apply_document_formatting_options, lsp_range_offsets, markdown_range_inside_musi_fence_body,
+    on_type_formatting_trigger,
+};
+use navigation::{
+    call_hierarchy_item_data_parts, call_hierarchy_items_match, caller_symbol_for_reference,
+    code_action_kind_requested, import_definition_at, import_document_highlights,
+    import_linked_editing_ranges, position_in_lsp_range, push_reference_lenses,
+    reference_lens_data_parts, reference_lens_title, symbol_at_position,
+};
+use semantic::{SemanticTokenSnapshot, semantic_tokens_delta, semantic_tokens_result_id};
+use workspace::{
+    collect_workspace_source_paths, import_specifier_for_target, paths_match, renamed_target_path,
+    sort_dedup_paths, workspace_module_paths, workspace_roots,
 };
 
 type ServerFuture<T> = Pin<Box<dyn Future<Output = Result<T, ResponseError>> + Send + 'static>>;
@@ -93,12 +102,6 @@ pub struct MusiLanguageServer {
     config: LspConfig,
 }
 
-#[derive(Debug, Clone)]
-struct SemanticTokenSnapshot {
-    result_id: String,
-    data: Vec<SemanticToken>,
-}
-
 impl MusiLanguageServer {
     #[must_use]
     pub fn new(client: ClientSocket) -> Self {
@@ -111,162 +114,8 @@ impl MusiLanguageServer {
         }
     }
 
-    #[allow(clippy::too_many_lines)]
     fn initialize_result() -> InitializeResult {
-        InitializeResult {
-            capabilities: ServerCapabilities {
-                text_document_sync: Some(TextDocumentSyncCapability::Options(
-                    TextDocumentSyncOptions {
-                        open_close: Some(true),
-                        change: Some(TextDocumentSyncKind::FULL),
-                        will_save: Some(true),
-                        will_save_wait_until: Some(true),
-                        save: Some(TextDocumentSyncSaveOptions::Supported(true)),
-                    },
-                )),
-                hover_provider: Some(HoverProviderCapability::Simple(true)),
-                signature_help_provider: Some(SignatureHelpOptions {
-                    trigger_characters: Some(vec!["(".to_owned(), ",".to_owned()]),
-                    retrigger_characters: Some(vec![",".to_owned()]),
-                    work_done_progress_options: WorkDoneProgressOptions {
-                        work_done_progress: None,
-                    },
-                }),
-                declaration_provider: Some(DeclarationCapability::Simple(true)),
-                definition_provider: Some(OneOf::Left(true)),
-                type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
-                references_provider: Some(OneOf::Left(true)),
-                moniker_provider: Some(OneOf::Left(true)),
-                call_hierarchy_provider: Some(CallHierarchyServerCapability::Simple(true)),
-                linked_editing_range_provider: Some(LinkedEditingRangeServerCapabilities::Simple(
-                    true,
-                )),
-                document_highlight_provider: Some(OneOf::Left(true)),
-                document_symbol_provider: Some(OneOf::Left(true)),
-                document_link_provider: Some(DocumentLinkOptions {
-                    resolve_provider: Some(true),
-                    work_done_progress_options: WorkDoneProgressOptions {
-                        work_done_progress: None,
-                    },
-                }),
-                code_lens_provider: Some(CodeLensOptions {
-                    resolve_provider: Some(true),
-                }),
-                execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: vec![REFERENCES_COMMAND.to_owned()],
-                    work_done_progress_options: WorkDoneProgressOptions {
-                        work_done_progress: None,
-                    },
-                }),
-                workspace: Some(WorkspaceServerCapabilities {
-                    workspace_folders: Some(WorkspaceFoldersServerCapabilities {
-                        supported: Some(true),
-                        change_notifications: Some(OneOf::Left(true)),
-                    }),
-                    file_operations: Some(WorkspaceFileOperationsServerCapabilities {
-                        will_rename: Some(FileOperationRegistrationOptions {
-                            filters: vec![
-                                FileOperationFilter {
-                                    scheme: Some("file".to_owned()),
-                                    pattern: FileOperationPattern {
-                                        glob: "**/*.ms".to_owned(),
-                                        matches: Some(FileOperationPatternKind::File),
-                                        options: None,
-                                    },
-                                },
-                                FileOperationFilter {
-                                    scheme: Some("file".to_owned()),
-                                    pattern: FileOperationPattern {
-                                        glob: "**".to_owned(),
-                                        matches: Some(FileOperationPatternKind::Folder),
-                                        options: None,
-                                    },
-                                },
-                            ],
-                        }),
-                        ..WorkspaceFileOperationsServerCapabilities::default()
-                    }),
-                }),
-                diagnostic_provider: Some(DiagnosticServerCapabilities::Options(
-                    DiagnosticOptions {
-                        identifier: Some("musi".to_owned()),
-                        inter_file_dependencies: true,
-                        workspace_diagnostics: true,
-                        work_done_progress_options: WorkDoneProgressOptions {
-                            work_done_progress: None,
-                        },
-                    },
-                )),
-                folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
-                selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
-                workspace_symbol_provider: Some(OneOf::Right(WorkspaceSymbolOptions {
-                    work_done_progress_options: WorkDoneProgressOptions {
-                        work_done_progress: None,
-                    },
-                    resolve_provider: Some(true),
-                })),
-                code_action_provider: Some(CodeActionProviderCapability::Options(
-                    CodeActionOptions {
-                        code_action_kinds: Some(vec![CodeActionKind::SOURCE_ORGANIZE_IMPORTS]),
-                        work_done_progress_options: WorkDoneProgressOptions {
-                            work_done_progress: None,
-                        },
-                        resolve_provider: Some(true),
-                    },
-                )),
-                rename_provider: Some(OneOf::Right(RenameOptions {
-                    prepare_provider: Some(true),
-                    work_done_progress_options: WorkDoneProgressOptions {
-                        work_done_progress: None,
-                    },
-                })),
-                document_formatting_provider: Some(OneOf::Left(true)),
-                document_range_formatting_provider: Some(OneOf::Left(true)),
-                document_on_type_formatting_provider: Some(DocumentOnTypeFormattingOptions {
-                    first_trigger_character: ";".to_owned(),
-                    more_trigger_character: Some(vec![
-                        ")".to_owned(),
-                        "]".to_owned(),
-                        "}".to_owned(),
-                    ]),
-                }),
-                completion_provider: Some(CompletionOptions {
-                    resolve_provider: Some(true),
-                    trigger_characters: Some(vec![
-                        ".".to_owned(),
-                        "\"".to_owned(),
-                        "/".to_owned(),
-                        "@".to_owned(),
-                    ]),
-                    ..CompletionOptions::default()
-                }),
-                inlay_hint_provider: Some(OneOf::Right(InlayHintServerCapabilities::Options(
-                    InlayHintOptions {
-                        work_done_progress_options: WorkDoneProgressOptions {
-                            work_done_progress: None,
-                        },
-                        resolve_provider: Some(true),
-                    },
-                ))),
-                semantic_tokens_provider: Some(
-                    SemanticTokensServerCapabilities::SemanticTokensOptions(
-                        SemanticTokensOptions {
-                            work_done_progress_options: WorkDoneProgressOptions {
-                                work_done_progress: None,
-                            },
-                            legend: semantic_tokens_legend(),
-                            range: Some(true),
-                            full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
-                        },
-                    ),
-                ),
-                ..ServerCapabilities::default()
-            },
-            server_info: Some(ServerInfo {
-                name: "musi_lsp".to_owned(),
-                version: None,
-            }),
-        }
+        capabilities::initialize_result(REFERENCES_COMMAND)
     }
 
     fn configure(&mut self, params: &InitializeParams) {
@@ -1421,383 +1270,6 @@ impl MusiLanguageServer {
     }
 }
 
-fn apply_document_formatting_options(
-    options: &mut FormatOptions,
-    formatting_options: &FormattingOptions,
-) {
-    options.indent_width = usize::try_from(formatting_options.tab_size).unwrap_or(2);
-    options.use_tabs = !formatting_options.insert_spaces;
-}
-
-fn on_type_formatting_trigger(ch: &str) -> bool {
-    matches!(ch, ";" | ")" | "]" | "}")
-}
-
-fn reference_lens_title(count: usize) -> String {
-    if count == 1 {
-        "1 reference".to_owned()
-    } else {
-        format!("{count} references")
-    }
-}
-
-fn push_reference_lenses(path: &Path, symbol: &ToolDocumentSymbol, lenses: &mut Vec<CodeLens>) {
-    if let Some(data) = reference_lens_data(path, symbol) {
-        lenses.push(CodeLens {
-            range: to_tool_range(&symbol.selection_range),
-            command: None,
-            data: Some(data),
-        });
-    }
-    for child in &symbol.children {
-        push_reference_lenses(path, child, lenses);
-    }
-}
-
-fn symbol_at_position(
-    symbols: &[ToolDocumentSymbol],
-    position: Position,
-) -> Option<&ToolDocumentSymbol> {
-    symbols.iter().find_map(|symbol| {
-        let selection_range = to_tool_range(&symbol.selection_range);
-        if position_in_lsp_range(position, selection_range) {
-            return Some(symbol);
-        }
-        symbol_at_position(&symbol.children, position)
-    })
-}
-
-fn caller_symbol_for_reference<'a>(
-    symbols: &'a [ToolDocumentSymbol],
-    range: &musi_tooling::ToolRange,
-) -> Option<&'a ToolDocumentSymbol> {
-    symbols
-        .iter()
-        .flat_map(flatten_symbols)
-        .filter(|symbol| tool_range_contains_range(&symbol.range, range))
-        .min_by_key(|symbol| tool_range_size(&symbol.range))
-}
-
-fn flatten_symbols(symbol: &ToolDocumentSymbol) -> Vec<&ToolDocumentSymbol> {
-    let mut symbols = vec![symbol];
-    for child in &symbol.children {
-        symbols.extend(flatten_symbols(child));
-    }
-    symbols
-}
-
-fn call_hierarchy_item_data_parts(item: &CallHierarchyItem) -> Option<(Url, usize, usize)> {
-    let data = item.data.as_ref()?;
-    let uri = data.get("uri")?.as_str()?;
-    let line = usize::try_from(data.get("line")?.as_u64()?).ok()?;
-    let character = usize::try_from(data.get("character")?.as_u64()?).ok()?;
-    Some((Url::parse(uri).ok()?, line, character))
-}
-
-fn call_hierarchy_items_match(left: &CallHierarchyItem, right: &CallHierarchyItem) -> bool {
-    left.uri == right.uri && left.selection_range == right.selection_range
-}
-
-fn import_definition_at(
-    path: &Path,
-    overlay: Option<&str>,
-    position: Position,
-) -> Option<Location> {
-    let link = document_links_for_project_file_with_overlay(path, overlay)
-        .into_iter()
-        .find(|link| position_in_lsp_range(position, to_tool_range(&link.range)))?;
-    Some(Location {
-        uri: Url::from_file_path(link.target).ok()?,
-        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
-    })
-}
-
-fn import_document_highlights(
-    path: &Path,
-    overlay: Option<&str>,
-    position: Position,
-) -> Option<Vec<DocumentHighlight>> {
-    let links = document_links_for_project_file_with_overlay(path, overlay);
-    let target = links
-        .iter()
-        .find(|link| position_in_lsp_range(position, to_tool_range(&link.range)))?
-        .target
-        .clone();
-    Some(
-        links
-            .into_iter()
-            .filter(|link| paths_match(&link.target, &target))
-            .map(|link| DocumentHighlight {
-                range: to_tool_range(&link.range),
-                kind: Some(DocumentHighlightKind::TEXT),
-            })
-            .collect(),
-    )
-}
-
-fn import_linked_editing_ranges(
-    path: &Path,
-    overlay: Option<&str>,
-    position: Position,
-) -> Option<LinkedEditingRanges> {
-    let ranges = import_document_highlights(path, overlay, position)?
-        .into_iter()
-        .map(|highlight| highlight.range)
-        .collect::<Vec<_>>();
-    (ranges.len() > 1).then_some(LinkedEditingRanges {
-        ranges,
-        word_pattern: None,
-    })
-}
-
-const fn position_in_lsp_range(position: Position, range: Range) -> bool {
-    !position_lt(position, range.start) && position_lt(position, range.end)
-}
-
-const fn position_lt(left: Position, right: Position) -> bool {
-    left.line < right.line || (left.line == right.line && left.character < right.character)
-}
-
-const fn tool_range_contains_range(
-    container: &musi_tooling::ToolRange,
-    range: &musi_tooling::ToolRange,
-) -> bool {
-    (range.start_line > container.start_line
-        || range.start_line == container.start_line && range.start_col >= container.start_col)
-        && (range.end_line < container.end_line
-            || range.end_line == container.end_line && range.end_col <= container.end_col)
-}
-
-const fn tool_range_size(range: &musi_tooling::ToolRange) -> (usize, usize) {
-    (
-        range.end_line.saturating_sub(range.start_line),
-        range.end_col.saturating_sub(range.start_col),
-    )
-}
-
-fn reference_lens_data(path: &Path, symbol: &ToolDocumentSymbol) -> Option<Value> {
-    Some(json!({
-        "uri": Url::from_file_path(path).ok()?.as_str(),
-        "line": symbol.selection_range.start_line.saturating_sub(1),
-        "character": symbol.selection_range.start_col.saturating_sub(1),
-    }))
-}
-
-fn reference_lens_data_parts(data: &Value) -> Option<(Url, usize, usize)> {
-    let uri = data.get("uri")?.as_str()?;
-    let line = usize::try_from(data.get("line")?.as_u64()?).ok()?;
-    let character = usize::try_from(data.get("character")?.as_u64()?).ok()?;
-    Some((Url::parse(uri).ok()?, line, character))
-}
-
-fn semantic_tokens_result_id(tokens: &[SemanticToken]) -> String {
-    let mut hasher = DefaultHasher::new();
-    for token in tokens {
-        token.delta_line.hash(&mut hasher);
-        token.delta_start.hash(&mut hasher);
-        token.length.hash(&mut hasher);
-        token.token_type.hash(&mut hasher);
-        token.token_modifiers_bitset.hash(&mut hasher);
-    }
-    format!("{:016x}", hasher.finish())
-}
-
-fn semantic_tokens_delta(
-    previous: &SemanticTokenSnapshot,
-    next: &SemanticTokenSnapshot,
-) -> SemanticTokensDelta {
-    let mut prefix_len = 0usize;
-    while prefix_len < previous.data.len()
-        && prefix_len < next.data.len()
-        && previous.data.get(prefix_len) == next.data.get(prefix_len)
-    {
-        prefix_len = prefix_len.saturating_add(1);
-    }
-    let mut suffix_len = 0usize;
-    while suffix_len < previous.data.len().saturating_sub(prefix_len)
-        && suffix_len < next.data.len().saturating_sub(prefix_len)
-        && previous.data[previous.data.len() - suffix_len - 1]
-            == next.data[next.data.len() - suffix_len - 1]
-    {
-        suffix_len = suffix_len.saturating_add(1);
-    }
-    let inserted = next.data[prefix_len..next.data.len() - suffix_len].to_vec();
-    SemanticTokensDelta {
-        result_id: Some(next.result_id.clone()),
-        edits: vec![SemanticTokensEdit {
-            start: len_to_u32(prefix_len),
-            delete_count: len_to_u32(previous.data.len() - prefix_len - suffix_len),
-            data: (!inserted.is_empty()).then_some(inserted),
-        }],
-    }
-}
-
-fn len_to_u32(value: usize) -> u32 {
-    u32::try_from(value).expect("semantic token vector length should fit u32")
-}
-
-#[allow(deprecated)]
-fn workspace_roots(params: &InitializeParams) -> Vec<PathBuf> {
-    let mut roots = Vec::new();
-    if let Some(folders) = &params.workspace_folders {
-        roots.extend(
-            folders
-                .iter()
-                .filter_map(|folder| folder.uri.to_file_path().ok()),
-        );
-    }
-    if roots.is_empty()
-        && let Some(root_uri) = &params.root_uri
-        && let Ok(path) = root_uri.to_file_path()
-    {
-        roots.push(path);
-    }
-    roots
-}
-
-fn workspace_module_paths(root: &Path) -> Vec<PathBuf> {
-    let Ok(project) = load_project(root, ProjectOptions::default()) else {
-        return Vec::new();
-    };
-    sort_dedup_paths(
-        project
-            .workspace()
-            .packages
-            .values()
-            .filter(|package| matches!(package.source, PackageSource::Workspace))
-            .flat_map(|package| package.module_keys.values().cloned())
-            .collect(),
-    )
-}
-
-fn collect_workspace_source_paths(root: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(root) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.components().any(is_ignored_workspace_component) {
-            continue;
-        }
-        if path.is_dir() {
-            collect_workspace_source_paths(&path, out);
-        } else if path.extension().and_then(|extension| extension.to_str()) == Some("ms") {
-            out.push(path);
-        }
-    }
-}
-
-fn is_ignored_workspace_component(component: Component<'_>) -> bool {
-    let text = component.as_os_str().to_string_lossy();
-    matches!(
-        text.as_ref(),
-        ".git" | ".cache" | ".musi" | "musi_modules" | "node_modules" | "target"
-    )
-}
-
-fn sort_dedup_paths(mut paths: Vec<PathBuf>) -> Vec<PathBuf> {
-    paths.sort_by_key(|path| canonical_path(path));
-    paths.dedup_by(|left, right| paths_match(left, right));
-    paths
-}
-
-fn paths_match(left: &Path, right: &Path) -> bool {
-    canonical_path(left) == canonical_path(right)
-}
-
-fn canonical_path(path: &Path) -> PathBuf {
-    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
-}
-
-fn renamed_target_path(renames: &[(PathBuf, PathBuf)], target: &Path) -> Option<PathBuf> {
-    renames.iter().find_map(|(old_path, new_path)| {
-        let target_key = canonical_path(target);
-        let old_key = canonical_path(old_path);
-        if target_key == old_key {
-            return Some(new_path.clone());
-        }
-        target_key
-            .strip_prefix(old_key)
-            .ok()
-            .map(|relative| new_path.join(relative))
-    })
-}
-
-fn import_specifier_for_target(importer_path: &Path, target_path: &Path) -> Option<String> {
-    let importer_dir = canonical_path(importer_path.parent()?);
-    let target_path = canonical_target_path(target_path);
-    let relative = relative_path(&importer_dir, &target_path)?;
-    let relative = strip_musi_extension(relative);
-    let mut specifier = relative.to_string_lossy().replace('\\', "/");
-    if !specifier.starts_with('.') {
-        specifier = format!("./{specifier}");
-    }
-    Some(specifier)
-}
-
-fn canonical_target_path(path: &Path) -> PathBuf {
-    if let Ok(path) = path.canonicalize() {
-        return path;
-    }
-    let mut missing = Vec::new();
-    let mut current = path;
-    while let Some(parent) = current.parent() {
-        if let Some(file_name) = current.file_name() {
-            missing.push(file_name.to_owned());
-        }
-        if let Ok(mut base) = parent.canonicalize() {
-            for component in missing.iter().rev() {
-                base.push(component);
-            }
-            return base;
-        }
-        current = parent;
-    }
-    path.to_path_buf()
-}
-
-fn relative_path(from_dir: &Path, target_path: &Path) -> Option<PathBuf> {
-    let from_components = normal_components(from_dir);
-    let target_components = normal_components(target_path);
-    if from_components.first() != target_components.first() {
-        return None;
-    }
-    let mut common = 0usize;
-    while from_components.get(common) == target_components.get(common)
-        && common < from_components.len()
-        && common < target_components.len()
-    {
-        common = common.saturating_add(1);
-    }
-    let mut relative = PathBuf::new();
-    for _ in common..from_components.len() {
-        relative.push("..");
-    }
-    for component in &target_components[common..] {
-        relative.push(component);
-    }
-    Some(relative)
-}
-
-fn normal_components(path: &Path) -> Vec<String> {
-    path.components()
-        .filter_map(|component| match component {
-            Component::CurDir => None,
-            Component::Normal(part) => Some(part.to_string_lossy().into_owned()),
-            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
-                Some(component.as_os_str().to_string_lossy().into_owned())
-            }
-        })
-        .collect()
-}
-
-fn strip_musi_extension(mut path: PathBuf) -> PathBuf {
-    if path.extension().and_then(|extension| extension.to_str()) == Some("ms") {
-        let _ = path.set_extension("");
-    }
-    path
-}
-
 const fn full_document_diagnostic_report(
     diagnostics: Vec<Diagnostic>,
 ) -> DocumentDiagnosticReportResult {
@@ -1810,136 +1282,6 @@ const fn full_document_diagnostic_report(
             },
         },
     ))
-}
-
-fn lsp_range_offsets(text: &str, range: Range) -> Option<(usize, usize)> {
-    let start = lsp_position_offset(text, range.start)?;
-    let end = lsp_position_offset(text, range.end)?;
-    (start <= end).then_some((start, end))
-}
-
-fn markdown_range_inside_musi_fence_body(text: &str, start: usize, end: usize) -> bool {
-    let mut offset = 0usize;
-    let mut open_fence = None::<(MarkdownFence, usize)>;
-    while offset < text.len() {
-        let line_start = offset;
-        let line = next_markdown_line(text, &mut offset);
-        if let Some((fence, body_start)) = open_fence {
-            if fence.is_closing(line) {
-                if fence.is_musi && start >= body_start && end <= line_start {
-                    return true;
-                }
-                open_fence = None;
-                continue;
-            }
-            open_fence = Some((fence, body_start));
-            continue;
-        }
-        if let Some(fence) = MarkdownFence::parse(line) {
-            if start < offset {
-                return false;
-            }
-            open_fence = Some((fence, offset));
-        }
-    }
-    open_fence.is_some_and(|(fence, body_start)| {
-        fence.is_musi && start >= body_start && end <= text.len()
-    })
-}
-
-fn next_markdown_line<'a>(text: &'a str, offset: &mut usize) -> &'a str {
-    let Some(rest) = text.get(*offset..) else {
-        return "";
-    };
-    let end = rest
-        .find('\n')
-        .map_or(text.len(), |index| *offset + index + 1);
-    let start = *offset;
-    *offset = end;
-    text.get(start..end).unwrap_or_default()
-}
-
-#[derive(Debug, Clone, Copy)]
-struct MarkdownFence {
-    marker: char,
-    marker_len: usize,
-    is_musi: bool,
-}
-
-impl MarkdownFence {
-    fn parse(line: &str) -> Option<Self> {
-        let trimmed = line.trim_start();
-        let marker = trimmed.chars().next()?;
-        if marker != '`' && marker != '~' {
-            return None;
-        }
-        let marker_len = trimmed.chars().take_while(|char| *char == marker).count();
-        if marker_len < 3 {
-            return None;
-        }
-        let tag = markdown_fence_tag(trimmed.trim_start_matches(marker).trim());
-        Some(Self {
-            marker,
-            marker_len,
-            is_musi: ["musi", "ms", "music"]
-                .iter()
-                .any(|candidate| tag.eq_ignore_ascii_case(candidate)),
-        })
-    }
-
-    fn is_closing(self, line: &str) -> bool {
-        let trimmed = line.trim_start();
-        let marker_len = trimmed
-            .chars()
-            .take_while(|char| *char == self.marker)
-            .count();
-        marker_len >= self.marker_len
-            && trimmed
-                .get(marker_len..)
-                .is_some_and(|rest| rest.trim().is_empty())
-    }
-}
-
-fn markdown_fence_tag(info: &str) -> &str {
-    if let Some(attributes) = info.strip_prefix('{') {
-        return attributes
-            .trim_end_matches('}')
-            .split(|char: char| char.is_whitespace())
-            .find_map(|attribute| attribute.strip_prefix('.'))
-            .unwrap_or_default();
-    }
-    info.split_whitespace().next().unwrap_or_default()
-}
-
-fn lsp_position_offset(text: &str, position: Position) -> Option<usize> {
-    let target_line = usize::try_from(position.line).ok()?;
-    let target_character = usize::try_from(position.character).ok()?;
-    let mut line = 0usize;
-    let mut character = 0usize;
-    for (offset, ch) in text.char_indices() {
-        if line == target_line && character == target_character {
-            return Some(offset);
-        }
-        if ch == '\n' {
-            line = line.saturating_add(1);
-            character = 0;
-        } else {
-            character = character.saturating_add(1);
-        }
-    }
-    (line == target_line && character == target_character).then_some(text.len())
-}
-
-fn code_action_kind_requested(only: Option<&[CodeActionKind]>, target: &CodeActionKind) -> bool {
-    only.is_none_or(|kinds| {
-        kinds.iter().any(|kind| {
-            kind == target
-                || target
-                    .as_str()
-                    .strip_prefix(kind.as_str())
-                    .is_some_and(|suffix| suffix.starts_with('.'))
-        })
-    })
 }
 
 impl LanguageServer for MusiLanguageServer {
