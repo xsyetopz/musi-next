@@ -76,7 +76,7 @@ pub(super) fn to_lsp_range_in_text(text: &str, range: &ToolRange) -> Range {
     }
 }
 
-fn to_lsp_position_in_text(text: &str, line: usize, col: usize) -> Position {
+pub(super) fn to_lsp_position_in_text(text: &str, line: usize, col: usize) -> Position {
     let lsp_line = line.saturating_sub(1);
     let character = text_line(text, lsp_line).map_or_else(
         || col.saturating_sub(1),
@@ -453,14 +453,14 @@ pub(super) fn encode_semantic_tokens(
     encoded
 }
 
-pub(super) fn position_in_range(position: ToolPosition, range: Range) -> bool {
-    let position = to_tool_position(position);
+pub(super) fn position_in_range(text: &str, position: ToolPosition, range: Range) -> bool {
+    let position = to_lsp_position_in_text(text, position.line, position.col);
     !position_lt(position, range.start) && position_lt(position, range.end)
 }
 
-pub(super) fn to_lsp_inlay_hint(hint: ToolInlayHint) -> InlayHint {
+pub(super) fn to_lsp_inlay_hint(text: &str, hint: ToolInlayHint) -> InlayHint {
     InlayHint {
-        position: to_tool_position(hint.position),
+        position: to_lsp_position_in_text(text, hint.position.line, hint.position.col),
         label: InlayHintLabel::String(hint.label),
         kind: Some(match hint.kind {
             ToolInlayHintKind::Type => InlayHintKind::TYPE,
@@ -643,13 +643,6 @@ fn token_intersects_range(token: &ToolSemanticToken, range: Option<&Range>) -> b
 
 const fn position_lt(left: Position, right: Position) -> bool {
     left.line < right.line || (left.line == right.line && left.character < right.character)
-}
-
-fn to_tool_position(position: ToolPosition) -> Position {
-    Position {
-        line: usize_to_u32(position.line.saturating_sub(1)),
-        character: usize_to_u32(position.col.saturating_sub(1)),
-    }
 }
 
 fn semantic_modifier_bitset(modifiers: &[ToolSemanticModifier]) -> u32 {

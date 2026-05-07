@@ -1247,6 +1247,50 @@ dep.add(1, 2);
     }
 
     #[test]
+    fn inlay_hints_use_utf16_positions() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "\
+let add (left : Int, right : Int) : Int := left + right;
+let icon := \"\u{1F600}\"; add(1, 2);
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+        server.update_configuration(&DidChangeConfigurationParams {
+            settings: serde_json::json!({
+                "inlayHints": {
+                    "enabled": true,
+                    "parameterNames": "all",
+                    "variableTypes": false,
+                },
+            }),
+        });
+
+        let hints = server
+            .inlay_hints(&InlayHintParams {
+                text_document: TextDocumentIdentifier { uri },
+                range: Range::new(Position::new(1, 20), Position::new(1, 30)),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("inlay hints should run");
+        let positions = hints.iter().map(|hint| hint.position).collect::<Vec<_>>();
+
+        assert_eq!(positions, [Position::new(1, 22), Position::new(1, 25)]);
+    }
+
+    #[test]
     fn workspace_symbols_use_initialize_workspace_roots_without_open_documents() {
         let root = temp_project();
         fs::write(
@@ -3863,7 +3907,7 @@ let other := value + 2;
             ToolInlayHintKind::Parameter,
         );
         tool_hint.tooltip = Some("parameter `value`".to_owned());
-        let hint = to_lsp_inlay_hint(tool_hint);
+        let hint = to_lsp_inlay_hint("one\nvalue", tool_hint);
 
         assert_eq!(hint.position, Position::new(1, 4));
         assert!(matches!(hint.kind, Some(InlayHintKind::PARAMETER)));

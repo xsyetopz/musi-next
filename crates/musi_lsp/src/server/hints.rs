@@ -1,5 +1,7 @@
 //! Inlay hint helpers for the LSP server.
 
+use std::fs::read_to_string;
+
 use async_lsp::lsp_types::{InlayHint, InlayHintParams};
 use musi_tooling::inlay_hints_for_project_file_with_overlay;
 
@@ -16,12 +18,18 @@ impl MusiLanguageServer {
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
-        let overlay = self.open_documents.get(uri).map(String::as_str);
-        let hints = inlay_hints_for_project_file_with_overlay(&path, overlay)
+        let file_text;
+        let text = if let Some(text) = self.open_documents.get(uri) {
+            text.as_str()
+        } else {
+            file_text = read_to_string(&path).ok()?;
+            file_text.as_str()
+        };
+        let hints = inlay_hints_for_project_file_with_overlay(&path, Some(text))
             .into_iter()
             .filter(|hint| self.config.inlay_hints.allows(hint))
-            .filter(|hint| position_in_range(hint.position, params.range))
-            .map(to_lsp_inlay_hint)
+            .filter(|hint| position_in_range(text, hint.position, params.range))
+            .map(|hint| to_lsp_inlay_hint(text, hint))
             .collect();
         Some(hints)
     }
