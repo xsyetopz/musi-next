@@ -13,6 +13,7 @@ struct CatalogEntry {
     help: Option<&'static str>,
 }
 
+#[rustfmt::skip]
 const ENTRIES: &[CatalogEntry] = &[
     CatalogEntry {
         kind: SyntaxDiagKind::InvalidChar,
@@ -326,6 +327,7 @@ pub fn from_code(raw: u16) -> Option<SyntaxDiagKind> {
         .map(|entry| entry.kind)
 }
 
+#[rustfmt::skip]
 pub const fn lex_error_kind(source: super::LexErrorKind) -> SyntaxDiagKind {
     match source {
         super::LexErrorKind::InvalidChar { .. } => SyntaxDiagKind::InvalidChar,
@@ -369,6 +371,7 @@ pub const fn lex_error_kind(source: super::LexErrorKind) -> SyntaxDiagKind {
     }
 }
 
+#[rustfmt::skip]
 pub const fn parse_error_kind(source: super::ParseErrorKind) -> SyntaxDiagKind {
     match source {
         super::ParseErrorKind::ExpectedToken { .. } => SyntaxDiagKind::ExpectedToken,

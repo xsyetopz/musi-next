@@ -13,6 +13,7 @@ struct CatalogEntry {
     help: Option<&'static str>,
 }
 
+#[rustfmt::skip]
 const ENTRIES: &[CatalogEntry] = &[
     CatalogEntry {
         kind: SeamDiagKind::ArtifactValidationFailed,
@@ -326,6 +327,7 @@ pub fn from_code(raw: u16) -> Option<SeamDiagKind> {
         .map(|entry| entry.kind)
 }
 
+#[rustfmt::skip]
 pub const fn assembly_error_kind(source: &crate::AssemblyError) -> SeamDiagKind {
     match source {
         crate::AssemblyError::ArtifactValidationFailed(_) => SeamDiagKind::ArtifactValidationFailed,
@@ -338,6 +340,7 @@ pub const fn assembly_error_kind(source: &crate::AssemblyError) -> SeamDiagKind 
     }
 }
 
+#[rustfmt::skip]
 pub const fn artifact_error_kind(source: &crate::ArtifactError) -> SeamDiagKind {
     match source {
         crate::ArtifactError::InvalidReference { .. } => SeamDiagKind::InvalidReference,
@@ -348,6 +351,7 @@ pub const fn artifact_error_kind(source: &crate::ArtifactError) -> SeamDiagKind 
     }
 }
 
+#[rustfmt::skip]
 pub const fn hil_verify_error_kind(source: &crate::HilVerifyError) -> SeamDiagKind {
     match source {
         crate::HilVerifyError::MissingEntryBlock { .. } => SeamDiagKind::HilMissingEntryBlock,

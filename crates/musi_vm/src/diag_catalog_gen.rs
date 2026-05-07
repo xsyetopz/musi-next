@@ -13,6 +13,7 @@ struct CatalogEntry {
     help: Option<&'static str>,
 }
 
+#[rustfmt::skip]
 const ENTRIES: &[CatalogEntry] = &[
     CatalogEntry {
         kind: VmDiagKind::SeamDecodeFailed,
@@ -486,6 +487,7 @@ pub fn from_code(raw: u16) -> Option<VmDiagKind> {
         .map(|entry| entry.kind)
 }
 
+#[rustfmt::skip]
 pub const fn vm_error_kind(source: &crate::VmErrorKind) -> VmDiagKind {
     match source {
         crate::VmErrorKind::SeamDecodeFailed { .. } => VmDiagKind::SeamDecodeFailed,
