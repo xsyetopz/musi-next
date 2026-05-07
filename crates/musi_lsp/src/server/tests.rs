@@ -652,6 +652,56 @@ point.
     }
 
     #[test]
+    fn completion_after_dot_classifies_imported_function_exports() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        fs::write(
+            root.join("dep.ms"),
+            "export let add (left : Int, right : Int) : Int := left + right;\n",
+        )
+        .expect("dep should be written");
+        let path = root.join("index.ms");
+        let source = "let dep := import \"./dep\";\ndep.";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let response = server
+            .completions(CompletionParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 4),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+                context: None,
+            })
+            .expect("completion response should exist");
+        let CompletionResponse::List(list) = response else {
+            panic!("completion list expected");
+        };
+        let add = list
+            .items
+            .iter()
+            .find(|item| item.label == "add")
+            .expect("add completion should exist");
+        let add = MusiLanguageServer::resolve_completion(add.clone());
+
+        assert_eq!(add.kind, Some(CompletionItemKind::FUNCTION));
+        assert_eq!(add.detail.as_deref(), Some("function"));
+    }
+
+    #[test]
     fn completion_inside_import_string_returns_module_items() {
         let root = temp_project();
         fs::write(

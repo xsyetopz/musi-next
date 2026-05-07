@@ -7,7 +7,7 @@ use music_hir::{HirExprId, HirExprKind, HirTyId, HirTyKind};
 use music_module::ModuleKey;
 use music_module::{ImportSiteKind, collect_import_sites};
 use music_names::{NameBinding, NameBindingKind, Symbol};
-use music_sema::SemaModule;
+use music_sema::{ExportedValue, ModuleSurface, SemaModule, SurfaceTyKind};
 use music_session::Session;
 use music_syntax::{Lexer, TokenKind, parse};
 
@@ -346,6 +346,14 @@ fn member_completions_for_base(
             &mut seen,
         );
     }
+    push_import_record_export_completions(
+        session,
+        sema,
+        base,
+        &replace_range,
+        &mut completions,
+        &mut seen,
+    );
     if let Some(ty) = sema.try_expr_ty(base) {
         push_type_member_completions(
             session,
@@ -357,6 +365,58 @@ fn member_completions_for_base(
         );
     }
     completions
+}
+
+fn push_import_record_export_completions(
+    session: &Session,
+    sema: &SemaModule,
+    base: HirExprId,
+    replace_range: &ToolRange,
+    completions: &mut ToolCompletionList,
+    seen: &mut HashSet<String>,
+) {
+    let Some(target) = sema.expr_import_record_target(base) else {
+        return;
+    };
+    let Some(imported) = session.sema_module_cached(target).ok().flatten() else {
+        return;
+    };
+    let surface = imported.surface();
+    for (index, export) in surface.exported_values().iter().enumerate() {
+        let label = export.name.to_string();
+        let kind = completion_kind_for_export(surface, export);
+        let detail = completion_detail_for_export(kind);
+        push_completion(
+            completions,
+            seen,
+            ToolCompletion::new(label.clone(), kind, Some(detail.to_owned()), *replace_range)
+                .with_sort_text(format!("1_{index:03}_{label}")),
+        );
+    }
+}
+
+fn completion_kind_for_export(
+    surface: &ModuleSurface,
+    export: &ExportedValue,
+) -> ToolCompletionKind {
+    if export.shape_key.is_some() || export.effect_key.is_some() || export.data_key.is_some() {
+        return ToolCompletionKind::Type;
+    }
+    surface
+        .try_ty(export.ty)
+        .map_or(ToolCompletionKind::Property, |ty| match ty.kind {
+            SurfaceTyKind::Arrow { .. } | SurfaceTyKind::Pi { .. } => ToolCompletionKind::Function,
+            SurfaceTyKind::Type => ToolCompletionKind::Type,
+            _ => ToolCompletionKind::Property,
+        })
+}
+
+const fn completion_detail_for_export(kind: ToolCompletionKind) -> &'static str {
+    match kind {
+        ToolCompletionKind::Function => "function",
+        ToolCompletionKind::Type => "type",
+        _ => "export",
+    }
 }
 
 fn push_effect_operation_completions(

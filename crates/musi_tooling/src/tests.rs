@@ -16,8 +16,8 @@ use music_session::{Session, SessionOptions};
 use musi_project::{Project, ProjectDiagKind, ProjectError, ProjectOptions};
 
 use crate::{
-    ToolDocumentHighlightKind, ToolFoldingRangeKind, ToolInlayHintKind, ToolMonikerKind,
-    ToolSemanticModifier, ToolSemanticTokenKind, ToolingDiagKind, ToolingError,
+    ToolCompletionKind, ToolDocumentHighlightKind, ToolFoldingRangeKind, ToolInlayHintKind,
+    ToolMonikerKind, ToolSemanticModifier, ToolSemanticTokenKind, ToolingDiagKind, ToolingError,
     artifact::write_output, collect_project_diagnostics_with_overlay,
     completions_for_project_file_with_overlay, definition_for_project_file_with_overlay,
     document_highlights_for_project_file_with_overlay,
@@ -256,6 +256,33 @@ span.lower
         assert_eq!(completions[0].replace_range.start_col, 6);
         assert_eq!(completions[0].replace_range.end_line, 2);
         assert_eq!(completions[0].replace_range.end_col, 11);
+    }
+
+    #[test]
+    fn completions_after_dot_classify_imported_function_exports() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        write_file(
+            test_dir.path(),
+            "dep.ms",
+            "export let add (left : Int, right : Int) : Int := left + right;\n",
+        );
+        let source = "let dep := import \"./dep\";\ndep.";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let completions = completions_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            2,
+            5,
+        );
+        let add = completions
+            .iter()
+            .find(|completion| completion.label == "add")
+            .expect("add completion should exist");
+
+        assert_eq!(add.kind, ToolCompletionKind::Function);
+        assert_eq!(add.detail.as_deref(), Some("function"));
     }
 
     #[test]
