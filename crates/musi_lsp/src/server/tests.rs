@@ -3751,7 +3751,7 @@ let other := value + 2;
         ];
 
         assert_eq!(
-            encode_semantic_tokens(&tokens, None),
+            encode_semantic_tokens("let\n  binding", &tokens, None),
             vec![
                 SemanticToken {
                     delta_line: 0,
@@ -3768,6 +3768,26 @@ let other := value + 2;
                     token_modifiers_bitset: 0b11,
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn semantic_token_encoding_uses_utf16_positions() {
+        let tokens = vec![ToolSemanticToken::new(
+            ToolRange::new(1, 18, 1, 21),
+            ToolSemanticTokenKind::Variable,
+            Vec::new(),
+        )];
+
+        assert_eq!(
+            encode_semantic_tokens("let icon := \"\u{1F600}\"; bef", &tokens, None),
+            vec![SemanticToken {
+                delta_line: 0,
+                delta_start: 18,
+                length: 3,
+                token_type: 4,
+                token_modifiers_bitset: 0,
+            }]
         );
     }
 

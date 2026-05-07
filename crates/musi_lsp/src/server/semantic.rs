@@ -1,4 +1,5 @@
 use std::collections::hash_map::DefaultHasher;
+use std::fs::read_to_string;
 use std::hash::{Hash, Hasher};
 
 use async_lsp::lsp_types::{
@@ -76,9 +77,15 @@ impl MusiLanguageServer {
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
-        let overlay = self.open_documents.get(uri).map(String::as_str);
-        let tokens = semantic_tokens_for_project_file_with_overlay(&path, overlay);
-        let data = encode_semantic_tokens(&tokens, range.as_ref());
+        let file_text;
+        let text = if let Some(text) = self.open_documents.get(uri) {
+            text.as_str()
+        } else {
+            file_text = read_to_string(&path).ok()?;
+            file_text.as_str()
+        };
+        let tokens = semantic_tokens_for_project_file_with_overlay(&path, Some(text));
+        let data = encode_semantic_tokens(text, &tokens, range.as_ref());
         Some(SemanticTokens {
             result_id: range.is_none().then(|| semantic_tokens_result_id(&data)),
             data,

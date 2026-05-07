@@ -418,6 +418,7 @@ pub(super) fn semantic_tokens_legend() -> SemanticTokensLegend {
 }
 
 pub(super) fn encode_semantic_tokens(
+    text: &str,
     tokens: &[ToolSemanticToken],
     range: Option<&Range>,
 ) -> Vec<SemanticToken> {
@@ -426,11 +427,12 @@ pub(super) fn encode_semantic_tokens(
     let mut prev_start = 0u32;
     for token in tokens
         .iter()
-        .filter(|token| token_intersects_range(token, range))
+        .filter(|token| token_intersects_range(text, token, range))
     {
-        let line = usize_to_u32(token.range.start_line.saturating_sub(1));
-        let start = usize_to_u32(token.range.start_col.saturating_sub(1));
-        let end = usize_to_u32(token.range.end_col.saturating_sub(1));
+        let lsp_range = to_lsp_range_in_text(text, &token.range);
+        let line = lsp_range.start.line;
+        let start = lsp_range.start.character;
+        let end = lsp_range.end.character;
         if end <= start {
             continue;
         }
@@ -626,19 +628,12 @@ fn related_information(labels: &[CliDiagnosticLabel]) -> Option<Vec<DiagnosticRe
     (!items.is_empty()).then_some(items)
 }
 
-fn token_intersects_range(token: &ToolSemanticToken, range: Option<&Range>) -> bool {
+fn token_intersects_range(text: &str, token: &ToolSemanticToken, range: Option<&Range>) -> bool {
     let Some(range) = range else {
         return true;
     };
-    let start = Position::new(
-        usize_to_u32(token.range.start_line.saturating_sub(1)),
-        usize_to_u32(token.range.start_col.saturating_sub(1)),
-    );
-    let end = Position::new(
-        usize_to_u32(token.range.end_line.saturating_sub(1)),
-        usize_to_u32(token.range.end_col.saturating_sub(1)),
-    );
-    position_lt(start, range.end) && position_lt(range.start, end)
+    let token_range = to_lsp_range_in_text(text, &token.range);
+    position_lt(token_range.start, range.end) && position_lt(range.start, token_range.end)
 }
 
 const fn position_lt(left: Position, right: Position) -> bool {
