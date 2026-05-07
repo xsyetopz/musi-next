@@ -63,7 +63,11 @@ impl<'a> MarkdownFormatter<'a> {
                 }
                 continue;
             };
-            if self.ignore_range || self.ignore_next_fence || !fence.is_musi() {
+            if self.ignore_range || !fence.is_musi() {
+                self.copy_fence_block(line_start, &fence);
+                continue;
+            }
+            if self.ignore_next_fence {
                 self.ignore_next_fence = false;
                 self.copy_fence_block(line_start, &fence);
                 continue;

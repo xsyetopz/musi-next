@@ -1465,6 +1465,17 @@ let d := import "./d";
     }
 
     #[test]
+    fn markdown_ignore_skips_next_musi_fence_after_non_musi_fence() {
+        let markdown = "<!-- musi-fmt-ignore -->\n```ts\nlet x=1\n```\n```musi\nlet x:=1;\n```\n```musi\nlet y:=2;\n```\n";
+        let formatted_result = format_markdown(markdown, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "<!-- musi-fmt-ignore -->\n```ts\nlet x=1\n```\n```musi\nlet x:=1;\n```\n```musi\nlet y := 2;\n```\n"
+        );
+    }
+
+    #[test]
     fn format_file_writes_changed_file() {
         let root = temp_dir();
         let path = root.join("std.ms");
