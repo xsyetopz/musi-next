@@ -1399,6 +1399,20 @@ let io := import "@std/io";
     }
 
     #[test]
+    fn ignore_preserves_next_documented_item() {
+        let formatted_result = format_source(
+            "-- musi-fmt-ignore\n--- important value\nlet   x:=1;\nlet y:=2;",
+            &options(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "-- musi-fmt-ignore\n--- important value\nlet   x:=1;\nlet y := 2;\n"
+        );
+    }
+
+    #[test]
     fn ignore_range_preserves_source_lines() {
         let formatted_result = format_source(
             "-- musi-fmt-ignore-start\nlet   x:=1;\n-- musi-fmt-ignore-end\nlet y:=2;",
