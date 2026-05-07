@@ -41,8 +41,9 @@ pub use folding::{
     folding_ranges_for_project_file_with_overlay,
 };
 pub use navigation::{
-    ToolDocumentSymbol, ToolLocation, ToolTextEdit, ToolWorkspaceEdit, ToolWorkspaceSymbol,
-    definition_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
+    ToolCallHierarchyItem, ToolDocumentSymbol, ToolLocation, ToolOutgoingCall, ToolTextEdit,
+    ToolWorkspaceEdit, ToolWorkspaceSymbol, definition_for_project_file_with_overlay,
+    document_symbols_for_project_file_with_overlay, outgoing_calls_for_project_file_with_overlay,
     prepare_rename_for_project_file_with_overlay, references_for_project_file_with_overlay,
     rename_for_project_file_with_overlay, type_definition_for_project_file_with_overlay,
     workspace_symbols_for_project_file_with_overlay, workspace_symbols_for_project_root,

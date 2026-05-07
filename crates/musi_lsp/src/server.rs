@@ -56,11 +56,11 @@ use musi_tooling::{
     document_links_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
     folding_ranges_for_project_file_with_overlay, hover_for_project_file_with_overlay,
     inlay_hints_for_project_file_with_overlay, module_docs_for_project_file_with_overlay,
-    prepare_rename_for_project_file_with_overlay, references_for_project_file_with_overlay,
-    rename_for_project_file_with_overlay, selection_ranges_for_project_file_with_overlay,
-    semantic_tokens_for_project_file_with_overlay, signature_help_for_project_file_with_overlay,
-    type_definition_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
-    workspace_symbols_for_project_root,
+    outgoing_calls_for_project_file_with_overlay, prepare_rename_for_project_file_with_overlay,
+    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
+    selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
+    signature_help_for_project_file_with_overlay, type_definition_for_project_file_with_overlay,
+    workspace_symbols_for_project_file_with_overlay, workspace_symbols_for_project_root,
 };
 use serde_json::{Value, json};
 
@@ -74,8 +74,8 @@ use convert::{
     resolve_lsp_workspace_symbol, semantic_tokens_legend, to_lsp_call_hierarchy_item,
     to_lsp_completion, to_lsp_diagnostic, to_lsp_document_highlight, to_lsp_document_link,
     to_lsp_document_symbol, to_lsp_folding_range, to_lsp_inlay_hint, to_lsp_location,
-    to_lsp_selection_range, to_lsp_signature_help, to_lsp_workspace_edit, to_lsp_workspace_symbol,
-    to_tool_range, tool_location_matches_path, truncate_hover_contents,
+    to_lsp_selection_range, to_lsp_signature_help, to_lsp_symbol_kind, to_lsp_workspace_edit,
+    to_lsp_workspace_symbol, to_tool_range, tool_location_matches_path, truncate_hover_contents,
 };
 
 type ServerFuture<T> = Pin<Box<dyn Future<Output = Result<T, ResponseError>> + Send + 'static>>;
@@ -727,10 +727,41 @@ impl MusiLanguageServer {
         Some(calls)
     }
 
-    const fn call_hierarchy_outgoing_calls(
-        _: &CallHierarchyOutgoingCallsParams,
-    ) -> Vec<CallHierarchyOutgoingCall> {
-        Vec::new()
+    fn call_hierarchy_outgoing_calls(
+        &self,
+        params: &CallHierarchyOutgoingCallsParams,
+    ) -> Option<Vec<CallHierarchyOutgoingCall>> {
+        let (uri, line, character) = call_hierarchy_item_data_parts(&params.item)?;
+        let path = uri.to_file_path().ok()?;
+        let overlay = self.open_documents.get(&uri).map(String::as_str);
+        let calls = outgoing_calls_for_project_file_with_overlay(
+            &path,
+            overlay,
+            line.saturating_add(1),
+            character.saturating_add(1),
+        )
+        .into_iter()
+        .filter_map(|call| {
+            Some(CallHierarchyOutgoingCall {
+                to: CallHierarchyItem {
+                    name: call.to.name,
+                    kind: to_lsp_symbol_kind(call.to.kind),
+                    tags: None,
+                    detail: None,
+                    uri: Url::from_file_path(call.to.location.path).ok()?,
+                    range: to_tool_range(&call.to.location.range),
+                    selection_range: to_tool_range(&call.to.location.range),
+                    data: None,
+                },
+                from_ranges: call
+                    .from_ranges
+                    .into_iter()
+                    .map(|range| to_tool_range(&range))
+                    .collect(),
+            })
+        })
+        .collect();
+        Some(calls)
     }
 
     fn document_links(&self, params: DocumentLinkParams) -> Option<Vec<DocumentLink>> {
@@ -1971,8 +2002,8 @@ impl LanguageServer for MusiLanguageServer {
         &mut self,
         params: CallHierarchyOutgoingCallsParams,
     ) -> ServerFuture<Option<Vec<CallHierarchyOutgoingCall>>> {
-        let outgoing_calls = Self::call_hierarchy_outgoing_calls(&params);
-        Box::pin(async move { Ok(Some(outgoing_calls)) })
+        let outgoing_calls = self.call_hierarchy_outgoing_calls(&params);
+        Box::pin(async move { Ok(outgoing_calls) })
     }
 
     fn document_link(

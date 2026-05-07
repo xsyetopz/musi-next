@@ -1499,33 +1499,39 @@ let other := value + value;
     }
 
     #[test]
-    fn call_hierarchy_outgoing_calls_remain_empty_without_call_graph() {
+    fn call_hierarchy_outgoing_calls_return_direct_name_callees() {
         let root = temp_project();
         let path = root.join("index.ms");
         let uri = Url::from_file_path(&path).expect("file URI should build");
-        let source = "let value := 1;\n";
+        let source = "let target () := 1;\nlet caller () := target();\n";
         fs::write(&path, source).expect("entry should be written");
         let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
-        let _ = server.open_documents.insert(uri, source.to_owned());
-        let item = CallHierarchyItem {
-            name: "value".to_owned(),
-            kind: SymbolKind::VARIABLE,
-            tags: None,
-            detail: None,
-            uri: Url::from_file_path(&path).expect("file URI should build"),
-            range: Range::new(Position::new(0, 4), Position::new(0, 9)),
-            selection_range: Range::new(Position::new(0, 4), Position::new(0, 9)),
-            data: None,
-        };
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+        let item = server
+            .prepare_call_hierarchy_at(CallHierarchyPrepareParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 5),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("call hierarchy should prepare")
+            .pop()
+            .expect("caller item should exist");
 
-        let calls =
-            MusiLanguageServer::call_hierarchy_outgoing_calls(&CallHierarchyOutgoingCallsParams {
+        let calls = server
+            .call_hierarchy_outgoing_calls(&CallHierarchyOutgoingCallsParams {
                 item,
                 work_done_progress_params: WorkDoneProgressParams::default(),
                 partial_result_params: PartialResultParams::default(),
-            });
+            })
+            .expect("outgoing calls should run");
 
-        assert!(calls.is_empty());
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].to.name, "target");
+        assert_eq!(calls[0].from_ranges.len(), 1);
+        assert_eq!(calls[0].from_ranges[0].start, Position::new(1, 17));
+        assert_eq!(calls[0].from_ranges[0].end, Position::new(1, 23));
     }
 
     #[test]

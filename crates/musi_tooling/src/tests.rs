@@ -23,10 +23,11 @@ use crate::{
     document_symbols_for_project_file_with_overlay, folding_ranges_for_project_file_with_overlay,
     hover_for_project_file_with_overlay, inlay_hints_for_project_file_with_overlay,
     load_direct_graph, module_docs_for_project_file_with_overlay,
-    prepare_rename_for_project_file_with_overlay, project_error_report,
-    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
-    selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
-    session_error_report, signature_help_for_project_file_with_overlay, tooling_error_report,
+    outgoing_calls_for_project_file_with_overlay, prepare_rename_for_project_file_with_overlay,
+    project_error_report, references_for_project_file_with_overlay,
+    rename_for_project_file_with_overlay, selection_ranges_for_project_file_with_overlay,
+    semantic_tokens_for_project_file_with_overlay, session_error_report,
+    signature_help_for_project_file_with_overlay, tooling_error_report,
     type_definition_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
     workspace_symbols_for_project_root,
 };
@@ -423,6 +424,28 @@ boxedName.value;
                 .iter()
                 .any(|symbol| symbol.name == "before")
         );
+    }
+
+    #[test]
+    fn outgoing_calls_include_direct_name_callees() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "let target () := 1;\nlet caller () := target();\n";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let calls = outgoing_calls_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            2,
+            5,
+        );
+
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].to.name, "target");
+        assert_eq!(calls[0].from_ranges.len(), 1);
+        assert_eq!(calls[0].from_ranges[0].start_line, 2);
+        assert_eq!(calls[0].from_ranges[0].start_col, 18);
+        assert_eq!(calls[0].from_ranges[0].end_col, 24);
     }
 
     #[test]

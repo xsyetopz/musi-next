@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use musi_project::{PackageSource, ProjectOptions, load_project, load_project_ancestor};
-use music_base::{Source, SourceId};
-use music_hir::{HirExprKind, HirTyId, HirTyKind};
+use music_base::{Source, SourceId, Span};
+use music_hir::{HirExpr, HirExprKind, HirTyId, HirTyKind};
 use music_module::ModuleKey;
 use music_names::{NameBinding, NameBindingId, NameBindingKind, NameResolution, NameSite, Symbol};
 use music_sema::SemaModule;
@@ -43,6 +43,19 @@ pub struct ToolWorkspaceSymbol {
     pub name: String,
     pub kind: ToolSymbolKind,
     pub location: ToolLocation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolCallHierarchyItem {
+    pub name: String,
+    pub kind: ToolSymbolKind,
+    pub location: ToolLocation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolOutgoingCall {
+    pub to: ToolCallHierarchyItem,
+    pub from_ranges: Vec<ToolRange>,
 }
 
 #[must_use]
@@ -94,6 +107,19 @@ pub fn document_symbols_for_project_file_with_overlay(
         return Vec::new();
     };
     context.document_symbols()
+}
+
+#[must_use]
+pub fn outgoing_calls_for_project_file_with_overlay(
+    path: &Path,
+    overlay_text: Option<&str>,
+    line: usize,
+    character: usize,
+) -> Vec<ToolOutgoingCall> {
+    let Some(context) = SymbolAnalysis::new(path, overlay_text) else {
+        return Vec::new();
+    };
+    context.outgoing_calls(line, character)
 }
 
 #[must_use]
@@ -179,6 +205,37 @@ fn module_symbol_name(package_root: &Path, module_path: &Path) -> Option<String>
         let _ = relative.set_extension("");
     }
     Some(relative.to_string_lossy().replace('\\', "/"))
+}
+
+const fn callee_name_site(source_id: SourceId, expr: &HirExpr) -> Option<NameSite> {
+    match expr.kind {
+        HirExprKind::Name { name } => Some(NameSite::new(source_id, name.span)),
+        _ => None,
+    }
+}
+
+fn enclosing_let_range(sema: &SemaModule, binding_span: Span) -> Option<Span> {
+    sema.module()
+        .store
+        .exprs
+        .iter()
+        .filter_map(|(_, expr)| {
+            matches!(expr.kind, HirExprKind::Let { .. })
+                .then_some(expr.origin.span)
+                .filter(|span| span_contains_span(*span, binding_span))
+        })
+        .min_by_key(|span| span.end.saturating_sub(span.start))
+}
+
+const fn tool_range_contains_range(container: &ToolRange, range: &ToolRange) -> bool {
+    (range.start_line > container.start_line
+        || range.start_line == container.start_line && range.start_col >= container.start_col)
+        && (range.end_line < container.end_line
+            || range.end_line == container.end_line && range.end_col <= container.end_col)
+}
+
+const fn span_contains_span(container: Span, span: Span) -> bool {
+    container.start <= span.start && span.end <= container.end
 }
 
 #[must_use]
@@ -427,6 +484,69 @@ impl SymbolAnalysis {
             )
         });
         symbols
+    }
+
+    fn outgoing_calls(&self, line: usize, character: usize) -> Vec<ToolOutgoingCall> {
+        let Some(source) = self.source() else {
+            return Vec::new();
+        };
+        let Some(sema) = self.sema() else {
+            return Vec::new();
+        };
+        let Some(resolved) = self.resolved() else {
+            return Vec::new();
+        };
+        let Some(binding_id) = self.binding_at(line, character) else {
+            return Vec::new();
+        };
+        let binding = resolved.bindings.get(binding_id);
+        let container_range = enclosing_let_range(sema, binding.site.span).map_or_else(
+            || tool_range(source, binding.site.span),
+            |span| tool_range(source, span),
+        );
+        let mut calls = Vec::<ToolOutgoingCall>::new();
+        for (_, expr) in &sema.module().store.exprs {
+            let HirExprKind::Call { callee, .. } = expr.kind else {
+                continue;
+            };
+            let callee = sema.module().store.exprs.get(callee);
+            let Some(site) = callee_name_site(self.source_id, callee) else {
+                continue;
+            };
+            let range = tool_range(source, site.span);
+            if !tool_range_contains_range(&container_range, &range) {
+                continue;
+            }
+            let Some(binding_id) = resolved.refs.get(&site).copied() else {
+                continue;
+            };
+            let binding = resolved.bindings.get(binding_id);
+            let Some(location) = self.binding_location(binding_id) else {
+                continue;
+            };
+            let to = ToolCallHierarchyItem {
+                name: self.session.resolve_symbol(binding.name).to_owned(),
+                kind: binding_symbol_kind(binding_id, binding, Some(sema)),
+                location,
+            };
+            if let Some(call) = calls.iter_mut().find(|call| call.to == to) {
+                call.from_ranges.push(range);
+            } else {
+                calls.push(ToolOutgoingCall {
+                    to,
+                    from_ranges: vec![range],
+                });
+            }
+        }
+        calls.sort_by_key(|call| {
+            (
+                call.to.name.clone(),
+                call.to.location.path.clone(),
+                call.to.location.range.start_line,
+                call.to.location.range.start_col,
+            )
+        });
+        calls
     }
 
     fn workspace_symbols(&self, query: &str) -> Vec<ToolWorkspaceSymbol> {
