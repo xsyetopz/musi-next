@@ -125,6 +125,10 @@ mod success {
             .expect("completion provider");
         assert_eq!(completion.resolve_provider, Some(true));
         assert_eq!(
+            completion.trigger_characters.as_deref(),
+            Some(&[".".to_owned(), "\"".to_owned(), "/".to_owned()][..])
+        );
+        assert_eq!(
             initialize_result.capabilities.declaration_provider,
             Some(DeclarationCapability::Simple(true))
         );
@@ -597,6 +601,71 @@ point.
                 .iter()
                 .all(|item| item.kind == Some(CompletionItemKind::PROPERTY))
         );
+    }
+
+    #[test]
+    fn completion_inside_import_string_returns_module_items() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "src/index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        fs::create_dir_all(root.join("src/lib")).expect("lib dir should be created");
+        let path = root.join("src/index.ms");
+        let source = "let dep := import \"./l\";\n";
+        fs::write(&path, "let dep := import \"./lib/dep\";\n").expect("entry should be written");
+        fs::write(root.join("src/lib/dep.ms"), "export let value := 1;\n")
+            .expect("dep should be written");
+        fs::write(root.join("src/local.ms"), "export let local := 1;\n")
+            .expect("local should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let response = server
+            .completions(CompletionParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(0, 22),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+                context: None,
+            })
+            .expect("completion response should exist");
+        let CompletionResponse::List(list) = response else {
+            panic!("completion list expected");
+        };
+        let labels = list
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>();
+        let dep = list
+            .items
+            .iter()
+            .find(|item| item.label == "./lib/dep")
+            .expect("dep module completion should exist");
+        let edit = dep
+            .text_edit
+            .as_ref()
+            .and_then(|edit| match edit {
+                CompletionTextEdit::Edit(edit) => Some(edit),
+                CompletionTextEdit::InsertAndReplace(_) => None,
+            })
+            .expect("completion should provide replacement edit");
+
+        assert_eq!(labels, ["./lib/dep", "./local"]);
+        assert_eq!(dep.kind, Some(CompletionItemKind::MODULE));
+        assert_eq!(edit.range.start, Position::new(0, 19));
+        assert_eq!(edit.range.end, Position::new(0, 22));
+        assert_eq!(edit.new_text, "./lib/dep");
     }
 
     #[test]

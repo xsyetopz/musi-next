@@ -228,7 +228,7 @@ impl MusiLanguageServer {
                 }),
                 completion_provider: Some(CompletionOptions {
                     resolve_provider: Some(true),
-                    trigger_characters: Some(vec![".".to_owned()]),
+                    trigger_characters: Some(vec![".".to_owned(), "\"".to_owned(), "/".to_owned()]),
                     ..CompletionOptions::default()
                 }),
                 inlay_hint_provider: Some(OneOf::Right(InlayHintServerCapabilities::Options(

@@ -1,13 +1,15 @@
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
+use musi_project::{ProjectOptions, load_project_ancestor};
 use music_base::{Source, SourceId};
 use music_hir::{HirExprId, HirExprKind, HirTyId, HirTyKind};
 use music_module::ModuleKey;
+use music_module::{ImportSiteKind, collect_import_sites};
 use music_names::{NameBinding, NameBindingKind, Symbol};
 use music_sema::SemaModule;
 use music_session::Session;
-use music_syntax::{Lexer, TokenKind};
+use music_syntax::{Lexer, TokenKind, parse};
 
 use crate::ToolRange;
 use crate::analysis_support::analysis_session;
@@ -77,6 +79,13 @@ struct CompletionContext {
     dot_offset: Option<u32>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ImportCompletionContext {
+    prefix: String,
+    replace_start: u32,
+    replace_end: u32,
+}
+
 #[must_use]
 pub fn completions_for_project_file(
     path: &Path,
@@ -105,6 +114,9 @@ pub fn completions_for_project_file_with_overlay(
     let Some(offset) = source.offset(line, character) else {
         return Vec::new();
     };
+    if let Some(context) = import_completion_context(source, offset) {
+        return import_path_completions(path, source, &context);
+    }
     if !allows_completion_at_offset(source, offset) {
         return Vec::new();
     }
@@ -115,6 +127,38 @@ pub fn completions_for_project_file_with_overlay(
         return dot_completions(path, source, &context, line, character);
     }
     global_completions(&session, parsed.source_id, source, &context, &module_key)
+}
+
+fn import_path_completions(
+    path: &Path,
+    source: &Source,
+    context: &ImportCompletionContext,
+) -> ToolCompletionList {
+    let Ok(project) = load_project_ancestor(path, ProjectOptions::default()) else {
+        return Vec::new();
+    };
+    let replace_range = range_from_offsets(source, context.replace_start, context.replace_end);
+    let mut completions = project
+        .workspace()
+        .packages
+        .values()
+        .flat_map(|package| package.module_keys.values())
+        .filter(|module_path| !same_path(module_path, path))
+        .filter_map(|module_path| import_specifier_for_target(path, module_path))
+        .filter(|specifier| specifier.starts_with(&context.prefix))
+        .map(|specifier| {
+            ToolCompletion::new(
+                specifier.clone(),
+                ToolCompletionKind::Module,
+                Some("module".to_owned()),
+                replace_range,
+            )
+            .with_sort_text(format!("1_{specifier}"))
+        })
+        .collect::<Vec<_>>();
+    completions.sort_by(|left, right| left.label.cmp(&right.label));
+    completions.dedup_by(|left, right| left.label == right.label);
+    completions
 }
 
 fn global_completions(
@@ -480,6 +524,116 @@ fn completion_context(source: &Source, offset: u32) -> Option<CompletionContext>
         replace_end: u32::try_from(replace_end).ok()?,
         dot_offset,
     })
+}
+
+fn import_completion_context(source: &Source, offset: u32) -> Option<ImportCompletionContext> {
+    let lexed = Lexer::new(source.text()).lex();
+    let parsed = parse(lexed.clone());
+    let import_sites = collect_import_sites(source.id(), parsed.tree());
+    for token in lexed.tokens() {
+        if !matches!(token.kind, TokenKind::String | TokenKind::TemplateNoSubst)
+            || !token.span.contains(offset)
+        {
+            continue;
+        }
+        if !import_sites.iter().any(|site| {
+            matches!(
+                site.kind,
+                ImportSiteKind::Static { .. } | ImportSiteKind::InvalidStringLit
+            ) && site.span.contains(token.span.start)
+        }) {
+            continue;
+        }
+        let start = usize::try_from(token.span.start).ok()?;
+        let end = usize::try_from(token.span.end).ok()?;
+        let cursor = usize::try_from(offset).ok()?;
+        let text = source.text().get(start..end)?;
+        let content_start = start.saturating_add(1);
+        let content_end = if string_token_has_closing_delimiter(text) {
+            end.saturating_sub(1)
+        } else {
+            end
+        };
+        if cursor < content_start || cursor > content_end {
+            return None;
+        }
+        return Some(ImportCompletionContext {
+            prefix: source.text().get(content_start..cursor)?.to_owned(),
+            replace_start: u32::try_from(content_start).ok()?,
+            replace_end: u32::try_from(content_end).ok()?,
+        });
+    }
+    None
+}
+
+fn import_specifier_for_target(importer_path: &Path, target_path: &Path) -> Option<String> {
+    let importer_dir = canonical_path(importer_path.parent()?);
+    let target_path = canonical_path(target_path);
+    let relative = relative_path(&importer_dir, &target_path)?;
+    let relative = strip_musi_extension(relative);
+    let mut specifier = relative.to_string_lossy().replace('\\', "/");
+    if !specifier.starts_with('.') {
+        specifier = format!("./{specifier}");
+    }
+    Some(specifier)
+}
+
+fn same_path(left: &Path, right: &Path) -> bool {
+    canonical_path(left) == canonical_path(right)
+}
+
+fn canonical_path(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+}
+
+fn relative_path(from_dir: &Path, target_path: &Path) -> Option<PathBuf> {
+    let from_components = normal_components(from_dir);
+    let target_components = normal_components(target_path);
+    if from_components.first() != target_components.first() {
+        return None;
+    }
+    let mut common = 0usize;
+    while from_components.get(common) == target_components.get(common)
+        && common < from_components.len()
+        && common < target_components.len()
+    {
+        common = common.saturating_add(1);
+    }
+    let mut relative = PathBuf::new();
+    for _ in common..from_components.len() {
+        relative.push("..");
+    }
+    for component in &target_components[common..] {
+        relative.push(component);
+    }
+    Some(relative)
+}
+
+fn normal_components(path: &Path) -> Vec<String> {
+    path.components()
+        .filter_map(|component| match component {
+            Component::CurDir => None,
+            Component::Normal(part) => Some(part.to_string_lossy().into_owned()),
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                Some(component.as_os_str().to_string_lossy().into_owned())
+            }
+        })
+        .collect()
+}
+
+fn strip_musi_extension(mut path: PathBuf) -> PathBuf {
+    if path.extension().and_then(|extension| extension.to_str()) == Some("ms") {
+        let _ = path.set_extension("");
+    }
+    path
+}
+
+fn string_token_has_closing_delimiter(text: &str) -> bool {
+    let mut chars = text.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    matches!(first, '"' | '`') && text.ends_with(first) && text.len() > first.len_utf8()
 }
 
 fn identifier_start(text: &str, cursor: usize) -> Option<usize> {

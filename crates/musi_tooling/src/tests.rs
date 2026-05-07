@@ -251,6 +251,44 @@ span.lower
     }
 
     #[test]
+    fn completions_inside_import_string_return_project_modules() {
+        let test_dir = TempDir::new();
+        write_file(
+            test_dir.path(),
+            "musi.json",
+            "{\n  \"name\": \"app\",\n  \"version\": \"0.1.0\",\n  \"entry\": \"src/index.ms\"\n}\n",
+        );
+        let source = "let dep := import \"./l\";\n";
+        write_file(
+            test_dir.path(),
+            "src/index.ms",
+            "let dep := import \"./lib/dep\";\n",
+        );
+        write_file(
+            test_dir.path(),
+            "src/lib/dep.ms",
+            "export let value := 1;\n",
+        );
+        write_file(test_dir.path(), "src/local.ms", "export let local := 1;\n");
+
+        let completions = completions_for_project_file_with_overlay(
+            &test_dir.path().join("src/index.ms"),
+            Some(source),
+            1,
+            22,
+        );
+        let labels = completions
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(labels, ["./lib/dep", "./local"]);
+        assert_eq!(completions[0].replace_range.start_line, 1);
+        assert_eq!(completions[0].replace_range.start_col, 20);
+        assert_eq!(completions[0].replace_range.end_col, 23);
+    }
+
+    #[test]
     fn definition_resolves_local_binding_from_reference() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
