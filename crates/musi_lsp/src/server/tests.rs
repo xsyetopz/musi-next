@@ -2933,6 +2933,126 @@ let testing := import \"@std/testing\";
     }
 
     #[test]
+    fn import_string_features_use_utf16_positions() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        fs::write(
+            root.join("dep.ms"),
+            "--! Dep docs.\nexport let value := 1;\n",
+        )
+        .expect("dep should be written");
+        let path = root.join("index.ms");
+        let source = "let icon := \"\u{1F600}\"; let dep := import \"./dep\";\nlet other := import \"./dep\";\n";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let links = server
+            .document_links(DocumentLinkParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("document links should run");
+        assert_eq!(
+            links[0].range,
+            Range::new(Position::new(0, 36), Position::new(0, 43))
+        );
+
+        let hover = server
+            .hover_at(HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: uri.clone() },
+                    position: Position::new(0, 37),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("import hover should resolve");
+        assert_eq!(
+            hover.range,
+            Some(Range::new(Position::new(0, 36), Position::new(0, 43)))
+        );
+
+        let definition = server
+            .definition_at(GotoDefinitionParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: uri.clone() },
+                    position: Position::new(0, 37),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("import definition should resolve");
+        assert!(matches!(definition, GotoDefinitionResponse::Scalar(_)));
+
+        let references = server
+            .references_at(ReferenceParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: uri.clone() },
+                    position: Position::new(0, 37),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+                context: ReferenceContext {
+                    include_declaration: false,
+                },
+            })
+            .expect("import references should resolve");
+        assert_eq!(
+            references
+                .iter()
+                .map(|location| location.range)
+                .collect::<Vec<_>>(),
+            [
+                Range::new(Position::new(0, 36), Position::new(0, 43)),
+                Range::new(Position::new(1, 20), Position::new(1, 27)),
+            ]
+        );
+
+        let highlights = server
+            .document_highlights(DocumentHighlightParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: uri.clone() },
+                    position: Position::new(0, 37),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("import highlights should resolve");
+        assert_eq!(
+            highlights[0].range,
+            Range::new(Position::new(0, 36), Position::new(0, 43))
+        );
+
+        let linked = server
+            .linked_editing_ranges(LinkedEditingRangeParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(0, 37),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("linked import ranges should resolve");
+        assert_eq!(
+            linked.ranges,
+            [
+                Range::new(Position::new(0, 36), Position::new(0, 43)),
+                Range::new(Position::new(1, 20), Position::new(1, 27)),
+            ]
+        );
+    }
+
+    #[test]
     fn hover_on_import_string_returns_resolved_module_docs() {
         let root = temp_project();
         fs::write(

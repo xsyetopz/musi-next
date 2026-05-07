@@ -7,7 +7,7 @@ use async_lsp::lsp_types::{
 use musi_tooling::{ToolDocumentSymbol, document_links_for_project_file_with_overlay};
 use serde_json::{Value, json};
 
-use super::convert::{to_tool_range, uri_for_path};
+use super::convert::{to_lsp_range_in_text, to_tool_range, uri_for_path};
 use super::workspace::paths_match;
 
 pub(super) fn reference_lens_title(count: usize) -> String {
@@ -86,26 +86,22 @@ pub(super) fn call_hierarchy_items_match(
 
 pub(super) fn import_definition_at(
     path: &Path,
-    overlay: Option<&str>,
+    text: &str,
     position: Position,
 ) -> Option<Location> {
-    let link = document_links_for_project_file_with_overlay(path, overlay)
+    let link = document_links_for_project_file_with_overlay(path, Some(text))
         .into_iter()
-        .find(|link| position_in_lsp_range(position, to_tool_range(&link.range)))?;
+        .find(|link| position_in_lsp_range(position, to_lsp_range_in_text(text, &link.range)))?;
     Some(Location {
         uri: uri_for_path(&link.target)?,
         range: Range::new(Position::new(0, 0), Position::new(0, 0)),
     })
 }
 
-pub(super) fn import_moniker_at(
-    path: &Path,
-    overlay: Option<&str>,
-    position: Position,
-) -> Option<Moniker> {
-    let link = document_links_for_project_file_with_overlay(path, overlay)
+pub(super) fn import_moniker_at(path: &Path, text: &str, position: Position) -> Option<Moniker> {
+    let link = document_links_for_project_file_with_overlay(path, Some(text))
         .into_iter()
-        .find(|link| position_in_lsp_range(position, to_tool_range(&link.range)))?;
+        .find(|link| position_in_lsp_range(position, to_lsp_range_in_text(text, &link.range)))?;
     let uri = uri_for_path(&link.target)?;
     Some(Moniker {
         scheme: "musi".to_owned(),
@@ -117,13 +113,13 @@ pub(super) fn import_moniker_at(
 
 pub(super) fn import_document_highlights(
     path: &Path,
-    overlay: Option<&str>,
+    text: &str,
     position: Position,
 ) -> Option<Vec<DocumentHighlight>> {
-    let links = document_links_for_project_file_with_overlay(path, overlay);
+    let links = document_links_for_project_file_with_overlay(path, Some(text));
     let target = links
         .iter()
-        .find(|link| position_in_lsp_range(position, to_tool_range(&link.range)))?
+        .find(|link| position_in_lsp_range(position, to_lsp_range_in_text(text, &link.range)))?
         .target
         .clone();
     Some(
@@ -131,7 +127,7 @@ pub(super) fn import_document_highlights(
             .into_iter()
             .filter(|link| paths_match(&link.target, &target))
             .map(|link| DocumentHighlight {
-                range: to_tool_range(&link.range),
+                range: to_lsp_range_in_text(text, &link.range),
                 kind: Some(DocumentHighlightKind::TEXT),
             })
             .collect(),
@@ -140,10 +136,10 @@ pub(super) fn import_document_highlights(
 
 pub(super) fn import_linked_editing_ranges(
     path: &Path,
-    overlay: Option<&str>,
+    text: &str,
     position: Position,
 ) -> Option<LinkedEditingRanges> {
-    let ranges = import_document_highlights(path, overlay, position)?
+    let ranges = import_document_highlights(path, text, position)?
         .into_iter()
         .map(|highlight| highlight.range)
         .collect::<Vec<_>>();

@@ -96,7 +96,7 @@ impl MusiLanguageServer {
                 kind: MarkupKind::Markdown,
                 value: contents,
             }),
-            range: Some(to_tool_range(&link.range)),
+            range: Some(to_lsp_range_in_text(overlay?, &link.range)),
         })
     }
 
@@ -134,7 +134,14 @@ impl MusiLanguageServer {
             .open_documents
             .get(&text_document.uri)
             .map(String::as_str);
-        if let Some(location) = import_definition_at(&path, overlay, position) {
+        let file_text;
+        let text = if let Some(text) = self.open_documents.get(&text_document.uri) {
+            text.as_str()
+        } else {
+            file_text = read_to_string(&path).ok()?;
+            file_text.as_str()
+        };
+        if let Some(location) = import_definition_at(&path, text, position) {
             return Some(GotoDefinitionResponse::Scalar(location));
         }
         let location = definition_for_project_file_with_overlay(
@@ -208,7 +215,14 @@ impl MusiLanguageServer {
             .open_documents
             .get(&text_document.uri)
             .map(String::as_str);
-        if let Some(locations) = self.import_references_at(&path, overlay, position) {
+        let file_text;
+        let text = if let Some(text) = self.open_documents.get(&text_document.uri) {
+            text.as_str()
+        } else {
+            file_text = read_to_string(&path).ok()?;
+            file_text.as_str()
+        };
+        if let Some(locations) = self.import_references_at(&path, text, position) {
             return Some(locations);
         }
         let locations = references_for_project_file_with_overlay(
@@ -227,12 +241,12 @@ impl MusiLanguageServer {
     pub(super) fn import_references_at(
         &self,
         path: &Path,
-        overlay: Option<&str>,
+        text: &str,
         position: Position,
     ) -> Option<Vec<Location>> {
-        let target = document_links_for_project_file_with_overlay(path, overlay)
+        let target = document_links_for_project_file_with_overlay(path, Some(text))
             .into_iter()
-            .find(|link| position_in_lsp_range(position, to_tool_range(&link.range)))?
+            .find(|link| position_in_lsp_range(position, to_lsp_range_in_text(text, &link.range)))?
             .target;
         let mut locations = Vec::new();
         for candidate_path in self.workspace_source_paths() {
@@ -244,13 +258,20 @@ impl MusiLanguageServer {
             else {
                 continue;
             };
+            let file_text;
+            let candidate_text = if let Some(text) = candidate_overlay {
+                text
+            } else {
+                file_text = read_to_string(&candidate_path).ok()?;
+                file_text.as_str()
+            };
             locations.extend(
-                document_links_for_project_file_with_overlay(&candidate_path, candidate_overlay)
+                document_links_for_project_file_with_overlay(&candidate_path, Some(candidate_text))
                     .into_iter()
                     .filter(|link| paths_match(&link.target, &target))
                     .map(|link| Location {
                         uri: uri.clone(),
-                        range: to_tool_range(&link.range),
+                        range: to_lsp_range_in_text(candidate_text, &link.range),
                     }),
             );
         }
@@ -278,16 +299,19 @@ impl MusiLanguageServer {
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
-        let overlay = self
-            .open_documents
-            .get(&text_document.uri)
-            .map(String::as_str);
-        if let Some(moniker) = import_moniker_at(&path, overlay, position) {
+        let file_text;
+        let text = if let Some(text) = self.open_documents.get(&text_document.uri) {
+            text.as_str()
+        } else {
+            file_text = read_to_string(&path).ok()?;
+            file_text.as_str()
+        };
+        if let Some(moniker) = import_moniker_at(&path, text, position) {
             return Some(vec![moniker]);
         }
         let moniker = moniker_for_project_file_with_overlay(
             &path,
-            overlay,
+            Some(text),
             usize::try_from(position.line).ok()?.saturating_add(1),
             usize::try_from(position.character).ok()?.saturating_add(1),
         )?;
@@ -318,16 +342,19 @@ impl MusiLanguageServer {
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
-        let overlay = self
-            .open_documents
-            .get(&text_document.uri)
-            .map(String::as_str);
-        if let Some(highlights) = import_document_highlights(&path, overlay, position) {
+        let file_text;
+        let text = if let Some(text) = self.open_documents.get(&text_document.uri) {
+            text.as_str()
+        } else {
+            file_text = read_to_string(&path).ok()?;
+            file_text.as_str()
+        };
+        if let Some(highlights) = import_document_highlights(&path, text, position) {
             return Some(highlights);
         }
         let highlights = document_highlights_for_project_file_with_overlay(
             &path,
-            overlay,
+            Some(text),
             usize::try_from(position.line).ok()?.saturating_add(1),
             usize::try_from(position.character).ok()?.saturating_add(1),
         )
@@ -353,16 +380,19 @@ impl MusiLanguageServer {
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
-        let overlay = self
-            .open_documents
-            .get(&text_document.uri)
-            .map(String::as_str);
-        if let Some(ranges) = import_linked_editing_ranges(&path, overlay, position) {
+        let file_text;
+        let text = if let Some(text) = self.open_documents.get(&text_document.uri) {
+            text.as_str()
+        } else {
+            file_text = read_to_string(&path).ok()?;
+            file_text.as_str()
+        };
+        if let Some(ranges) = import_linked_editing_ranges(&path, text, position) {
             return Some(ranges);
         }
         let ranges = references_for_project_file_with_overlay(
             &path,
-            overlay,
+            Some(text),
             usize::try_from(position.line).ok()?.saturating_add(1),
             usize::try_from(position.character).ok()?.saturating_add(1),
             true,
@@ -485,10 +515,16 @@ impl MusiLanguageServer {
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
-        let overlay = self.open_documents.get(&uri).map(String::as_str);
-        let links = document_links_for_project_file_with_overlay(&path, overlay)
+        let file_text;
+        let text = if let Some(text) = self.open_documents.get(&uri) {
+            text.as_str()
+        } else {
+            file_text = read_to_string(&path).ok()?;
+            file_text.as_str()
+        };
+        let links = document_links_for_project_file_with_overlay(&path, Some(text))
             .into_iter()
-            .filter_map(|link| to_lsp_document_link(&link))
+            .filter_map(|link| to_lsp_document_link(text, &link))
             .collect();
         Some(links)
     }

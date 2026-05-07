@@ -168,10 +168,10 @@ pub(super) fn to_lsp_folding_range(range: &ToolFoldingRange) -> FoldingRange {
     }
 }
 
-pub(super) fn to_lsp_document_link(link: &ToolDocumentLink) -> Option<DocumentLink> {
+pub(super) fn to_lsp_document_link(text: &str, link: &ToolDocumentLink) -> Option<DocumentLink> {
     let target = uri_for_path(&link.target)?;
     Some(DocumentLink {
-        range: to_tool_range(&link.range),
+        range: to_lsp_range_in_text(text, &link.range),
         target: None,
         tooltip: None,
         data: Some(json!({
