@@ -742,16 +742,21 @@ impl MusiLanguageServer {
         )
         .into_iter()
         .filter_map(|call| {
+            let uri = Url::from_file_path(call.to.location.path).ok()?;
             Some(CallHierarchyOutgoingCall {
                 to: CallHierarchyItem {
                     name: call.to.name,
                     kind: to_lsp_symbol_kind(call.to.kind),
                     tags: None,
                     detail: None,
-                    uri: Url::from_file_path(call.to.location.path).ok()?,
+                    uri: uri.clone(),
                     range: to_tool_range(&call.to.location.range),
                     selection_range: to_tool_range(&call.to.location.range),
-                    data: None,
+                    data: Some(json!({
+                        "uri": uri.as_str(),
+                        "line": call.to.location.range.start_line.saturating_sub(1),
+                        "character": call.to.location.range.start_col.saturating_sub(1),
+                    })),
                 },
                 from_ranges: call
                     .from_ranges

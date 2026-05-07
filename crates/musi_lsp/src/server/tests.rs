@@ -1532,6 +1532,17 @@ let other := value + value;
         assert_eq!(calls[0].from_ranges.len(), 1);
         assert_eq!(calls[0].from_ranges[0].start, Position::new(1, 17));
         assert_eq!(calls[0].from_ranges[0].end, Position::new(1, 23));
+
+        let incoming = server
+            .call_hierarchy_incoming_calls(&CallHierarchyIncomingCallsParams {
+                item: calls[0].to.clone(),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("outgoing callee item should keep navigation data");
+
+        assert_eq!(incoming.len(), 1);
+        assert_eq!(incoming[0].from.name, "caller");
     }
 
     #[test]
