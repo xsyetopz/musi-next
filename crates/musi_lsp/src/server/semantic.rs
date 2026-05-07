@@ -1,12 +1,89 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-use async_lsp::lsp_types::{SemanticToken, SemanticTokensDelta, SemanticTokensEdit};
+use async_lsp::lsp_types::{
+    Range, SemanticToken, SemanticTokens, SemanticTokensDelta, SemanticTokensDeltaParams,
+    SemanticTokensEdit, SemanticTokensFullDeltaResult, SemanticTokensParams,
+    SemanticTokensRangeParams, Url,
+};
+use musi_tooling::semantic_tokens_for_project_file_with_overlay;
+
+use super::MusiLanguageServer;
+use super::convert::encode_semantic_tokens;
 
 #[derive(Debug, Clone)]
 pub(super) struct SemanticTokenSnapshot {
     pub(super) result_id: String,
     pub(super) data: Vec<SemanticToken>,
+}
+
+impl MusiLanguageServer {
+    pub(super) fn semantic_tokens(&self, params: &SemanticTokensParams) -> Option<SemanticTokens> {
+        self.semantic_tokens_for_uri(&params.text_document.uri, None)
+    }
+
+    pub(super) fn semantic_range_tokens(
+        &self,
+        params: &SemanticTokensRangeParams,
+    ) -> Option<SemanticTokens> {
+        self.semantic_tokens_for_uri(&params.text_document.uri, Some(params.range))
+    }
+
+    pub(super) fn semantic_tokens_full_response(
+        &mut self,
+        params: &SemanticTokensParams,
+    ) -> Option<SemanticTokens> {
+        let uri = &params.text_document.uri;
+        let tokens = self.semantic_tokens(params)?;
+        let result_id = tokens.result_id.clone()?;
+        let snapshot = SemanticTokenSnapshot {
+            result_id,
+            data: tokens.data.clone(),
+        };
+        let _ = self.semantic_token_cache.insert(uri.clone(), snapshot);
+        Some(tokens)
+    }
+
+    pub(super) fn semantic_token_delta(
+        &mut self,
+        params: &SemanticTokensDeltaParams,
+    ) -> Option<SemanticTokensFullDeltaResult> {
+        let uri = &params.text_document.uri;
+        let tokens = self.semantic_tokens_for_uri(uri, None)?;
+        let result_id = tokens.result_id.clone()?;
+        let next = SemanticTokenSnapshot {
+            result_id,
+            data: tokens.data.clone(),
+        };
+        let response = self
+            .semantic_token_cache
+            .get(uri)
+            .filter(|previous| previous.result_id == params.previous_result_id)
+            .map_or_else(
+                || SemanticTokensFullDeltaResult::Tokens(tokens),
+                |previous| {
+                    SemanticTokensFullDeltaResult::TokensDelta(semantic_tokens_delta(
+                        previous, &next,
+                    ))
+                },
+            );
+        let _ = self.semantic_token_cache.insert(uri.clone(), next);
+        Some(response)
+    }
+
+    fn semantic_tokens_for_uri(&self, uri: &Url, range: Option<Range>) -> Option<SemanticTokens> {
+        let path = uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let overlay = self.open_documents.get(uri).map(String::as_str);
+        let tokens = semantic_tokens_for_project_file_with_overlay(&path, overlay);
+        let data = encode_semantic_tokens(&tokens, range.as_ref());
+        Some(SemanticTokens {
+            result_id: range.is_none().then(|| semantic_tokens_result_id(&data)),
+            data,
+        })
+    }
 }
 
 pub(super) fn semantic_tokens_result_id(tokens: &[SemanticToken]) -> String {

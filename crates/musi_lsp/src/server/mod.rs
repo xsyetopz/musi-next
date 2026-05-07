@@ -19,33 +19,29 @@ use async_lsp::lsp_types::{
     InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintParams,
     LinkedEditingRangeParams, LinkedEditingRanges, Location, MarkupContent, MarkupKind, Moniker,
     MonikerKind, MonikerParams, PartialResultParams, Position, PrepareRenameResponse,
-    PublishDiagnosticsParams, Range, ReferenceContext, ReferenceParams, RenameFilesParams,
-    RenameParams, SelectionRange, SelectionRangeParams, SemanticTokens, SemanticTokensDeltaParams,
-    SemanticTokensFullDeltaResult, SemanticTokensParams, SemanticTokensRangeParams,
-    SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, SignatureHelpParams,
-    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
-    TextDocumentPositionParams, TextEdit, UniquenessLevel, Url, WillSaveTextDocumentParams,
-    WorkDoneProgressParams, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
-    WorkspaceEdit, WorkspaceSymbol, WorkspaceSymbolParams, WorkspaceSymbolResponse,
-    notification::PublishDiagnostics,
+    PublishDiagnosticsParams, ReferenceContext, ReferenceParams, RenameFilesParams, RenameParams,
+    SelectionRange, SelectionRangeParams, SemanticTokensDeltaParams, SemanticTokensFullDeltaResult,
+    SemanticTokensParams, SemanticTokensRangeParams, SemanticTokensRangeResult,
+    SemanticTokensResult, SignatureHelp, SignatureHelpParams, TextDocumentContentChangeEvent,
+    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit,
+    UniquenessLevel, Url, WillSaveTextDocumentParams, WorkDoneProgressParams,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceEdit, WorkspaceSymbol,
+    WorkspaceSymbolParams, WorkspaceSymbolResponse, notification::PublishDiagnostics,
 };
 #[cfg(test)]
 use async_lsp::lsp_types::{
     CallHierarchyServerCapability, CodeActionProviderCapability, FormattingOptions,
-    HoverProviderCapability, OneOf, WorkDoneProgressOptions,
+    HoverProviderCapability, OneOf, Range, WorkDoneProgressOptions,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
-use musi_fmt::{FormatOptions, format_source, format_text_for_path};
-use musi_project::{ProjectOptions, load_project_ancestor};
 use musi_tooling::{
     ToolMonikerKind, completions_for_project_file_with_overlay,
     definition_for_project_file_with_overlay, document_links_for_project_file_with_overlay,
     document_symbols_for_project_file_with_overlay, folding_ranges_for_project_file_with_overlay,
-    hover_for_project_file_with_overlay, inlay_hints_for_project_file_with_overlay,
-    module_docs_for_project_file_with_overlay, moniker_for_project_file_with_overlay,
-    outgoing_calls_for_project_file_with_overlay, prepare_rename_for_project_file_with_overlay,
-    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
-    selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
+    hover_for_project_file_with_overlay, module_docs_for_project_file_with_overlay,
+    moniker_for_project_file_with_overlay, outgoing_calls_for_project_file_with_overlay,
+    prepare_rename_for_project_file_with_overlay, references_for_project_file_with_overlay,
+    rename_for_project_file_with_overlay, selection_ranges_for_project_file_with_overlay,
     signature_help_for_project_file_with_overlay, type_definition_for_project_file_with_overlay,
 };
 use serde_json::{Value, json};
@@ -56,31 +52,34 @@ mod config;
 mod convert;
 mod diagnostics;
 mod formatting;
+mod hints;
 mod navigation;
 mod semantic;
 mod symbols;
 mod workspace;
 
 use config::LspConfig;
+#[cfg(test)]
+use convert::encode_semantic_tokens;
+#[cfg(test)]
+use convert::full_document_range;
 use convert::{
-    encode_semantic_tokens, full_document_range, position_in_range, resolve_lsp_completion,
-    resolve_lsp_document_link, resolve_lsp_inlay_hint, to_lsp_call_hierarchy_item,
+    resolve_lsp_completion, resolve_lsp_document_link, to_lsp_call_hierarchy_item,
     to_lsp_completion, to_lsp_document_highlight, to_lsp_document_link, to_lsp_folding_range,
-    to_lsp_inlay_hint, to_lsp_location, to_lsp_selection_range, to_lsp_signature_help,
-    to_lsp_symbol_kind, to_lsp_workspace_edit, to_tool_range, tool_location_matches_path,
-    truncate_hover_contents,
+    to_lsp_location, to_lsp_selection_range, to_lsp_signature_help, to_lsp_symbol_kind,
+    to_lsp_workspace_edit, to_tool_range, tool_location_matches_path, truncate_hover_contents,
 };
-use formatting::{
-    apply_document_formatting_options, lsp_range_offsets, markdown_range_inside_musi_fence_body,
-    on_type_formatting_trigger,
-};
+#[cfg(test)]
+use formatting::apply_document_formatting_options;
+#[cfg(test)]
+use musi_fmt::FormatOptions;
 use navigation::{
     call_hierarchy_item_data_parts, call_hierarchy_items_match, caller_symbol_for_reference,
     import_definition_at, import_document_highlights, import_linked_editing_ranges,
     position_in_lsp_range, push_reference_lenses, reference_lens_data_parts, reference_lens_title,
     symbol_at_position,
 };
-use semantic::{SemanticTokenSnapshot, semantic_tokens_delta, semantic_tokens_result_id};
+use semantic::SemanticTokenSnapshot;
 use workspace::{
     collect_workspace_source_paths, import_specifier_for_target, paths_match, renamed_target_path,
     sort_dedup_paths, workspace_roots,
@@ -831,202 +830,12 @@ impl MusiLanguageServer {
         })
     }
 
-    fn semantic_tokens(&self, params: &SemanticTokensParams) -> Option<SemanticTokens> {
-        self.semantic_tokens_for_uri(&params.text_document.uri, None)
-    }
-
-    fn semantic_range_tokens(&self, params: &SemanticTokensRangeParams) -> Option<SemanticTokens> {
-        self.semantic_tokens_for_uri(&params.text_document.uri, Some(params.range))
-    }
-
-    fn semantic_tokens_full_response(
-        &mut self,
-        params: &SemanticTokensParams,
-    ) -> Option<SemanticTokens> {
-        let uri = &params.text_document.uri;
-        let tokens = self.semantic_tokens(params)?;
-        let result_id = tokens.result_id.clone()?;
-        let snapshot = SemanticTokenSnapshot {
-            result_id,
-            data: tokens.data.clone(),
-        };
-        let _ = self.semantic_token_cache.insert(uri.clone(), snapshot);
-        Some(tokens)
-    }
-
-    fn semantic_token_delta(
-        &mut self,
-        params: &SemanticTokensDeltaParams,
-    ) -> Option<SemanticTokensFullDeltaResult> {
-        let uri = &params.text_document.uri;
-        let tokens = self.semantic_tokens_for_uri(uri, None)?;
-        let result_id = tokens.result_id.clone()?;
-        let next = SemanticTokenSnapshot {
-            result_id,
-            data: tokens.data.clone(),
-        };
-        let response = self
-            .semantic_token_cache
-            .get(uri)
-            .filter(|previous| previous.result_id == params.previous_result_id)
-            .map_or_else(
-                || SemanticTokensFullDeltaResult::Tokens(tokens),
-                |previous| {
-                    SemanticTokensFullDeltaResult::TokensDelta(semantic_tokens_delta(
-                        previous, &next,
-                    ))
-                },
-            );
-        let _ = self.semantic_token_cache.insert(uri.clone(), next);
-        Some(response)
-    }
-
-    fn inlay_hints(&self, params: &InlayHintParams) -> Option<Vec<InlayHint>> {
-        if !self.config.inlay_hints.enabled {
-            return Some(Vec::new());
-        }
-        let uri = &params.text_document.uri;
-        let path = uri.to_file_path().ok()?;
-        if path.file_name().is_some_and(|name| name == "musi.json") {
-            return None;
-        }
-        let overlay = self.open_documents.get(uri).map(String::as_str);
-        let hints = inlay_hints_for_project_file_with_overlay(&path, overlay)
-            .into_iter()
-            .filter(|hint| self.config.inlay_hints.allows(hint))
-            .filter(|hint| position_in_range(hint.position, params.range))
-            .map(to_lsp_inlay_hint)
-            .collect();
-        Some(hints)
-    }
-
-    fn resolve_inlay_hint(hint: InlayHint) -> InlayHint {
-        resolve_lsp_inlay_hint(hint)
-    }
-
     fn workspace_source_paths(&self) -> Vec<PathBuf> {
         let mut paths = self.workspace_diagnostic_paths();
         for root in self.workspace_query_roots() {
             collect_workspace_source_paths(&root, &mut paths);
         }
         sort_dedup_paths(paths)
-    }
-
-    fn semantic_tokens_for_uri(&self, uri: &Url, range: Option<Range>) -> Option<SemanticTokens> {
-        let path = uri.to_file_path().ok()?;
-        if path.file_name().is_some_and(|name| name == "musi.json") {
-            return None;
-        }
-        let overlay = self.open_documents.get(uri).map(String::as_str);
-        let tokens = semantic_tokens_for_project_file_with_overlay(&path, overlay);
-        let data = encode_semantic_tokens(&tokens, range.as_ref());
-        Some(SemanticTokens {
-            result_id: range.is_none().then(|| semantic_tokens_result_id(&data)),
-            data,
-        })
-    }
-
-    fn document_formatting(&self, params: DocumentFormattingParams) -> Option<Vec<TextEdit>> {
-        let uri = params.text_document.uri;
-        let text = self.open_documents.get(&uri)?;
-        let path = uri.to_file_path().ok()?;
-        if path.file_name().is_some_and(|name| name == "musi.json") {
-            return None;
-        }
-        let mut options = load_project_ancestor(&path, ProjectOptions::default())
-            .ok()
-            .map_or_else(FormatOptions::default, |project| {
-                FormatOptions::from_manifest(project.manifest().fmt.as_ref())
-            });
-        apply_document_formatting_options(&mut options, &params.options);
-        let formatted = format_text_for_path(&path, text, &options).ok()?;
-        if !formatted.changed {
-            return Some(Vec::new());
-        }
-        Some(vec![TextEdit::new(
-            full_document_range(text),
-            formatted.text,
-        )])
-    }
-
-    fn will_save_formatting(&self, params: WillSaveTextDocumentParams) -> Option<Vec<TextEdit>> {
-        let uri = params.text_document.uri;
-        let text = self.open_documents.get(&uri)?;
-        let path = uri.to_file_path().ok()?;
-        if path.file_name().is_some_and(|name| name == "musi.json") {
-            return None;
-        }
-        let options = load_project_ancestor(&path, ProjectOptions::default())
-            .ok()
-            .map_or_else(FormatOptions::default, |project| {
-                FormatOptions::from_manifest(project.manifest().fmt.as_ref())
-            });
-        let formatted = format_text_for_path(&path, text, &options).ok()?;
-        if !formatted.changed {
-            return Some(Vec::new());
-        }
-        Some(vec![TextEdit::new(
-            full_document_range(text),
-            formatted.text,
-        )])
-    }
-
-    fn document_on_type_formatting(
-        &self,
-        params: DocumentOnTypeFormattingParams,
-    ) -> Option<Vec<TextEdit>> {
-        if !on_type_formatting_trigger(&params.ch) {
-            return Some(Vec::new());
-        }
-        let uri = params.text_document_position.text_document.uri;
-        let text = self.open_documents.get(&uri)?;
-        let path = uri.to_file_path().ok()?;
-        if path.file_name().is_some_and(|name| name == "musi.json") {
-            return None;
-        }
-        let mut options = load_project_ancestor(&path, ProjectOptions::default())
-            .ok()
-            .map_or_else(FormatOptions::default, |project| {
-                FormatOptions::from_manifest(project.manifest().fmt.as_ref())
-            });
-        apply_document_formatting_options(&mut options, &params.options);
-        let formatted = format_text_for_path(&path, text, &options).ok()?;
-        if !formatted.changed {
-            return Some(Vec::new());
-        }
-        Some(vec![TextEdit::new(
-            full_document_range(text),
-            formatted.text,
-        )])
-    }
-
-    fn document_range_formatting(
-        &self,
-        params: DocumentRangeFormattingParams,
-    ) -> Option<Vec<TextEdit>> {
-        let uri = params.text_document.uri;
-        let text = self.open_documents.get(&uri)?;
-        let path = uri.to_file_path().ok()?;
-        if path.file_name().is_some_and(|name| name == "musi.json") {
-            return None;
-        }
-        let (start, end) = lsp_range_offsets(text, params.range)?;
-        let selected = text.get(start..end)?;
-        let mut options = load_project_ancestor(&path, ProjectOptions::default())
-            .ok()
-            .map_or_else(FormatOptions::default, |project| {
-                FormatOptions::from_manifest(project.manifest().fmt.as_ref())
-            });
-        apply_document_formatting_options(&mut options, &params.options);
-        let formatted = if markdown_range_inside_musi_fence_body(text, start, end) {
-            format_source(selected, &options).ok()?
-        } else {
-            format_text_for_path(&path, selected, &options).ok()?
-        };
-        if !formatted.changed {
-            return Some(Vec::new());
-        }
-        Some(vec![TextEdit::new(params.range, formatted.text)])
     }
 }
 

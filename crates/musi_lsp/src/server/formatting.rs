@@ -1,5 +1,119 @@
-use async_lsp::lsp_types::{FormattingOptions, Position, Range};
-use musi_fmt::FormatOptions;
+//! Formatting request helpers for the LSP server.
+
+use std::path::Path;
+
+use async_lsp::lsp_types::{
+    DocumentFormattingParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
+    FormattingOptions, Position, Range, TextEdit, WillSaveTextDocumentParams,
+};
+use musi_fmt::{FormatOptions, format_source, format_text_for_path};
+use musi_project::{ProjectOptions, load_project_ancestor};
+
+use super::MusiLanguageServer;
+use super::convert::full_document_range;
+
+impl MusiLanguageServer {
+    pub(super) fn document_formatting(
+        &self,
+        params: DocumentFormattingParams,
+    ) -> Option<Vec<TextEdit>> {
+        let uri = params.text_document.uri;
+        let text = self.open_documents.get(&uri)?;
+        let path = uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let mut options = formatting_options_for_path(&path);
+        apply_document_formatting_options(&mut options, &params.options);
+        let formatted = format_text_for_path(&path, text, &options).ok()?;
+        if !formatted.changed {
+            return Some(Vec::new());
+        }
+        Some(vec![TextEdit::new(
+            full_document_range(text),
+            formatted.text,
+        )])
+    }
+
+    pub(super) fn will_save_formatting(
+        &self,
+        params: WillSaveTextDocumentParams,
+    ) -> Option<Vec<TextEdit>> {
+        let uri = params.text_document.uri;
+        let text = self.open_documents.get(&uri)?;
+        let path = uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let options = formatting_options_for_path(&path);
+        let formatted = format_text_for_path(&path, text, &options).ok()?;
+        if !formatted.changed {
+            return Some(Vec::new());
+        }
+        Some(vec![TextEdit::new(
+            full_document_range(text),
+            formatted.text,
+        )])
+    }
+
+    pub(super) fn document_on_type_formatting(
+        &self,
+        params: DocumentOnTypeFormattingParams,
+    ) -> Option<Vec<TextEdit>> {
+        if !on_type_formatting_trigger(&params.ch) {
+            return Some(Vec::new());
+        }
+        let uri = params.text_document_position.text_document.uri;
+        let text = self.open_documents.get(&uri)?;
+        let path = uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let mut options = formatting_options_for_path(&path);
+        apply_document_formatting_options(&mut options, &params.options);
+        let formatted = format_text_for_path(&path, text, &options).ok()?;
+        if !formatted.changed {
+            return Some(Vec::new());
+        }
+        Some(vec![TextEdit::new(
+            full_document_range(text),
+            formatted.text,
+        )])
+    }
+
+    pub(super) fn document_range_formatting(
+        &self,
+        params: DocumentRangeFormattingParams,
+    ) -> Option<Vec<TextEdit>> {
+        let uri = params.text_document.uri;
+        let text = self.open_documents.get(&uri)?;
+        let path = uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let (start, end) = lsp_range_offsets(text, params.range)?;
+        let selected = text.get(start..end)?;
+        let mut options = formatting_options_for_path(&path);
+        apply_document_formatting_options(&mut options, &params.options);
+        let formatted = if markdown_range_inside_musi_fence_body(text, start, end) {
+            format_source(selected, &options).ok()?
+        } else {
+            format_text_for_path(&path, selected, &options).ok()?
+        };
+        if !formatted.changed {
+            return Some(Vec::new());
+        }
+        Some(vec![TextEdit::new(params.range, formatted.text)])
+    }
+}
+
+fn formatting_options_for_path(path: &Path) -> FormatOptions {
+    load_project_ancestor(path, ProjectOptions::default())
+        .ok()
+        .map_or_else(FormatOptions::default, |project| {
+            FormatOptions::from_manifest(project.manifest().fmt.as_ref())
+        })
+}
 
 pub(super) fn apply_document_formatting_options(
     options: &mut FormatOptions,
