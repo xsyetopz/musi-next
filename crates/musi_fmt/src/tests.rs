@@ -1371,6 +1371,18 @@ let io := import "@std/io";
     }
 
     #[test]
+    fn ignore_preserves_import_before_organizing_imports() {
+        let source = "let b := import \"./b\";\n-- musi-fmt-ignore\nlet   a:=import \"./a\";\n";
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "let b := import \"./b\";\n-- musi-fmt-ignore\nlet   a:=import \"./a\";\n"
+        );
+    }
+
+    #[test]
     fn formats_musi_markdown_fences() {
         let markdown = "# Example\n\n```musi\nlet x:=1;\n```\n\n```ts\nlet x=1\n```\n";
         let formatted_result = format_markdown(markdown, &options()).unwrap();

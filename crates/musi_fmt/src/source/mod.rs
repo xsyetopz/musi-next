@@ -26,7 +26,9 @@ pub fn format_source(source: &str, options: &FormatOptions) -> FormatResultOf {
             changed: source != ensure_final_newline(source),
         });
     }
-    let organized = organize_imports(source);
+    let organized = (!has_protected_ignore(source))
+        .then(|| organize_imports(source))
+        .flatten();
     let source = organized.as_deref().unwrap_or(source);
     let lexed = Lexer::new(source).lex();
     let parsed = parse(lexed.clone());
@@ -48,6 +50,12 @@ fn has_ignore_file(source: &str) -> bool {
         .lines()
         .take(5)
         .any(|line| line.contains("musi-fmt-ignore-file"))
+}
+
+fn has_protected_ignore(source: &str) -> bool {
+    source
+        .lines()
+        .any(|line| line.contains("musi-fmt-ignore") && !line.contains("musi-fmt-ignore-file"))
 }
 
 fn ensure_final_newline(source: &str) -> String {
