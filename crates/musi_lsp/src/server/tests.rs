@@ -1748,6 +1748,84 @@ let boolEq :=
     }
 
     #[test]
+    fn implementation_resolves_workspace_shape_givens() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        fs::write(root.join("index.ms"), "import \"./shapes\";\n")
+            .expect("entry should be written");
+        let shape_path = root.join("shapes.ms");
+        let shape_source = "\
+export let Eq [T] := shape {
+  let equals (left : T, right : T) : Bool;
+};
+";
+        let impl_source = "\
+let shapes := import \"./shapes\";
+let Eq := shapes.Eq;
+let intEq :=
+  given Eq[Int] {
+  let equals (left : Int, right : Int) : Bool := left = right;
+  };
+";
+        let more_impl_source = "\
+let shapes := import \"./shapes\";
+let Eq := shapes.Eq;
+let boolEq :=
+  given Eq[Bool] {
+  let equals (left : Bool, right : Bool) : Bool := left = right;
+  };
+";
+        fs::write(&shape_path, shape_source).expect("shape module should be written");
+        fs::write(root.join("impls.ms"), impl_source).expect("impl module should be written");
+        fs::write(root.join("more_impls.ms"), more_impl_source)
+            .expect("more impl module should be written");
+        let uri = Url::from_file_path(&shape_path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server
+            .open_documents
+            .insert(uri.clone(), shape_source.to_owned());
+
+        let response = server
+            .implementation_at(GotoDefinitionParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(0, 11),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("workspace implementations should resolve");
+        let GotoDefinitionResponse::Array(locations) = response else {
+            panic!("implementation locations expected");
+        };
+
+        assert_eq!(locations.len(), 2);
+        assert_eq!(locations[0].range.start, Position::new(2, 0));
+        assert_eq!(locations[1].range.start, Position::new(2, 0));
+        assert!(locations.iter().any(|location| {
+            location
+                .uri
+                .to_file_path()
+                .is_ok_and(|path| path.file_name().is_some_and(|name| name == "impls.ms"))
+        }));
+        assert!(locations.iter().any(|location| {
+            location
+                .uri
+                .to_file_path()
+                .is_ok_and(|path| path.file_name().is_some_and(|name| name == "more_impls.ms"))
+        }));
+    }
+
+    #[test]
     fn prepare_rename_on_reference_returns_reference_range() {
         let root = temp_project();
         fs::write(
