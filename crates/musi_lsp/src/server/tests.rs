@@ -639,6 +639,59 @@ let current := bef;
     }
 
     #[test]
+    fn completion_uses_utf16_positions_for_request_and_edit() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let before := 1;\nlet icon := \"\u{1F600}\"; bef;\n";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let response = server
+            .completions(CompletionParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 21),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+                context: None,
+            })
+            .expect("completion response should exist");
+        let items = match response {
+            CompletionResponse::List(list) => list.items,
+            CompletionResponse::Array(items) => items,
+        };
+        let before = items
+            .iter()
+            .find(|item| item.label == "before")
+            .expect("before completion should exist");
+        let edit = before
+            .text_edit
+            .as_ref()
+            .and_then(|edit| match edit {
+                CompletionTextEdit::Edit(edit) => Some(edit),
+                CompletionTextEdit::InsertAndReplace(_) => None,
+            })
+            .expect("completion should provide replacement edit");
+
+        assert_eq!(edit.range.start, Position::new(1, 18));
+        assert_eq!(edit.range.end, Position::new(1, 21));
+        assert_eq!(edit.new_text, "before");
+    }
+
+    #[test]
     fn completion_after_dot_returns_member_items() {
         let root = temp_project();
         fs::write(

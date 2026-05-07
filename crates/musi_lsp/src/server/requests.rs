@@ -1,5 +1,7 @@
 //! Request handlers for the LSP server.
 
+use std::fs::read_to_string;
+
 use super::*;
 
 impl MusiLanguageServer {
@@ -10,18 +12,22 @@ impl MusiLanguageServer {
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
-        let overlay = self
-            .open_documents
-            .get(&text_document.uri)
-            .map(String::as_str);
+        let file_text;
+        let text = if let Some(text) = self.open_documents.get(&text_document.uri) {
+            text.as_str()
+        } else {
+            file_text = read_to_string(&path).ok()?;
+            file_text.as_str()
+        };
+        let tool_position = to_tool_position_in_text(text, position)?;
         let items = completions_for_project_file_with_overlay(
             &path,
-            overlay,
-            usize::try_from(position.line).ok()?.saturating_add(1),
-            usize::try_from(position.character).ok()?.saturating_add(1),
+            Some(text),
+            tool_position.line,
+            tool_position.col,
         )
         .into_iter()
-        .map(to_lsp_completion)
+        .map(|completion| to_lsp_completion(text, completion))
         .collect();
         Some(CompletionResponse::List(CompletionList {
             is_incomplete: false,

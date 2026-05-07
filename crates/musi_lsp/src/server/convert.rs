@@ -20,8 +20,8 @@ use musi_tooling::{
 };
 use serde_json::{Value, json};
 
-pub(super) fn to_lsp_completion(completion: ToolCompletion) -> CompletionItem {
-    let text = completion
+pub(super) fn to_lsp_completion(text: &str, completion: ToolCompletion) -> CompletionItem {
+    let insert_text = completion
         .insert_text
         .clone()
         .unwrap_or_else(|| completion.label.clone());
@@ -33,8 +33,8 @@ pub(super) fn to_lsp_completion(completion: ToolCompletion) -> CompletionItem {
         sort_text: completion.sort_text,
         filter_text: completion.filter_text,
         text_edit: Some(CompletionTextEdit::Edit(TextEdit::new(
-            to_tool_range(&completion.replace_range),
-            text,
+            to_lsp_range_in_text(text, &completion.replace_range),
+            insert_text,
         ))),
         data: Some(json!({
             "detail": completion.detail,
@@ -42,6 +42,75 @@ pub(super) fn to_lsp_completion(completion: ToolCompletion) -> CompletionItem {
         })),
         ..CompletionItem::default()
     }
+}
+
+pub(super) fn to_tool_position_in_text(text: &str, position: Position) -> Option<ToolPosition> {
+    let target_line = usize::try_from(position.line).ok()?;
+    let target_character = usize::try_from(position.character).ok()?;
+    let line = text_line(text, target_line)?;
+    let mut utf16_character = 0usize;
+    let mut character_col = 1usize;
+    for ch in line.chars() {
+        if utf16_character == target_character {
+            return Some(ToolPosition::new(
+                target_line.saturating_add(1),
+                character_col,
+            ));
+        }
+        utf16_character = utf16_character.saturating_add(ch.len_utf16());
+        character_col = character_col.saturating_add(1);
+        if utf16_character > target_character {
+            return None;
+        }
+    }
+    (utf16_character == target_character).then_some(ToolPosition::new(
+        target_line.saturating_add(1),
+        character_col,
+    ))
+}
+
+pub(super) fn to_lsp_range_in_text(text: &str, range: &ToolRange) -> Range {
+    Range {
+        start: to_lsp_position_in_text(text, range.start_line, range.start_col),
+        end: to_lsp_position_in_text(text, range.end_line, range.end_col),
+    }
+}
+
+fn to_lsp_position_in_text(text: &str, line: usize, col: usize) -> Position {
+    let lsp_line = line.saturating_sub(1);
+    let character = text_line(text, lsp_line).map_or_else(
+        || col.saturating_sub(1),
+        |line_text| {
+            line_text
+                .chars()
+                .take(col.saturating_sub(1))
+                .map(char::len_utf16)
+                .sum::<usize>()
+        },
+    );
+    Position::new(usize_to_u32(lsp_line), usize_to_u32(character))
+}
+
+fn text_line(text: &str, zero_based_line: usize) -> Option<&str> {
+    let mut current = 0usize;
+    let mut start = 0usize;
+    for (offset, ch) in text.char_indices() {
+        if current == zero_based_line && ch == '\n' {
+            return text
+                .get(start..offset)
+                .map(|line| line.strip_suffix('\r').unwrap_or(line));
+        }
+        if ch == '\n' {
+            current = current.saturating_add(1);
+            start = offset.saturating_add(1);
+        }
+    }
+    (current == zero_based_line)
+        .then(|| {
+            text.get(start..)
+                .map(|line| line.strip_suffix('\r').unwrap_or(line))
+        })
+        .flatten()
 }
 
 pub(super) fn resolve_lsp_completion(mut completion: CompletionItem) -> CompletionItem {
