@@ -12,18 +12,18 @@ use async_lsp::lsp_types::{
     DidChangeConfigurationParams, DidChangeWorkspaceFoldersParams, DocumentDiagnosticParams,
     DocumentDiagnosticReport, DocumentDiagnosticReportResult, DocumentHighlightKind,
     DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
-    Documentation, ExecuteCommandParams, FileOperationPatternKind, FileRename, FoldingRangeKind,
-    FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse, InitializeParams,
-    InlayHintKind, InlayHintLabel, InlayHintParams, InlayHintServerCapabilities, InlayHintTooltip,
-    LinkedEditingRangeParams, MonikerKind, PartialResultParams, Position, PrepareRenameResponse,
-    ReferenceContext, RenameFilesParams, SelectionRangeParams, SemanticToken,
-    SemanticTokensDeltaParams, SemanticTokensFullDeltaResult, SignatureHelpParams, SymbolKind,
-    TextDocumentIdentifier, TextDocumentPositionParams, TextDocumentSaveReason,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability, WillSaveTextDocumentParams,
-    WorkDoneProgressParams, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
-    WorkspaceDocumentDiagnosticReport, WorkspaceFolder, WorkspaceFoldersChangeEvent,
-    WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    DocumentSymbolParams, DocumentSymbolResponse, Documentation, ExecuteCommandParams,
+    FileOperationPatternKind, FileRename, FoldingRangeKind, FoldingRangeParams,
+    GotoDefinitionParams, GotoDefinitionResponse, InitializeParams, InlayHintKind, InlayHintLabel,
+    InlayHintParams, InlayHintServerCapabilities, InlayHintTooltip, LinkedEditingRangeParams,
+    MonikerKind, PartialResultParams, Position, PrepareRenameResponse, ReferenceContext,
+    RenameFilesParams, SelectionRangeParams, SemanticToken, SemanticTokensDeltaParams,
+    SemanticTokensFullDeltaResult, SignatureHelpParams, SymbolKind, TextDocumentIdentifier,
+    TextDocumentPositionParams, TextDocumentSaveReason, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
+    TypeDefinitionProviderCapability, WillSaveTextDocumentParams, WorkDoneProgressParams,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
+    WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceSymbolParams, WorkspaceSymbolResponse,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -1096,6 +1096,47 @@ add(value, 2);
 
         assert!(names.contains(&"newValue"), "{names:?}");
         assert!(!names.contains(&"oldValue"), "{names:?}");
+    }
+
+    #[test]
+    fn document_symbols_use_declaration_range_and_name_selection() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let before :=\n  1;\nlet after := before;\n";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let symbols = server
+            .document_symbols(DocumentSymbolParams {
+                text_document: TextDocumentIdentifier { uri },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("document symbols should resolve");
+        let DocumentSymbolResponse::Nested(symbols) = symbols else {
+            panic!("nested document symbols expected");
+        };
+        let before = symbols
+            .iter()
+            .find(|symbol| symbol.name == "before")
+            .expect("before symbol should exist");
+
+        assert_eq!(before.range.start, Position::new(0, 0));
+        assert_eq!(before.range.end.line, 1);
+        assert_eq!(before.selection_range.start, Position::new(0, 4));
+        assert_eq!(before.selection_range.end, Position::new(0, 10));
     }
 
     #[test]

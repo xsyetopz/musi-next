@@ -499,16 +499,23 @@ impl SymbolAnalysis {
                 )
             })
             .map(|(binding_id, binding)| {
-                let range = self
+                let selection_range = self
                     .source_for_site(binding.site)
                     .map_or(ToolRange::new(1, 1, 1, 1), |source| {
                         tool_range(source, binding.site.span)
                     });
+                let range = sema
+                    .and_then(|sema| enclosing_let_range(sema, binding.site.span))
+                    .and_then(|span| {
+                        self.source_for_site(binding.site)
+                            .map(|source| tool_range(source, span))
+                    })
+                    .unwrap_or(selection_range);
                 ToolDocumentSymbol {
                     name: self.session.resolve_symbol(binding.name).to_owned(),
                     kind: binding_symbol_kind(binding_id, binding, sema),
                     range,
-                    selection_range: range,
+                    selection_range,
                     children: Vec::new(),
                 }
             })

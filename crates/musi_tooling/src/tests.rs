@@ -489,6 +489,30 @@ boxedName.value;
     }
 
     #[test]
+    fn document_symbols_use_declaration_range_and_name_selection() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "let before :=\n  1;\nlet after := before;\n";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let symbols = document_symbols_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+        );
+        let before = symbols
+            .iter()
+            .find(|symbol| symbol.name == "before")
+            .expect("before symbol should exist");
+
+        assert_eq!(before.range.start_line, 1);
+        assert_eq!(before.range.start_col, 1);
+        assert_eq!(before.range.end_line, 2);
+        assert_eq!(before.selection_range.start_line, 1);
+        assert_eq!(before.selection_range.start_col, 5);
+        assert_eq!(before.selection_range.end_col, 11);
+    }
+
+    #[test]
     fn outgoing_calls_include_direct_name_callees() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
