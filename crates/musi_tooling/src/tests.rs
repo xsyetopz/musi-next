@@ -267,7 +267,7 @@ span.lower
         write_file(
             test_dir.path(),
             "src/lib/dep.ms",
-            "export let value := 1;\n",
+            "--! dep docs\nexport let value := 1;\n",
         );
         write_file(test_dir.path(), "src/local.ms", "export let local := 1;\n");
 
@@ -283,6 +283,7 @@ span.lower
             .collect::<Vec<_>>();
 
         assert_eq!(labels, ["./lib/dep", "./local"]);
+        assert_eq!(completions[0].documentation.as_deref(), Some("dep docs"));
         assert_eq!(completions[0].replace_range.start_line, 1);
         assert_eq!(completions[0].replace_range.start_col, 20);
         assert_eq!(completions[0].replace_range.end_col, 23);

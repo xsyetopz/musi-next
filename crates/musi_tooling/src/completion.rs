@@ -12,6 +12,7 @@ use music_session::Session;
 use music_syntax::{Lexer, TokenKind, parse};
 
 use crate::ToolRange;
+use crate::analysis::module_docs_for_project_file_with_overlay;
 use crate::analysis_support::analysis_session;
 
 const COMPLETION_PROBE: &str = "musiCompletionProbe";
@@ -144,16 +145,20 @@ fn import_path_completions(
         .values()
         .flat_map(|package| package.module_keys.values())
         .filter(|module_path| !same_path(module_path, path))
-        .filter_map(|module_path| import_specifier_for_target(path, module_path))
-        .filter(|specifier| specifier.starts_with(&context.prefix))
-        .map(|specifier| {
-            ToolCompletion::new(
+        .filter_map(|module_path| {
+            let specifier = import_specifier_for_target(path, module_path)?;
+            if !specifier.starts_with(&context.prefix) {
+                return None;
+            }
+            let mut completion = ToolCompletion::new(
                 specifier.clone(),
                 ToolCompletionKind::Module,
                 Some("module".to_owned()),
                 replace_range,
             )
-            .with_sort_text(format!("1_{specifier}"))
+            .with_sort_text(format!("1_{specifier}"));
+            completion.documentation = module_docs_for_project_file_with_overlay(module_path, None);
+            Some(completion)
         })
         .collect::<Vec<_>>();
     completions.sort_by(|left, right| left.label.cmp(&right.label));

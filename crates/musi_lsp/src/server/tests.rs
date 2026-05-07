@@ -12,7 +12,7 @@ use async_lsp::lsp_types::{
     DidChangeConfigurationParams, DidChangeWorkspaceFoldersParams, DocumentDiagnosticParams,
     DocumentDiagnosticReport, DocumentDiagnosticReportResult, DocumentHighlightKind,
     DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
-    ExecuteCommandParams, FileOperationPatternKind, FileRename, FoldingRangeKind,
+    Documentation, ExecuteCommandParams, FileOperationPatternKind, FileRename, FoldingRangeKind,
     FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse, InitializeParams,
     InlayHintKind, InlayHintServerCapabilities, InlayHintTooltip, LinkedEditingRangeParams,
     PartialResultParams, Position, RenameFilesParams, SelectionRangeParams, SemanticToken,
@@ -620,8 +620,11 @@ point.
         let path = root.join("src/index.ms");
         let source = "let dep := import \"./l\";\n";
         fs::write(&path, "let dep := import \"./lib/dep\";\n").expect("entry should be written");
-        fs::write(root.join("src/lib/dep.ms"), "export let value := 1;\n")
-            .expect("dep should be written");
+        fs::write(
+            root.join("src/lib/dep.ms"),
+            "--! dep docs\nexport let value := 1;\n",
+        )
+        .expect("dep should be written");
         fs::write(root.join("src/local.ms"), "export let local := 1;\n")
             .expect("local should be written");
         let uri = Url::from_file_path(&path).expect("file URI should build");
@@ -663,6 +666,12 @@ point.
 
         assert_eq!(labels, ["./lib/dep", "./local"]);
         assert_eq!(dep.kind, Some(CompletionItemKind::MODULE));
+        assert_eq!(dep.documentation, None);
+        let dep = MusiLanguageServer::resolve_completion(dep.clone());
+        assert_eq!(
+            dep.documentation,
+            Some(Documentation::String("dep docs".to_owned()))
+        );
         assert_eq!(edit.range.start, Position::new(0, 19));
         assert_eq!(edit.range.end, Position::new(0, 22));
         assert_eq!(edit.new_text, "./lib/dep");
