@@ -173,8 +173,8 @@ Foundation host modules stay separate from stdlib:
 
 ```musi
 let Core := import "musi:core";
-let Io := import "musi:io";
 let Fs := import "musi:fs";
+let Io := import "musi:io";
 ```
 
 Reach for `@std` first in ordinary application code. Reach for `musi:*` only when you are working at language, runtime, or integration boundaries.
