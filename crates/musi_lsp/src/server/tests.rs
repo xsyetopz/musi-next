@@ -1896,6 +1896,50 @@ let other := value + value;
     }
 
     #[test]
+    fn call_hierarchy_incoming_calls_use_multiline_caller_range() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let target () := 1;\nlet caller () : Int :=\n  target();\n";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+        let item = server
+            .prepare_call_hierarchy_at(CallHierarchyPrepareParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(0, 5),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("call hierarchy item should exist")
+            .remove(0);
+
+        let calls = server
+            .call_hierarchy_incoming_calls(&CallHierarchyIncomingCallsParams {
+                item,
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("incoming calls should run");
+
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].from.name, "caller");
+        assert_eq!(calls[0].from_ranges[0].start, Position::new(2, 2));
+        assert_eq!(calls[0].from_ranges[0].end, Position::new(2, 8));
+    }
+
+    #[test]
     fn call_hierarchy_outgoing_calls_return_direct_name_callees() {
         let root = temp_project();
         let path = root.join("index.ms");

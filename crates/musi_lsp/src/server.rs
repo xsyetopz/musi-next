@@ -1470,11 +1470,8 @@ fn caller_symbol_for_reference<'a>(
     symbols
         .iter()
         .flat_map(flatten_symbols)
-        .filter(|symbol| {
-            symbol.selection_range.start_line == range.start_line
-                && symbol.selection_range.start_col < range.start_col
-        })
-        .max_by_key(|symbol| symbol.selection_range.start_col)
+        .filter(|symbol| tool_range_contains_range(&symbol.range, range))
+        .min_by_key(|symbol| tool_range_size(&symbol.range))
 }
 
 fn flatten_symbols(symbol: &ToolDocumentSymbol) -> Vec<&ToolDocumentSymbol> {
@@ -1555,6 +1552,23 @@ const fn position_in_lsp_range(position: Position, range: Range) -> bool {
 
 const fn position_lt(left: Position, right: Position) -> bool {
     left.line < right.line || (left.line == right.line && left.character < right.character)
+}
+
+const fn tool_range_contains_range(
+    container: &musi_tooling::ToolRange,
+    range: &musi_tooling::ToolRange,
+) -> bool {
+    (range.start_line > container.start_line
+        || range.start_line == container.start_line && range.start_col >= container.start_col)
+        && (range.end_line < container.end_line
+            || range.end_line == container.end_line && range.end_col <= container.end_col)
+}
+
+const fn tool_range_size(range: &musi_tooling::ToolRange) -> (usize, usize) {
+    (
+        range.end_line.saturating_sub(range.start_line),
+        range.end_col.saturating_sub(range.start_col),
+    )
 }
 
 fn reference_lens_data(path: &Path, symbol: &ToolDocumentSymbol) -> Option<Value> {
