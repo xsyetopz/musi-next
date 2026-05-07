@@ -2,7 +2,8 @@ use std::path::Path;
 
 use music_base::{Source, Span};
 use music_hir::{HirExprId, HirExprKind, HirTyId, HirTyKind};
-use music_sema::SemaModule;
+use music_module::ModuleKey;
+use music_sema::{ExprMemberKind, SemaModule};
 use music_session::Session;
 
 use crate::analysis::type_render::render_hir_ty;
@@ -54,11 +55,13 @@ fn signature_help_for_call(
     };
     let callee_expr = sema.module().store.exprs.get(callee);
     let callable_ty = sema.try_expr_ty(callee)?;
+    let param_names = imported_export_param_names(session, sema, callee);
     let signature = signature_information_for_ty(
         session,
         sema,
         callable_ty,
         source_text_for_span(source, callee_expr.origin.span).unwrap_or("call"),
+        param_names.as_deref(),
     )?;
     let active_parameter = active_parameter_index(
         source,
@@ -100,6 +103,7 @@ fn signature_information_for_ty(
     sema: &SemaModule,
     ty: HirTyId,
     name: &str,
+    param_names: Option<&[String]>,
 ) -> Option<ToolSignatureInformation> {
     let mut params = Vec::new();
     let mut current = ty;
@@ -130,8 +134,14 @@ fn signature_information_for_ty(
                         .ty_ids
                         .get(ty_params)
                         .iter()
-                        .map(|param| ToolParameterInformation {
-                            label: render_hir_ty(sema, session, *param),
+                        .enumerate()
+                        .map(|(index, param)| {
+                            let rendered = render_hir_ty(sema, session, *param);
+                            let label = param_names.and_then(|names| names.get(index)).map_or_else(
+                                || rendered.clone(),
+                                |name| format!("{name} : {rendered}"),
+                            );
+                            ToolParameterInformation { label }
                         }),
                 );
                 let label = signature_label(name, &params, &render_hir_ty(sema, session, ret));
@@ -150,6 +160,39 @@ fn signature_information_for_ty(
             _ => return None,
         }
     }
+}
+
+fn imported_export_param_names(
+    session: &Session,
+    sema: &SemaModule,
+    callee: HirExprId,
+) -> Option<Vec<String>> {
+    if let HirExprKind::Apply { callee, .. } = sema.module().store.exprs.get(callee).kind {
+        return imported_export_param_names(session, sema, callee);
+    }
+    let fact = sema.expr_member_fact(callee)?;
+    if !matches!(fact.kind, ExprMemberKind::ImportRecordExport) {
+        return None;
+    }
+    let target = fact
+        .import_record_target
+        .as_ref()
+        .or_else(|| import_record_base_target(sema, callee))?;
+    let export_name = session.resolve_symbol(fact.name);
+    let imported = session.sema_module_cached(target).ok().flatten()?;
+    let export = imported
+        .surface()
+        .exported_values()
+        .iter()
+        .find(|export| export.name.as_ref() == export_name)?;
+    Some(export.param_names.iter().map(ToString::to_string).collect())
+}
+
+fn import_record_base_target(sema: &SemaModule, callee: HirExprId) -> Option<&ModuleKey> {
+    let HirExprKind::Field { base, .. } = sema.module().store.exprs.get(callee).kind else {
+        return None;
+    };
+    sema.expr_import_record_target(base)
 }
 
 fn signature_label(name: &str, params: &[ToolParameterInformation], ret: &str) -> String {

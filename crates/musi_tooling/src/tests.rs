@@ -983,6 +983,36 @@ one.inc(2);
     }
 
     #[test]
+    fn signature_help_returns_imported_member_signature() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        write_file(
+            test_dir.path(),
+            "dep.ms",
+            "export let add (left : Int, right : Int) : Int := left + right;\n",
+        );
+        let source = "\
+let dep := import \"./dep\";
+dep.add(1, 2);
+";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let help = signature_help_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            2,
+            12,
+        )
+        .expect("signature help should resolve");
+
+        assert_eq!(
+            help.signatures[0].label,
+            "dep.add(left : Int, right : Int) -> Int"
+        );
+        assert_eq!(help.active_parameter, 1);
+    }
+
+    #[test]
     fn semantic_tokens_complete_textmate_without_lexical_overrides() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
