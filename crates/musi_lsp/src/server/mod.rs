@@ -221,6 +221,10 @@ impl LanguageServer for MusiLanguageServer {
         ControlFlow::Continue(())
     }
 
+    fn will_save(&mut self, _: WillSaveTextDocumentParams) -> NotifyResult {
+        ControlFlow::Continue(())
+    }
+
     fn did_change_configuration(&mut self, params: DidChangeConfigurationParams) -> NotifyResult {
         self.update_configuration(&params);
         ControlFlow::Continue(())

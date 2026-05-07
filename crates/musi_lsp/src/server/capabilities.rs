@@ -24,7 +24,7 @@ pub(super) fn initialize_result(references_command: &str) -> InitializeResult {
                 TextDocumentSyncOptions {
                     open_close: Some(true),
                     change: Some(TextDocumentSyncKind::FULL),
-                    will_save: Some(true),
+                    will_save: None,
                     will_save_wait_until: Some(true),
                     save: Some(TextDocumentSyncSaveOptions::Supported(true)),
                 },
