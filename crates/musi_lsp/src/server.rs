@@ -18,30 +18,31 @@ use async_lsp::lsp_types::{
     DidChangeTextDocumentParams, DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentDiagnosticParams,
     DocumentDiagnosticReport, DocumentDiagnosticReportResult, DocumentFormattingParams,
-    DocumentHighlight, DocumentHighlightParams, DocumentLink, DocumentLinkOptions,
-    DocumentLinkParams, DocumentOnTypeFormattingOptions, DocumentOnTypeFormattingParams,
-    DocumentRangeFormattingParams, DocumentSymbolParams, DocumentSymbolResponse,
-    ExecuteCommandOptions, ExecuteCommandParams, FileOperationFilter, FileOperationPattern,
-    FileOperationPatternKind, FileOperationRegistrationOptions, FoldingRange, FoldingRangeParams,
-    FoldingRangeProviderCapability, FormattingOptions, FullDocumentDiagnosticReport,
-    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
-    HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, InlayHint,
-    InlayHintOptions, InlayHintParams, InlayHintServerCapabilities, LinkedEditingRangeParams,
-    LinkedEditingRangeServerCapabilities, LinkedEditingRanges, Location, MarkupContent, MarkupKind,
-    Moniker, MonikerParams, OneOf, Position, PrepareRenameResponse, PublishDiagnosticsParams,
-    Range, ReferenceParams, RelatedFullDocumentDiagnosticReport, RenameFilesParams, RenameOptions,
-    RenameParams, SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability,
-    SemanticToken, SemanticTokens, SemanticTokensDelta, SemanticTokensDeltaParams,
-    SemanticTokensEdit, SemanticTokensFullDeltaResult, SemanticTokensFullOptions,
-    SemanticTokensOptions, SemanticTokensParams, SemanticTokensRangeParams,
-    SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
-    ServerCapabilities, ServerInfo, SignatureHelp, SignatureHelpOptions, SignatureHelpParams,
-    TextDocumentContentChangeEvent, TextDocumentItem, TextDocumentPositionParams,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextDocumentSyncSaveOptions, TextEdit, TypeDefinitionProviderCapability, UniquenessLevel, Url,
-    WillSaveTextDocumentParams, WorkDoneProgressOptions, WorkspaceDiagnosticParams,
-    WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
-    WorkspaceEdit, WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
+    DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, DocumentLink,
+    DocumentLinkOptions, DocumentLinkParams, DocumentOnTypeFormattingOptions,
+    DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, DocumentSymbolParams,
+    DocumentSymbolResponse, ExecuteCommandOptions, ExecuteCommandParams, FileOperationFilter,
+    FileOperationPattern, FileOperationPatternKind, FileOperationRegistrationOptions, FoldingRange,
+    FoldingRangeParams, FoldingRangeProviderCapability, FormattingOptions,
+    FullDocumentDiagnosticReport, GotoDefinitionParams, GotoDefinitionResponse, Hover,
+    HoverContents, HoverParams, HoverProviderCapability, InitializeParams, InitializeResult,
+    InitializedParams, InlayHint, InlayHintOptions, InlayHintParams, InlayHintServerCapabilities,
+    LinkedEditingRangeParams, LinkedEditingRangeServerCapabilities, LinkedEditingRanges, Location,
+    MarkupContent, MarkupKind, Moniker, MonikerParams, OneOf, Position, PrepareRenameResponse,
+    PublishDiagnosticsParams, Range, ReferenceParams, RelatedFullDocumentDiagnosticReport,
+    RenameFilesParams, RenameOptions, RenameParams, SelectionRange, SelectionRangeParams,
+    SelectionRangeProviderCapability, SemanticToken, SemanticTokens, SemanticTokensDelta,
+    SemanticTokensDeltaParams, SemanticTokensEdit, SemanticTokensFullDeltaResult,
+    SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
+    SemanticTokensRangeParams, SemanticTokensRangeResult, SemanticTokensResult,
+    SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, SignatureHelp,
+    SignatureHelpOptions, SignatureHelpParams, TextDocumentContentChangeEvent, TextDocumentItem,
+    TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TextEdit,
+    TypeDefinitionProviderCapability, UniquenessLevel, Url, WillSaveTextDocumentParams,
+    WorkDoneProgressOptions, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
+    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport, WorkspaceEdit,
+    WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
     WorkspaceFullDocumentDiagnosticReport, WorkspaceServerCapabilities, WorkspaceSymbol,
     WorkspaceSymbolOptions, WorkspaceSymbolParams, WorkspaceSymbolResponse,
     notification::PublishDiagnostics,
@@ -601,6 +602,9 @@ impl MusiLanguageServer {
             .open_documents
             .get(&text_document.uri)
             .map(String::as_str);
+        if let Some(highlights) = import_document_highlights(&path, overlay, position) {
+            return Some(highlights);
+        }
         let highlights = references_for_project_file_with_overlay(
             &path,
             overlay,
@@ -1459,6 +1463,29 @@ fn import_definition_at(
         uri: Url::from_file_path(link.target).ok()?,
         range: Range::new(Position::new(0, 0), Position::new(0, 0)),
     })
+}
+
+fn import_document_highlights(
+    path: &Path,
+    overlay: Option<&str>,
+    position: Position,
+) -> Option<Vec<DocumentHighlight>> {
+    let links = document_links_for_project_file_with_overlay(path, overlay);
+    let target = links
+        .iter()
+        .find(|link| position_in_lsp_range(position, to_tool_range(&link.range)))?
+        .target
+        .clone();
+    Some(
+        links
+            .into_iter()
+            .filter(|link| paths_match(&link.target, &target))
+            .map(|link| DocumentHighlight {
+                range: to_tool_range(&link.range),
+                kind: Some(DocumentHighlightKind::TEXT),
+            })
+            .collect(),
+    )
 }
 
 const fn position_in_lsp_range(position: Position, range: Range) -> bool {

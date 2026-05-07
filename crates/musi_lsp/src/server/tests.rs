@@ -1143,6 +1143,50 @@ let other := value;
     }
 
     #[test]
+    fn document_highlight_on_import_string_marks_matching_imports() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let dep := import \"./dep\";\nlet again := import \"./dep\";\n";
+        fs::write(&path, source).expect("entry should be written");
+        fs::write(root.join("dep.ms"), "export let value := 1;\n").expect("dep should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let highlights = server
+            .document_highlights(DocumentHighlightParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(0, 21),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("import highlights should resolve");
+
+        assert_eq!(highlights.len(), 2);
+        assert_eq!(highlights[0].kind, Some(DocumentHighlightKind::TEXT));
+        assert_eq!(
+            highlights[0].range,
+            Range::new(Position::new(0, 18), Position::new(0, 25))
+        );
+        assert_eq!(
+            highlights[1].range,
+            Range::new(Position::new(1, 20), Position::new(1, 27))
+        );
+    }
+
+    #[test]
     fn type_definition_resolves_named_value_type() {
         let root = temp_project();
         fs::write(
