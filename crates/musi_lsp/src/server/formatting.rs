@@ -56,8 +56,32 @@ impl MusiLanguageServer {
         )])
     }
 
-    pub(super) fn document_on_type_formatting(_: DocumentOnTypeFormattingParams) -> Vec<TextEdit> {
-        Vec::new()
+    pub(super) fn document_on_type_formatting(
+        &self,
+        params: DocumentOnTypeFormattingParams,
+    ) -> Option<Vec<TextEdit>> {
+        if !on_type_formatting_trigger(&params.ch) {
+            return Some(Vec::new());
+        }
+        let uri = params.text_document_position.text_document.uri;
+        let text = self.open_documents.get(&uri)?;
+        let path = uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let offset = lsp_position_offset(text, params.text_document_position.position)?;
+        let (start, end) = line_offsets_around(text, offset)?;
+        let selected = text.get(start..end)?;
+        let mut options = FormatOptions::default();
+        apply_document_formatting_options(&mut options, &params.options);
+        let formatted = format_source(selected, &options).ok()?;
+        if !formatted.changed {
+            return Some(Vec::new());
+        }
+        Some(vec![TextEdit::new(
+            range_for_offsets(text, start, end)?,
+            formatted.text,
+        )])
     }
 
     pub(super) fn document_range_formatting(
@@ -106,6 +130,52 @@ pub(super) fn lsp_range_offsets(text: &str, range: Range) -> Option<(usize, usiz
     let start = lsp_position_offset(text, range.start)?;
     let end = lsp_position_offset(text, range.end)?;
     (start <= end).then_some((start, end))
+}
+
+fn line_offsets_around(text: &str, offset: usize) -> Option<(usize, usize)> {
+    if offset > text.len() || !text.is_char_boundary(offset) {
+        return None;
+    }
+    let before = text.get(..offset)?;
+    let after = text.get(offset..)?;
+    let start = before
+        .rfind('\n')
+        .map_or(0, |index| index.saturating_add(1));
+    let end = after.find('\n').map_or(text.len(), |index| {
+        offset.saturating_add(index).saturating_add(1)
+    });
+    Some((start, end))
+}
+
+fn range_for_offsets(text: &str, start: usize, end: usize) -> Option<Range> {
+    Some(Range::new(
+        lsp_position_for_offset(text, start)?,
+        lsp_position_for_offset(text, end)?,
+    ))
+}
+
+fn lsp_position_for_offset(text: &str, target: usize) -> Option<Position> {
+    if target > text.len() || !text.is_char_boundary(target) {
+        return None;
+    }
+    let mut line = 0u32;
+    let mut character = 0u32;
+    for (offset, ch) in text.char_indices() {
+        if offset == target {
+            return Some(Position::new(line, character));
+        }
+        if ch == '\n' {
+            line = line.saturating_add(1);
+            character = 0;
+        } else {
+            character = character.saturating_add(u32::try_from(ch.len_utf16()).ok()?);
+        }
+    }
+    (target == text.len()).then_some(Position::new(line, character))
+}
+
+pub(super) const fn on_type_formatting_trigger(ch: &str) -> bool {
+    matches!(ch.as_bytes(), b";" | b")" | b"]" | b"}")
 }
 
 pub(super) fn markdown_range_inside_musi_fence_body(text: &str, start: usize, end: usize) -> bool {

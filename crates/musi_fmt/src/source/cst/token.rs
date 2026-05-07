@@ -328,11 +328,28 @@ impl CstFormatter<'_> {
                 .saturating_add(text.len())
                 <= self.options.line_width;
         }
+        if token.kind == TokenKind::LParen
+            && (matches!(
+                role,
+                CstLeafRole::ParamParen | CstLeafRole::MemberParamParen
+            ) || self.declaration_state == DeclarationState::NameBeforeParams
+                || self.declaration_head_active && self.previous == Some(TokenKind::Ident))
+        {
+            return line_len.saturating_add(space_len).saturating_add(group_len)
+                > self.options.line_width
+                && line_len
+                    .saturating_add(space_len)
+                    .saturating_add(text.len())
+                    <= self.options.line_width;
+        }
         let flat_len = if matches!(
             role,
             CstLeafRole::ParamParen | CstLeafRole::MemberParamParen
-        ) || self.declaration_head_active
+        ) || self.declaration_state == DeclarationState::NameBeforeParams
+            || self.declaration_head_active && self.previous == Some(TokenKind::Ident)
         {
+            group_len
+        } else if self.declaration_head_active {
             let tail_len = declaration_tail_flat_len(lexed, token_index);
             if group_len > self.options.line_width / 2 {
                 tail_len.max(self.options.line_width.saturating_add(1))

@@ -453,6 +453,19 @@ mod success {
     }
 
     #[test]
+    fn keeps_short_declaration_parameters_inline_when_body_wraps() {
+        let source =
+            "export let exists (target : Path) : Bool := fsHost.exists(target.toString()) > 0;";
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "export let exists (target : Path) : Bool :=\n  fsHost.exists(target.toString()) > 0;\n"
+        );
+    }
+
+    #[test]
     fn keeps_fitting_effect_members_inline_and_aligned() {
         let source = r"export opaque let Runtime := effect {
   let envGet (name : String) : String;

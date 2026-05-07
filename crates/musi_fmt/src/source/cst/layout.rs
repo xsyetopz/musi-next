@@ -50,14 +50,6 @@ pub(super) fn format_bind_layout(text: String, options: &FormatOptions) -> Strin
         }
         if line.chars().count() > options.line_width
             && is_let_line(line)
-            && let Some(broken) = split_long_let_signature(line, options)
-        {
-            out.push_str(&broken);
-            index = index.saturating_add(1);
-            continue;
-        }
-        if line.chars().count() > options.line_width
-            && is_let_line(line)
             && let Some(bind_index) = line.find(" := ")
         {
             let lhs_end = bind_index.saturating_add(" :=".len());
@@ -82,6 +74,14 @@ pub(super) fn format_bind_layout(text: String, options: &FormatOptions) -> Strin
             out.push_str(&options.indent_unit());
             out.push_str(rhs.trim_start());
             out.push('\n');
+            index = index.saturating_add(1);
+            continue;
+        }
+        if line.chars().count() > options.line_width
+            && is_let_line(line)
+            && let Some(broken) = split_long_let_signature(line, options)
+        {
+            out.push_str(&broken);
             index = index.saturating_add(1);
             continue;
         }

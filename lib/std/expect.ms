@@ -82,7 +82,7 @@ let expectMapOrElse [T, E, U] (
 let expectAndThen [T, E, U] (
   target : Expect[T, E],
   f : T -> Expect[U, E]
-) : Expect[U, E] :=
+) : Expect[U, E,] :=
   match target (
   | .Success(item) => f(item)
   | .Failure(error) => Failure[U, E](error)
@@ -92,7 +92,7 @@ let expectAndThen [T, E, U] (
 let expectOrElse [T, E, F] (
   target : Expect[T, E],
   f : E -> Expect[T, F]
-) : Expect[T, F] :=
+) : Expect[T, F,] :=
   match target (
   | .Success(item) => Success[T, F](item)
   | .Failure(error) => f(error)
@@ -153,13 +153,13 @@ export let mapOrElse [T, E, U] (
 export let andThen [T, E, U] (
   target : Expect[T, E],
   f : T -> Expect[U, E]
-) : Expect[U, E] := expectAndThen[T, E, U](target, f);
+) : Expect[U, E,] := expectAndThen[T, E, U](target, f);
 
 --- Core operation for `orElse`.
 export let orElse [T, E, F] (
   target : Expect[T, E],
   f : E -> Expect[T, F]
-) : Expect[T, F] := expectOrElse[T, E, F](target, f);
+) : Expect[T, F,] := expectOrElse[T, E, F](target, f);
 
 --- Core operation for `fold`.
 export let fold [T, E, U] (
@@ -207,14 +207,15 @@ export let (
   expectMapOrElse[T, E, U](self, onFailure, onSuccess);
 
 --- Chain an operation that may fail.
-export let (self : Expect[T, E]).andThen [T, E, U] (
-  f : T -> Expect[U, E]
-) : Expect[U, E] := expectAndThen[T, E, U](self, f);
+export let (
+  self : Expect[T, E]
+).andThen [T, E, U] (f : T -> Expect[U, E]) : Expect[U, E,] :=
+  expectAndThen[T, E, U](self, f);
 
 --- Recover from an error with another expect.
 export let (self : Expect[T, E]).orElse [T, E, F] (
   f : E -> Expect[T, F]
-) : Expect[T, F] := expectOrElse[T, E, F](self, f);
+) : Expect[T, F,] := expectOrElse[T, E, F](self, f);
 
 --- Fold both expect cases into one value.
 export let (

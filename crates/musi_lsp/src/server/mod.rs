@@ -476,7 +476,7 @@ impl LanguageServer for MusiLanguageServer {
         &mut self,
         params: DocumentOnTypeFormattingParams,
     ) -> ServerFuture<Option<Vec<TextEdit>>> {
-        let formatting_response = Some(Self::document_on_type_formatting(params));
+        let formatting_response = self.document_on_type_formatting(params);
         Box::pin(async move { Ok(formatting_response) })
     }
 
