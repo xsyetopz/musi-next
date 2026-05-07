@@ -513,6 +513,36 @@ boxedName.value;
     }
 
     #[test]
+    fn document_symbols_nest_bindings_inside_declarations() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "let outer (value : Int) : Int := value;\nlet after := outer(1);\n";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let symbols = document_symbols_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+        );
+        let outer = symbols
+            .iter()
+            .find(|symbol| symbol.name == "outer")
+            .expect("outer symbol should exist");
+
+        assert!(
+            outer.children.iter().any(|symbol| symbol.name == "value"),
+            "{outer:?}"
+        );
+        assert!(
+            symbols.iter().any(|symbol| symbol.name == "after"),
+            "{symbols:?}"
+        );
+        assert!(
+            !symbols.iter().any(|symbol| symbol.name == "value"),
+            "{symbols:?}"
+        );
+    }
+
+    #[test]
     fn outgoing_calls_include_direct_name_callees() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);

@@ -1140,6 +1140,54 @@ add(value, 2);
     }
 
     #[test]
+    fn document_symbols_nest_bindings_inside_declarations() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let outer (value : Int) : Int := value;\nlet after := outer(1);\n";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let symbols = server
+            .document_symbols(DocumentSymbolParams {
+                text_document: TextDocumentIdentifier { uri },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("document symbols should resolve");
+        let DocumentSymbolResponse::Nested(symbols) = symbols else {
+            panic!("nested document symbols expected");
+        };
+        let outer = symbols
+            .iter()
+            .find(|symbol| symbol.name == "outer")
+            .expect("outer symbol should exist");
+
+        assert!(
+            outer
+                .children
+                .as_ref()
+                .is_some_and(|children| children.iter().any(|symbol| symbol.name == "value")),
+            "{outer:?}"
+        );
+        assert!(
+            !symbols.iter().any(|symbol| symbol.name == "value"),
+            "{symbols:?}"
+        );
+    }
+
+    #[test]
     fn declaration_reuses_symbol_definition_location() {
         let root = temp_project();
         fs::write(

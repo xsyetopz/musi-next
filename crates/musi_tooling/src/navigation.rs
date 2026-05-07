@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -265,8 +266,34 @@ const fn tool_range_contains_range(container: &ToolRange, range: &ToolRange) -> 
             || range.end_line == container.end_line && range.end_col <= container.end_col)
 }
 
+const fn tool_range_strictly_contains_range(container: &ToolRange, range: &ToolRange) -> bool {
+    tool_range_contains_range(container, range)
+        && (container.start_line < range.start_line
+            || container.start_line == range.start_line && container.start_col < range.start_col
+            || range.end_line < container.end_line
+            || range.end_line == container.end_line && range.end_col < container.end_col)
+}
+
 const fn span_contains_span(container: Span, span: Span) -> bool {
     container.start <= span.start && span.end <= container.end
+}
+
+fn nest_document_symbols(symbols: Vec<ToolDocumentSymbol>) -> Vec<ToolDocumentSymbol> {
+    let mut roots = Vec::new();
+    for symbol in symbols {
+        push_nested_document_symbol(&mut roots, symbol);
+    }
+    roots
+}
+
+fn push_nested_document_symbol(symbols: &mut Vec<ToolDocumentSymbol>, symbol: ToolDocumentSymbol) {
+    if let Some(parent) = symbols.iter_mut().rev().find(|candidate| {
+        tool_range_strictly_contains_range(&candidate.range, &symbol.selection_range)
+    }) {
+        push_nested_document_symbol(&mut parent.children, symbol);
+    } else {
+        symbols.push(symbol);
+    }
 }
 
 #[must_use]
@@ -524,10 +551,12 @@ impl SymbolAnalysis {
             (
                 symbol.range.start_line,
                 symbol.range.start_col,
+                Reverse(symbol.range.end_line),
+                Reverse(symbol.range.end_col),
                 symbol.name.clone(),
             )
         });
-        symbols
+        nest_document_symbols(symbols)
     }
 
     fn outgoing_calls(&self, line: usize, character: usize) -> Vec<ToolOutgoingCall> {
