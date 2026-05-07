@@ -1723,6 +1723,34 @@ add(value, 2);
         assert!(!left.is_literal_argument);
         assert!(right.is_literal_argument);
     }
+
+    #[test]
+    fn inlay_hints_include_imported_member_parameter_names() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        write_file(
+            test_dir.path(),
+            "dep.ms",
+            "export let add (left : Int, right : Int) : Int := left + right;\n",
+        );
+        let source = "\
+let dep := import \"./dep\";
+dep.add(1, 2);
+";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let hints = inlay_hints_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+        );
+        let labels = hints
+            .iter()
+            .filter(|hint| hint.kind == ToolInlayHintKind::Parameter)
+            .map(|hint| hint.label.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(labels, ["left:", "right:"]);
+    }
 }
 
 mod failure {
