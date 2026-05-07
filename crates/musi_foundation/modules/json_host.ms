@@ -1,3 +1,5 @@
+--! Host-backed JSON primitives.
+
 let Core := import "musi:core";
 let Int := Core.Int;
 let String := Core.String;

@@ -1,3 +1,5 @@
+--! Formatting helper namespace.
+
 let datetime := import "@std/datetime";
 let text := import "@std/text";
 let fmtHost := import "musi:fmt";

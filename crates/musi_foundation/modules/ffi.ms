@@ -1,3 +1,5 @@
+--! Compiler-owned FFI builtin surface.
+
 let Core := import "musi:core";
 
 --- Raw FFI pointer type.

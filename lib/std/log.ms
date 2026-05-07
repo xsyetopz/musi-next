@@ -1,3 +1,5 @@
+--! Logging helper namespace.
+
 let io := import "@std/io";
 let text := import "@std/text";
 

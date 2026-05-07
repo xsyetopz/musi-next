@@ -1,3 +1,5 @@
+--! Random value helper namespace.
+
 let randomHost := import "musi:random";
 
 --- Random integer in half-open bounds.

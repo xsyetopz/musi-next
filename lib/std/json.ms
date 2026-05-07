@@ -1,3 +1,5 @@
+--! JSON encoding and decoding helpers.
+
 let jsonHost := import "musi:json";
 
 --- Normalized JSON text.

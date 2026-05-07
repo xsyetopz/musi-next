@@ -1,3 +1,5 @@
+--! Interactive command-line prompt helpers.
+
 let io := import "@std/io";
 let maybe := import "@std/maybe";
 let text := import "@std/text";

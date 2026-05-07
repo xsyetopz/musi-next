@@ -1,3 +1,5 @@
+--! Safe C library wrapper surface.
+
 let ascii := import "@std/ascii";
 let cmp := import "@std/cmp";
 let ffi := import "@std/ffi";

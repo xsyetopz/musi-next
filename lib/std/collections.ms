@@ -1,3 +1,5 @@
+--! Collection type namespace.
+
 --- Array helpers surface.
 export let array := import "@std/collections/array";
 

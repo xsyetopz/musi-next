@@ -1,3 +1,5 @@
+--! Foreign function interface pointer and ABI helpers.
+
 let core := import "musi:core";
 
 --- Null-terminated C string ABI value.

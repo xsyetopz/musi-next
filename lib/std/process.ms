@@ -1,3 +1,5 @@
+--! Process helper namespace.
+
 let maybe := import "@std/maybe";
 let Maybe := maybe.Maybe;
 let path := import "@std/path";

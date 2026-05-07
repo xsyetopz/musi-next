@@ -1,3 +1,5 @@
+--! Host-backed cryptographic primitives.
+
 let Core := import "musi:core";
 let String := Core.String;
 

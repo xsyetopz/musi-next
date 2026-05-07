@@ -1,3 +1,5 @@
+--! Integer math helpers.
+
 --- Absolute integer value.
 export let abs (value : Int) : Int :=
   match () (

@@ -1,3 +1,5 @@
+--! File system helper namespace.
+
 let path := import "@std/path";
 let Path := path.Path;
 let fsHost := import "musi:fs";

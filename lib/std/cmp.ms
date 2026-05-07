@@ -1,3 +1,5 @@
+--! Ordering and comparison helpers.
+
 --- Ordering expect for comparisons.
 export opaque let Ordering := data {
   | Less

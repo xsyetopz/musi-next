@@ -1,3 +1,5 @@
+--! Environment variable helpers.
+
 let maybe := import "@std/maybe";
 let Maybe := maybe.Maybe;
 let envHost := import "musi:env";

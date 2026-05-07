@@ -1,3 +1,5 @@
+--! Host-backed test primitives.
+
 let Core := import "musi:core";
 let Bool := Core.Bool;
 let String := Core.String;

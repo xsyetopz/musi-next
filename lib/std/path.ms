@@ -1,3 +1,5 @@
+--! Path manipulation helpers.
+
 let text := import "@std/text";
 
 --- Platform path value.

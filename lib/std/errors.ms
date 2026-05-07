@@ -1,3 +1,5 @@
+--! Error value helpers.
+
 --- Error value with a diagnostic message.
 export opaque let Error := data {
   | ErrorMessage(message : String)

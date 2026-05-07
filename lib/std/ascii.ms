@@ -1,3 +1,5 @@
+--! ASCII character classification and case helpers.
+
 let maybe := import "@std/maybe";
 let Maybe := maybe.Maybe;
 

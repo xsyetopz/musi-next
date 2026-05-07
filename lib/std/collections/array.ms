@@ -1,3 +1,5 @@
+--! Array collection helpers.
+
 --- Core operation for `empty`.
 export let empty [T] () : []T := [];
 --- Core operation for `single`.

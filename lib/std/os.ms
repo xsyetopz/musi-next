@@ -1,3 +1,5 @@
+--! Operating system helper namespace.
+
 let sys := import "#sys";
 
 --- Operating system name.

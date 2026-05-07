@@ -1,3 +1,5 @@
+--! Host-backed input and output primitives.
+
 let Core := import "musi:core";
 let String := Core.String;
 let Unit := Core.Unit;

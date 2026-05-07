@@ -1,3 +1,5 @@
+--! Iterator helpers for collections.
+
 --- Core operation for `empty`.
 export let empty [T] () : []T := [];
 --- Core operation for `once`.

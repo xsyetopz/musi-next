@@ -1,3 +1,5 @@
+--! Host-backed random primitives.
+
 let Core := import "musi:core";
 let Float := Core.Float;
 let Int := Core.Int;

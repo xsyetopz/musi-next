@@ -1,3 +1,5 @@
+--! Hexadecimal encoding helpers.
+
 let maybe := import "@std/maybe";
 let both (left : Bool, right : Bool) : Bool :=
   match left (

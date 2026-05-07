@@ -1,3 +1,5 @@
+--! System helper namespace.
+
 @link(symbol := "sys.target.os")
 native "musi" let targetOsIntrinsic () : String;
 

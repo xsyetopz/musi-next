@@ -1,3 +1,5 @@
+--! Input and output helper namespace.
+
 let ioHost := import "musi:io";
 
 --- Read one line from stdin.

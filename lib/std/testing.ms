@@ -1,3 +1,5 @@
+--! Testing helper namespace.
+
 let assert := import "@std/assert";
 let core := import "musi:core";
 let intrinsics := import "musi:test";

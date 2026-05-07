@@ -1,3 +1,5 @@
+--! Cryptographic helper namespace.
+
 let cryptoHost := import "musi:crypto";
 let randomHost := import "musi:random";
 

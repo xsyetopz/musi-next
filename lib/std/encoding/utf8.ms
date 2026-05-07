@@ -1,3 +1,5 @@
+--! UTF-8 encoding helpers.
+
 let maybe := import "@std/maybe";
 let encodingHost := import "musi:encoding";
 let Maybe := maybe.Maybe;

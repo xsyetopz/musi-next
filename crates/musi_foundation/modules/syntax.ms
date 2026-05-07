@@ -1,3 +1,5 @@
+--! Compiler syntax builtin surface.
+
 let Core := import "musi:core";
 let Any := Core.Any;
 let String := Core.String;

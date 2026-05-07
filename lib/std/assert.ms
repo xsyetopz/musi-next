@@ -1,3 +1,5 @@
+--! Assertion helpers for tests and runtime checks.
+
 let pass := 0 = 0;
 let failBool (message : String) : Bool := 0 = 1;
 

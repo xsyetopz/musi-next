@@ -1,3 +1,5 @@
+--! Floating-point math helpers.
+
 --- Absolute float value.
 export let absFloat (value : Float) : Float :=
   match () (

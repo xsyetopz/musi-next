@@ -1,3 +1,5 @@
+--! Host-backed time primitives.
+
 let Core := import "musi:core";
 let Int := Core.Int;
 let Unit := Core.Unit;

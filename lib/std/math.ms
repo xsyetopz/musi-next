@@ -1,3 +1,5 @@
+--! Math helper namespace.
+
 let floatMath := import "./math/float.ms";
 let intMath := import "./math/integer.ms";
 let libm := import "@std/libm";

@@ -1,3 +1,5 @@
+--! Host-backed formatting primitives.
+
 let Core := import "musi:core";
 let Float := Core.Float;
 let Int := Core.Int;

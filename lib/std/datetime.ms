@@ -1,3 +1,5 @@
+--! Date and time helper namespace.
+
 let timeHost := import "musi:time";
 
 --- Core operation for `millisPerSecond`.

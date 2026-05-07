@@ -1,3 +1,5 @@
+--! Byte sequence helpers.
+
 --- Byte buffer backed by integer byte values.
 export opaque let Bytes := data {
   | ByteValues(values : []Int)

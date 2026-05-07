@@ -1,3 +1,5 @@
+--! Compiler-owned core builtin surface.
+
 @musi.builtin(name := "Type")
 export let Type := Type;
 

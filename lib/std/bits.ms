@@ -1,3 +1,5 @@
+--! Bit-level integer helpers.
+
 let core := import "musi:core";
 
 --- Fixed-width bit-vector type constructor.

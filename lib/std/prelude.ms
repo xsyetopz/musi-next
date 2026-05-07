@@ -1,3 +1,5 @@
+--! Default std prelude exports.
+
 let bytes := import "@std/bytes";
 let cmp := import "@std/cmp";
 let collections := import "@std/collections";

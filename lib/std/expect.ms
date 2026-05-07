@@ -1,3 +1,5 @@
+--! Expect success or failure result helpers.
+
 --- Recoverable success or failure value.
 export opaque let Expect [T, E] := data {
   | Success(T)

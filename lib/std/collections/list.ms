@@ -1,3 +1,5 @@
+--! List collection helpers.
+
 --- Ordered list backed by an array.
 export opaque let List [T] := data {
   | ListValues(values : []T)

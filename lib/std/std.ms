@@ -1,3 +1,5 @@
+--! Top-level std module namespace.
+
 --- Standard library version.
 export let version := "0.1.0";
 

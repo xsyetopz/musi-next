@@ -1,3 +1,5 @@
+--! Text helper namespace.
+
 let ascii := import "@std/ascii";
 let textHost := import "musi:text";
 

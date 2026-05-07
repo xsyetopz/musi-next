@@ -1,3 +1,5 @@
+--! Semantic version helpers.
+
 let text := import "@std/text";
 
 --- Semantic version value.

@@ -1,3 +1,5 @@
+--! Maybe value helpers for Some or None.
+
 --- Maybe value with either Some value or None.
 export opaque let Maybe [T] := data {
   | Some(T)
