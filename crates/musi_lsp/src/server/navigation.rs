@@ -2,7 +2,7 @@ use std::path::Path;
 
 use async_lsp::lsp_types::{
     CallHierarchyItem, CodeActionKind, CodeLens, DocumentHighlight, DocumentHighlightKind,
-    LinkedEditingRanges, Location, Position, Range, Url,
+    LinkedEditingRanges, Location, Moniker, MonikerKind, Position, Range, UniquenessLevel, Url,
 };
 use musi_tooling::{ToolDocumentSymbol, document_links_for_project_file_with_overlay};
 use serde_json::{Value, json};
@@ -95,6 +95,23 @@ pub(super) fn import_definition_at(
     Some(Location {
         uri: Url::from_file_path(link.target).ok()?,
         range: Range::new(Position::new(0, 0), Position::new(0, 0)),
+    })
+}
+
+pub(super) fn import_moniker_at(
+    path: &Path,
+    overlay: Option<&str>,
+    position: Position,
+) -> Option<Moniker> {
+    let link = document_links_for_project_file_with_overlay(path, overlay)
+        .into_iter()
+        .find(|link| position_in_lsp_range(position, to_tool_range(&link.range)))?;
+    let uri = Url::from_file_path(link.target).ok()?;
+    Some(Moniker {
+        scheme: "musi".to_owned(),
+        identifier: format!("{}#1:1", uri.as_str()),
+        unique: UniquenessLevel::Project,
+        kind: Some(MonikerKind::Import),
     })
 }
 

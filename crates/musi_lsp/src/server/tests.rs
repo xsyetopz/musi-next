@@ -1945,6 +1945,49 @@ let other := value + value;
     }
 
     #[test]
+    fn moniker_on_import_string_identifies_resolved_module() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let dep_path = root.join("dep.ms");
+        let source = "let dep := import \"./dep\";\n";
+        fs::write(&path, source).expect("entry should be written");
+        fs::write(&dep_path, "export let value := 1;\n").expect("dep should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let dep_uri =
+            Url::from_file_path(fs::canonicalize(dep_path).expect("dep path should canonicalize"))
+                .expect("dep URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let monikers = server
+            .monikers_at(MonikerParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(0, 21),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("import string moniker should resolve");
+
+        assert_eq!(monikers.len(), 1);
+        assert_eq!(monikers[0].scheme, "musi");
+        assert_eq!(monikers[0].unique, UniquenessLevel::Project);
+        assert_eq!(monikers[0].kind, Some(MonikerKind::Import));
+        assert_eq!(monikers[0].identifier, format!("{}#1:1", dep_uri.as_str()));
+    }
+
+    #[test]
     fn call_hierarchy_prepare_returns_symbol_under_cursor() {
         let root = temp_project();
         fs::write(
