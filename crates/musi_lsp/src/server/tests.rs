@@ -3018,6 +3018,54 @@ let other := value + 2;
     }
 
     #[test]
+    fn will_rename_files_infers_project_root_from_open_document() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "src/index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        fs::create_dir_all(root.join("src")).expect("src dir should be created");
+        let index_path = root.join("src/index.ms");
+        let dep_path = root.join("src/dep.ms");
+        let next_path = root.join("src/renamed.ms");
+        fs::write(&index_path, "let dep := import \"./dep\";\n").expect("index should be written");
+        fs::write(&dep_path, "export let value := 1;\n").expect("dep should be written");
+        let uri = Url::from_file_path(&index_path).expect("index URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server
+            .open_documents
+            .insert(uri, "let dep := import \"./dep\";\n".to_owned());
+
+        let edit = server
+            .will_rename_files_edit(&RenameFilesParams {
+                files: vec![FileRename {
+                    old_uri: Url::from_file_path(&dep_path)
+                        .expect("old URI should build")
+                        .to_string(),
+                    new_uri: Url::from_file_path(&next_path)
+                        .expect("new URI should build")
+                        .to_string(),
+                }],
+            })
+            .expect("rename should produce import edit");
+
+        let changes = edit.changes.expect("edit should use plain changes");
+        let (edit_uri, edits) = changes.iter().next().expect("index edit should exist");
+        let edit_path = edit_uri
+            .to_file_path()
+            .expect("edit URI should be a file path");
+        assert!(paths_match(&edit_path, &index_path));
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].new_text, "\"./renamed\"");
+    }
+
+    #[test]
     fn cli_range_is_zero_based_lsp_range() {
         let range = to_cli_range(&CliDiagnosticRange {
             start_line: 3,
