@@ -38,11 +38,12 @@ use musi_tooling::{
     ToolMonikerKind, completions_for_project_file_with_overlay,
     definition_for_project_file_with_overlay, document_links_for_project_file_with_overlay,
     document_symbols_for_project_file_with_overlay, folding_ranges_for_project_file_with_overlay,
-    hover_for_project_file_with_overlay, module_docs_for_project_file_with_overlay,
-    moniker_for_project_file_with_overlay, outgoing_calls_for_project_file_with_overlay,
-    prepare_rename_for_project_file_with_overlay, references_for_project_file_with_overlay,
-    rename_for_project_file_with_overlay, selection_ranges_for_project_file_with_overlay,
-    signature_help_for_project_file_with_overlay, type_definition_for_project_file_with_overlay,
+    hover_for_project_file_with_overlay, implementation_for_project_file_with_overlay,
+    module_docs_for_project_file_with_overlay, moniker_for_project_file_with_overlay,
+    outgoing_calls_for_project_file_with_overlay, prepare_rename_for_project_file_with_overlay,
+    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
+    selection_ranges_for_project_file_with_overlay, signature_help_for_project_file_with_overlay,
+    type_definition_for_project_file_with_overlay,
 };
 use serde_json::{Value, json};
 
@@ -310,6 +311,14 @@ impl LanguageServer for MusiLanguageServer {
     ) -> ServerFuture<Option<GotoDefinitionResponse>> {
         let type_definition_response = self.type_definition_at(params);
         Box::pin(async move { Ok(type_definition_response) })
+    }
+
+    fn implementation(
+        &mut self,
+        params: GotoDefinitionParams,
+    ) -> ServerFuture<Option<GotoDefinitionResponse>> {
+        let implementation_response = self.implementation_at(params);
+        Box::pin(async move { Ok(implementation_response) })
     }
 
     fn references(&mut self, params: ReferenceParams) -> ServerFuture<Option<Vec<Location>>> {

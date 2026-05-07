@@ -161,6 +161,32 @@ impl MusiLanguageServer {
         Some(GotoDefinitionResponse::Scalar(location))
     }
 
+    pub(super) fn implementation_at(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> Option<GotoDefinitionResponse> {
+        let text_document = params.text_document_position_params.text_document;
+        let position = params.text_document_position_params.position;
+        let path = text_document.uri.to_file_path().ok()?;
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let overlay = self
+            .open_documents
+            .get(&text_document.uri)
+            .map(String::as_str);
+        let locations = implementation_for_project_file_with_overlay(
+            &path,
+            overlay,
+            usize::try_from(position.line).ok()?.saturating_add(1),
+            usize::try_from(position.character).ok()?.saturating_add(1),
+        )
+        .into_iter()
+        .filter_map(|location| to_lsp_location(&location))
+        .collect::<Vec<_>>();
+        (!locations.is_empty()).then_some(GotoDefinitionResponse::Array(locations))
+    }
+
     pub(super) fn references_at(&self, params: ReferenceParams) -> Option<Vec<Location>> {
         let text_document = params.text_document_position.text_document;
         let position = params.text_document_position.position;

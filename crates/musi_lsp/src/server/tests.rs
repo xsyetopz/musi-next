@@ -14,16 +14,17 @@ use async_lsp::lsp_types::{
     DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
     DocumentSymbolParams, DocumentSymbolResponse, Documentation, ExecuteCommandParams,
     FileOperationPatternKind, FileRename, FoldingRangeKind, FoldingRangeParams,
-    GotoDefinitionParams, GotoDefinitionResponse, InitializeParams, InlayHintKind, InlayHintLabel,
-    InlayHintParams, InlayHintServerCapabilities, InlayHintTooltip, LinkedEditingRangeParams,
-    MonikerKind, PartialResultParams, Position, PrepareRenameResponse, ReferenceContext,
-    RenameFilesParams, SelectionRangeParams, SemanticToken, SemanticTokensDeltaParams,
-    SemanticTokensFullDeltaResult, SignatureHelpParams, SymbolKind, TextDocumentIdentifier,
-    TextDocumentPositionParams, TextDocumentSaveReason, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
-    TypeDefinitionProviderCapability, WillSaveTextDocumentParams, WorkDoneProgressParams,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
-    WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    GotoDefinitionParams, GotoDefinitionResponse, ImplementationProviderCapability,
+    InitializeParams, InlayHintKind, InlayHintLabel, InlayHintParams, InlayHintServerCapabilities,
+    InlayHintTooltip, LinkedEditingRangeParams, MonikerKind, PartialResultParams, Position,
+    PrepareRenameResponse, ReferenceContext, RenameFilesParams, SelectionRangeParams,
+    SemanticToken, SemanticTokensDeltaParams, SemanticTokensFullDeltaResult, SignatureHelpParams,
+    SymbolKind, TextDocumentIdentifier, TextDocumentPositionParams, TextDocumentSaveReason,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability, WillSaveTextDocumentParams,
+    WorkDoneProgressParams, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
+    WorkspaceDocumentDiagnosticReport, WorkspaceFolder, WorkspaceFoldersChangeEvent,
+    WorkspaceSymbolParams, WorkspaceSymbolResponse,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -147,6 +148,10 @@ mod success {
         assert_eq!(
             initialize_result.capabilities.type_definition_provider,
             Some(TypeDefinitionProviderCapability::Simple(true))
+        );
+        assert_eq!(
+            initialize_result.capabilities.implementation_provider,
+            Some(ImplementationProviderCapability::Simple(true))
         );
         assert_eq!(
             initialize_result.capabilities.references_provider,
@@ -1689,6 +1694,57 @@ boxedName.value;
 
         assert_eq!(location.range.start, Position::new(0, 4));
         assert_eq!(location.range.end, Position::new(0, 7));
+    }
+
+    #[test]
+    fn implementation_resolves_shape_givens() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "\
+let Eq [T] := shape {
+  let equals (left : T, right : T) : Bool;
+};
+let intEq :=
+  given Eq[Int] {
+  let equals (left : Int, right : Int) : Bool := left = right;
+  };
+let boolEq :=
+  given Eq[Bool] {
+  let equals (left : Bool, right : Bool) : Bool := left = right;
+  };
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let response = server
+            .implementation_at(GotoDefinitionParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(0, 4),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("implementations should resolve");
+        let GotoDefinitionResponse::Array(locations) = response else {
+            panic!("implementation locations expected");
+        };
+
+        assert_eq!(locations.len(), 2);
+        assert_eq!(locations[0].range.start, Position::new(3, 0));
+        assert_eq!(locations[1].range.start, Position::new(7, 0));
     }
 
     #[test]

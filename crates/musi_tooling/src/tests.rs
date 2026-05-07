@@ -21,13 +21,14 @@ use crate::{
     collect_project_diagnostics_with_overlay, completions_for_project_file_with_overlay,
     definition_for_project_file_with_overlay, document_links_for_project_file_with_overlay,
     document_symbols_for_project_file_with_overlay, folding_ranges_for_project_file_with_overlay,
-    hover_for_project_file_with_overlay, inlay_hints_for_project_file_with_overlay,
-    load_direct_graph, module_docs_for_project_file_with_overlay,
-    moniker_for_project_file_with_overlay, outgoing_calls_for_project_file_with_overlay,
-    prepare_rename_for_project_file_with_overlay, project_error_report,
-    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
-    selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
-    session_error_report, signature_help_for_project_file_with_overlay, tooling_error_report,
+    hover_for_project_file_with_overlay, implementation_for_project_file_with_overlay,
+    inlay_hints_for_project_file_with_overlay, load_direct_graph,
+    module_docs_for_project_file_with_overlay, moniker_for_project_file_with_overlay,
+    outgoing_calls_for_project_file_with_overlay, prepare_rename_for_project_file_with_overlay,
+    project_error_report, references_for_project_file_with_overlay,
+    rename_for_project_file_with_overlay, selection_ranges_for_project_file_with_overlay,
+    semantic_tokens_for_project_file_with_overlay, session_error_report,
+    signature_help_for_project_file_with_overlay, tooling_error_report,
     type_definition_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
     workspace_symbols_for_project_root,
 };
@@ -343,6 +344,40 @@ boxedName.value;
         assert_eq!(location.range.start_line, 1);
         assert_eq!(location.range.start_col, 5);
         assert_eq!(location.range.end_col, 8);
+    }
+
+    #[test]
+    fn implementation_resolves_shape_givens() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "\
+let Eq [T] := shape {
+  let equals (left : T, right : T) : Bool;
+};
+let intEq :=
+  given Eq[Int] {
+  let equals (left : Int, right : Int) : Bool := left = right;
+  };
+let boolEq :=
+  given Eq[Bool] {
+  let equals (left : Bool, right : Bool) : Bool := left = right;
+  };
+";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let implementations = implementation_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            1,
+            5,
+        );
+
+        assert_eq!(implementations.len(), 2);
+        assert_eq!(implementations[0].path, test_dir.path().join("index.ms"));
+        assert_eq!(implementations[0].range.start_line, 4);
+        assert_eq!(implementations[0].range.start_col, 1);
+        assert_eq!(implementations[1].range.start_line, 8);
+        assert_eq!(implementations[1].range.start_col, 1);
     }
 
     #[test]

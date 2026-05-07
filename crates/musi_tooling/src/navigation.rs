@@ -95,6 +95,22 @@ pub fn type_definition_for_project_file_with_overlay(
 }
 
 #[must_use]
+pub fn implementation_for_project_file_with_overlay(
+    path: &Path,
+    overlay_text: Option<&str>,
+    line: usize,
+    character: usize,
+) -> Vec<ToolLocation> {
+    let Some(context) = SymbolAnalysis::new(path, overlay_text) else {
+        return Vec::new();
+    };
+    let Some(binding_id) = context.binding_at(line, character) else {
+        return Vec::new();
+    };
+    context.implementations_for_binding(binding_id)
+}
+
+#[must_use]
 pub fn moniker_for_project_file_with_overlay(
     path: &Path,
     overlay_text: Option<&str>,
@@ -473,6 +489,52 @@ impl SymbolAnalysis {
                         .is_some_and(|ty| matches!(sema.ty(ty).kind, HirTyKind::Type))
             })
             .and_then(|(binding_id, _)| self.binding_location(binding_id))
+    }
+
+    fn implementations_for_binding(&self, binding_id: NameBindingId) -> Vec<ToolLocation> {
+        let Some(resolved) = self.resolved() else {
+            return Vec::new();
+        };
+        let Some(sema) = self.sema() else {
+            return Vec::new();
+        };
+        let binding = resolved.bindings.get(binding_id);
+        let Some(shape) = sema.shape_facts_by_name(binding.name) else {
+            return Vec::new();
+        };
+        let mut locations = sema
+            .module()
+            .store
+            .exprs
+            .iter()
+            .filter_map(|(expr_id, _)| sema.given_facts(expr_id))
+            .filter(|given| given.shape_key == shape.key)
+            .filter_map(|given| {
+                let source =
+                    self.source_for_site(NameSite::new(given.origin.source_id, given.origin.span))?;
+                Some(ToolLocation {
+                    path: self.path_for_source(source)?,
+                    range: tool_range(source, given.origin.span),
+                })
+            })
+            .collect::<Vec<_>>();
+        locations.sort_by_key(|location| {
+            (
+                location.path.clone(),
+                location.range.start_line,
+                location.range.start_col,
+            )
+        });
+        locations.dedup_by_key(|location| {
+            (
+                location.path.clone(),
+                location.range.start_line,
+                location.range.start_col,
+                location.range.end_line,
+                location.range.end_col,
+            )
+        });
+        locations
     }
 
     fn binding_location(&self, binding_id: NameBindingId) -> Option<ToolLocation> {
