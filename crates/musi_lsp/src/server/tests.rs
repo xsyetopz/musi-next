@@ -126,7 +126,14 @@ mod success {
         assert_eq!(completion.resolve_provider, Some(true));
         assert_eq!(
             completion.trigger_characters.as_deref(),
-            Some(&[".".to_owned(), "\"".to_owned(), "/".to_owned()][..])
+            Some(
+                &[
+                    ".".to_owned(),
+                    "\"".to_owned(),
+                    "/".to_owned(),
+                    "@".to_owned()
+                ][..]
+            )
         );
         assert_eq!(
             initialize_result.capabilities.declaration_provider,
