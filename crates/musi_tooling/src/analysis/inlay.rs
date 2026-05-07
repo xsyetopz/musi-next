@@ -222,6 +222,10 @@ fn push_parameter_hint(
     if argument_text == name_text {
         return;
     }
+    let is_literal_argument = matches!(
+        expr.kind,
+        HirExprKind::Lit { .. } | HirExprKind::Template { .. }
+    );
     let (line, col) = context.source.line_col(expr.origin.span.start);
     let mut hint = ToolInlayHint::new(
         ToolPosition::new(line, col),
@@ -229,5 +233,6 @@ fn push_parameter_hint(
         ToolInlayHintKind::Parameter,
     );
     hint.tooltip = Some(format!("parameter `{name_text}`"));
+    hint.is_literal_argument = is_literal_argument;
     hints.push(hint);
 }

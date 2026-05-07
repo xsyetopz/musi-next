@@ -14,15 +14,16 @@ use async_lsp::lsp_types::{
     DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
     Documentation, ExecuteCommandParams, FileOperationPatternKind, FileRename, FoldingRangeKind,
     FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse, InitializeParams,
-    InlayHintKind, InlayHintServerCapabilities, InlayHintTooltip, LinkedEditingRangeParams,
-    MonikerKind, PartialResultParams, Position, PrepareRenameResponse, ReferenceContext,
-    RenameFilesParams, SelectionRangeParams, SemanticToken, SemanticTokensDeltaParams,
-    SemanticTokensFullDeltaResult, SignatureHelpParams, SymbolKind, TextDocumentIdentifier,
-    TextDocumentPositionParams, TextDocumentSaveReason, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
-    TypeDefinitionProviderCapability, WillSaveTextDocumentParams, WorkDoneProgressParams,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
-    WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    InlayHintKind, InlayHintLabel, InlayHintParams, InlayHintServerCapabilities, InlayHintTooltip,
+    LinkedEditingRangeParams, MonikerKind, PartialResultParams, Position, PrepareRenameResponse,
+    ReferenceContext, RenameFilesParams, SelectionRangeParams, SemanticToken,
+    SemanticTokensDeltaParams, SemanticTokensFullDeltaResult, SignatureHelpParams, SymbolKind,
+    TextDocumentIdentifier, TextDocumentPositionParams, TextDocumentSaveReason,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability, WillSaveTextDocumentParams,
+    WorkDoneProgressParams, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
+    WorkspaceDocumentDiagnosticReport, WorkspaceFolder, WorkspaceFoldersChangeEvent,
+    WorkspaceSymbolParams, WorkspaceSymbolResponse,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -768,6 +769,57 @@ render(8080, 1 = 1);
             panic!("markup hover expected");
         };
         assert_eq!(contents.value, "```musi\n(v…");
+    }
+
+    #[test]
+    fn inlay_hints_literal_parameter_setting_filters_non_literals() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "\
+let add (left : Int, right : Int) : Int := left + right;
+let value := 1;
+add(value, 2);
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+        server.update_configuration(&DidChangeConfigurationParams {
+            settings: serde_json::json!({
+                "inlayHints": {
+                    "enabled": true,
+                    "parameterNames": "literals",
+                    "variableTypes": false,
+                },
+            }),
+        });
+
+        let hints = server
+            .inlay_hints(&InlayHintParams {
+                text_document: TextDocumentIdentifier { uri },
+                range: full_document_range(source),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("inlay hints should run");
+        let labels = hints
+            .iter()
+            .map(|hint| match &hint.label {
+                InlayHintLabel::String(label) => label.as_str(),
+                InlayHintLabel::LabelParts(_) => "",
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(labels, ["right:"]);
     }
 
     #[test]

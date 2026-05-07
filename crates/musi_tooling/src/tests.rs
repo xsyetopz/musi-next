@@ -1379,6 +1379,34 @@ export opaque let Env := effect {
             })
         );
     }
+
+    #[test]
+    fn inlay_hints_mark_literal_parameter_arguments() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "\
+let add (left : Int, right : Int) : Int := left + right;
+let value := 1;
+add(value, 2);
+";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let hints = inlay_hints_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+        );
+        let left = hints
+            .iter()
+            .find(|hint| hint.kind == ToolInlayHintKind::Parameter && hint.label == "left:")
+            .expect("left parameter hint should exist");
+        let right = hints
+            .iter()
+            .find(|hint| hint.kind == ToolInlayHintKind::Parameter && hint.label == "right:")
+            .expect("right parameter hint should exist");
+
+        assert!(!left.is_literal_argument);
+        assert!(right.is_literal_argument);
+    }
 }
 
 mod failure {

@@ -66,9 +66,11 @@ impl InlayHintConfig {
     pub(super) const fn allows(self, hint: &ToolInlayHint) -> bool {
         match hint.kind {
             ToolInlayHintKind::Type => self.variable_types,
-            ToolInlayHintKind::Parameter => {
-                !matches!(self.parameter_names, ParameterNameHints::None)
-            }
+            ToolInlayHintKind::Parameter => match self.parameter_names {
+                ParameterNameHints::None => false,
+                ParameterNameHints::Literals => hint.is_literal_argument,
+                ParameterNameHints::All => true,
+            },
         }
     }
 }

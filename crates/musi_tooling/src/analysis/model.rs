@@ -74,6 +74,7 @@ pub struct ToolInlayHint {
     pub label: String,
     pub kind: ToolInlayHintKind,
     pub tooltip: Option<String>,
+    pub is_literal_argument: bool,
 }
 
 impl ToolInlayHint {
@@ -84,6 +85,7 @@ impl ToolInlayHint {
             label: label.into(),
             kind,
             tooltip: None,
+            is_literal_argument: false,
         }
     }
 }
