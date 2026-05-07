@@ -1383,6 +1383,33 @@ let io := import "@std/io";
     }
 
     #[test]
+    fn ignore_does_not_disable_unprotected_import_sorting() {
+        let source = r#"let z := import "./z";
+let y := import "./y";
+
+-- musi-fmt-ignore
+let   b:=import "./b";
+
+let d := import "./d";
+let c := import "./c";
+"#;
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            r#"let y := import "./y";
+let z := import "./z";
+
+-- musi-fmt-ignore
+let   b:=import "./b";
+let c := import "./c";
+let d := import "./d";
+"#
+        );
+    }
+
+    #[test]
     fn formats_musi_markdown_fences() {
         let markdown = "# Example\n\n```musi\nlet x:=1;\n```\n\n```ts\nlet x=1\n```\n";
         let formatted_result = format_markdown(markdown, &options()).unwrap();

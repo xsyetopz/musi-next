@@ -1,7 +1,7 @@
 use music_syntax::{Lexer, parse};
 
 use crate::{
-    FormatError, FormatOptions, FormatResultOf, imports::organize_imports,
+    FormatError, FormatOptions, FormatResultOf, imports::organize_imports_protecting,
     protected::protected_line_ranges,
 };
 
@@ -26,9 +26,13 @@ pub fn format_source(source: &str, options: &FormatOptions) -> FormatResultOf {
             changed: source != ensure_final_newline(source),
         });
     }
-    let organized = (!has_protected_ignore(source))
-        .then(|| organize_imports(source))
-        .flatten();
+    let lexed = Lexer::new(source).lex();
+    let parsed = parse(lexed.clone());
+    if !lexed.errors().is_empty() || !parsed.errors().is_empty() {
+        return Err(FormatError::SyntaxErrors);
+    }
+    let protected_ranges = protected_line_ranges(source, parsed.tree());
+    let organized = organize_imports_protecting(source, &protected_ranges);
     let source = organized.as_deref().unwrap_or(source);
     let lexed = Lexer::new(source).lex();
     let parsed = parse(lexed.clone());
@@ -50,12 +54,6 @@ fn has_ignore_file(source: &str) -> bool {
         .lines()
         .take(5)
         .any(|line| line.contains("musi-fmt-ignore-file"))
-}
-
-fn has_protected_ignore(source: &str) -> bool {
-    source
-        .lines()
-        .any(|line| line.contains("musi-fmt-ignore") && !line.contains("musi-fmt-ignore-file"))
 }
 
 fn ensure_final_newline(source: &str) -> String {

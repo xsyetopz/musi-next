@@ -33,6 +33,14 @@ struct Replacement {
 
 #[must_use]
 pub fn organize_imports(source: &str) -> Option<String> {
+    organize_imports_protecting(source, &[])
+}
+
+#[must_use]
+pub fn organize_imports_protecting(
+    source: &str,
+    protected_ranges: &[Range<usize>],
+) -> Option<String> {
     let lexed = Lexer::new(source).lex();
     if !lexed.errors().is_empty() {
         return None;
@@ -42,7 +50,7 @@ pub fn organize_imports(source: &str) -> Option<String> {
         return None;
     }
     let statements = collect_top_level_statements(source, &tokens);
-    let replacements = import_block_replacements(source, &statements);
+    let replacements = import_block_replacements(source, &statements, protected_ranges);
     apply_replacements(source, &replacements)
 }
 
@@ -209,11 +217,23 @@ fn previous_line_start(source: &str, line_start: usize) -> Option<usize> {
     )
 }
 
-fn import_block_replacements(source: &str, statements: &[ImportStatement]) -> Vec<Replacement> {
+fn import_block_replacements(
+    source: &str,
+    statements: &[ImportStatement],
+    protected_ranges: &[Range<usize>],
+) -> Vec<Replacement> {
     let mut replacements = Vec::new();
     let mut block = Vec::<ImportStatement>::new();
 
     for statement in statements {
+        if protected_ranges
+            .iter()
+            .any(|range| ranges_overlap(&statement.range, range))
+        {
+            push_sorted_block(&mut replacements, &block);
+            block.clear();
+            continue;
+        }
         if let Some(previous) = block.last() {
             let between = source
                 .get(previous.range.end..statement.range.start)
@@ -227,6 +247,10 @@ fn import_block_replacements(source: &str, statements: &[ImportStatement]) -> Ve
     }
     push_sorted_block(&mut replacements, &block);
     replacements
+}
+
+const fn ranges_overlap(left: &Range<usize>, right: &Range<usize>) -> bool {
+    left.start < right.end && right.start < left.end
 }
 
 fn newline_count(text: &str) -> usize {
