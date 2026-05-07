@@ -54,11 +54,12 @@ use musi_tooling::{
     completions_for_project_file_with_overlay, definition_for_project_file_with_overlay,
     document_links_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
     folding_ranges_for_project_file_with_overlay, hover_for_project_file_with_overlay,
-    inlay_hints_for_project_file_with_overlay, prepare_rename_for_project_file_with_overlay,
-    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
-    selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
-    signature_help_for_project_file_with_overlay, type_definition_for_project_file_with_overlay,
-    workspace_symbols_for_project_file_with_overlay, workspace_symbols_for_project_root,
+    inlay_hints_for_project_file_with_overlay, module_docs_for_project_file_with_overlay,
+    prepare_rename_for_project_file_with_overlay, references_for_project_file_with_overlay,
+    rename_for_project_file_with_overlay, selection_ranges_for_project_file_with_overlay,
+    semantic_tokens_for_project_file_with_overlay, signature_help_for_project_file_with_overlay,
+    type_definition_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
+    workspace_symbols_for_project_root,
 };
 use serde_json::{Value, json};
 
@@ -370,6 +371,9 @@ impl MusiLanguageServer {
             .open_documents
             .get(&text_document.uri)
             .map(String::as_str);
+        if let Some(hover) = self.import_hover_at(&path, overlay, position) {
+            return Some(hover);
+        }
         let hover = hover_for_project_file_with_overlay(
             &path,
             overlay,
@@ -383,6 +387,33 @@ impl MusiLanguageServer {
                 value: contents,
             }),
             range: Some(to_tool_range(&hover.range)),
+        })
+    }
+
+    fn import_hover_at(
+        &self,
+        path: &Path,
+        overlay: Option<&str>,
+        position: Position,
+    ) -> Option<Hover> {
+        let link = document_links_for_project_file_with_overlay(path, overlay)
+            .into_iter()
+            .find(|link| position_in_lsp_range(position, to_tool_range(&link.range)))?;
+        let mut contents = format!(
+            "```musi\n(module) {}\n```\n\nResolves to `{}`.",
+            link.specifier, link.resolved
+        );
+        if let Some(docs) = module_docs_for_project_file_with_overlay(&link.target, None) {
+            contents.push_str("\n\n");
+            contents.push_str(&docs);
+        }
+        let contents = truncate_hover_contents(&contents, self.config.hover_maximum_length);
+        Some(Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: contents,
+            }),
+            range: Some(to_tool_range(&link.range)),
         })
     }
 

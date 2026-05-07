@@ -11,6 +11,8 @@ use crate::analysis::{ToolRange, tool_range};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolDocumentLink {
     pub range: ToolRange,
+    pub specifier: String,
+    pub resolved: String,
     pub target: PathBuf,
     pub tooltip: Option<String>,
 }
@@ -53,6 +55,8 @@ pub fn document_links_for_project_file_with_overlay(
             let target = target_path_for_resolved_spec(&project, &resolved)?;
             Some(ToolDocumentLink {
                 range: tool_range(source, import_link_span(source, site.span, spec.as_str())),
+                specifier: spec.as_str().to_owned(),
+                resolved: resolved.as_str().to_owned(),
                 target,
                 tooltip: Some(format!("Open `{resolved}`")),
             })

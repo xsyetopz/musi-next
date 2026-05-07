@@ -466,6 +466,8 @@ boxedName.value;
         );
 
         assert_eq!(links.len(), 1);
+        assert_eq!(links[0].specifier, "./dep");
+        assert_eq!(links[0].resolved, "@app@0.1.0/dep.ms");
         assert_eq!(
             links[0].target,
             fs::canonicalize(test_dir.path().join("dep.ms")).expect("dep path should canonicalize")

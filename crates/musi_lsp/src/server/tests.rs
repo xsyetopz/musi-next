@@ -1396,6 +1396,53 @@ let other := value + value;
     }
 
     #[test]
+    fn hover_on_import_string_returns_resolved_module_docs() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let dep := import \"./dep\";\n";
+        fs::write(&path, source).expect("entry should be written");
+        fs::write(
+            root.join("dep.ms"),
+            "--! dependency docs\nexport let value := 1;\n",
+        )
+        .expect("dep should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let hover = server
+            .hover_at(HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(0, 21),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("import hover should resolve");
+
+        let HoverContents::Markup(contents) = hover.contents else {
+            panic!("markup hover expected");
+        };
+        assert!(contents.value.contains("(module) ./dep"));
+        assert!(contents.value.contains("Resolves to `@app@0.1.0/dep.ms`."));
+        assert!(contents.value.contains("dependency docs"));
+        assert_eq!(
+            hover.range,
+            Some(Range::new(Position::new(0, 18), Position::new(0, 25)))
+        );
+    }
+
+    #[test]
     fn hover_returns_module_docs_on_module_doc_comments() {
         let root = temp_project();
         fs::write(
