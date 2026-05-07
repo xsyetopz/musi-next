@@ -43,7 +43,7 @@ impl MusiLanguageServer {
             .filter_map(|uri| uri.to_file_path().ok())
             .collect::<Vec<_>>();
         let mut symbols = self
-            .workspace_roots
+            .workspace_query_roots()
             .iter()
             .flat_map(|root| workspace_symbols_for_project_root(root, &params.query))
             .filter(|symbol| {

@@ -77,7 +77,7 @@ impl MusiLanguageServer {
 
     pub(super) fn workspace_diagnostic_paths(&self) -> Vec<PathBuf> {
         let mut paths = self
-            .workspace_roots
+            .workspace_query_roots()
             .iter()
             .flat_map(|root| workspace_module_paths(root))
             .collect::<Vec<_>>();

@@ -2,7 +2,9 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 use async_lsp::lsp_types::InitializeParams;
-use musi_project::{PackageSource, ProjectOptions, load_project};
+use musi_project::{PackageSource, ProjectOptions, load_project, load_project_ancestor};
+
+use super::MusiLanguageServer;
 
 #[allow(deprecated)]
 pub(super) fn workspace_roots(params: &InitializeParams) -> Vec<PathBuf> {
@@ -34,6 +36,31 @@ pub(super) fn workspace_module_paths(root: &Path) -> Vec<PathBuf> {
             .values()
             .filter(|package| matches!(package.source, PackageSource::Workspace))
             .flat_map(|package| package.module_keys.values().cloned())
+            .collect(),
+    )
+}
+
+impl MusiLanguageServer {
+    pub(super) fn workspace_query_roots(&self) -> Vec<PathBuf> {
+        let mut roots = self.workspace_roots.clone();
+        roots.extend(inferred_workspace_roots(
+            self.open_documents
+                .keys()
+                .filter_map(|uri| uri.to_file_path().ok()),
+        ));
+        sort_dedup_paths(roots)
+    }
+}
+
+fn inferred_workspace_roots(paths: impl IntoIterator<Item = PathBuf>) -> Vec<PathBuf> {
+    sort_dedup_paths(
+        paths
+            .into_iter()
+            .filter_map(|path| {
+                load_project_ancestor(&path, ProjectOptions::default())
+                    .ok()
+                    .map(|project| project.root_dir().to_path_buf())
+            })
             .collect(),
     )
 }

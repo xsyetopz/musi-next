@@ -906,8 +906,8 @@ impl MusiLanguageServer {
 
     fn workspace_source_paths(&self) -> Vec<PathBuf> {
         let mut paths = self.workspace_diagnostic_paths();
-        for root in &self.workspace_roots {
-            collect_workspace_source_paths(root, &mut paths);
+        for root in self.workspace_query_roots() {
+            collect_workspace_source_paths(&root, &mut paths);
         }
         sort_dedup_paths(paths)
     }

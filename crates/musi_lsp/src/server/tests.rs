@@ -1095,6 +1095,53 @@ add(value, 2);
     }
 
     #[test]
+    fn workspace_symbols_infer_project_root_from_open_document() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "src/index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        fs::create_dir_all(root.join("src")).expect("src dir should be created");
+        let path = root.join("src/index.ms");
+        fs::write(
+            &path,
+            "let extra := import \"./extra\";\nlet entryValue := extra.extraValue;\n",
+        )
+        .expect("entry should be written");
+        fs::write(root.join("src/extra.ms"), "export let extraValue := 2;\n")
+            .expect("extra should be written");
+        let uri = Url::from_file_path(&path).expect("entry URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(
+            uri,
+            "let extra := import \"./extra\";\nlet unsavedValue := extra.extraValue;\n".to_owned(),
+        );
+
+        let response = server.workspace_symbols(&WorkspaceSymbolParams {
+            query: "Value".to_owned(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        });
+        let WorkspaceSymbolResponse::Nested(symbols) = response else {
+            panic!("workspace symbols expected");
+        };
+        let names = symbols
+            .iter()
+            .map(|symbol| symbol.name.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(names.contains(&"unsavedValue"), "{names:?}");
+        assert!(names.contains(&"extraValue"), "{names:?}");
+        assert!(!names.contains(&"entryValue"), "{names:?}");
+    }
+
+    #[test]
     fn workspace_folder_changes_update_workspace_symbol_roots() {
         let old_root = temp_project();
         fs::write(
@@ -1414,6 +1461,60 @@ let other := value;
         assert!(locations.iter().all(|location| {
             location.range == Range::new(Position::new(0, 18), Position::new(0, 25))
         }));
+    }
+
+    #[test]
+    fn references_on_import_string_infer_project_root_from_open_document() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "src/index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        fs::create_dir_all(root.join("src")).expect("src dir should be created");
+        let index_path = root.join("src/index.ms");
+        let other_path = root.join("src/other.ms");
+        fs::write(
+            &index_path,
+            "let other := import \"./other\";\nlet dep := import \"./dep\";\n",
+        )
+        .expect("entry should be written");
+        fs::write(&other_path, "let dep := import \"./dep\";\n").expect("other should be written");
+        fs::write(root.join("src/dep.ms"), "export let value := 1;\n")
+            .expect("dep should be written");
+        let uri = Url::from_file_path(&index_path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(
+            uri.clone(),
+            "let other := import \"./other\";\nlet dep := import \"./dep\";\n".to_owned(),
+        );
+
+        let locations = server
+            .references_at(ReferenceParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 21),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+                context: ReferenceContext {
+                    include_declaration: true,
+                },
+            })
+            .expect("import references should resolve");
+        let paths = locations
+            .iter()
+            .map(|location| location.uri.to_file_path().expect("location path"))
+            .collect::<Vec<_>>();
+
+        assert_eq!(locations.len(), 2);
+        assert!(paths.iter().any(|path| paths_match(path, &index_path)));
+        assert!(paths.iter().any(|path| paths_match(path, &other_path)));
     }
 
     #[test]
@@ -2728,6 +2829,66 @@ let other := value + 2;
         };
         assert_eq!(item.uri, uri);
         assert!(!item.full_document_diagnostic_report.items.is_empty());
+    }
+
+    #[test]
+    fn workspace_diagnostic_infers_project_root_from_open_document() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "src/index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        fs::create_dir_all(root.join("src")).expect("src dir should be created");
+        let index_path = root.join("src/index.ms");
+        let other_path = root.join("src/other.ms");
+        fs::write(
+            &index_path,
+            "let other := import \"./other\";\nlet value : Int := 1;\n",
+        )
+        .expect("entry should be written");
+        fs::write(&other_path, "export let otherValue : Int := \"bad\";\n")
+            .expect("other should be written");
+        let uri = Url::from_file_path(&index_path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(
+            uri,
+            "let other := import \"./other\";\nlet value : Int := 1;\n".to_owned(),
+        );
+
+        let report = server.workspace_diagnostics(WorkspaceDiagnosticParams {
+            identifier: Some("musi".to_owned()),
+            previous_result_ids: Vec::new(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        });
+
+        let WorkspaceDiagnosticReportResult::Report(report) = report else {
+            panic!("workspace diagnostics should return a report");
+        };
+        let diagnostic_paths = report
+            .items
+            .iter()
+            .filter_map(|item| {
+                let WorkspaceDocumentDiagnosticReport::Full(item) = item else {
+                    return None;
+                };
+                (!item.full_document_diagnostic_report.items.is_empty())
+                    .then(|| item.uri.to_file_path().expect("diagnostic URI path"))
+            })
+            .collect::<Vec<_>>();
+
+        assert!(
+            diagnostic_paths
+                .iter()
+                .any(|path| paths_match(path, &other_path)),
+            "{diagnostic_paths:?}"
+        );
     }
 
     #[test]
