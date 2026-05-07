@@ -15,9 +15,9 @@ use async_lsp::lsp_types::{
     Documentation, ExecuteCommandParams, FileOperationPatternKind, FileRename, FoldingRangeKind,
     FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse, InitializeParams,
     InlayHintKind, InlayHintServerCapabilities, InlayHintTooltip, LinkedEditingRangeParams,
-    PartialResultParams, Position, RenameFilesParams, SelectionRangeParams, SemanticToken,
-    SemanticTokensDeltaParams, SemanticTokensFullDeltaResult, SignatureHelpParams, SymbolKind,
-    TextDocumentIdentifier, TextDocumentPositionParams, TextDocumentSaveReason,
+    PartialResultParams, Position, ReferenceContext, RenameFilesParams, SelectionRangeParams,
+    SemanticToken, SemanticTokensDeltaParams, SemanticTokensFullDeltaResult, SignatureHelpParams,
+    SymbolKind, TextDocumentIdentifier, TextDocumentPositionParams, TextDocumentSaveReason,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
     TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability, WillSaveTextDocumentParams,
     WorkDoneProgressParams, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
@@ -1072,6 +1072,74 @@ let other := value;
             location.range,
             Range::new(Position::new(0, 0), Position::new(0, 0))
         );
+    }
+
+    #[test]
+    fn references_on_import_string_find_matching_imports() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "src/index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        fs::create_dir_all(root.join("src")).expect("src dir should be created");
+        let index_path = root.join("src/index.ms");
+        let other_path = root.join("src/other.ms");
+        fs::write(&index_path, "let dep := import \"./dep\";\n").expect("entry should be written");
+        fs::write(&other_path, "let dep := import \"./dep\";\n").expect("other should be written");
+        fs::write(root.join("src/dep.ms"), "export let value := 1;\n")
+            .expect("dep should be written");
+        let uri = Url::from_file_path(&index_path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        #[allow(deprecated)]
+        server.configure(&InitializeParams {
+            process_id: None,
+            root_path: None,
+            root_uri: None,
+            initialization_options: None,
+            capabilities: ClientCapabilities::default(),
+            trace: None,
+            workspace_folders: Some(vec![WorkspaceFolder {
+                uri: Url::from_file_path(&root).expect("workspace URI should build"),
+                name: "app".to_owned(),
+            }]),
+            client_info: None,
+            locale: None,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        });
+        let _ = server
+            .open_documents
+            .insert(uri.clone(), "let dep := import \"./dep\";\n".to_owned());
+
+        let locations = server
+            .references_at(ReferenceParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(0, 21),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+                context: ReferenceContext {
+                    include_declaration: true,
+                },
+            })
+            .expect("import references should resolve");
+        let paths = locations
+            .iter()
+            .map(|location| location.uri.to_file_path().expect("location path"))
+            .collect::<Vec<_>>();
+
+        assert_eq!(locations.len(), 2);
+        assert!(paths.iter().any(|path| paths_match(path, &index_path)));
+        assert!(paths.iter().any(|path| paths_match(path, &other_path)));
+        assert!(locations.iter().all(|location| {
+            location.range == Range::new(Position::new(0, 18), Position::new(0, 25))
+        }));
     }
 
     #[test]

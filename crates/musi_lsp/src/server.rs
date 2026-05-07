@@ -493,6 +493,9 @@ impl MusiLanguageServer {
             .open_documents
             .get(&text_document.uri)
             .map(String::as_str);
+        if let Some(locations) = self.import_references_at(&path, overlay, position) {
+            return Some(locations);
+        }
         let locations = references_for_project_file_with_overlay(
             &path,
             overlay,
@@ -503,6 +506,53 @@ impl MusiLanguageServer {
         .into_iter()
         .filter_map(to_lsp_location)
         .collect();
+        Some(locations)
+    }
+
+    fn import_references_at(
+        &self,
+        path: &Path,
+        overlay: Option<&str>,
+        position: Position,
+    ) -> Option<Vec<Location>> {
+        let target = document_links_for_project_file_with_overlay(path, overlay)
+            .into_iter()
+            .find(|link| position_in_lsp_range(position, to_tool_range(&link.range)))?
+            .target;
+        let mut locations = Vec::new();
+        for candidate_path in self.workspace_source_paths() {
+            let open = self.open_document_for_path(&candidate_path);
+            let candidate_overlay = open.map(|(_, text)| text);
+            let Some(uri) = open
+                .map(|(uri, _)| uri.clone())
+                .or_else(|| Url::from_file_path(&candidate_path).ok())
+            else {
+                continue;
+            };
+            locations.extend(
+                document_links_for_project_file_with_overlay(&candidate_path, candidate_overlay)
+                    .into_iter()
+                    .filter(|link| paths_match(&link.target, &target))
+                    .map(|link| Location {
+                        uri: uri.clone(),
+                        range: to_tool_range(&link.range),
+                    }),
+            );
+        }
+        locations.sort_by_key(|location| {
+            (
+                location.uri.to_string(),
+                location.range.start.line,
+                location.range.start.character,
+            )
+        });
+        locations.dedup_by_key(|location| {
+            (
+                location.uri.to_string(),
+                location.range.start.line,
+                location.range.start.character,
+            )
+        });
         Some(locations)
     }
 
