@@ -28,39 +28,41 @@ use async_lsp::lsp_types::{
     HoverContents, HoverParams, HoverProviderCapability, InitializeParams, InitializeResult,
     InitializedParams, InlayHint, InlayHintOptions, InlayHintParams, InlayHintServerCapabilities,
     LinkedEditingRangeParams, LinkedEditingRangeServerCapabilities, LinkedEditingRanges, Location,
-    MarkupContent, MarkupKind, Moniker, MonikerParams, OneOf, PartialResultParams, Position,
-    PrepareRenameResponse, PublishDiagnosticsParams, Range, ReferenceContext, ReferenceParams,
-    RelatedFullDocumentDiagnosticReport, RenameFilesParams, RenameOptions, RenameParams,
-    SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability, SemanticToken,
-    SemanticTokens, SemanticTokensDelta, SemanticTokensDeltaParams, SemanticTokensEdit,
-    SemanticTokensFullDeltaResult, SemanticTokensFullOptions, SemanticTokensOptions,
-    SemanticTokensParams, SemanticTokensRangeParams, SemanticTokensRangeResult,
-    SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
-    SignatureHelp, SignatureHelpOptions, SignatureHelpParams, TextDocumentContentChangeEvent,
-    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextDocumentSyncSaveOptions, TextEdit, TypeDefinitionProviderCapability, UniquenessLevel, Url,
-    WillSaveTextDocumentParams, WorkDoneProgressOptions, WorkDoneProgressParams,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult,
-    WorkspaceDocumentDiagnosticReport, WorkspaceEdit, WorkspaceFileOperationsServerCapabilities,
-    WorkspaceFoldersServerCapabilities, WorkspaceFullDocumentDiagnosticReport,
-    WorkspaceServerCapabilities, WorkspaceSymbol, WorkspaceSymbolOptions, WorkspaceSymbolParams,
-    WorkspaceSymbolResponse, notification::PublishDiagnostics,
+    MarkupContent, MarkupKind, Moniker, MonikerKind, MonikerParams, OneOf, PartialResultParams,
+    Position, PrepareRenameResponse, PublishDiagnosticsParams, Range, ReferenceContext,
+    ReferenceParams, RelatedFullDocumentDiagnosticReport, RenameFilesParams, RenameOptions,
+    RenameParams, SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability,
+    SemanticToken, SemanticTokens, SemanticTokensDelta, SemanticTokensDeltaParams,
+    SemanticTokensEdit, SemanticTokensFullDeltaResult, SemanticTokensFullOptions,
+    SemanticTokensOptions, SemanticTokensParams, SemanticTokensRangeParams,
+    SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
+    ServerCapabilities, ServerInfo, SignatureHelp, SignatureHelpOptions, SignatureHelpParams,
+    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
+    TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TextEdit,
+    TypeDefinitionProviderCapability, UniquenessLevel, Url, WillSaveTextDocumentParams,
+    WorkDoneProgressOptions, WorkDoneProgressParams, WorkspaceDiagnosticParams,
+    WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
+    WorkspaceEdit, WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
+    WorkspaceFullDocumentDiagnosticReport, WorkspaceServerCapabilities, WorkspaceSymbol,
+    WorkspaceSymbolOptions, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    notification::PublishDiagnostics,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
 use musi_fmt::{FormatOptions, format_text_for_path};
 use musi_project::{PackageSource, ProjectOptions, load_project, load_project_ancestor};
 use musi_tooling::{
-    ToolDocumentSymbol, ToolSymbolKind, collect_project_diagnostics_with_overlay,
+    ToolDocumentSymbol, ToolMonikerKind, ToolSymbolKind, collect_project_diagnostics_with_overlay,
     completions_for_project_file_with_overlay, definition_for_project_file_with_overlay,
     document_links_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
     folding_ranges_for_project_file_with_overlay, hover_for_project_file_with_overlay,
     inlay_hints_for_project_file_with_overlay, module_docs_for_project_file_with_overlay,
-    outgoing_calls_for_project_file_with_overlay, prepare_rename_for_project_file_with_overlay,
-    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
-    selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
-    signature_help_for_project_file_with_overlay, type_definition_for_project_file_with_overlay,
-    workspace_symbols_for_project_file_with_overlay, workspace_symbols_for_project_root,
+    moniker_for_project_file_with_overlay, outgoing_calls_for_project_file_with_overlay,
+    prepare_rename_for_project_file_with_overlay, references_for_project_file_with_overlay,
+    rename_for_project_file_with_overlay, selection_ranges_for_project_file_with_overlay,
+    semantic_tokens_for_project_file_with_overlay, signature_help_for_project_file_with_overlay,
+    type_definition_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
+    workspace_symbols_for_project_root,
 };
 use serde_json::{Value, json};
 
@@ -568,23 +570,26 @@ impl MusiLanguageServer {
             .open_documents
             .get(&text_document.uri)
             .map(String::as_str);
-        let location = definition_for_project_file_with_overlay(
+        let moniker = moniker_for_project_file_with_overlay(
             &path,
             overlay,
             usize::try_from(position.line).ok()?.saturating_add(1),
             usize::try_from(position.character).ok()?.saturating_add(1),
         )?;
-        let uri = Url::from_file_path(location.path).ok()?;
+        let uri = Url::from_file_path(moniker.location.path).ok()?;
         Some(vec![Moniker {
             scheme: "musi".to_owned(),
             identifier: format!(
                 "{}#{}:{}",
                 uri.as_str(),
-                location.range.start_line,
-                location.range.start_col
+                moniker.location.range.start_line,
+                moniker.location.range.start_col
             ),
             unique: UniquenessLevel::Project,
-            kind: None,
+            kind: Some(match moniker.kind {
+                ToolMonikerKind::Import => MonikerKind::Import,
+                ToolMonikerKind::Local => MonikerKind::Local,
+            }),
         }])
     }
 

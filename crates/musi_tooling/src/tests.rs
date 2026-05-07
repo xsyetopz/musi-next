@@ -16,18 +16,18 @@ use music_session::{Session, SessionOptions};
 use musi_project::{Project, ProjectDiagKind, ProjectError, ProjectOptions};
 
 use crate::{
-    ToolFoldingRangeKind, ToolInlayHintKind, ToolSemanticModifier, ToolSemanticTokenKind,
-    ToolingDiagKind, ToolingError, artifact::write_output,
+    ToolFoldingRangeKind, ToolInlayHintKind, ToolMonikerKind, ToolSemanticModifier,
+    ToolSemanticTokenKind, ToolingDiagKind, ToolingError, artifact::write_output,
     collect_project_diagnostics_with_overlay, completions_for_project_file_with_overlay,
     definition_for_project_file_with_overlay, document_links_for_project_file_with_overlay,
     document_symbols_for_project_file_with_overlay, folding_ranges_for_project_file_with_overlay,
     hover_for_project_file_with_overlay, inlay_hints_for_project_file_with_overlay,
     load_direct_graph, module_docs_for_project_file_with_overlay,
-    outgoing_calls_for_project_file_with_overlay, prepare_rename_for_project_file_with_overlay,
-    project_error_report, references_for_project_file_with_overlay,
-    rename_for_project_file_with_overlay, selection_ranges_for_project_file_with_overlay,
-    semantic_tokens_for_project_file_with_overlay, session_error_report,
-    signature_help_for_project_file_with_overlay, tooling_error_report,
+    moniker_for_project_file_with_overlay, outgoing_calls_for_project_file_with_overlay,
+    prepare_rename_for_project_file_with_overlay, project_error_report,
+    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
+    selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
+    session_error_report, signature_help_for_project_file_with_overlay, tooling_error_report,
     type_definition_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
     workspace_symbols_for_project_root,
 };
@@ -395,6 +395,47 @@ boxedName.value;
         assert_eq!(prepared.1, "before");
         assert_eq!(edits.len(), 2);
         assert!(edits.iter().all(|edit| edit.new_text == "renamed"));
+    }
+
+    #[test]
+    fn moniker_marks_project_local_bindings() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "let value := 1;\nlet other := value;\n";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let moniker = moniker_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            2,
+            15,
+        )
+        .expect("moniker should resolve");
+
+        assert_eq!(moniker.kind, ToolMonikerKind::Local);
+        assert_eq!(moniker.location.range.start_line, 1);
+        assert_eq!(moniker.location.range.start_col, 5);
+    }
+
+    #[test]
+    fn moniker_marks_imported_bindings() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "import \"./dep\";\nlet result := base;\n";
+        write_file(test_dir.path(), "index.ms", source);
+        write_file(test_dir.path(), "dep.ms", "export let base := 1;\n");
+
+        let moniker = moniker_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            2,
+            15,
+        )
+        .expect("import moniker should resolve");
+
+        assert_eq!(moniker.kind, ToolMonikerKind::Import);
+        assert_eq!(moniker.location.range.start_line, 1);
+        assert_eq!(moniker.location.range.start_col, 8);
     }
 
     #[test]

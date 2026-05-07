@@ -15,14 +15,14 @@ use async_lsp::lsp_types::{
     Documentation, ExecuteCommandParams, FileOperationPatternKind, FileRename, FoldingRangeKind,
     FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse, InitializeParams,
     InlayHintKind, InlayHintServerCapabilities, InlayHintTooltip, LinkedEditingRangeParams,
-    PartialResultParams, Position, ReferenceContext, RenameFilesParams, SelectionRangeParams,
-    SemanticToken, SemanticTokensDeltaParams, SemanticTokensFullDeltaResult, SignatureHelpParams,
-    SymbolKind, TextDocumentIdentifier, TextDocumentPositionParams, TextDocumentSaveReason,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability, WillSaveTextDocumentParams,
-    WorkDoneProgressParams, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
-    WorkspaceDocumentDiagnosticReport, WorkspaceFolder, WorkspaceFoldersChangeEvent,
-    WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    MonikerKind, PartialResultParams, Position, ReferenceContext, RenameFilesParams,
+    SelectionRangeParams, SemanticToken, SemanticTokensDeltaParams, SemanticTokensFullDeltaResult,
+    SignatureHelpParams, SymbolKind, TextDocumentIdentifier, TextDocumentPositionParams,
+    TextDocumentSaveReason, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TypeDefinitionProviderCapability,
+    WillSaveTextDocumentParams, WorkDoneProgressParams, WorkspaceDiagnosticParams,
+    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport, WorkspaceFolder,
+    WorkspaceFoldersChangeEvent, WorkspaceSymbolParams, WorkspaceSymbolResponse,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolInlayHint, ToolInlayHintKind,
@@ -1411,8 +1411,45 @@ let other := value + value;
         assert_eq!(monikers.len(), 1);
         assert_eq!(monikers[0].scheme, "musi");
         assert_eq!(monikers[0].unique, UniquenessLevel::Project);
-        assert_eq!(monikers[0].kind, None);
+        assert_eq!(monikers[0].kind, Some(MonikerKind::Local));
         assert_eq!(monikers[0].identifier, format!("{}#1:5", uri.as_str()));
+    }
+
+    #[test]
+    fn moniker_marks_imported_binding_identifiers() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "import \"./dep\";\nlet result := base;\n";
+        fs::write(&path, source).expect("entry should be written");
+        fs::write(root.join("dep.ms"), "export let base := 1;\n").expect("dep should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let monikers = server
+            .monikers_at(MonikerParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: uri.clone() },
+                    position: Position::new(1, 14),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("import moniker should resolve");
+
+        assert_eq!(monikers.len(), 1);
+        assert_eq!(monikers[0].kind, Some(MonikerKind::Import));
+        assert_eq!(monikers[0].identifier, format!("{}#1:8", uri.as_str()));
     }
 
     #[test]

@@ -45,6 +45,18 @@ pub struct ToolWorkspaceSymbol {
     pub location: ToolLocation,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolMonikerKind {
+    Import,
+    Local,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolMoniker {
+    pub location: ToolLocation,
+    pub kind: ToolMonikerKind,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolCallHierarchyItem {
     pub name: String,
@@ -79,6 +91,25 @@ pub fn type_definition_for_project_file_with_overlay(
 ) -> Option<ToolLocation> {
     let context = SymbolAnalysis::new(path, overlay_text)?;
     context.type_definition_at(line, character)
+}
+
+#[must_use]
+pub fn moniker_for_project_file_with_overlay(
+    path: &Path,
+    overlay_text: Option<&str>,
+    line: usize,
+    character: usize,
+) -> Option<ToolMoniker> {
+    let context = SymbolAnalysis::new(path, overlay_text)?;
+    let binding_id = context.binding_at(line, character)?;
+    let binding = context.resolved()?.bindings.get(binding_id);
+    Some(ToolMoniker {
+        location: context.binding_location(binding_id)?,
+        kind: match binding.kind {
+            NameBindingKind::Import => ToolMonikerKind::Import,
+            _ => ToolMonikerKind::Local,
+        },
+    })
 }
 
 #[must_use]
