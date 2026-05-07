@@ -56,6 +56,10 @@ pub fn module_docs_for_project_file_with_overlay(
     module_doc_text(source)
 }
 
+pub fn leading_binding_doc_text(source: &Source, span: Span) -> Option<String> {
+    leading_doc_text(source, span)
+}
+
 #[must_use]
 pub fn hover_for_project_file_with_overlay(
     path: &Path,

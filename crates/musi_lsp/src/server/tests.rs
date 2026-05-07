@@ -498,7 +498,8 @@ let value:=1;
         )
         .expect("manifest should be written");
         let path = root.join("index.ms");
-        let source = r"let before := 1;
+        let source = r"--- before docs
+let before := 1;
 let current := bef;
 ";
         fs::write(&path, source).expect("entry should be written");
@@ -510,7 +511,7 @@ let current := bef;
             .completions(CompletionParams {
                 text_document_position: TextDocumentPositionParams {
                     text_document: TextDocumentIdentifier { uri },
-                    position: Position::new(1, 18),
+                    position: Position::new(2, 18),
                 },
                 work_done_progress_params: WorkDoneProgressParams::default(),
                 partial_result_params: PartialResultParams::default(),
@@ -537,7 +538,10 @@ let current := bef;
         assert!(before.data.is_some());
         let before = MusiLanguageServer::resolve_completion(before.clone());
         assert_eq!(before.detail.as_deref(), Some("binding"));
-        assert_eq!(before.documentation, None);
+        assert_eq!(
+            before.documentation,
+            Some(Documentation::String("before docs".to_owned()))
+        );
         let edit = before
             .text_edit
             .as_ref()
@@ -546,8 +550,8 @@ let current := bef;
                 CompletionTextEdit::InsertAndReplace(_) => None,
             })
             .expect("completion should provide replacement edit");
-        assert_eq!(edit.range.start, Position::new(1, 15));
-        assert_eq!(edit.range.end, Position::new(1, 18));
+        assert_eq!(edit.range.start, Position::new(2, 15));
+        assert_eq!(edit.range.end, Position::new(2, 18));
         assert_eq!(edit.new_text, "before");
     }
 

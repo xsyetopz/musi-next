@@ -163,7 +163,8 @@ mod success {
     fn completions_include_current_terms_and_visible_bindings() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
-        let source = r"let before := 1;
+        let source = r"--- before docs
+let before := 1;
 let current := bef;
 ";
         write_file(test_dir.path(), "index.ms", source);
@@ -171,11 +172,15 @@ let current := bef;
         let completions = completions_for_project_file_with_overlay(
             &test_dir.path().join("index.ms"),
             Some(source),
-            2,
+            3,
             19,
         );
 
-        assert!(completions.iter().any(|item| item.label == "before"));
+        let before = completions
+            .iter()
+            .find(|item| item.label == "before")
+            .expect("before completion should exist");
+        assert_eq!(before.documentation.as_deref(), Some("before docs"));
         assert!(completions.iter().any(|item| item.label == "let"));
     }
 

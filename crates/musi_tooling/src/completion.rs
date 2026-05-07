@@ -12,7 +12,7 @@ use music_session::Session;
 use music_syntax::{Lexer, TokenKind, parse};
 
 use crate::ToolRange;
-use crate::analysis::module_docs_for_project_file_with_overlay;
+use crate::analysis::{leading_binding_doc_text, module_docs_for_project_file_with_overlay};
 use crate::analysis_support::analysis_session;
 
 const COMPLETION_PROBE: &str = "musiCompletionProbe";
@@ -199,17 +199,17 @@ fn global_completions(
             if label == "_" {
                 continue;
             }
-            push_completion(
-                &mut completions,
-                &mut seen,
-                ToolCompletion::new(
-                    label.clone(),
-                    completion_kind_for_binding(binding.kind),
-                    Some(binding_kind_label(binding.kind).to_owned()),
-                    replace_range,
-                )
-                .with_sort_text(format!("1_{label}")),
-            );
+            let mut completion = ToolCompletion::new(
+                label.clone(),
+                completion_kind_for_binding(binding.kind),
+                Some(binding_kind_label(binding.kind).to_owned()),
+                replace_range,
+            )
+            .with_sort_text(format!("1_{label}"));
+            completion.documentation = session
+                .source(binding.site.source_id)
+                .and_then(|source| leading_binding_doc_text(source, binding.site.span));
+            push_completion(&mut completions, &mut seen, completion);
         }
     }
 
