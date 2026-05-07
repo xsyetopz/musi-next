@@ -4,7 +4,9 @@ use async_lsp::lsp_types::{
     CallHierarchyItem, CodeActionKind, CodeLens, Command, DocumentHighlight, DocumentHighlightKind,
     LinkedEditingRanges, Location, Moniker, MonikerKind, Position, Range, UniquenessLevel, Url,
 };
-use musi_tooling::{ToolDocumentSymbol, document_links_for_project_file_with_overlay};
+use musi_tooling::{
+    ToolDocumentSymbol, ToolReferenceLens, document_links_for_project_file_with_overlay,
+};
 use serde_json::{Value, json};
 
 use super::convert::{to_lsp_range_in_text, to_tool_range, uri_for_path};
@@ -18,26 +20,26 @@ pub(super) fn reference_lens_title(count: usize) -> String {
     }
 }
 
-pub(super) fn push_reference_lenses(
+pub(super) fn push_reference_lens(
     path: &Path,
-    symbol: &ToolDocumentSymbol,
+    lens: &ToolReferenceLens,
     command_name: &str,
     lenses: &mut Vec<CodeLens>,
 ) {
-    if let Some(data) = reference_lens_data(path, symbol) {
+    if lens.reference_count == 0 {
+        return;
+    }
+    if let Some(data) = reference_lens_data(path, &lens.range) {
         let command = Command::new(
-            "references".to_owned(),
+            reference_lens_title(lens.reference_count),
             command_name.to_owned(),
             Some(vec![data.clone()]),
         );
         lenses.push(CodeLens {
-            range: to_tool_range(&symbol.selection_range),
+            range: to_tool_range(&lens.range),
             command: Some(command),
             data: Some(data),
         });
-    }
-    for child in &symbol.children {
-        push_reference_lenses(path, child, command_name, lenses);
     }
 }
 
@@ -180,11 +182,11 @@ const fn tool_range_size(range: &musi_tooling::ToolRange) -> (usize, usize) {
     )
 }
 
-fn reference_lens_data(path: &Path, symbol: &ToolDocumentSymbol) -> Option<Value> {
+fn reference_lens_data(path: &Path, range: &musi_tooling::ToolRange) -> Option<Value> {
     Some(json!({
         "uri": Url::from_file_path(path).ok()?.as_str(),
-        "line": symbol.selection_range.start_line.saturating_sub(1),
-        "character": symbol.selection_range.start_col.saturating_sub(1),
+        "line": range.start_line.saturating_sub(1),
+        "character": range.start_col.saturating_sub(1),
     }))
 }
 

@@ -39,6 +39,12 @@ pub struct ToolDocumentSymbol {
     pub children: Vec<Self>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolReferenceLens {
+    pub range: ToolRange,
+    pub reference_count: usize,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToolDocumentHighlightKind {
     Read,
@@ -184,6 +190,17 @@ pub fn document_symbols_for_project_file_with_overlay(
         return Vec::new();
     };
     context.document_symbols()
+}
+
+#[must_use]
+pub fn reference_lenses_for_project_file_with_overlay(
+    path: &Path,
+    overlay_text: Option<&str>,
+) -> Vec<ToolReferenceLens> {
+    let Some(mut context) = SymbolAnalysis::new(path, overlay_text) else {
+        return Vec::new();
+    };
+    context.reference_lenses()
 }
 
 #[must_use]
@@ -831,6 +848,34 @@ impl SymbolAnalysis {
             )
         });
         nest_document_symbols(symbols)
+    }
+
+    fn reference_lenses(&mut self) -> Vec<ToolReferenceLens> {
+        let Some(resolved) = self.resolved() else {
+            return Vec::new();
+        };
+        let mut bindings = resolved
+            .bindings
+            .iter()
+            .filter(|(_, binding)| binding.site.source_id == self.source_id)
+            .filter(|(_, binding)| {
+                !matches!(
+                    binding.kind,
+                    NameBindingKind::Prelude | NameBindingKind::Import
+                )
+            })
+            .map(|(binding_id, binding)| (binding_id, binding.site))
+            .collect::<Vec<_>>();
+        bindings.sort_by_key(|(_, site)| site.span.start);
+        bindings
+            .into_iter()
+            .filter_map(|(binding_id, site)| {
+                Some(ToolReferenceLens {
+                    range: tool_range(self.source_for_site(site)?, site.span),
+                    reference_count: self.references(binding_id, false).len(),
+                })
+            })
+            .collect()
     }
 
     fn outgoing_calls(&self, line: usize, character: usize) -> Vec<ToolOutgoingCall> {

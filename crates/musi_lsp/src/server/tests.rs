@@ -3382,7 +3382,7 @@ let other := value + value;
             .find(|lens| lens.range.start == Position::new(0, 4))
             .expect("value reference lens should exist");
         let command = value_lens.command.as_ref().expect("lens command");
-        assert_eq!(command.title, "references");
+        assert_eq!(command.title, "2 references");
         assert_eq!(command.command, "musi.references");
         let arguments = command.arguments.as_ref().expect("lens arguments");
         assert_eq!(arguments.len(), 1);
@@ -3439,7 +3439,7 @@ let other := value + value;
             .find(|lens| lens.range.start == Position::new(0, 11))
             .expect("value reference lens should exist");
         let command = value_lens.command.as_ref().expect("lens command");
-        assert_eq!(command.title, "references");
+        assert_eq!(command.title, "1 reference");
         let result = server
             .execute_command_request(&ExecuteCommandParams {
                 command: command.command.clone(),

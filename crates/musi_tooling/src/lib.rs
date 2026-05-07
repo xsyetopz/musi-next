@@ -42,14 +42,15 @@ pub use folding::{
 };
 pub use navigation::{
     ToolCallHierarchyItem, ToolDocumentHighlight, ToolDocumentHighlightKind, ToolDocumentSymbol,
-    ToolLocation, ToolMoniker, ToolMonikerKind, ToolOutgoingCall, ToolTextEdit, ToolWorkspaceEdit,
-    ToolWorkspaceSymbol, definition_for_project_file_with_overlay,
+    ToolLocation, ToolMoniker, ToolMonikerKind, ToolOutgoingCall, ToolReferenceLens, ToolTextEdit,
+    ToolWorkspaceEdit, ToolWorkspaceSymbol, definition_for_project_file_with_overlay,
     document_highlights_for_project_file_with_overlay,
     document_symbols_for_project_file_with_overlay, implementation_for_project_file_with_overlay,
     moniker_for_project_file_with_overlay, outgoing_calls_for_project_file_with_overlay,
-    prepare_rename_for_project_file_with_overlay, references_for_project_file_with_overlay,
-    rename_for_project_file_with_overlay, type_definition_for_project_file_with_overlay,
-    workspace_symbols_for_project_file_with_overlay, workspace_symbols_for_project_root,
+    prepare_rename_for_project_file_with_overlay, reference_lenses_for_project_file_with_overlay,
+    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
+    type_definition_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
+    workspace_symbols_for_project_root,
 };
 pub use selection::{
     ToolSelectionRange, selection_ranges_for_project_file,

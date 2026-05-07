@@ -550,8 +550,8 @@ impl MusiLanguageServer {
         }
         let overlay = self.open_documents.get(&uri).map(String::as_str);
         let mut lenses = Vec::new();
-        for symbol in document_symbols_for_project_file_with_overlay(&path, overlay) {
-            push_reference_lenses(&path, &symbol, REFERENCES_COMMAND, &mut lenses);
+        for lens in reference_lenses_for_project_file_with_overlay(&path, overlay) {
+            push_reference_lens(&path, &lens, REFERENCES_COMMAND, &mut lenses);
         }
         Some(lenses)
     }

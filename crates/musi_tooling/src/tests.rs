@@ -27,9 +27,10 @@ use crate::{
     load_direct_graph, module_docs_for_project_file_with_overlay,
     moniker_for_project_file_with_overlay, outgoing_calls_for_project_file_with_overlay,
     prepare_rename_for_project_file_with_overlay, project_error_report,
-    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
-    selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
-    session_error_report, signature_help_for_project_file_with_overlay, tooling_error_report,
+    reference_lenses_for_project_file_with_overlay, references_for_project_file_with_overlay,
+    rename_for_project_file_with_overlay, selection_ranges_for_project_file_with_overlay,
+    semantic_tokens_for_project_file_with_overlay, session_error_report,
+    signature_help_for_project_file_with_overlay, tooling_error_report,
     type_definition_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
     workspace_symbols_for_project_root,
 };
@@ -525,6 +526,30 @@ let boolEq :=
         );
         assert_eq!(references[0].range.start_line, 2);
         assert_eq!(references[0].range.start_col, 19);
+    }
+
+    #[test]
+    fn reference_lenses_count_references_for_document_bindings() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "let before := 1;\nlet after := before + before;\n";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let lenses = reference_lenses_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+        );
+
+        let before = lenses
+            .iter()
+            .find(|lens| lens.range.start_line == 1 && lens.range.start_col == 5)
+            .expect("before reference lens should exist");
+        assert_eq!(before.reference_count, 2);
+        let after = lenses
+            .iter()
+            .find(|lens| lens.range.start_line == 2 && lens.range.start_col == 5)
+            .expect("after reference lens should exist");
+        assert_eq!(after.reference_count, 0);
     }
 
     #[test]

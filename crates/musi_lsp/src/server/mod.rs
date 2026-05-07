@@ -41,9 +41,10 @@ use musi_tooling::{
     folding_ranges_for_project_file_with_overlay, hover_for_project_file_with_overlay,
     implementation_for_project_file_with_overlay, module_docs_for_project_file_with_overlay,
     moniker_for_project_file_with_overlay, outgoing_calls_for_project_file_with_overlay,
-    prepare_rename_for_project_file_with_overlay, references_for_project_file_with_overlay,
-    rename_for_project_file_with_overlay, selection_ranges_for_project_file_with_overlay,
-    signature_help_for_project_file_with_overlay, type_definition_for_project_file_with_overlay,
+    prepare_rename_for_project_file_with_overlay, reference_lenses_for_project_file_with_overlay,
+    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
+    selection_ranges_for_project_file_with_overlay, signature_help_for_project_file_with_overlay,
+    type_definition_for_project_file_with_overlay,
 };
 use serde_json::{Value, json};
 
@@ -78,7 +79,7 @@ use musi_fmt::FormatOptions;
 use navigation::{
     call_hierarchy_item_data_parts, call_hierarchy_items_match, caller_symbol_for_reference,
     import_definition_at, import_document_highlights, import_linked_editing_ranges,
-    import_moniker_at, position_in_lsp_range, push_reference_lenses, reference_lens_data_parts,
+    import_moniker_at, position_in_lsp_range, push_reference_lens, reference_lens_data_parts,
     reference_lens_title, symbol_at_position,
 };
 use semantic::SemanticTokenSnapshot;
