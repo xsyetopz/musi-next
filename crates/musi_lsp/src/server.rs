@@ -28,24 +28,24 @@ use async_lsp::lsp_types::{
     HoverContents, HoverParams, HoverProviderCapability, InitializeParams, InitializeResult,
     InitializedParams, InlayHint, InlayHintOptions, InlayHintParams, InlayHintServerCapabilities,
     LinkedEditingRangeParams, LinkedEditingRangeServerCapabilities, LinkedEditingRanges, Location,
-    MarkupContent, MarkupKind, Moniker, MonikerParams, OneOf, Position, PrepareRenameResponse,
-    PublishDiagnosticsParams, Range, ReferenceParams, RelatedFullDocumentDiagnosticReport,
-    RenameFilesParams, RenameOptions, RenameParams, SelectionRange, SelectionRangeParams,
-    SelectionRangeProviderCapability, SemanticToken, SemanticTokens, SemanticTokensDelta,
-    SemanticTokensDeltaParams, SemanticTokensEdit, SemanticTokensFullDeltaResult,
-    SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
-    SemanticTokensRangeParams, SemanticTokensRangeResult, SemanticTokensResult,
-    SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, SignatureHelp,
-    SignatureHelpOptions, SignatureHelpParams, TextDocumentContentChangeEvent, TextDocumentItem,
-    TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TextEdit,
-    TypeDefinitionProviderCapability, UniquenessLevel, Url, WillSaveTextDocumentParams,
-    WorkDoneProgressOptions, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
-    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport, WorkspaceEdit,
-    WorkspaceFileOperationsServerCapabilities, WorkspaceFoldersServerCapabilities,
-    WorkspaceFullDocumentDiagnosticReport, WorkspaceServerCapabilities, WorkspaceSymbol,
-    WorkspaceSymbolOptions, WorkspaceSymbolParams, WorkspaceSymbolResponse,
-    notification::PublishDiagnostics,
+    MarkupContent, MarkupKind, Moniker, MonikerParams, OneOf, PartialResultParams, Position,
+    PrepareRenameResponse, PublishDiagnosticsParams, Range, ReferenceContext, ReferenceParams,
+    RelatedFullDocumentDiagnosticReport, RenameFilesParams, RenameOptions, RenameParams,
+    SelectionRange, SelectionRangeParams, SelectionRangeProviderCapability, SemanticToken,
+    SemanticTokens, SemanticTokensDelta, SemanticTokensDeltaParams, SemanticTokensEdit,
+    SemanticTokensFullDeltaResult, SemanticTokensFullOptions, SemanticTokensOptions,
+    SemanticTokensParams, SemanticTokensRangeParams, SemanticTokensRangeResult,
+    SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
+    SignatureHelp, SignatureHelpOptions, SignatureHelpParams, TextDocumentContentChangeEvent,
+    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions, TextEdit, TypeDefinitionProviderCapability, UniquenessLevel, Url,
+    WillSaveTextDocumentParams, WorkDoneProgressOptions, WorkDoneProgressParams,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult,
+    WorkspaceDocumentDiagnosticReport, WorkspaceEdit, WorkspaceFileOperationsServerCapabilities,
+    WorkspaceFoldersServerCapabilities, WorkspaceFullDocumentDiagnosticReport,
+    WorkspaceServerCapabilities, WorkspaceSymbol, WorkspaceSymbolOptions, WorkspaceSymbolParams,
+    WorkspaceSymbolResponse, notification::PublishDiagnostics,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
 use musi_fmt::{FormatOptions, format_text_for_path};
@@ -905,18 +905,17 @@ impl MusiLanguageServer {
         let line = usize::try_from(argument.get("line")?.as_u64()?).ok()?;
         let character = usize::try_from(argument.get("character")?.as_u64()?).ok()?;
         let uri = Url::parse(uri).ok()?;
-        let path = uri.to_file_path().ok()?;
-        let overlay = self.open_documents.get(&uri).map(String::as_str);
-        let locations = references_for_project_file_with_overlay(
-            &path,
-            overlay,
-            line.saturating_add(1),
-            character.saturating_add(1),
-            false,
-        )
-        .into_iter()
-        .filter_map(to_lsp_location)
-        .collect::<Vec<_>>();
+        let locations = self.references_at(ReferenceParams {
+            text_document_position: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri },
+                position: Position::new(u32::try_from(line).ok()?, u32::try_from(character).ok()?),
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+            context: ReferenceContext {
+                include_declaration: false,
+            },
+        })?;
         serde_json::to_value(locations).ok()
     }
 
