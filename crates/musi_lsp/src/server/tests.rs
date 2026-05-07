@@ -2906,6 +2906,48 @@ let other := value + value;
     }
 
     #[test]
+    fn code_lens_counts_workspace_references() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "export let value := 1;\n";
+        fs::write(&path, source).expect("entry should be written");
+        fs::write(
+            root.join("use.ms"),
+            "let app := import \"./index\";\nlet result := app.value;\n",
+        )
+        .expect("use module should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let lenses = server
+            .code_lenses(CodeLensParams {
+                text_document: TextDocumentIdentifier { uri },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("code lenses should run");
+        let value_lens = lenses
+            .iter()
+            .find(|lens| lens.range.start == Position::new(0, 11))
+            .expect("value reference lens should exist");
+        let value_lens = server.resolve_code_lens(value_lens.clone());
+
+        let command = value_lens.command.as_ref().expect("lens command");
+        assert_eq!(command.title, "1 reference");
+    }
+
+    #[test]
     fn execute_references_command_returns_reference_locations() {
         let root = temp_project();
         fs::write(

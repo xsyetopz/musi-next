@@ -7,7 +7,7 @@ use music_base::{Source, SourceId, Span};
 use music_hir::{HirExpr, HirExprId, HirExprKind, HirTyId, HirTyKind};
 use music_module::ModuleKey;
 use music_names::{NameBinding, NameBindingId, NameBindingKind, NameResolution, NameSite, Symbol};
-use music_sema::{DefinitionKey, SemaModule};
+use music_sema::{DefinitionKey, ExprMemberKind, SemaModule};
 use music_session::Session;
 
 use crate::analysis::{ToolRange, ToolSymbolKind, binding_symbol_kind, tool_range};
@@ -150,7 +150,7 @@ pub fn references_for_project_file_with_overlay(
     character: usize,
     include_declaration: bool,
 ) -> Vec<ToolLocation> {
-    let Some(context) = SymbolAnalysis::new(path, overlay_text) else {
+    let Some(mut context) = SymbolAnalysis::new(path, overlay_text) else {
         return Vec::new();
     };
     let Some(binding_id) = context.binding_at(line, character) else {
@@ -371,7 +371,7 @@ pub fn rename_for_project_file_with_overlay(
     if !is_valid_rename_name(new_name) {
         return None;
     }
-    let context = SymbolAnalysis::new(path, overlay_text)?;
+    let mut context = SymbolAnalysis::new(path, overlay_text)?;
     let binding_id = context.binding_at(line, character)?;
     let binding = context.resolved()?.bindings.get(binding_id);
     if !context.can_rename_binding(binding) {
@@ -631,13 +631,14 @@ impl SymbolAnalysis {
     }
 
     fn references(
-        &self,
+        &mut self,
         binding_id: NameBindingId,
         include_declaration: bool,
     ) -> Vec<ToolLocation> {
         let Some(resolved) = self.resolved() else {
             return Vec::new();
         };
+        let binding_name = resolved.bindings.get(binding_id).name;
         let mut locations = Vec::new();
         if include_declaration && let Some(location) = self.binding_location(binding_id) {
             locations.push(location);
@@ -650,6 +651,7 @@ impl SymbolAnalysis {
                 .filter_map(|(site, _)| self.site_location(*site)),
         );
         locations.extend(self.member_references(binding_id));
+        locations.extend(self.workspace_import_record_member_references(binding_name));
         locations.sort_by_key(|location| {
             (
                 location.path.clone(),
@@ -666,6 +668,69 @@ impl SymbolAnalysis {
                 location.range.end_col,
             )
         });
+        locations
+    }
+
+    fn workspace_import_record_member_references(&mut self, name: Symbol) -> Vec<ToolLocation> {
+        let mut modules = self.workspace_modules.clone();
+        modules.retain(|(module_key, _)| module_key != &self.module_key);
+        let mut locations = Vec::new();
+        for (module_key, path) in modules {
+            locations.extend(self.import_record_member_references_in_module(
+                &module_key,
+                &path,
+                name,
+            ));
+        }
+        locations
+    }
+
+    fn import_record_member_references_in_module(
+        &mut self,
+        module_key: &ModuleKey,
+        path: &Path,
+        name: Symbol,
+    ) -> Vec<ToolLocation> {
+        let Ok(sema) = self.session.check_module(module_key) else {
+            return Vec::new();
+        };
+        let sites = sema
+            .module()
+            .store
+            .exprs
+            .iter()
+            .filter_map(|(expr_id, expr)| {
+                let HirExprKind::Field {
+                    base, name: field, ..
+                } = expr.kind
+                else {
+                    return None;
+                };
+                let fact = sema.expr_member_fact(expr_id)?;
+                if !matches!(fact.kind, ExprMemberKind::ImportRecordExport) || fact.name != name {
+                    return None;
+                }
+                let target = fact
+                    .import_record_target
+                    .as_ref()
+                    .or_else(|| sema.expr_import_record_target(base))?;
+                (target == &self.module_key)
+                    .then_some(NameSite::new(expr.origin.source_id, field.span))
+            })
+            .collect::<Vec<_>>();
+        let mut locations = Vec::new();
+        for site in sites {
+            let Some(source) = self.source_for_site(site) else {
+                continue;
+            };
+            let path = self
+                .path_for_source(source)
+                .unwrap_or_else(|| path.to_path_buf());
+            locations.push(ToolLocation {
+                path,
+                range: tool_range(source, site.span),
+            });
+        }
         locations
     }
 

@@ -495,6 +495,39 @@ let boolEq :=
     }
 
     #[test]
+    fn references_include_workspace_import_record_member_uses() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "export let value := 1;\n";
+        write_file(test_dir.path(), "index.ms", source);
+        write_file(
+            test_dir.path(),
+            "use.ms",
+            "let app := import \"./index\";\nlet result := app.value;\n",
+        );
+
+        let references = references_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            1,
+            12,
+            false,
+        );
+
+        assert_eq!(references.len(), 1);
+        assert_eq!(
+            references[0].path,
+            test_dir
+                .path()
+                .join("use.ms")
+                .canonicalize()
+                .expect("use path should canonicalize")
+        );
+        assert_eq!(references[0].range.start_line, 2);
+        assert_eq!(references[0].range.start_col, 19);
+    }
+
+    #[test]
     fn document_highlights_kind_declaration_and_references() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
