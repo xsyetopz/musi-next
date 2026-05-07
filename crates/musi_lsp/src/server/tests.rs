@@ -1774,6 +1774,43 @@ let other := value + value;
     }
 
     #[test]
+    fn code_action_organize_imports_respects_fmt_ignore() {
+        let root = temp_project();
+        let path = root.join("index.ms");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let source = "let z := import \"./z\";\nlet y := import \"./y\";\n-- musi-fmt-ignore\nlet   a:=import \"./a\";\n";
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let actions = server
+            .code_actions(CodeActionParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                range: full_document_range(source),
+                context: CodeActionContext {
+                    diagnostics: Vec::new(),
+                    only: Some(vec![CodeActionKind::SOURCE_ORGANIZE_IMPORTS]),
+                    trigger_kind: None,
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("code action response should exist");
+        let CodeActionOrCommand::CodeAction(action) = &actions[0] else {
+            panic!("organize imports should be returned as code action");
+        };
+        let action = server.resolve_code_action(action.clone());
+        let edit = action.edit.as_ref().expect("action should provide edit");
+        let changes = edit.changes.as_ref().expect("edit should include changes");
+        let edits = changes.get(&uri).expect("edit should target document URI");
+
+        assert_eq!(edits.len(), 1);
+        assert_eq!(
+            edits[0].new_text,
+            "let y := import \"./y\";\nlet z := import \"./z\";\n-- musi-fmt-ignore\nlet   a:=import \"./a\";\n"
+        );
+    }
+
+    #[test]
     fn document_link_resolves_static_import_targets() {
         let root = temp_project();
         fs::write(

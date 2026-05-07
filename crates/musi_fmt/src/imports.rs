@@ -1,6 +1,8 @@
 use std::ops::Range;
 
-use music_syntax::{Lexer, TokenKind};
+use music_syntax::{Lexer, TokenKind, parse};
+
+use crate::protected::protected_line_ranges;
 
 #[derive(Debug, Clone)]
 struct ImportStatement {
@@ -33,7 +35,16 @@ struct Replacement {
 
 #[must_use]
 pub fn organize_imports(source: &str) -> Option<String> {
-    organize_imports_protecting(source, &[])
+    let lexed = Lexer::new(source).lex();
+    if !lexed.errors().is_empty() {
+        return None;
+    }
+    let parsed = parse(lexed);
+    if !parsed.errors().is_empty() {
+        return None;
+    }
+    let protected_ranges = protected_line_ranges(source, parsed.tree());
+    organize_imports_protecting(source, &protected_ranges)
 }
 
 #[must_use]
