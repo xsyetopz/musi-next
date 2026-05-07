@@ -690,6 +690,61 @@ point.
     }
 
     #[test]
+    fn completion_inside_import_string_returns_package_export_items() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "src/index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        fs::create_dir_all(root.join("src")).expect("src dir should be created");
+        let path = root.join("src/index.ms");
+        let source = "let math := import \"@std/m\";\n";
+        fs::write(&path, "let math := import \"@std/math\";\n").expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let response = server
+            .completions(CompletionParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(0, 26),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+                context: None,
+            })
+            .expect("completion response should exist");
+        let CompletionResponse::List(list) = response else {
+            panic!("completion list expected");
+        };
+        let math = list
+            .items
+            .iter()
+            .find(|item| item.label == "@std/math")
+            .expect("@std/math completion should exist");
+        let edit = math
+            .text_edit
+            .as_ref()
+            .and_then(|edit| match edit {
+                CompletionTextEdit::Edit(edit) => Some(edit),
+                CompletionTextEdit::InsertAndReplace(_) => None,
+            })
+            .expect("completion should provide replacement edit");
+
+        assert_eq!(math.kind, Some(CompletionItemKind::MODULE));
+        assert_eq!(edit.range.start, Position::new(0, 20));
+        assert_eq!(edit.range.end, Position::new(0, 26));
+        assert_eq!(edit.new_text, "@std/math");
+    }
+
+    #[test]
     fn signature_help_returns_active_callable_parameter() {
         let root = temp_project();
         fs::write(

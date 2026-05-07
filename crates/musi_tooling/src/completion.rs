@@ -161,9 +161,39 @@ fn import_path_completions(
             Some(completion)
         })
         .collect::<Vec<_>>();
+    completions.extend(project.workspace().packages.values().flat_map(|package| {
+        package
+            .exports
+            .iter()
+            .filter_map(|(export_key, module_key)| {
+                let specifier = package_export_specifier(&package.id.name, export_key)?;
+                if !specifier.starts_with(&context.prefix) {
+                    return None;
+                }
+                let module_path = package.module_keys.get(module_key)?;
+                let mut completion = ToolCompletion::new(
+                    specifier.clone(),
+                    ToolCompletionKind::Module,
+                    Some("module".to_owned()),
+                    replace_range,
+                )
+                .with_sort_text(format!("0_{specifier}"));
+                completion.documentation =
+                    module_docs_for_project_file_with_overlay(module_path, None);
+                Some(completion)
+            })
+    }));
     completions.sort_by(|left, right| left.label.cmp(&right.label));
     completions.dedup_by(|left, right| left.label == right.label);
     completions
+}
+
+fn package_export_specifier(package_name: &str, export_key: &str) -> Option<String> {
+    if export_key == "." {
+        return Some(package_name.to_owned());
+    }
+    let subpath = export_key.strip_prefix("./")?;
+    Some(format!("{package_name}/{subpath}"))
 }
 
 fn global_completions(
