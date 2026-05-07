@@ -224,9 +224,8 @@ export let targetJit (target : Target) : Jit :=
 --- Core operation for `matchesOs`.
 export let matchesOs (value : Os) : Bool := sys.matchesOs(osText(value));
 --- Core operation for `matchesArch`.
-export let matchesArch (
-  value : Arch
-) : Bool := sys.matchesArch(archText(value));
+export let matchesArch (value : Arch) : Bool :=
+  sys.matchesArch(archText(value));
 --- Core operation for `matchesFamily`.
 export let matchesFamily (value : Family) : Bool :=
   sys.matchesFamily(familyText(value));

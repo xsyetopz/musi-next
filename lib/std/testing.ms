@@ -33,7 +33,7 @@ export let lessThan (actual : Int, upperBound : Int) : Bool :=
 export let betweenInclusive (
   actual : Int,
   lowerBound : Int,
-  upperBound : Int,
+  upperBound : Int
 ) : Bool := assert.betweenInclusive(actual, lowerBound, upperBound);
 --- Build integer matcher helpers for one actual value.
 export let expectInt (actual : Int) := assert.expectInt(actual);

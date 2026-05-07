@@ -556,6 +556,43 @@ let value:=1;
     }
 
     #[test]
+    fn document_on_type_formatting_uses_manifest_options() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            "{\n  \"name\": \"app\",\n  \"version\": \"0.1.0\",\n  \"fmt\": { \"lineWidth\": 20 }\n}\n",
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        fs::write(&path, "let placeholder := 0;").expect("source file should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let source = "let value := foo(aaaaaaaaaa, bbbbbbbbbb);";
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let edits = server
+            .document_on_type_formatting(DocumentOnTypeFormattingParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(0, 41),
+                },
+                ch: ";".to_owned(),
+                options: FormattingOptions {
+                    tab_size: 2,
+                    insert_spaces: true,
+                    ..FormattingOptions::default()
+                },
+            })
+            .expect("on type formatting should run");
+
+        assert_eq!(edits.len(), 1);
+        assert_eq!(
+            edits[0].new_text,
+            "let value :=\n  foo(\n    aaaaaaaaaa,\n    bbbbbbbbbb,\n  );\n"
+        );
+    }
+
+    #[test]
     fn document_on_type_formatting_ignores_non_trigger_characters() {
         let uri = Url::parse("file:///tmp/index.ms").expect("uri should parse");
         let mut server = MusiLanguageServer::new(ClientSocket::new_closed());

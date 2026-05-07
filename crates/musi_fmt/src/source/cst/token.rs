@@ -177,10 +177,10 @@ impl CstFormatter<'_> {
     ) -> bool {
         if self.options.line_width == 0
             || self.options.trailing_commas != TrailingCommas::MultiLine
-            || !self
-                .parens
-                .last()
-                .is_some_and(|frame| matches!(frame.kind, ParenKind::Regular | ParenKind::Bracket))
+            || !self.parens.last().is_some_and(|frame| {
+                frame.allows_trailing_comma
+                    && matches!(frame.kind, ParenKind::Regular | ParenKind::Bracket)
+            })
         {
             return false;
         }
@@ -475,6 +475,11 @@ impl CstFormatter<'_> {
     }
 
     fn write_open_bracket(&mut self, text: &str, role: CstLeafRole, break_after_open: bool) {
+        let role = if role == CstLeafRole::Regular && self.previous.is_some_and(is_word_like) {
+            CstLeafRole::ApplyBracket
+        } else {
+            role
+        };
         if matches!(
             role,
             CstLeafRole::TypeParamBracket | CstLeafRole::ArrayTypeBracket
@@ -484,9 +489,15 @@ impl CstFormatter<'_> {
             self.push_space();
         }
         self.write_punct(TokenKind::LBracket, text);
+        let allows_trailing_comma = !matches!(
+            role,
+            CstLeafRole::TypeParamBracket
+                | CstLeafRole::ApplyBracket
+                | CstLeafRole::ArrayTypeBracket
+        );
         self.parens.push(ParenFrame::with_trailing_commas(
             ParenKind::Bracket,
-            role != CstLeafRole::TypeParamBracket,
+            allows_trailing_comma,
         ));
         self.indent = self.indent.saturating_add(1);
         if break_after_open {

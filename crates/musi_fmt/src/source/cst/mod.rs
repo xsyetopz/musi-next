@@ -191,6 +191,9 @@ fn leaf_role_for(parent: SyntaxNode<'_, '_>, token: TokenKind) -> CstLeafRole {
         (SyntaxNodeKind::TypeParamList, TokenKind::LBracket | TokenKind::RBracket) => {
             CstLeafRole::TypeParamBracket
         }
+        (SyntaxNodeKind::ApplyExpr, TokenKind::LBracket | TokenKind::RBracket) => {
+            CstLeafRole::ApplyBracket
+        }
         (SyntaxNodeKind::ArrayTy, TokenKind::LBracket | TokenKind::RBracket) => {
             CstLeafRole::ArrayTypeBracket
         }
@@ -422,6 +425,7 @@ enum CstLeafRole {
     ParamParen,
     MemberParamParen,
     TypeParamBracket,
+    ApplyBracket,
     ArrayTypeBracket,
     CommaListBrace,
     Attribute,
@@ -674,10 +678,10 @@ impl CstFormatter<'_> {
 
     fn can_break_before_token(&self, current: TokenKind) -> bool {
         self.previous == Some(TokenKind::Comma)
-            && self
-                .parens
-                .last()
-                .is_some_and(|frame| matches!(frame.kind, ParenKind::Regular | ParenKind::Bracket))
+            && self.parens.last().is_some_and(|frame| {
+                frame.allows_trailing_comma
+                    && matches!(frame.kind, ParenKind::Regular | ParenKind::Bracket)
+            })
             || self.previous == Some(TokenKind::ColonEq)
             || (self.options.operator_break == OperatorBreak::After
                 && self.previous.is_some_and(is_operator))

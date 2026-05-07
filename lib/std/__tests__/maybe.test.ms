@@ -23,9 +23,7 @@ export let test () :=
     testing.it(
       "'map' transforms Some values",
       testing.toBe(
-        maybe.unwrapOr[Int](maybe.map[Int, Int](someOne, \(
-              x
-            ) => x + 1), 0),
+        maybe.unwrapOr[Int](maybe.map[Int, Int](someOne, \(x) => x + 1), 0),
         2,
       ),
     );

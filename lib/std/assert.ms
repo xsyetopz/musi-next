@@ -55,7 +55,7 @@ export let lessThan (actual : Int, upperBound : Int) : Bool :=
 export let betweenInclusive (
   actual : Int,
   lowerBound : Int,
-  upperBound : Int,
+  upperBound : Int
 ) : Bool :=
   match () (
   | _ if actual < lowerBound => fail(

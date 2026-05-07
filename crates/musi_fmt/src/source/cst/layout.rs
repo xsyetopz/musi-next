@@ -144,7 +144,10 @@ fn split_long_let_signature(line: &str, options: &FormatOptions) -> Option<Strin
     let mut out = String::new();
     out.push_str(line.get(..=open)?.trim_end());
     out.push('\n');
-    for item in split_top_level_commas(inner) {
+    for item in split_top_level_commas(inner)
+        .into_iter()
+        .filter(|item| !item.trim().is_empty())
+    {
         out.push_str(&item_indent);
         out.push_str(item.trim());
         out.push_str(",\n");
@@ -189,7 +192,9 @@ fn split_top_level_commas(text: &str) -> Vec<&str> {
             '[' => bracket_depth = bracket_depth.saturating_add(1),
             ']' => bracket_depth = bracket_depth.saturating_sub(1),
             ',' if paren_depth == 0 && bracket_depth == 0 => {
-                if let Some(item) = text.get(start..index) {
+                if let Some(item) = text.get(start..index)
+                    && !item.trim().is_empty()
+                {
                     items.push(item);
                 }
                 start = index.saturating_add(1);
@@ -197,7 +202,9 @@ fn split_top_level_commas(text: &str) -> Vec<&str> {
             _ => {}
         }
     }
-    if let Some(item) = text.get(start..) {
+    if let Some(item) = text.get(start..)
+        && !item.trim().is_empty()
+    {
         items.push(item);
     }
     items

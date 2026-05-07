@@ -62,10 +62,11 @@ let expectMapOr [T, E, U] (
   target : Expect[T, E],
   fallback : U,
   f : T -> U
-) : U := match target (
-| .Success(item) => f(item)
-| .Failure(_) => fallback
-);
+) : U :=
+  match target (
+  | .Success(item) => f(item)
+  | .Failure(_) => fallback
+  );
 
 --- Core operation for `mapOrElse`.
 let expectMapOrElse [T, E, U] (

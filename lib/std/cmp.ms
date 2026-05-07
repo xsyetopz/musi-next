@@ -107,11 +107,8 @@ export let maxInt (left : Int, right : Int) : Int :=
   );
 
 --- Core operation for `clampInt`.
-export let clampInt (
-  value : Int,
-  lowerBound : Int,
-  upperBound : Int,
-) : Int := maxInt(lowerBound, minInt(value, upperBound));
+export let clampInt (value : Int, lowerBound : Int, upperBound : Int,) : Int :=
+  maxInt(lowerBound, minInt(value, upperBound));
 
 --- Integer equality given.
 export let intEq :=

@@ -72,7 +72,7 @@ impl MusiLanguageServer {
         let offset = lsp_position_offset(text, params.text_document_position.position)?;
         let (start, end) = line_offsets_around(text, offset)?;
         let selected = text.get(start..end)?;
-        let mut options = FormatOptions::default();
+        let mut options = formatting_options_for_path(&path);
         apply_document_formatting_options(&mut options, &params.options);
         let formatted = format_source(selected, &options).ok()?;
         if !formatted.changed {

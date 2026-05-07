@@ -78,6 +78,18 @@ mod success {
     }
 
     #[test]
+    fn parses_type_application_in_type_annotations() {
+        let parsed =
+            parse(Lexer::new("let value (target : Expect[T, E]) : Expect[T, E] := target;").lex());
+
+        assert!(
+            parsed.errors().is_empty(),
+            "unexpected errors: {:?}",
+            parsed.errors()
+        );
+    }
+
+    #[test]
     fn parses_receiver_method_let_head() {
         let parsed = parse(Lexer::new("let (self : Int).abs () : Int := self;").lex());
         assert!(

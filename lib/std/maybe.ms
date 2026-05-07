@@ -81,10 +81,11 @@ let maybeMapOrElse [T, U] (
   target : Maybe[T],
   fallback :() -> U,
   f : T -> U
-) : U := match target (
-| .Some(item) => f(item)
-| .None => fallback()
-);
+) : U :=
+  match target (
+  | .Some(item) => f(item)
+  | .None => fallback()
+  );
 
 --- Core operation for `mapOrElse`.
 export let mapOrElse [T, U] (
@@ -128,21 +129,15 @@ export let filter [T] (target : Maybe[T], predicate : T -> Bool) : Maybe[T] :=
   maybeFilter[T](target, predicate);
 
 --- Core operation for `fold`.
-let maybeFold [T, U] (
-  target : Maybe[T],
-  onNone : U,
-  onSome : T -> U
-) : U := match target (
-| .Some(item) => onSome(item)
-| .None => onNone
-);
+let maybeFold [T, U] (target : Maybe[T], onNone : U, onSome : T -> U) : U :=
+  match target (
+  | .Some(item) => onSome(item)
+  | .None => onNone
+  );
 
 --- Core operation for `fold`.
-export let fold [T, U] (
-  target : Maybe[T],
-  onNone : U,
-  onSome : T -> U
-) : U := maybeFold[T, U](target, onNone, onSome);
+export let fold [T, U] (target : Maybe[T], onNone : U, onSome : T -> U) : U :=
+  maybeFold[T, U](target, onNone, onSome);
 
 --- Returns true when the maybe contains a value.
 export let (self : Maybe[T]).isSome [T] () : Bool := maybeIsSome[T](self);

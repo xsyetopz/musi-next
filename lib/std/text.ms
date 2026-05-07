@@ -126,11 +126,7 @@ let rec matchesAt (
   | _ => matchesAt(target, needle, targetIndex + 1, needleIndex + 1)
   );
 
-let rec indexOfFrom (
-  target : String,
-  needle : String,
-  index : Int
-) : Int :=
+let rec indexOfFrom (target : String, needle : String, index : Int) : Int :=
   match () (
   | _ if textLength(needle) = 0 => index
   | _ if index > textLength(target) - textLength(needle) => - 1

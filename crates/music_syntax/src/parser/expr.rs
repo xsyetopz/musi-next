@@ -120,7 +120,11 @@ impl Parser<'_> {
                 vec![op, SyntaxElementId::Node(operand)],
             ));
         }
-        self.parse_atom_expr()
+        let mut ty = self.parse_atom_expr()?;
+        while self.at(TokenKind::LBracket) {
+            ty = self.parse_apply_expr(ty)?;
+        }
+        Ok(ty)
     }
 
     fn parse_type_prefix_expr(&mut self) -> SyntaxNodeParseResult {

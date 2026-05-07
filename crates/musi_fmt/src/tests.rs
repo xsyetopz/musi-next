@@ -578,6 +578,34 @@ mod success {
     }
 
     #[test]
+    fn declaration_wrap_keeps_short_type_applications_inline() {
+        let source = "let expectAndThen [T, E, U] (target : Expect[T, E], f : T -> Expect[U, E]) : Expect[U, E] := target.andThen(f);";
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "let expectAndThen [T, E, U] (\n  target : Expect[T, E],\n  f : T -> Expect[U, E]\n) : Expect[U, E] := target.andThen(f);\n"
+        );
+        let second = format_source(&formatted_result.text, &options()).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
+    fn declaration_wrap_drops_empty_trailing_parameter_item() {
+        let source = "export let betweenInclusive (actual : Int, lowerBound : Int, upperBound : Int,) : Bool := assert.betweenInclusive(actual, lowerBound, upperBound);";
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "export let betweenInclusive (\n  actual : Int,\n  lowerBound : Int,\n  upperBound : Int\n) : Bool := assert.betweenInclusive(actual, lowerBound, upperBound);\n"
+        );
+        let second = format_source(&formatted_result.text, &options()).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
     fn trailing_commas_apply_to_record_comma_lists() {
         let mut options = options();
         options.record_field_layout = GroupLayout::Block;
