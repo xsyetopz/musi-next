@@ -15,6 +15,7 @@ Each feature should have one current-language explanation and at least one snipp
 - Delimiter law, arrays, tuples, sequences, records, indexing, semicolon rules, structural `let` members, and named arguments: `specs/language/syntax.md`, `specs/language/type-core.md`
 - `:=`, `/=`, `=`, `=>`, `->`, and `~>` as source separators and operators: `core/operators.md`, `types/type-annotations.md`
 - `?T` and `E!T` as optional and error-shaped type surfaces: `types/type-annotations.md`, `types/generics.md`
+- Comments, item docs, and module docs with `--!` or `/-! ... -/`: `reference/comments.md`
 
 ## Core expressions
 
@@ -41,4 +42,3 @@ Each feature should have one current-language explanation and at least one snipp
 - Proofs, `law`, `Proof[P]`, contextual proof evidence, and `@axiom` trust roots: `specs/language/first-class-everything.md`, `specs/language/type-core.md`, `specs/language/syntax.md`, `specs/language/items-and-attributes.md`
 - Pin action scopes are only valid inside `unsafe` blocks; `name` has type `Pin[T]`, remains scoped to `body`, and cannot be returned from that body.
 - Foundation, runtime, stdlib layering, attributes, hygienic `quote`, `#` splices, known, templates, tests, and tooling: `effects-runtime/foundation.md`, `effects-runtime/runtime.md`, `effects-runtime/stdlib.md`, `advanced/attributes.md`, `advanced/quote-and-syntax.md`, `advanced/known.md`, `advanced/templates-and-splices.md`, `advanced/testing.md`, `advanced/running-and-tooling.md`
-
