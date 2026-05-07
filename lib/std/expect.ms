@@ -189,8 +189,9 @@ export let (self : Expect[T, E]).map [T, E, U] (f : T -> U) : Expect[U, E] :=
   expectMap[T, E, U](self, f);
 
 --- Transform an error value.
-export let (self : Expect[T, E]).mapFail [T, E, F] (f : E -> F) : Expect[T, F,] :=
-  expectMapFail[T, E, F](self, f);
+export let (self : Expect[T, E]).mapFail [T, E, F] (
+  f : E -> F
+) : Expect[T, F,] := expectMapFail[T, E, F](self, f);
 
 --- Transform a success value or return the fallback.
 export let (self : Expect[T, E]).mapOr [T, E, U] (

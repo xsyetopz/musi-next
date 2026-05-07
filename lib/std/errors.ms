@@ -6,8 +6,9 @@ export opaque let Error := data {
 };
 
 --- Build an error value.
-export let error (message : String) : Error :=
-  .ErrorMessage(message := message);
+export let error (
+  message : String
+) : Error := .ErrorMessage(message := message);
 
 --- Return error message.
 export let (self : Error).message () : String :=
