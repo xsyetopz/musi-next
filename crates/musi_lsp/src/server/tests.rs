@@ -440,6 +440,37 @@ let value:=1;
     }
 
     #[test]
+    fn document_range_formatting_formats_selected_musi_fence_body() {
+        let root = temp_project();
+        let path = root.join("README.md");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let source = "# Example\n\n```musi\nlet x:=1;\n```\n";
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let edits = server
+            .document_range_formatting(DocumentRangeFormattingParams {
+                text_document: TextDocumentIdentifier { uri },
+                range: Range {
+                    start: Position::new(3, 0),
+                    end: Position::new(4, 0),
+                },
+                options: FormattingOptions {
+                    tab_size: 2,
+                    insert_spaces: true,
+                    ..FormattingOptions::default()
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("range formatting should run");
+
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].range.start, Position::new(3, 0));
+        assert_eq!(edits[0].range.end, Position::new(4, 0));
+        assert_eq!(edits[0].new_text, "let x := 1;\n");
+    }
+
+    #[test]
     fn document_on_type_formatting_formats_open_document_on_trigger() {
         let uri = Url::parse("file:///tmp/index.ms").expect("uri should parse");
         let source = "let x:=1;";

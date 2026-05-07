@@ -49,7 +49,7 @@ use async_lsp::lsp_types::{
     notification::PublishDiagnostics,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
-use musi_fmt::{FormatOptions, format_text_for_path, organize_imports};
+use musi_fmt::{FormatOptions, format_source, format_text_for_path, organize_imports};
 use musi_project::{PackageSource, ProjectOptions, load_project, load_project_ancestor};
 use musi_tooling::{
     ToolDocumentSymbol, ToolMonikerKind, ToolSymbolKind, collect_project_diagnostics_with_overlay,
@@ -1389,7 +1389,11 @@ impl MusiLanguageServer {
                 FormatOptions::from_manifest(project.manifest().fmt.as_ref())
             });
         apply_document_formatting_options(&mut options, &params.options);
-        let formatted = format_text_for_path(&path, selected, &options).ok()?;
+        let formatted = if markdown_range_inside_musi_fence_body(text, start, end) {
+            format_source(selected, &options).ok()?
+        } else {
+            format_text_for_path(&path, selected, &options).ok()?
+        };
         if !formatted.changed {
             return Some(Vec::new());
         }
@@ -1812,6 +1816,99 @@ fn lsp_range_offsets(text: &str, range: Range) -> Option<(usize, usize)> {
     let start = lsp_position_offset(text, range.start)?;
     let end = lsp_position_offset(text, range.end)?;
     (start <= end).then_some((start, end))
+}
+
+fn markdown_range_inside_musi_fence_body(text: &str, start: usize, end: usize) -> bool {
+    let mut offset = 0usize;
+    let mut open_fence = None::<(MarkdownFence, usize)>;
+    while offset < text.len() {
+        let line_start = offset;
+        let line = next_markdown_line(text, &mut offset);
+        if let Some((fence, body_start)) = open_fence {
+            if fence.is_closing(line) {
+                if fence.is_musi && start >= body_start && end <= line_start {
+                    return true;
+                }
+                open_fence = None;
+                continue;
+            }
+            open_fence = Some((fence, body_start));
+            continue;
+        }
+        if let Some(fence) = MarkdownFence::parse(line) {
+            if start < offset {
+                return false;
+            }
+            open_fence = Some((fence, offset));
+        }
+    }
+    open_fence.is_some_and(|(fence, body_start)| {
+        fence.is_musi && start >= body_start && end <= text.len()
+    })
+}
+
+fn next_markdown_line<'a>(text: &'a str, offset: &mut usize) -> &'a str {
+    let Some(rest) = text.get(*offset..) else {
+        return "";
+    };
+    let end = rest
+        .find('\n')
+        .map_or(text.len(), |index| *offset + index + 1);
+    let start = *offset;
+    *offset = end;
+    text.get(start..end).unwrap_or_default()
+}
+
+#[derive(Debug, Clone, Copy)]
+struct MarkdownFence {
+    marker: char,
+    marker_len: usize,
+    is_musi: bool,
+}
+
+impl MarkdownFence {
+    fn parse(line: &str) -> Option<Self> {
+        let trimmed = line.trim_start();
+        let marker = trimmed.chars().next()?;
+        if marker != '`' && marker != '~' {
+            return None;
+        }
+        let marker_len = trimmed.chars().take_while(|char| *char == marker).count();
+        if marker_len < 3 {
+            return None;
+        }
+        let tag = markdown_fence_tag(trimmed.trim_start_matches(marker).trim());
+        Some(Self {
+            marker,
+            marker_len,
+            is_musi: ["musi", "ms", "music"]
+                .iter()
+                .any(|candidate| tag.eq_ignore_ascii_case(candidate)),
+        })
+    }
+
+    fn is_closing(self, line: &str) -> bool {
+        let trimmed = line.trim_start();
+        let marker_len = trimmed
+            .chars()
+            .take_while(|char| *char == self.marker)
+            .count();
+        marker_len >= self.marker_len
+            && trimmed
+                .get(marker_len..)
+                .is_some_and(|rest| rest.trim().is_empty())
+    }
+}
+
+fn markdown_fence_tag(info: &str) -> &str {
+    if let Some(attributes) = info.strip_prefix('{') {
+        return attributes
+            .trim_end_matches('}')
+            .split(|char: char| char.is_whitespace())
+            .find_map(|attribute| attribute.strip_prefix('.'))
+            .unwrap_or_default();
+    }
+    info.split_whitespace().next().unwrap_or_default()
 }
 
 fn lsp_position_offset(text: &str, position: Position) -> Option<usize> {
