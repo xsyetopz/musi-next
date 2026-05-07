@@ -1091,6 +1091,42 @@ dep.add(1, 2);
     }
 
     #[test]
+    fn hover_uses_utf16_positions_for_request_and_range() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let value := 1;\nlet icon := \"\u{1F600}\"; value;\n";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let hover = server
+            .hover_at(HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 22),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("hover should resolve");
+
+        assert_eq!(
+            hover.range,
+            Some(Range::new(Position::new(1, 18), Position::new(1, 23)))
+        );
+    }
+
+    #[test]
     fn hover_names_imported_member_parameters() {
         let root = temp_project();
         fs::write(

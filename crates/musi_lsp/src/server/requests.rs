@@ -46,18 +46,22 @@ impl MusiLanguageServer {
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
-        let overlay = self
-            .open_documents
-            .get(&text_document.uri)
-            .map(String::as_str);
-        if let Some(hover) = self.import_hover_at(&path, overlay, position) {
+        let file_text;
+        let text = if let Some(text) = self.open_documents.get(&text_document.uri) {
+            text.as_str()
+        } else {
+            file_text = read_to_string(&path).ok()?;
+            file_text.as_str()
+        };
+        if let Some(hover) = self.import_hover_at(&path, Some(text), position) {
             return Some(hover);
         }
+        let tool_position = to_tool_position_in_text(text, position)?;
         let hover = hover_for_project_file_with_overlay(
             &path,
-            overlay,
-            usize::try_from(position.line).ok()?.saturating_add(1),
-            usize::try_from(position.character).ok()?.saturating_add(1),
+            Some(text),
+            tool_position.line,
+            tool_position.col,
         )?;
         let contents = truncate_hover_contents(&hover.contents, self.config.hover_maximum_length);
         Some(Hover {
@@ -65,7 +69,7 @@ impl MusiLanguageServer {
                 kind: MarkupKind::Markdown,
                 value: contents,
             }),
-            range: Some(to_tool_range(&hover.range)),
+            range: Some(to_lsp_range_in_text(text, &hover.range)),
         })
     }
 
