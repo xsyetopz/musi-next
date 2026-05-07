@@ -1587,7 +1587,7 @@ let other := value + value;
         let root = temp_project();
         let path = root.join("index.ms");
         let uri = Url::from_file_path(&path).expect("file URI should build");
-        let source = "let testing:=import \"@std/testing\";\nlet io:=import \"@std/io\";\n";
+        let source = "let testing := import \"@std/testing\";\nlet io := import \"@std/io\";\nlet value:=1;\n";
         let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
         let _ = server.open_documents.insert(uri.clone(), source.to_owned());
 
@@ -1620,7 +1620,7 @@ let other := value + value;
         assert_eq!(edits.len(), 1);
         assert_eq!(
             edits[0].new_text,
-            "let io := import \"@std/io\";\nlet testing := import \"@std/testing\";\n"
+            "let io := import \"@std/io\";\nlet testing := import \"@std/testing\";\nlet value:=1;\n"
         );
     }
 

@@ -49,7 +49,7 @@ use async_lsp::lsp_types::{
     notification::PublishDiagnostics,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
-use musi_fmt::{FormatOptions, format_text_for_path};
+use musi_fmt::{FormatOptions, format_text_for_path, organize_imports};
 use musi_project::{PackageSource, ProjectOptions, load_project, load_project_ancestor};
 use musi_tooling::{
     ToolDocumentSymbol, ToolMonikerKind, ToolSymbolKind, collect_project_diagnostics_with_overlay,
@@ -890,16 +890,14 @@ impl MusiLanguageServer {
     fn organize_imports_edit(&self, uri: &Url) -> Option<WorkspaceEdit> {
         let text = self.open_documents.get(uri)?;
         let path = uri.to_file_path().ok()?;
-        let options = load_project_ancestor(&path, ProjectOptions::default())
-            .ok()
-            .map_or_else(FormatOptions::default, |project| {
-                FormatOptions::from_manifest(project.manifest().fmt.as_ref())
-            });
-        let formatted = format_text_for_path(&path, text, &options).ok()?;
-        formatted.changed.then(|| WorkspaceEdit {
+        if path.file_name().is_some_and(|name| name == "musi.json") {
+            return None;
+        }
+        let organized = organize_imports(text)?;
+        Some(WorkspaceEdit {
             changes: Some(HashMap::from([(
                 uri.clone(),
-                vec![TextEdit::new(full_document_range(text), formatted.text)],
+                vec![TextEdit::new(full_document_range(text), organized)],
             )])),
             document_changes: None,
             change_annotations: None,

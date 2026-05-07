@@ -10,6 +10,7 @@ mod token_class;
 use std::io::Error as IoError;
 use std::path::PathBuf;
 
+pub use imports::organize_imports;
 pub use markdown::format_markdown;
 pub use paths::{
     FormatPathChange, FormatPathSummary, format_file, format_paths, format_text_for_path,
