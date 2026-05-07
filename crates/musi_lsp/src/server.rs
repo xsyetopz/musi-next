@@ -50,7 +50,7 @@ use async_lsp::{ClientSocket, LanguageServer, ResponseError};
 use musi_fmt::{FormatOptions, format_text_for_path};
 use musi_project::{PackageSource, ProjectOptions, load_project, load_project_ancestor};
 use musi_tooling::{
-    ToolDocumentSymbol, collect_project_diagnostics_with_overlay,
+    ToolDocumentSymbol, ToolSymbolKind, collect_project_diagnostics_with_overlay,
     completions_for_project_file_with_overlay, definition_for_project_file_with_overlay,
     document_links_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
     folding_ranges_for_project_file_with_overlay, hover_for_project_file_with_overlay,
@@ -878,9 +878,10 @@ impl MusiLanguageServer {
             .iter()
             .flat_map(|root| workspace_symbols_for_project_root(root, &params.query))
             .filter(|symbol| {
-                !open_paths
-                    .iter()
-                    .any(|path| paths_match(path, &symbol.location.path))
+                symbol.kind == ToolSymbolKind::Module
+                    || !open_paths
+                        .iter()
+                        .any(|path| paths_match(path, &symbol.location.path))
             })
             .collect::<Vec<_>>();
         symbols.extend(

@@ -893,6 +893,20 @@ render(8080, 1 = 1);
 
         assert!(names.contains(&"unsavedValue"), "{names:?}");
         assert!(!names.contains(&"entryValue"), "{names:?}");
+
+        let module_response = server.workspace_symbols(&WorkspaceSymbolParams {
+            query: "src/index".to_owned(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        });
+        let WorkspaceSymbolResponse::Nested(module_symbols) = module_response else {
+            panic!("workspace module symbols expected");
+        };
+        assert!(
+            module_symbols
+                .iter()
+                .any(|symbol| { symbol.name == "src/index" && symbol.kind == SymbolKind::MODULE })
+        );
     }
 
     #[test]
