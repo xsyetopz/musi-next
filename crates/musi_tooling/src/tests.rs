@@ -714,6 +714,28 @@ let caller () := one.inc(2);
     }
 
     #[test]
+    fn document_links_resolve_package_imports_to_builtin_paths() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "let math := import \"@std/math\";\n";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let links = document_links_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+        );
+
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].specifier, "@std/math");
+        assert_eq!(links[0].resolved, "@@std@0.1.0/math.ms");
+        assert_eq!(links[0].target.to_string_lossy(), "builtin:/@std/math.ms");
+        assert_eq!(links[0].tooltip.as_deref(), Some("Open `@std/math`"));
+        assert_eq!(links[0].range.start_line, 1);
+        assert_eq!(links[0].range.start_col, 20);
+        assert_eq!(links[0].range.end_col, 31);
+    }
+
+    #[test]
     fn folding_ranges_include_multiline_nodes_and_block_comments() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);

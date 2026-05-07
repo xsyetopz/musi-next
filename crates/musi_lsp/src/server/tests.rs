@@ -2336,6 +2336,51 @@ let caller () := one.inc(2);
     }
 
     #[test]
+    fn document_link_resolves_package_import_targets() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let math := import \"@std/math\";\n";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let links = server
+            .document_links(DocumentLinkParams {
+                text_document: TextDocumentIdentifier { uri },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("document links should run");
+
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].range.start, Position::new(0, 19));
+        assert_eq!(links[0].range.end, Position::new(0, 30));
+        let link = MusiLanguageServer::resolve_document_link(links[0].clone());
+        let target_path = link
+            .target
+            .expect("package import link should resolve target")
+            .to_file_path()
+            .expect("package import target should be file URI");
+
+        assert_eq!(
+            target_path.file_name().and_then(|name| name.to_str()),
+            Some("math.ms")
+        );
+        assert_eq!(link.tooltip.as_deref(), Some("Open `@std/math`"));
+    }
+
+    #[test]
     fn hover_on_import_string_returns_resolved_module_docs() {
         let root = temp_project();
         fs::write(

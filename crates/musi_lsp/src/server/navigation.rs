@@ -7,7 +7,7 @@ use async_lsp::lsp_types::{
 use musi_tooling::{ToolDocumentSymbol, document_links_for_project_file_with_overlay};
 use serde_json::{Value, json};
 
-use super::convert::to_tool_range;
+use super::convert::{to_tool_range, uri_for_path};
 use super::workspace::paths_match;
 
 pub(super) fn reference_lens_title(count: usize) -> String {
@@ -93,7 +93,7 @@ pub(super) fn import_definition_at(
         .into_iter()
         .find(|link| position_in_lsp_range(position, to_tool_range(&link.range)))?;
     Some(Location {
-        uri: Url::from_file_path(link.target).ok()?,
+        uri: uri_for_path(&link.target)?,
         range: Range::new(Position::new(0, 0), Position::new(0, 0)),
     })
 }
@@ -106,7 +106,7 @@ pub(super) fn import_moniker_at(
     let link = document_links_for_project_file_with_overlay(path, overlay)
         .into_iter()
         .find(|link| position_in_lsp_range(position, to_tool_range(&link.range)))?;
-    let uri = Url::from_file_path(link.target).ok()?;
+    let uri = uri_for_path(&link.target)?;
     Some(Moniker {
         scheme: "musi".to_owned(),
         identifier: format!("{}#1:1", uri.as_str()),

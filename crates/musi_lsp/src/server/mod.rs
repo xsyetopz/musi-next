@@ -310,7 +310,7 @@ impl MusiLanguageServer {
             usize::try_from(position.line).ok()?.saturating_add(1),
             usize::try_from(position.character).ok()?.saturating_add(1),
         )
-        .and_then(to_lsp_location)?;
+        .and_then(|location| to_lsp_location(&location))?;
         Some(GotoDefinitionResponse::Scalar(location))
     }
 
@@ -331,7 +331,7 @@ impl MusiLanguageServer {
             usize::try_from(position.line).ok()?.saturating_add(1),
             usize::try_from(position.character).ok()?.saturating_add(1),
         )
-        .and_then(to_lsp_location)?;
+        .and_then(|location| to_lsp_location(&location))?;
         Some(GotoDefinitionResponse::Scalar(location))
     }
 
@@ -357,7 +357,7 @@ impl MusiLanguageServer {
             params.context.include_declaration,
         )
         .into_iter()
-        .filter_map(to_lsp_location)
+        .filter_map(|location| to_lsp_location(&location))
         .collect();
         Some(locations)
     }
@@ -622,7 +622,7 @@ impl MusiLanguageServer {
         let overlay = self.open_documents.get(&uri).map(String::as_str);
         let links = document_links_for_project_file_with_overlay(&path, overlay)
             .into_iter()
-            .filter_map(to_lsp_document_link)
+            .filter_map(|link| to_lsp_document_link(&link))
             .collect();
         Some(links)
     }

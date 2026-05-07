@@ -60,9 +60,9 @@ pub(super) fn resolve_lsp_completion(mut completion: CompletionItem) -> Completi
     completion
 }
 
-pub(super) fn to_lsp_location(location: ToolLocation) -> Option<Location> {
+pub(super) fn to_lsp_location(location: &ToolLocation) -> Option<Location> {
     Some(Location {
-        uri: Url::from_file_path(location.path).ok()?,
+        uri: uri_for_path(&location.path)?,
         range: to_tool_range(&location.range),
     })
 }
@@ -86,8 +86,8 @@ pub(super) fn to_lsp_folding_range(range: &ToolFoldingRange) -> FoldingRange {
     }
 }
 
-pub(super) fn to_lsp_document_link(link: ToolDocumentLink) -> Option<DocumentLink> {
-    let target = Url::from_file_path(link.target).ok()?;
+pub(super) fn to_lsp_document_link(link: &ToolDocumentLink) -> Option<DocumentLink> {
+    let target = uri_for_path(&link.target)?;
     Some(DocumentLink {
         range: to_tool_range(&link.range),
         target: None,
@@ -97,6 +97,12 @@ pub(super) fn to_lsp_document_link(link: ToolDocumentLink) -> Option<DocumentLin
             "tooltip": link.tooltip,
         })),
     })
+}
+
+pub(super) fn uri_for_path(path: &Path) -> Option<Url> {
+    Url::from_file_path(path)
+        .ok()
+        .or_else(|| Url::parse(&path.to_string_lossy()).ok())
 }
 
 pub(super) fn resolve_lsp_document_link(mut link: DocumentLink) -> DocumentLink {

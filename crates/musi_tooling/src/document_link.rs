@@ -58,7 +58,7 @@ pub fn document_links_for_project_file_with_overlay(
                 specifier: spec.as_str().to_owned(),
                 resolved: resolved.as_str().to_owned(),
                 target,
-                tooltip: Some(format!("Open `{resolved}`")),
+                tooltip: Some(format!("Open `{}`", spec.as_str())),
             })
         })
         .collect()
