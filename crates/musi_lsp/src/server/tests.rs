@@ -1127,6 +1127,90 @@ dep.add(1, 2);
     }
 
     #[test]
+    fn symbol_navigation_uses_utf16_positions() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let value := 1;\nlet icon := \"\u{1F600}\"; value;\n";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let definition = server
+            .definition_at(GotoDefinitionParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: uri.clone() },
+                    position: Position::new(1, 20),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("definition should resolve");
+        let GotoDefinitionResponse::Scalar(definition) = definition else {
+            panic!("definition should be scalar");
+        };
+        assert_eq!(
+            definition.range,
+            Range::new(Position::new(0, 4), Position::new(0, 9))
+        );
+
+        let references = server
+            .references_at(ReferenceParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: uri.clone() },
+                    position: Position::new(1, 20),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+                context: ReferenceContext {
+                    include_declaration: true,
+                },
+            })
+            .expect("references should resolve");
+        assert_eq!(
+            references
+                .iter()
+                .map(|location| location.range)
+                .collect::<Vec<_>>(),
+            [
+                Range::new(Position::new(0, 4), Position::new(0, 9)),
+                Range::new(Position::new(1, 18), Position::new(1, 23)),
+            ]
+        );
+
+        let highlights = server
+            .document_highlights(DocumentHighlightParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 20),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("document highlights should resolve");
+        assert_eq!(
+            highlights
+                .iter()
+                .map(|highlight| highlight.range)
+                .collect::<Vec<_>>(),
+            [
+                Range::new(Position::new(0, 4), Position::new(0, 9)),
+                Range::new(Position::new(1, 18), Position::new(1, 23)),
+            ]
+        );
+    }
+
+    #[test]
     fn hover_names_imported_member_parameters() {
         let root = temp_project();
         fs::write(

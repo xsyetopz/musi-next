@@ -67,10 +67,10 @@ use convert::encode_semantic_tokens;
 use convert::full_document_range;
 use convert::{
     resolve_lsp_completion, resolve_lsp_document_link, to_lsp_call_hierarchy_item,
-    to_lsp_completion, to_lsp_document_highlight, to_lsp_document_highlight_kind,
-    to_lsp_document_link, to_lsp_folding_range, to_lsp_location, to_lsp_range_in_text,
-    to_lsp_selection_range, to_lsp_signature_help, to_lsp_symbol_kind, to_lsp_workspace_edit,
-    to_tool_position_in_text, to_tool_range, tool_location_matches_path, truncate_hover_contents,
+    to_lsp_completion, to_lsp_document_highlight_kind, to_lsp_document_link, to_lsp_folding_range,
+    to_lsp_range_in_text, to_lsp_selection_range, to_lsp_signature_help, to_lsp_symbol_kind,
+    to_lsp_workspace_edit, to_tool_position_in_text, to_tool_range, tool_location_matches_path,
+    truncate_hover_contents,
 };
 #[cfg(test)]
 use formatting::apply_document_formatting_options;

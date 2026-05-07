@@ -3,13 +3,12 @@ use std::path::{Component, Path, PathBuf};
 
 use async_lsp::lsp_types::{
     CallHierarchyItem, CompletionItem, CompletionItemKind, CompletionTextEdit, Diagnostic,
-    DiagnosticRelatedInformation, DiagnosticSeverity, DocumentHighlight, DocumentHighlightKind,
-    DocumentLink, DocumentSymbol, Documentation, FoldingRange, FoldingRangeKind, InlayHint,
-    InlayHintKind, InlayHintLabel, InlayHintTooltip, Location, NumberOrString, OneOf,
-    ParameterInformation, ParameterLabel, Position, Range, SelectionRange, SemanticToken,
-    SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend, SignatureHelp,
-    SignatureInformation, SymbolKind, TextEdit, Url, WorkspaceEdit, WorkspaceLocation,
-    WorkspaceSymbol,
+    DiagnosticRelatedInformation, DiagnosticSeverity, DocumentHighlightKind, DocumentLink,
+    DocumentSymbol, Documentation, FoldingRange, FoldingRangeKind, InlayHint, InlayHintKind,
+    InlayHintLabel, InlayHintTooltip, Location, NumberOrString, OneOf, ParameterInformation,
+    ParameterLabel, Position, Range, SelectionRange, SemanticToken, SemanticTokenModifier,
+    SemanticTokenType, SemanticTokensLegend, SignatureHelp, SignatureInformation, SymbolKind,
+    TextEdit, Url, WorkspaceEdit, WorkspaceLocation, WorkspaceSymbol,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolCompletion, ToolCompletionKind,
@@ -127,23 +126,6 @@ pub(super) fn resolve_lsp_completion(mut completion: CompletionItem) -> Completi
         completion.documentation = Some(Documentation::String(documentation.to_owned()));
     }
     completion
-}
-
-pub(super) fn to_lsp_location(location: &ToolLocation) -> Option<Location> {
-    Some(Location {
-        uri: uri_for_path(&location.path)?,
-        range: to_tool_range(&location.range),
-    })
-}
-
-pub(super) fn to_lsp_document_highlight(
-    location: &ToolLocation,
-    kind: DocumentHighlightKind,
-) -> DocumentHighlight {
-    DocumentHighlight {
-        range: to_tool_range(&location.range),
-        kind: Some(kind),
-    }
 }
 
 pub(super) const fn to_lsp_document_highlight_kind(

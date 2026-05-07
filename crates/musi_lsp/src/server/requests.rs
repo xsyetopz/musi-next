@@ -130,10 +130,6 @@ impl MusiLanguageServer {
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
-        let overlay = self
-            .open_documents
-            .get(&text_document.uri)
-            .map(String::as_str);
         let file_text;
         let text = if let Some(text) = self.open_documents.get(&text_document.uri) {
             text.as_str()
@@ -144,13 +140,14 @@ impl MusiLanguageServer {
         if let Some(location) = import_definition_at(&path, text, position) {
             return Some(GotoDefinitionResponse::Scalar(location));
         }
+        let tool_position = to_tool_position_in_text(text, position)?;
         let location = definition_for_project_file_with_overlay(
             &path,
-            overlay,
-            usize::try_from(position.line).ok()?.saturating_add(1),
-            usize::try_from(position.character).ok()?.saturating_add(1),
+            Some(text),
+            tool_position.line,
+            tool_position.col,
         )
-        .and_then(|location| to_lsp_location(&location))?;
+        .and_then(|location| self.lsp_location_for_tool_location(&location))?;
         Some(GotoDefinitionResponse::Scalar(location))
     }
 
@@ -164,17 +161,21 @@ impl MusiLanguageServer {
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
-        let overlay = self
-            .open_documents
-            .get(&text_document.uri)
-            .map(String::as_str);
+        let file_text;
+        let text = if let Some(text) = self.open_documents.get(&text_document.uri) {
+            text.as_str()
+        } else {
+            file_text = read_to_string(&path).ok()?;
+            file_text.as_str()
+        };
+        let tool_position = to_tool_position_in_text(text, position)?;
         let location = type_definition_for_project_file_with_overlay(
             &path,
-            overlay,
-            usize::try_from(position.line).ok()?.saturating_add(1),
-            usize::try_from(position.character).ok()?.saturating_add(1),
+            Some(text),
+            tool_position.line,
+            tool_position.col,
         )
-        .and_then(|location| to_lsp_location(&location))?;
+        .and_then(|location| self.lsp_location_for_tool_location(&location))?;
         Some(GotoDefinitionResponse::Scalar(location))
     }
 
@@ -188,18 +189,22 @@ impl MusiLanguageServer {
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
-        let overlay = self
-            .open_documents
-            .get(&text_document.uri)
-            .map(String::as_str);
+        let file_text;
+        let text = if let Some(text) = self.open_documents.get(&text_document.uri) {
+            text.as_str()
+        } else {
+            file_text = read_to_string(&path).ok()?;
+            file_text.as_str()
+        };
+        let tool_position = to_tool_position_in_text(text, position)?;
         let locations = implementation_for_project_file_with_overlay(
             &path,
-            overlay,
-            usize::try_from(position.line).ok()?.saturating_add(1),
-            usize::try_from(position.character).ok()?.saturating_add(1),
+            Some(text),
+            tool_position.line,
+            tool_position.col,
         )
         .into_iter()
-        .filter_map(|location| to_lsp_location(&location))
+        .filter_map(|location| self.lsp_location_for_tool_location(&location))
         .collect::<Vec<_>>();
         (!locations.is_empty()).then_some(GotoDefinitionResponse::Array(locations))
     }
@@ -211,10 +216,6 @@ impl MusiLanguageServer {
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
-        let overlay = self
-            .open_documents
-            .get(&text_document.uri)
-            .map(String::as_str);
         let file_text;
         let text = if let Some(text) = self.open_documents.get(&text_document.uri) {
             text.as_str()
@@ -225,15 +226,16 @@ impl MusiLanguageServer {
         if let Some(locations) = self.import_references_at(&path, text, position) {
             return Some(locations);
         }
+        let tool_position = to_tool_position_in_text(text, position)?;
         let locations = references_for_project_file_with_overlay(
             &path,
-            overlay,
-            usize::try_from(position.line).ok()?.saturating_add(1),
-            usize::try_from(position.character).ok()?.saturating_add(1),
+            Some(text),
+            tool_position.line,
+            tool_position.col,
             params.context.include_declaration,
         )
         .into_iter()
-        .filter_map(|location| to_lsp_location(&location))
+        .filter_map(|location| self.lsp_location_for_tool_location(&location))
         .collect();
         Some(locations)
     }
@@ -352,19 +354,21 @@ impl MusiLanguageServer {
         if let Some(highlights) = import_document_highlights(&path, text, position) {
             return Some(highlights);
         }
+        let tool_position = to_tool_position_in_text(text, position)?;
         let highlights = document_highlights_for_project_file_with_overlay(
             &path,
             Some(text),
-            usize::try_from(position.line).ok()?.saturating_add(1),
-            usize::try_from(position.character).ok()?.saturating_add(1),
+            tool_position.line,
+            tool_position.col,
         )
         .into_iter()
         .filter(|highlight| tool_location_matches_path(&path, &highlight.location))
         .map(|highlight| {
-            to_lsp_document_highlight(
-                &highlight.location,
-                to_lsp_document_highlight_kind(highlight.kind),
-            )
+            let range = to_lsp_range_in_text(text, &highlight.location.range);
+            DocumentHighlight {
+                range,
+                kind: Some(to_lsp_document_highlight_kind(highlight.kind)),
+            }
         })
         .collect();
         Some(highlights)
@@ -747,5 +751,23 @@ impl MusiLanguageServer {
             collect_workspace_source_paths(&root, &mut paths);
         }
         sort_dedup_paths(paths)
+    }
+
+    fn lsp_location_for_tool_location(
+        &self,
+        location: &musi_tooling::ToolLocation,
+    ) -> Option<Location> {
+        let uri = Url::from_file_path(&location.path).ok()?;
+        let file_text;
+        let text = if let Some((_, text)) = self.open_document_for_path(&location.path) {
+            text
+        } else {
+            file_text = read_to_string(&location.path).ok()?;
+            file_text.as_str()
+        };
+        Some(Location {
+            uri,
+            range: to_lsp_range_in_text(text, &location.range),
+        })
     }
 }
