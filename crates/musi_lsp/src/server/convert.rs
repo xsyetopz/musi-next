@@ -8,14 +8,14 @@ use async_lsp::lsp_types::{
     InlayHintLabel, InlayHintTooltip, Location, NumberOrString, OneOf, ParameterInformation,
     ParameterLabel, Position, Range, SelectionRange, SemanticToken, SemanticTokenModifier,
     SemanticTokenType, SemanticTokensLegend, SignatureHelp, SignatureInformation, SymbolKind,
-    TextEdit, Url, WorkspaceEdit, WorkspaceLocation, WorkspaceSymbol,
+    TextEdit, Url, WorkspaceLocation, WorkspaceSymbol,
 };
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolCompletion, ToolCompletionKind,
     ToolDocumentLink, ToolDocumentSymbol, ToolFoldingRange, ToolFoldingRangeKind, ToolInlayHint,
     ToolInlayHintKind, ToolLocation, ToolPosition, ToolRange, ToolSelectionRange,
     ToolSemanticModifier, ToolSemanticToken, ToolSemanticTokenKind, ToolSignatureHelp,
-    ToolSignatureInformation, ToolSymbolKind, ToolWorkspaceEdit, ToolWorkspaceSymbol,
+    ToolSignatureInformation, ToolSymbolKind, ToolWorkspaceSymbol,
 };
 use serde_json::{Value, json};
 
@@ -301,28 +301,6 @@ pub(super) fn resolve_lsp_workspace_symbol(mut symbol: WorkspaceSymbol) -> Works
         range,
     });
     symbol
-}
-
-pub(super) fn to_lsp_workspace_edit(edit: ToolWorkspaceEdit) -> WorkspaceEdit {
-    let changes = edit
-        .changes
-        .into_iter()
-        .filter_map(|(path, edits)| {
-            let uri = Url::from_file_path(path).ok()?;
-            Some((
-                uri,
-                edits
-                    .into_iter()
-                    .map(|edit| TextEdit::new(to_tool_range(&edit.range), edit.new_text))
-                    .collect(),
-            ))
-        })
-        .collect();
-    WorkspaceEdit {
-        changes: Some(changes),
-        document_changes: None,
-        change_annotations: None,
-    }
 }
 
 const fn to_completion_item_kind(kind: ToolCompletionKind) -> CompletionItemKind {

@@ -1250,6 +1250,79 @@ dep.add(1, 2);
     }
 
     #[test]
+    fn rename_uses_utf16_positions_and_ranges() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let value := 1;\nlet icon := \"\u{1F600}\"; value;\n";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let prepared = server
+            .prepare_rename_at(TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                position: Position::new(1, 20),
+            })
+            .expect("rename should prepare");
+        let PrepareRenameResponse::RangeWithPlaceholder { range, placeholder } = prepared else {
+            panic!("rename should return range with placeholder");
+        };
+        assert_eq!(
+            range,
+            Range::new(Position::new(1, 18), Position::new(1, 23))
+        );
+        assert_eq!(placeholder, "value");
+
+        let edit = server
+            .rename_at(RenameParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: uri.clone() },
+                    position: Position::new(1, 20),
+                },
+                new_name: "renamed".to_owned(),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("rename should produce edits");
+        let changes = edit.changes.expect("rename should have changes");
+        let edits = changes.get(&uri).expect("rename should edit current file");
+        assert_eq!(
+            edits.iter().map(|edit| edit.range).collect::<Vec<_>>(),
+            [
+                Range::new(Position::new(0, 4), Position::new(0, 9)),
+                Range::new(Position::new(1, 18), Position::new(1, 23)),
+            ]
+        );
+
+        let linked = server
+            .linked_editing_ranges(LinkedEditingRangeParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 20),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("linked ranges should resolve");
+        assert_eq!(
+            linked.ranges,
+            [
+                Range::new(Position::new(0, 4), Position::new(0, 9)),
+                Range::new(Position::new(1, 18), Position::new(1, 23)),
+            ]
+        );
+    }
+
+    #[test]
     fn hover_names_imported_member_parameters() {
         let root = temp_project();
         fs::write(

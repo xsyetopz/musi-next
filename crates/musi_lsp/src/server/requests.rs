@@ -398,16 +398,17 @@ impl MusiLanguageServer {
         if let Some(ranges) = import_linked_editing_ranges(&path, text, position) {
             return Some(ranges);
         }
+        let tool_position = to_tool_position_in_text(text, position)?;
         let ranges = references_for_project_file_with_overlay(
             &path,
             Some(text),
-            usize::try_from(position.line).ok()?.saturating_add(1),
-            usize::try_from(position.character).ok()?.saturating_add(1),
+            tool_position.line,
+            tool_position.col,
             true,
         )
         .into_iter()
         .filter(|location| tool_location_matches_path(&path, location))
-        .map(|location| to_tool_range(&location.range))
+        .map(|location| to_lsp_range_in_text(text, &location.range))
         .collect::<Vec<_>>();
         (ranges.len() > 1).then_some(LinkedEditingRanges {
             ranges,
@@ -661,18 +662,22 @@ impl MusiLanguageServer {
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
-        let overlay = self
-            .open_documents
-            .get(&text_document.uri)
-            .map(String::as_str);
+        let file_text;
+        let text = if let Some(text) = self.open_documents.get(&text_document.uri) {
+            text.as_str()
+        } else {
+            file_text = read_to_string(&path).ok()?;
+            file_text.as_str()
+        };
+        let tool_position = to_tool_position_in_text(text, position)?;
         let (range, placeholder) = prepare_rename_for_project_file_with_overlay(
             &path,
-            overlay,
-            usize::try_from(position.line).ok()?.saturating_add(1),
-            usize::try_from(position.character).ok()?.saturating_add(1),
+            Some(text),
+            tool_position.line,
+            tool_position.col,
         )?;
         Some(PrepareRenameResponse::RangeWithPlaceholder {
-            range: to_tool_range(&range),
+            range: to_lsp_range_in_text(text, &range),
             placeholder,
         })
     }
@@ -684,18 +689,22 @@ impl MusiLanguageServer {
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
-        let overlay = self
-            .open_documents
-            .get(&text_document.uri)
-            .map(String::as_str);
+        let file_text;
+        let text = if let Some(text) = self.open_documents.get(&text_document.uri) {
+            text.as_str()
+        } else {
+            file_text = read_to_string(&path).ok()?;
+            file_text.as_str()
+        };
+        let tool_position = to_tool_position_in_text(text, position)?;
         rename_for_project_file_with_overlay(
             &path,
-            overlay,
-            usize::try_from(position.line).ok()?.saturating_add(1),
-            usize::try_from(position.character).ok()?.saturating_add(1),
+            Some(text),
+            tool_position.line,
+            tool_position.col,
             &params.new_name,
         )
-        .map(to_lsp_workspace_edit)
+        .and_then(|edit| self.lsp_workspace_edit_for_tool_edit(edit))
     }
 
     pub(super) fn will_rename_files_edit(
@@ -772,6 +781,33 @@ impl MusiLanguageServer {
         Some(Location {
             uri,
             range: to_lsp_range_in_text(text, &location.range),
+        })
+    }
+
+    fn lsp_workspace_edit_for_tool_edit(
+        &self,
+        edit: musi_tooling::ToolWorkspaceEdit,
+    ) -> Option<WorkspaceEdit> {
+        let mut changes = HashMap::new();
+        for (path, edits) in edit.changes {
+            let uri = Url::from_file_path(&path).ok()?;
+            let file_text;
+            let text = if let Some((_, text)) = self.open_document_for_path(&path) {
+                text
+            } else {
+                file_text = read_to_string(&path).ok()?;
+                file_text.as_str()
+            };
+            let edits = edits
+                .into_iter()
+                .map(|edit| TextEdit::new(to_lsp_range_in_text(text, &edit.range), edit.new_text))
+                .collect::<Vec<_>>();
+            let _ = changes.insert(uri, edits);
+        }
+        Some(WorkspaceEdit {
+            changes: Some(changes),
+            document_changes: None,
+            change_annotations: None,
         })
     }
 }
