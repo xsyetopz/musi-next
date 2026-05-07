@@ -221,7 +221,7 @@ mod success {
             .capabilities
             .code_lens_provider
             .expect("code lens provider");
-        assert_eq!(code_lens.resolve_provider, Some(true));
+        assert_eq!(code_lens.resolve_provider, Some(false));
         assert_eq!(
             initialize_result.capabilities.diagnostic_provider,
             Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
@@ -3381,13 +3381,8 @@ let other := value + value;
             .iter()
             .find(|lens| lens.range.start == Position::new(0, 4))
             .expect("value reference lens should exist");
-        assert_eq!(value_lens.command, None);
-        assert!(value_lens.data.is_some());
-
-        let value_lens = server.resolve_code_lens(value_lens.clone());
-
         let command = value_lens.command.as_ref().expect("lens command");
-        assert_eq!(command.title, "2 references");
+        assert_eq!(command.title, "references");
         assert_eq!(command.command, "musi.references");
         let arguments = command.arguments.as_ref().expect("lens arguments");
         assert_eq!(arguments.len(), 1);
@@ -3408,7 +3403,7 @@ let other := value + value;
     }
 
     #[test]
-    fn code_lens_counts_workspace_references() {
+    fn code_lens_command_executes_workspace_references() {
         let root = temp_project();
         fs::write(
             root.join("musi.json"),
@@ -3443,10 +3438,19 @@ let other := value + value;
             .iter()
             .find(|lens| lens.range.start == Position::new(0, 11))
             .expect("value reference lens should exist");
-        let value_lens = server.resolve_code_lens(value_lens.clone());
-
         let command = value_lens.command.as_ref().expect("lens command");
-        assert_eq!(command.title, "1 reference");
+        assert_eq!(command.title, "references");
+        let result = server
+            .execute_command_request(&ExecuteCommandParams {
+                command: command.command.clone(),
+                arguments: command.arguments.clone().expect("lens arguments"),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("references command should return locations");
+        let locations: Vec<Location> =
+            serde_json::from_value(result).expect("locations should deserialize");
+
+        assert_eq!(locations.len(), 1);
     }
 
     #[test]

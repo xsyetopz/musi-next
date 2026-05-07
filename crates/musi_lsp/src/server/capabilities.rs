@@ -54,7 +54,7 @@ pub(super) fn initialize_result(references_command: &str) -> InitializeResult {
                 },
             }),
             code_lens_provider: Some(CodeLensOptions {
-                resolve_provider: Some(true),
+                resolve_provider: Some(false),
             }),
             execute_command_provider: Some(ExecuteCommandOptions {
                 commands: vec![references_command.to_owned()],

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use async_lsp::lsp_types::{
-    CallHierarchyItem, CodeActionKind, CodeLens, DocumentHighlight, DocumentHighlightKind,
+    CallHierarchyItem, CodeActionKind, CodeLens, Command, DocumentHighlight, DocumentHighlightKind,
     LinkedEditingRanges, Location, Moniker, MonikerKind, Position, Range, UniquenessLevel, Url,
 };
 use musi_tooling::{ToolDocumentSymbol, document_links_for_project_file_with_overlay};
@@ -21,17 +21,23 @@ pub(super) fn reference_lens_title(count: usize) -> String {
 pub(super) fn push_reference_lenses(
     path: &Path,
     symbol: &ToolDocumentSymbol,
+    command_name: &str,
     lenses: &mut Vec<CodeLens>,
 ) {
     if let Some(data) = reference_lens_data(path, symbol) {
+        let command = Command::new(
+            "references".to_owned(),
+            command_name.to_owned(),
+            Some(vec![data.clone()]),
+        );
         lenses.push(CodeLens {
             range: to_tool_range(&symbol.selection_range),
-            command: None,
+            command: Some(command),
             data: Some(data),
         });
     }
     for child in &symbol.children {
-        push_reference_lenses(path, child, lenses);
+        push_reference_lenses(path, child, command_name, lenses);
     }
 }
 
