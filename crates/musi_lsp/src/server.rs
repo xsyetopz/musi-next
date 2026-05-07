@@ -633,6 +633,9 @@ impl MusiLanguageServer {
             .open_documents
             .get(&text_document.uri)
             .map(String::as_str);
+        if let Some(ranges) = import_linked_editing_ranges(&path, overlay, position) {
+            return Some(ranges);
+        }
         let ranges = references_for_project_file_with_overlay(
             &path,
             overlay,
@@ -1486,6 +1489,21 @@ fn import_document_highlights(
             })
             .collect(),
     )
+}
+
+fn import_linked_editing_ranges(
+    path: &Path,
+    overlay: Option<&str>,
+    position: Position,
+) -> Option<LinkedEditingRanges> {
+    let ranges = import_document_highlights(path, overlay, position)?
+        .into_iter()
+        .map(|highlight| highlight.range)
+        .collect::<Vec<_>>();
+    (ranges.len() > 1).then_some(LinkedEditingRanges {
+        ranges,
+        word_pattern: None,
+    })
 }
 
 const fn position_in_lsp_range(position: Position, range: Range) -> bool {

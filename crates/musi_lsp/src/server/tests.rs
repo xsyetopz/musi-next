@@ -1187,6 +1187,47 @@ let other := value;
     }
 
     #[test]
+    fn linked_editing_on_import_string_returns_matching_import_ranges() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "let dep := import \"./dep\";\nlet again := import \"./dep\";\n";
+        fs::write(&path, source).expect("entry should be written");
+        fs::write(root.join("dep.ms"), "export let value := 1;\n").expect("dep should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let ranges = server
+            .linked_editing_ranges(LinkedEditingRangeParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(0, 21),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("import linked editing should resolve");
+
+        assert_eq!(
+            ranges.ranges,
+            [
+                Range::new(Position::new(0, 18), Position::new(0, 25)),
+                Range::new(Position::new(1, 20), Position::new(1, 27)),
+            ]
+        );
+        assert_eq!(ranges.word_pattern, None);
+    }
+
+    #[test]
     fn type_definition_resolves_named_value_type() {
         let root = temp_project();
         fs::write(
