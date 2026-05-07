@@ -7,29 +7,26 @@ use std::pin::Pin;
 use async_lsp::lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
     CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, CodeActionResponse,
-    CodeLens, CodeLensParams, Command, CompletionItem, CompletionList, CompletionParams,
-    CompletionResponse, Diagnostic, DidChangeConfigurationParams, DidChangeTextDocumentParams,
-    DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, DocumentDiagnosticParams, DocumentDiagnosticReport,
-    DocumentDiagnosticReportResult, DocumentFormattingParams, DocumentHighlight,
-    DocumentHighlightParams, DocumentLink, DocumentLinkParams, DocumentOnTypeFormattingParams,
-    DocumentRangeFormattingParams, DocumentSymbolParams, DocumentSymbolResponse,
-    ExecuteCommandParams, FoldingRange, FoldingRangeParams, FullDocumentDiagnosticReport,
+    CodeAction, CodeActionParams, CodeActionResponse, CodeLens, CodeLensParams, Command,
+    CompletionItem, CompletionList, CompletionParams, CompletionResponse,
+    DidChangeConfigurationParams, DidChangeTextDocumentParams, DidChangeWorkspaceFoldersParams,
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
+    DocumentDiagnosticParams, DocumentDiagnosticReportResult, DocumentFormattingParams,
+    DocumentHighlight, DocumentHighlightParams, DocumentLink, DocumentLinkParams,
+    DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, DocumentSymbolParams,
+    DocumentSymbolResponse, ExecuteCommandParams, FoldingRange, FoldingRangeParams,
     GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
     InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintParams,
     LinkedEditingRangeParams, LinkedEditingRanges, Location, MarkupContent, MarkupKind, Moniker,
     MonikerKind, MonikerParams, PartialResultParams, Position, PrepareRenameResponse,
-    PublishDiagnosticsParams, Range, ReferenceContext, ReferenceParams,
-    RelatedFullDocumentDiagnosticReport, RenameFilesParams, RenameParams, SelectionRange,
-    SelectionRangeParams, SemanticTokens, SemanticTokensDeltaParams, SemanticTokensFullDeltaResult,
-    SemanticTokensParams, SemanticTokensRangeParams, SemanticTokensRangeResult,
-    SemanticTokensResult, SignatureHelp, SignatureHelpParams, TextDocumentContentChangeEvent,
-    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit,
-    UniquenessLevel, Url, WillSaveTextDocumentParams, WorkDoneProgressParams,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult,
-    WorkspaceDocumentDiagnosticReport, WorkspaceEdit, WorkspaceFullDocumentDiagnosticReport,
-    WorkspaceSymbol, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    PublishDiagnosticsParams, Range, ReferenceContext, ReferenceParams, RenameFilesParams,
+    RenameParams, SelectionRange, SelectionRangeParams, SemanticTokens, SemanticTokensDeltaParams,
+    SemanticTokensFullDeltaResult, SemanticTokensParams, SemanticTokensRangeParams,
+    SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, SignatureHelpParams,
+    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
+    TextDocumentPositionParams, TextEdit, UniquenessLevel, Url, WillSaveTextDocumentParams,
+    WorkDoneProgressParams, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
+    WorkspaceEdit, WorkspaceSymbol, WorkspaceSymbolParams, WorkspaceSymbolResponse,
     notification::PublishDiagnostics,
 };
 #[cfg(test)]
@@ -38,40 +35,40 @@ use async_lsp::lsp_types::{
     HoverProviderCapability, OneOf, WorkDoneProgressOptions,
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
-use musi_fmt::{FormatOptions, format_source, format_text_for_path, organize_imports};
+use musi_fmt::{FormatOptions, format_source, format_text_for_path};
 use musi_project::{ProjectOptions, load_project_ancestor};
 use musi_tooling::{
-    ToolMonikerKind, ToolSymbolKind, collect_project_diagnostics_with_overlay,
-    completions_for_project_file_with_overlay, definition_for_project_file_with_overlay,
-    document_links_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
-    folding_ranges_for_project_file_with_overlay, hover_for_project_file_with_overlay,
-    inlay_hints_for_project_file_with_overlay, module_docs_for_project_file_with_overlay,
-    moniker_for_project_file_with_overlay, outgoing_calls_for_project_file_with_overlay,
-    prepare_rename_for_project_file_with_overlay, references_for_project_file_with_overlay,
-    rename_for_project_file_with_overlay, selection_ranges_for_project_file_with_overlay,
-    semantic_tokens_for_project_file_with_overlay, signature_help_for_project_file_with_overlay,
-    type_definition_for_project_file_with_overlay, workspace_symbols_for_project_file_with_overlay,
-    workspace_symbols_for_project_root,
+    ToolMonikerKind, completions_for_project_file_with_overlay,
+    definition_for_project_file_with_overlay, document_links_for_project_file_with_overlay,
+    document_symbols_for_project_file_with_overlay, folding_ranges_for_project_file_with_overlay,
+    hover_for_project_file_with_overlay, inlay_hints_for_project_file_with_overlay,
+    module_docs_for_project_file_with_overlay, moniker_for_project_file_with_overlay,
+    outgoing_calls_for_project_file_with_overlay, prepare_rename_for_project_file_with_overlay,
+    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
+    selection_ranges_for_project_file_with_overlay, semantic_tokens_for_project_file_with_overlay,
+    signature_help_for_project_file_with_overlay, type_definition_for_project_file_with_overlay,
 };
 use serde_json::{Value, json};
 
 mod capabilities;
+mod code_actions;
 mod config;
 mod convert;
+mod diagnostics;
 mod formatting;
 mod navigation;
 mod semantic;
+mod symbols;
 mod workspace;
 
 use config::LspConfig;
 use convert::{
-    diagnostic_matches_path, encode_semantic_tokens, full_document_range, position_in_range,
-    resolve_lsp_completion, resolve_lsp_document_link, resolve_lsp_inlay_hint,
-    resolve_lsp_workspace_symbol, to_lsp_call_hierarchy_item, to_lsp_completion, to_lsp_diagnostic,
-    to_lsp_document_highlight, to_lsp_document_link, to_lsp_document_symbol, to_lsp_folding_range,
+    encode_semantic_tokens, full_document_range, position_in_range, resolve_lsp_completion,
+    resolve_lsp_document_link, resolve_lsp_inlay_hint, to_lsp_call_hierarchy_item,
+    to_lsp_completion, to_lsp_document_highlight, to_lsp_document_link, to_lsp_folding_range,
     to_lsp_inlay_hint, to_lsp_location, to_lsp_selection_range, to_lsp_signature_help,
-    to_lsp_symbol_kind, to_lsp_workspace_edit, to_lsp_workspace_symbol, to_tool_range,
-    tool_location_matches_path, truncate_hover_contents,
+    to_lsp_symbol_kind, to_lsp_workspace_edit, to_tool_range, tool_location_matches_path,
+    truncate_hover_contents,
 };
 use formatting::{
     apply_document_formatting_options, lsp_range_offsets, markdown_range_inside_musi_fence_body,
@@ -79,14 +76,14 @@ use formatting::{
 };
 use navigation::{
     call_hierarchy_item_data_parts, call_hierarchy_items_match, caller_symbol_for_reference,
-    code_action_kind_requested, import_definition_at, import_document_highlights,
-    import_linked_editing_ranges, position_in_lsp_range, push_reference_lenses,
-    reference_lens_data_parts, reference_lens_title, symbol_at_position,
+    import_definition_at, import_document_highlights, import_linked_editing_ranges,
+    position_in_lsp_range, push_reference_lenses, reference_lens_data_parts, reference_lens_title,
+    symbol_at_position,
 };
 use semantic::{SemanticTokenSnapshot, semantic_tokens_delta, semantic_tokens_result_id};
 use workspace::{
     collect_workspace_source_paths, import_specifier_for_target, paths_match, renamed_target_path,
-    sort_dedup_paths, workspace_module_paths, workspace_roots,
+    sort_dedup_paths, workspace_roots,
 };
 
 type ServerFuture<T> = Pin<Box<dyn Future<Output = Result<T, ResponseError>> + Send + 'static>>;
@@ -512,20 +509,6 @@ impl MusiLanguageServer {
         })
     }
 
-    fn document_symbols(&self, params: DocumentSymbolParams) -> Option<DocumentSymbolResponse> {
-        let uri = params.text_document.uri;
-        let path = uri.to_file_path().ok()?;
-        if path.file_name().is_some_and(|name| name == "musi.json") {
-            return None;
-        }
-        let overlay = self.open_documents.get(&uri).map(String::as_str);
-        let symbols = document_symbols_for_project_file_with_overlay(&path, overlay)
-            .into_iter()
-            .map(to_lsp_document_symbol)
-            .collect();
-        Some(DocumentSymbolResponse::Nested(symbols))
-    }
-
     fn prepare_call_hierarchy_at(
         &self,
         params: CallHierarchyPrepareParams,
@@ -692,72 +675,6 @@ impl MusiLanguageServer {
         lens
     }
 
-    fn code_actions(&self, params: CodeActionParams) -> Option<CodeActionResponse> {
-        if !code_action_kind_requested(
-            params.context.only.as_deref(),
-            &CodeActionKind::SOURCE_ORGANIZE_IMPORTS,
-        ) {
-            return Some(Vec::new());
-        }
-        let uri = params.text_document.uri;
-        let path = uri.to_file_path().ok()?;
-        if path.file_name().is_some_and(|name| name == "musi.json") {
-            return None;
-        }
-        if self.organize_imports_edit(&uri).is_none() {
-            return Some(Vec::new());
-        }
-        Some(vec![CodeActionOrCommand::CodeAction(CodeAction {
-            title: "Organize imports".to_owned(),
-            kind: Some(CodeActionKind::SOURCE_ORGANIZE_IMPORTS),
-            diagnostics: None,
-            edit: None,
-            command: None,
-            is_preferred: Some(true),
-            disabled: None,
-            data: Some(json!({
-                "uri": uri.as_str(),
-            })),
-        })])
-    }
-
-    fn resolve_code_action(&self, mut action: CodeAction) -> CodeAction {
-        if action.edit.is_some() {
-            return action;
-        }
-        if action.kind.as_ref() != Some(&CodeActionKind::SOURCE_ORGANIZE_IMPORTS) {
-            return action;
-        }
-        let Some(uri) = action
-            .data
-            .as_ref()
-            .and_then(|data| data.get("uri"))
-            .and_then(Value::as_str)
-            .and_then(|uri| Url::parse(uri).ok())
-        else {
-            return action;
-        };
-        action.edit = self.organize_imports_edit(&uri);
-        action
-    }
-
-    fn organize_imports_edit(&self, uri: &Url) -> Option<WorkspaceEdit> {
-        let text = self.open_documents.get(uri)?;
-        let path = uri.to_file_path().ok()?;
-        if path.file_name().is_some_and(|name| name == "musi.json") {
-            return None;
-        }
-        let organized = organize_imports(text)?;
-        Some(WorkspaceEdit {
-            changes: Some(HashMap::from([(
-                uri.clone(),
-                vec![TextEdit::new(full_document_range(text), organized)],
-            )])),
-            document_changes: None,
-            change_annotations: None,
-        })
-    }
-
     fn execute_command_request(&self, params: &ExecuteCommandParams) -> Option<Value> {
         if params.command != REFERENCES_COMMAND {
             return None;
@@ -817,63 +734,6 @@ impl MusiLanguageServer {
             .filter_map(|range| range.map(to_lsp_selection_range))
             .collect();
         Some(ranges)
-    }
-
-    fn workspace_symbols(&self, params: &WorkspaceSymbolParams) -> WorkspaceSymbolResponse {
-        let open_paths = self
-            .open_documents
-            .keys()
-            .filter_map(|uri| uri.to_file_path().ok())
-            .collect::<Vec<_>>();
-        let mut symbols = self
-            .workspace_roots
-            .iter()
-            .flat_map(|root| workspace_symbols_for_project_root(root, &params.query))
-            .filter(|symbol| {
-                symbol.kind == ToolSymbolKind::Module
-                    || !open_paths
-                        .iter()
-                        .any(|path| paths_match(path, &symbol.location.path))
-            })
-            .collect::<Vec<_>>();
-        symbols.extend(
-            self.open_documents
-                .iter()
-                .filter_map(|(uri, text)| {
-                    let path = uri.to_file_path().ok()?;
-                    Some(workspace_symbols_for_project_file_with_overlay(
-                        &path,
-                        Some(text),
-                        &params.query,
-                    ))
-                })
-                .flatten(),
-        );
-        symbols.sort_by_key(|symbol| {
-            (
-                symbol.name.clone(),
-                symbol.location.path.clone(),
-                symbol.location.range.start_line,
-                symbol.location.range.start_col,
-            )
-        });
-        symbols.dedup_by_key(|symbol| {
-            (
-                symbol.name.clone(),
-                symbol.location.path.clone(),
-                symbol.location.range.start_line,
-                symbol.location.range.start_col,
-            )
-        });
-        let symbols = symbols
-            .into_iter()
-            .filter_map(to_lsp_workspace_symbol)
-            .collect();
-        WorkspaceSymbolResponse::Nested(symbols)
-    }
-
-    fn resolve_workspace_symbol(symbol: WorkspaceSymbol) -> WorkspaceSymbol {
-        resolve_lsp_workspace_symbol(symbol)
     }
 
     fn prepare_rename_at(
@@ -1044,92 +904,12 @@ impl MusiLanguageServer {
         resolve_lsp_inlay_hint(hint)
     }
 
-    fn document_diagnostics(
-        &self,
-        params: &DocumentDiagnosticParams,
-    ) -> DocumentDiagnosticReportResult {
-        let Some(path) = params.text_document.uri.to_file_path().ok() else {
-            return full_document_diagnostic_report(Vec::new());
-        };
-        if path.file_name().is_some_and(|name| name == "musi.json") {
-            return full_document_diagnostic_report(Vec::new());
-        }
-        let overlay = self
-            .open_documents
-            .get(&params.text_document.uri)
-            .map(String::as_str);
-        let diagnostics = collect_project_diagnostics_with_overlay(&path, overlay)
-            .into_iter()
-            .filter(|diag| diagnostic_matches_path(&path, diag))
-            .map(to_lsp_diagnostic)
-            .collect();
-        full_document_diagnostic_report(diagnostics)
-    }
-
-    fn workspace_diagnostics(
-        &self,
-        _params: WorkspaceDiagnosticParams,
-    ) -> WorkspaceDiagnosticReportResult {
-        let paths = self.workspace_diagnostic_paths();
-        let items = paths
-            .into_iter()
-            .filter_map(|path| {
-                if path.file_name().is_some_and(|name| name == "musi.json") {
-                    return None;
-                }
-                let open_document = self.open_document_for_path(&path);
-                let uri = open_document.map_or_else(
-                    || Url::from_file_path(&path).ok(),
-                    |(uri, _)| Some(uri.clone()),
-                )?;
-                let overlay = open_document.map(|(_, text)| text);
-                let diagnostics = collect_project_diagnostics_with_overlay(&path, overlay)
-                    .into_iter()
-                    .filter(|diag| diagnostic_matches_path(&path, diag))
-                    .map(to_lsp_diagnostic)
-                    .collect();
-                Some(WorkspaceDocumentDiagnosticReport::Full(
-                    WorkspaceFullDocumentDiagnosticReport {
-                        uri,
-                        version: None,
-                        full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                            result_id: None,
-                            items: diagnostics,
-                        },
-                    },
-                ))
-            })
-            .collect();
-        WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items })
-    }
-
-    fn workspace_diagnostic_paths(&self) -> Vec<PathBuf> {
-        let mut paths = self
-            .workspace_roots
-            .iter()
-            .flat_map(|root| workspace_module_paths(root))
-            .collect::<Vec<_>>();
-        paths.extend(
-            self.open_documents
-                .keys()
-                .filter_map(|uri| uri.to_file_path().ok()),
-        );
-        sort_dedup_paths(paths)
-    }
-
     fn workspace_source_paths(&self) -> Vec<PathBuf> {
         let mut paths = self.workspace_diagnostic_paths();
         for root in &self.workspace_roots {
             collect_workspace_source_paths(root, &mut paths);
         }
         sort_dedup_paths(paths)
-    }
-
-    fn open_document_for_path(&self, path: &Path) -> Option<(&Url, &str)> {
-        self.open_documents.iter().find_map(|(uri, text)| {
-            let open_path = uri.to_file_path().ok()?;
-            paths_match(&open_path, path).then_some((uri, text.as_str()))
-        })
     }
 
     fn semantic_tokens_for_uri(&self, uri: &Url, range: Option<Range>) -> Option<SemanticTokens> {
@@ -1248,40 +1028,6 @@ impl MusiLanguageServer {
         }
         Some(vec![TextEdit::new(params.range, formatted.text)])
     }
-
-    fn publish_document_diagnostics(&self, uri: &Url, path: &Path) {
-        if path.file_name().is_some_and(|name| name == "musi.json") {
-            return;
-        }
-        let overlay = self.open_documents.get(uri).map(String::as_str);
-        let diagnostics = collect_project_diagnostics_with_overlay(path, overlay)
-            .into_iter()
-            .filter(|diag| diagnostic_matches_path(path, diag))
-            .map(to_lsp_diagnostic)
-            .collect();
-        drop(
-            self.client
-                .notify::<PublishDiagnostics>(PublishDiagnosticsParams {
-                    uri: uri.clone(),
-                    diagnostics,
-                    version: None,
-                }),
-        );
-    }
-}
-
-const fn full_document_diagnostic_report(
-    diagnostics: Vec<Diagnostic>,
-) -> DocumentDiagnosticReportResult {
-    DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(
-        RelatedFullDocumentDiagnosticReport {
-            related_documents: None,
-            full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                result_id: None,
-                items: diagnostics,
-            },
-        },
-    ))
 }
 
 impl LanguageServer for MusiLanguageServer {
