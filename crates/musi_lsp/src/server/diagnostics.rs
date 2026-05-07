@@ -4,10 +4,9 @@ use std::path::{Path, PathBuf};
 
 use async_lsp::lsp_types::{
     Diagnostic, DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
-    FullDocumentDiagnosticReport, PublishDiagnosticsParams, RelatedFullDocumentDiagnosticReport,
-    Url, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult,
+    FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport, Url,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult,
     WorkspaceDocumentDiagnosticReport, WorkspaceFullDocumentDiagnosticReport,
-    notification::PublishDiagnostics,
 };
 use musi_tooling::collect_project_diagnostics_with_overlay;
 
@@ -94,26 +93,6 @@ impl MusiLanguageServer {
             let open_path = uri.to_file_path().ok()?;
             paths_match(&open_path, path).then_some((uri, text.as_str()))
         })
-    }
-
-    pub(super) fn publish_document_diagnostics(&self, uri: &Url, path: &Path) {
-        if path.file_name().is_some_and(|name| name == "musi.json") {
-            return;
-        }
-        let overlay = self.open_documents.get(uri).map(String::as_str);
-        let diagnostics = collect_project_diagnostics_with_overlay(path, overlay)
-            .into_iter()
-            .filter(|diag| diagnostic_matches_path(path, diag))
-            .map(to_lsp_diagnostic)
-            .collect();
-        drop(
-            self.client
-                .notify::<PublishDiagnostics>(PublishDiagnosticsParams {
-                    uri: uri.clone(),
-                    diagnostics,
-                    version: None,
-                }),
-        );
     }
 }
 

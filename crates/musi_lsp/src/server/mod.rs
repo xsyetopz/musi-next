@@ -122,13 +122,9 @@ impl MusiLanguageServer {
     }
 
     fn did_open_document(&mut self, item: TextDocumentItem) {
-        let path = item.uri.to_file_path().ok();
         let uri = item.uri;
         let text = item.text;
-        let _ = self.open_documents.insert(uri.clone(), text);
-        if let Some(path) = path {
-            self.publish_document_diagnostics(&uri, &path);
-        }
+        let _ = self.open_documents.insert(uri, text);
     }
 
     fn did_change_document(&mut self, uri: &Url, changes: &[TextDocumentContentChangeEvent]) {
@@ -136,9 +132,6 @@ impl MusiLanguageServer {
             return;
         };
         let _ = self.open_documents.insert(uri.clone(), change.text.clone());
-        if let Ok(path) = uri.to_file_path() {
-            self.publish_document_diagnostics(uri, &path);
-        }
     }
 
     fn did_close_document(&mut self, uri: &Url) {
@@ -152,12 +145,6 @@ impl MusiLanguageServer {
                     version: None,
                 }),
         );
-    }
-
-    fn did_save_document(&self, uri: &Url) {
-        if let Ok(path) = uri.to_file_path() {
-            self.publish_document_diagnostics(uri, &path);
-        }
     }
 
     fn update_configuration(&mut self, params: &DidChangeConfigurationParams) {
@@ -216,8 +203,7 @@ impl LanguageServer for MusiLanguageServer {
         ControlFlow::Continue(())
     }
 
-    fn did_save(&mut self, params: DidSaveTextDocumentParams) -> NotifyResult {
-        self.did_save_document(&params.text_document.uri);
+    fn did_save(&mut self, _: DidSaveTextDocumentParams) -> NotifyResult {
         ControlFlow::Continue(())
     }
 
