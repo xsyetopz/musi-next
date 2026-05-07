@@ -56,29 +56,8 @@ impl MusiLanguageServer {
         )])
     }
 
-    pub(super) fn document_on_type_formatting(
-        &self,
-        params: DocumentOnTypeFormattingParams,
-    ) -> Option<Vec<TextEdit>> {
-        if !on_type_formatting_trigger(&params.ch) {
-            return Some(Vec::new());
-        }
-        let uri = params.text_document_position.text_document.uri;
-        let text = self.open_documents.get(&uri)?;
-        let path = uri.to_file_path().ok()?;
-        if path.file_name().is_some_and(|name| name == "musi.json") {
-            return None;
-        }
-        let mut options = formatting_options_for_path(&path);
-        apply_document_formatting_options(&mut options, &params.options);
-        let formatted = format_text_for_path(&path, text, &options).ok()?;
-        if !formatted.changed {
-            return Some(Vec::new());
-        }
-        Some(vec![TextEdit::new(
-            full_document_range(text),
-            formatted.text,
-        )])
+    pub(super) fn document_on_type_formatting(_: DocumentOnTypeFormattingParams) -> Vec<TextEdit> {
+        Vec::new()
     }
 
     pub(super) fn document_range_formatting(
@@ -121,10 +100,6 @@ pub(super) fn apply_document_formatting_options(
 ) {
     options.indent_width = usize::try_from(formatting_options.tab_size).unwrap_or(2);
     options.use_tabs = !formatting_options.insert_spaces;
-}
-
-pub(super) fn on_type_formatting_trigger(ch: &str) -> bool {
-    matches!(ch, ";" | ")" | "]" | "}")
 }
 
 pub(super) fn lsp_range_offsets(text: &str, range: Range) -> Option<(usize, usize)> {

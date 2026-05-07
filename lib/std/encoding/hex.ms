@@ -83,8 +83,6 @@ let rec decodeFrom (source : String, index : Int, end : Int) : String :=
 --- Decode a value from this format.
 export let decode (source : String) : Maybe[String] :=
   match isValid(source) (
-  | valid if valid => maybe.Some[String](
-    decodeFrom(source, 0, source.length())
-  )
+  | valid if valid => maybe.Some[String](decodeFrom(source, 0, source.length()))
   | _ => maybe.None[String]()
   );
