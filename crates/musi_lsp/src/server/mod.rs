@@ -97,6 +97,7 @@ pub struct MusiLanguageServer {
     client: ClientSocket,
     open_documents: HashMap<Url, String>,
     semantic_token_cache: HashMap<Url, SemanticTokenSnapshot>,
+    format_options_cache: HashMap<PathBuf, formatting::FormatOptionsCacheEntry>,
     workspace_roots: Vec<PathBuf>,
     config: LspConfig,
 }
@@ -108,6 +109,7 @@ impl MusiLanguageServer {
             client,
             open_documents: HashMap::new(),
             semantic_token_cache: HashMap::new(),
+            format_options_cache: HashMap::new(),
             workspace_roots: Vec::new(),
             config: LspConfig::default(),
         }
@@ -125,6 +127,7 @@ impl MusiLanguageServer {
     fn did_open_document(&mut self, item: TextDocumentItem) {
         let uri = item.uri;
         let text = item.text;
+        self.invalidate_format_options_cache_if_manifest(&uri);
         let _ = self.open_documents.insert(uri, text);
     }
 
@@ -132,12 +135,14 @@ impl MusiLanguageServer {
         let Some(change) = changes.last() else {
             return;
         };
+        self.invalidate_format_options_cache_if_manifest(uri);
         let _ = self.open_documents.insert(uri.clone(), change.text.clone());
     }
 
     fn did_close_document(&mut self, uri: &Url) {
         let _ = self.open_documents.remove(uri);
         let _ = self.semantic_token_cache.remove(uri);
+        self.invalidate_format_options_cache_if_manifest(uri);
         drop(
             self.client
                 .notify::<PublishDiagnostics>(PublishDiagnosticsParams {
@@ -153,6 +158,7 @@ impl MusiLanguageServer {
     }
 
     fn update_workspace_folders(&mut self, params: DidChangeWorkspaceFoldersParams) {
+        self.format_options_cache.clear();
         for folder in params.event.removed {
             if let Ok(path) = folder.uri.to_file_path() {
                 self.workspace_roots
@@ -204,7 +210,8 @@ impl LanguageServer for MusiLanguageServer {
         ControlFlow::Continue(())
     }
 
-    fn did_save(&mut self, _: DidSaveTextDocumentParams) -> NotifyResult {
+    fn did_save(&mut self, params: DidSaveTextDocumentParams) -> NotifyResult {
+        self.invalidate_format_options_cache_if_manifest(&params.text_document.uri);
         ControlFlow::Continue(())
     }
 

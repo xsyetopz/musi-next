@@ -1,10 +1,12 @@
 //! Formatting request helpers for the LSP server.
 
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use async_lsp::lsp_types::{
     DocumentFormattingParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
-    FormattingOptions, Position, Range, TextEdit, WillSaveTextDocumentParams,
+    FormattingOptions, Position, Range, TextEdit, Url, WillSaveTextDocumentParams,
 };
 use musi_fmt::{FormatOptions, format_source, format_text_for_path};
 use musi_project::{ProjectOptions, load_project_ancestor};
@@ -12,19 +14,25 @@ use musi_project::{ProjectOptions, load_project_ancestor};
 use super::MusiLanguageServer;
 use super::convert::full_document_range;
 
+#[derive(Debug, Clone)]
+pub(super) struct FormatOptionsCacheEntry {
+    modified: Option<SystemTime>,
+    options: FormatOptions,
+}
+
 impl MusiLanguageServer {
     pub(super) fn document_formatting(
-        &self,
+        &mut self,
         params: DocumentFormattingParams,
     ) -> Option<Vec<TextEdit>> {
         let uri = params.text_document.uri;
-        let text = self.open_documents.get(&uri)?;
         let path = uri.to_file_path().ok()?;
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
-        let mut options = formatting_options_for_path(&path);
+        let mut options = self.formatting_options_for_path(&path);
         apply_document_formatting_options(&mut options, &params.options);
+        let text = self.open_documents.get(&uri)?;
         let formatted = format_text_for_path(&path, text, &options).ok()?;
         if !formatted.changed {
             return Some(Vec::new());
@@ -36,16 +44,16 @@ impl MusiLanguageServer {
     }
 
     pub(super) fn will_save_formatting(
-        &self,
+        &mut self,
         params: WillSaveTextDocumentParams,
     ) -> Option<Vec<TextEdit>> {
         let uri = params.text_document.uri;
-        let text = self.open_documents.get(&uri)?;
         let path = uri.to_file_path().ok()?;
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
-        let options = formatting_options_for_path(&path);
+        let options = self.formatting_options_for_path(&path);
+        let text = self.open_documents.get(&uri)?;
         let formatted = format_text_for_path(&path, text, &options).ok()?;
         if !formatted.changed {
             return Some(Vec::new());
@@ -57,23 +65,23 @@ impl MusiLanguageServer {
     }
 
     pub(super) fn document_on_type_formatting(
-        &self,
+        &mut self,
         params: DocumentOnTypeFormattingParams,
     ) -> Option<Vec<TextEdit>> {
         if !on_type_formatting_trigger(&params.ch) {
             return Some(Vec::new());
         }
         let uri = params.text_document_position.text_document.uri;
-        let text = self.open_documents.get(&uri)?;
         let path = uri.to_file_path().ok()?;
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
+        let mut options = self.formatting_options_for_path(&path);
+        apply_document_formatting_options(&mut options, &params.options);
+        let text = self.open_documents.get(&uri)?;
         let offset = lsp_position_offset(text, params.text_document_position.position)?;
         let (start, end) = line_offsets_around(text, offset)?;
         let selected = text.get(start..end)?;
-        let mut options = formatting_options_for_path(&path);
-        apply_document_formatting_options(&mut options, &params.options);
         let formatted = format_source(selected, &options).ok()?;
         if !formatted.changed {
             return Some(Vec::new());
@@ -85,19 +93,19 @@ impl MusiLanguageServer {
     }
 
     pub(super) fn document_range_formatting(
-        &self,
+        &mut self,
         params: DocumentRangeFormattingParams,
     ) -> Option<Vec<TextEdit>> {
         let uri = params.text_document.uri;
-        let text = self.open_documents.get(&uri)?;
         let path = uri.to_file_path().ok()?;
         if path.file_name().is_some_and(|name| name == "musi.json") {
             return None;
         }
+        let mut options = self.formatting_options_for_path(&path);
+        apply_document_formatting_options(&mut options, &params.options);
+        let text = self.open_documents.get(&uri)?;
         let (start, end) = lsp_range_offsets(text, params.range)?;
         let selected = text.get(start..end)?;
-        let mut options = formatting_options_for_path(&path);
-        apply_document_formatting_options(&mut options, &params.options);
         let formatted = if markdown_range_inside_musi_fence_body(text, start, end) {
             format_source(selected, &options).ok()?
         } else {
@@ -108,14 +116,55 @@ impl MusiLanguageServer {
         }
         Some(vec![TextEdit::new(params.range, formatted.text)])
     }
+    pub(super) fn formatting_options_for_path(&mut self, path: &Path) -> FormatOptions {
+        let Some(manifest_path) = ancestor_manifest_path(path) else {
+            return FormatOptions::default();
+        };
+        let modified = manifest_modified(&manifest_path);
+        if let Some(entry) = self.format_options_cache.get(&manifest_path)
+            && entry.modified == modified
+        {
+            return entry.options.clone();
+        }
+        let options = load_project_ancestor(path, ProjectOptions::default())
+            .ok()
+            .map_or_else(FormatOptions::default, |project| {
+                FormatOptions::from_manifest(project.manifest().fmt.as_ref())
+            });
+        let _ = self.format_options_cache.insert(
+            manifest_path,
+            FormatOptionsCacheEntry {
+                modified,
+                options: options.clone(),
+            },
+        );
+        options
+    }
+
+    pub(super) fn invalidate_format_options_cache_if_manifest(&mut self, uri: &Url) {
+        if let Some(path) = uri
+            .to_file_path()
+            .ok()
+            .filter(|path| path.file_name().is_some_and(|name| name == "musi.json"))
+        {
+            let _ = self.format_options_cache.remove(&path);
+        }
+    }
 }
 
-fn formatting_options_for_path(path: &Path) -> FormatOptions {
-    load_project_ancestor(path, ProjectOptions::default())
-        .ok()
-        .map_or_else(FormatOptions::default, |project| {
-            FormatOptions::from_manifest(project.manifest().fmt.as_ref())
-        })
+fn ancestor_manifest_path(path: &Path) -> Option<PathBuf> {
+    let mut current = if path.is_dir() { path } else { path.parent()? };
+    loop {
+        let manifest = current.join("musi.json");
+        if manifest.is_file() {
+            return Some(manifest);
+        }
+        current = current.parent()?;
+    }
+}
+
+fn manifest_modified(path: &Path) -> Option<SystemTime> {
+    fs::metadata(path).ok()?.modified().ok()
 }
 
 pub(super) fn apply_document_formatting_options(
