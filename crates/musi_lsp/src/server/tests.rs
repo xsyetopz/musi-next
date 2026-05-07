@@ -556,6 +556,36 @@ let value:=1;
     }
 
     #[test]
+    fn document_on_type_formatting_edits_only_triggered_line() {
+        let uri = Url::parse("file:///tmp/index.ms").expect("uri should parse");
+        let source = "let before:=1;\nlet current:=2;\nlet after:=3;\n";
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let edits = server
+            .document_on_type_formatting(DocumentOnTypeFormattingParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 15),
+                },
+                ch: ";".to_owned(),
+                options: FormattingOptions {
+                    tab_size: 2,
+                    insert_spaces: true,
+                    ..FormattingOptions::default()
+                },
+            })
+            .expect("on type formatting should run");
+
+        assert_eq!(edits.len(), 1);
+        assert_eq!(
+            edits[0].range,
+            Range::new(Position::new(1, 0), Position::new(2, 0))
+        );
+        assert_eq!(edits[0].new_text, "let current := 2;\n");
+    }
+
+    #[test]
     fn document_on_type_formatting_uses_manifest_options() {
         let root = temp_project();
         fs::write(
