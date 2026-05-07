@@ -36,14 +36,14 @@ use async_lsp::lsp_types::{
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
 use musi_tooling::{
     ToolMonikerKind, completions_for_project_file_with_overlay,
-    definition_for_project_file_with_overlay, document_links_for_project_file_with_overlay,
-    document_symbols_for_project_file_with_overlay, folding_ranges_for_project_file_with_overlay,
-    hover_for_project_file_with_overlay, implementation_for_project_file_with_overlay,
-    module_docs_for_project_file_with_overlay, moniker_for_project_file_with_overlay,
-    outgoing_calls_for_project_file_with_overlay, prepare_rename_for_project_file_with_overlay,
-    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
-    selection_ranges_for_project_file_with_overlay, signature_help_for_project_file_with_overlay,
-    type_definition_for_project_file_with_overlay,
+    definition_for_project_file_with_overlay, document_highlights_for_project_file_with_overlay,
+    document_links_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
+    folding_ranges_for_project_file_with_overlay, hover_for_project_file_with_overlay,
+    implementation_for_project_file_with_overlay, module_docs_for_project_file_with_overlay,
+    moniker_for_project_file_with_overlay, outgoing_calls_for_project_file_with_overlay,
+    prepare_rename_for_project_file_with_overlay, references_for_project_file_with_overlay,
+    rename_for_project_file_with_overlay, selection_ranges_for_project_file_with_overlay,
+    signature_help_for_project_file_with_overlay, type_definition_for_project_file_with_overlay,
 };
 use serde_json::{Value, json};
 
@@ -67,9 +67,10 @@ use convert::encode_semantic_tokens;
 use convert::full_document_range;
 use convert::{
     resolve_lsp_completion, resolve_lsp_document_link, to_lsp_call_hierarchy_item,
-    to_lsp_completion, to_lsp_document_highlight, to_lsp_document_link, to_lsp_folding_range,
-    to_lsp_location, to_lsp_selection_range, to_lsp_signature_help, to_lsp_symbol_kind,
-    to_lsp_workspace_edit, to_tool_range, tool_location_matches_path, truncate_hover_contents,
+    to_lsp_completion, to_lsp_document_highlight, to_lsp_document_highlight_kind,
+    to_lsp_document_link, to_lsp_folding_range, to_lsp_location, to_lsp_selection_range,
+    to_lsp_signature_help, to_lsp_symbol_kind, to_lsp_workspace_edit, to_tool_range,
+    tool_location_matches_path, truncate_hover_contents,
 };
 #[cfg(test)]
 use formatting::apply_document_formatting_options;

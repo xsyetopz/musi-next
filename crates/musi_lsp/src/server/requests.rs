@@ -315,16 +315,20 @@ impl MusiLanguageServer {
         if let Some(highlights) = import_document_highlights(&path, overlay, position) {
             return Some(highlights);
         }
-        let highlights = references_for_project_file_with_overlay(
+        let highlights = document_highlights_for_project_file_with_overlay(
             &path,
             overlay,
             usize::try_from(position.line).ok()?.saturating_add(1),
             usize::try_from(position.character).ok()?.saturating_add(1),
-            true,
         )
         .into_iter()
-        .filter(|location| tool_location_matches_path(&path, location))
-        .map(|location| to_lsp_document_highlight(&location))
+        .filter(|highlight| tool_location_matches_path(&path, &highlight.location))
+        .map(|highlight| {
+            to_lsp_document_highlight(
+                &highlight.location,
+                to_lsp_document_highlight_kind(highlight.kind),
+            )
+        })
         .collect();
         Some(highlights)
     }

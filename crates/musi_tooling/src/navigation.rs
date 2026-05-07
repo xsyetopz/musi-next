@@ -39,6 +39,19 @@ pub struct ToolDocumentSymbol {
     pub children: Vec<Self>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolDocumentHighlightKind {
+    Read,
+    Text,
+    Write,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolDocumentHighlight {
+    pub location: ToolLocation,
+    pub kind: ToolDocumentHighlightKind,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolWorkspaceSymbol {
     pub name: String,
@@ -144,6 +157,22 @@ pub fn references_for_project_file_with_overlay(
         return Vec::new();
     };
     context.references(binding_id, include_declaration)
+}
+
+#[must_use]
+pub fn document_highlights_for_project_file_with_overlay(
+    path: &Path,
+    overlay_text: Option<&str>,
+    line: usize,
+    character: usize,
+) -> Vec<ToolDocumentHighlight> {
+    let Some(context) = SymbolAnalysis::new(path, overlay_text) else {
+        return Vec::new();
+    };
+    let Some(binding_id) = context.binding_at(line, character) else {
+        return Vec::new();
+    };
+    context.document_highlights(binding_id)
 }
 
 #[must_use]
@@ -638,6 +667,56 @@ impl SymbolAnalysis {
             )
         });
         locations
+    }
+
+    fn document_highlights(&self, binding_id: NameBindingId) -> Vec<ToolDocumentHighlight> {
+        let Some(resolved) = self.resolved() else {
+            return Vec::new();
+        };
+        let mut highlights = Vec::new();
+        if let Some(location) = self.binding_location(binding_id) {
+            highlights.push(ToolDocumentHighlight {
+                location,
+                kind: ToolDocumentHighlightKind::Write,
+            });
+        }
+        highlights.extend(
+            resolved
+                .refs
+                .iter()
+                .filter(|(_, target)| **target == binding_id)
+                .filter_map(|(site, _)| {
+                    Some(ToolDocumentHighlight {
+                        location: self.site_location(*site)?,
+                        kind: ToolDocumentHighlightKind::Read,
+                    })
+                }),
+        );
+        highlights.extend(
+            self.member_references(binding_id)
+                .into_iter()
+                .map(|location| ToolDocumentHighlight {
+                    location,
+                    kind: ToolDocumentHighlightKind::Read,
+                }),
+        );
+        highlights.sort_by_key(|highlight| {
+            (
+                highlight.location.path.clone(),
+                highlight.location.range.start_line,
+                highlight.location.range.start_col,
+            )
+        });
+        highlights.dedup_by_key(|highlight| {
+            (
+                highlight.location.path.clone(),
+                highlight.location.range.start_line,
+                highlight.location.range.start_col,
+                highlight.location.range.end_line,
+                highlight.location.range.end_col,
+            )
+        });
+        highlights
     }
 
     fn document_symbols(&self) -> Vec<ToolDocumentSymbol> {

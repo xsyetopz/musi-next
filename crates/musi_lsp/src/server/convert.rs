@@ -67,10 +67,23 @@ pub(super) fn to_lsp_location(location: &ToolLocation) -> Option<Location> {
     })
 }
 
-pub(super) fn to_lsp_document_highlight(location: &ToolLocation) -> DocumentHighlight {
+pub(super) fn to_lsp_document_highlight(
+    location: &ToolLocation,
+    kind: DocumentHighlightKind,
+) -> DocumentHighlight {
     DocumentHighlight {
         range: to_tool_range(&location.range),
-        kind: Some(DocumentHighlightKind::TEXT),
+        kind: Some(kind),
+    }
+}
+
+pub(super) const fn to_lsp_document_highlight_kind(
+    kind: musi_tooling::ToolDocumentHighlightKind,
+) -> DocumentHighlightKind {
+    match kind {
+        musi_tooling::ToolDocumentHighlightKind::Read => DocumentHighlightKind::READ,
+        musi_tooling::ToolDocumentHighlightKind::Text => DocumentHighlightKind::TEXT,
+        musi_tooling::ToolDocumentHighlightKind::Write => DocumentHighlightKind::WRITE,
     }
 }
 

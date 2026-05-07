@@ -1933,11 +1933,9 @@ let other := value + value;
             .expect("document highlight response should exist");
 
         assert_eq!(highlights.len(), 3);
-        assert!(
-            highlights
-                .iter()
-                .all(|highlight| highlight.kind == Some(DocumentHighlightKind::TEXT))
-        );
+        assert_eq!(highlights[0].kind, Some(DocumentHighlightKind::WRITE));
+        assert_eq!(highlights[1].kind, Some(DocumentHighlightKind::READ));
+        assert_eq!(highlights[2].kind, Some(DocumentHighlightKind::READ));
         assert!(
             highlights
                 .iter()
