@@ -221,7 +221,7 @@ mod success {
             .capabilities
             .code_lens_provider
             .expect("code lens provider");
-        assert_eq!(code_lens.resolve_provider, Some(false));
+        assert_eq!(code_lens.resolve_provider, Some(true));
         assert_eq!(
             initialize_result.capabilities.diagnostic_provider,
             Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
@@ -3481,7 +3481,7 @@ let testing := import \"@std/testing\";
     }
 
     #[test]
-    fn code_lens_returns_reference_counts_for_document_symbols() {
+    fn code_lens_resolves_reference_counts_for_document_symbols() {
         let root = temp_project();
         fs::write(
             root.join("musi.json"),
@@ -3514,29 +3514,31 @@ let other := value + value;
             .iter()
             .find(|lens| lens.range.start == Position::new(0, 4))
             .expect("value reference lens should exist");
+        assert!(value_lens.command.is_none());
+        let value_lens = server.resolve_code_lens(value_lens.clone());
         let command = value_lens.command.as_ref().expect("lens command");
         assert_eq!(command.title, "2 references");
-        assert_eq!(command.command, "musi.references");
+        assert_eq!(command.command, "editor.action.showReferences");
         let arguments = command.arguments.as_ref().expect("lens arguments");
-        assert_eq!(arguments.len(), 1);
+        assert_eq!(arguments.len(), 3);
+        assert_eq!(arguments[0].as_str(), Some(uri.as_str()));
         assert_eq!(
-            arguments[0].get("uri").and_then(|value| value.as_str()),
-            Some(uri.as_str())
-        );
-        assert_eq!(
-            arguments[0].get("line").and_then(serde_json::Value::as_u64),
+            arguments[1].get("line").and_then(serde_json::Value::as_u64),
             Some(0)
         );
         assert_eq!(
-            arguments[0]
+            arguments[1]
                 .get("character")
                 .and_then(serde_json::Value::as_u64),
             Some(4)
         );
+        let locations: Vec<Location> =
+            serde_json::from_value(arguments[2].clone()).expect("locations should deserialize");
+        assert_eq!(locations.len(), 2);
     }
 
     #[test]
-    fn code_lens_command_executes_workspace_references() {
+    fn code_lens_resolves_workspace_references_command() {
         let root = temp_project();
         fs::write(
             root.join("musi.json"),
@@ -3571,17 +3573,13 @@ let other := value + value;
             .iter()
             .find(|lens| lens.range.start == Position::new(0, 11))
             .expect("value reference lens should exist");
+        let value_lens = server.resolve_code_lens(value_lens.clone());
         let command = value_lens.command.as_ref().expect("lens command");
         assert_eq!(command.title, "1 reference");
-        let result = server
-            .execute_command_request(&ExecuteCommandParams {
-                command: command.command.clone(),
-                arguments: command.arguments.clone().expect("lens arguments"),
-                work_done_progress_params: WorkDoneProgressParams::default(),
-            })
-            .expect("references command should return locations");
+        assert_eq!(command.command, "editor.action.showReferences");
+        let arguments = command.arguments.as_ref().expect("lens arguments");
         let locations: Vec<Location> =
-            serde_json::from_value(result).expect("locations should deserialize");
+            serde_json::from_value(arguments[2].clone()).expect("locations should deserialize");
 
         assert_eq!(locations.len(), 1);
     }

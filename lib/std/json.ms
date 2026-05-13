@@ -8,7 +8,7 @@ export hidden let Json := data {
 };
 
 --- Parse and normalize JSON text.
-export let parse(source : String) : Json :=
+export let parse (source : String) : Json :=
   .JsonSource(source := jsonHost.normalize(source));
 
 --- Render JSON text.
@@ -18,4 +18,4 @@ export let (self : Json).stringify () : String :=
   );
 
 --- Returns true when source is valid JSON.
-export let isValid(source : String) : Bit := jsonHost.isValid(source) > 0;
+export let isValid (source : String) : Bit := jsonHost.isValid(source) > 0;

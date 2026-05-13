@@ -52,11 +52,7 @@ pub fn organize_imports_protecting(
     source: &str,
     protected_ranges: &[Range<usize>],
 ) -> Option<String> {
-    let lexed = Lexer::new(source).lex();
-    if !lexed.errors().is_empty() {
-        return None;
-    }
-    let tokens = token_views(source);
+    let tokens = token_views(source)?;
     if tokens.is_empty() {
         return None;
     }
@@ -65,24 +61,29 @@ pub fn organize_imports_protecting(
     apply_replacements(source, &replacements)
 }
 
-fn token_views(source: &str) -> Vec<TokenView<'_>> {
+fn token_views(source: &str) -> Option<Vec<TokenView<'_>>> {
     let lexed = Lexer::new(source).lex();
-    lexed
-        .tokens()
-        .iter()
-        .filter(|token| token.kind != TokenKind::Eof)
-        .filter_map(|token| {
-            let start = usize::try_from(token.span.start).ok()?;
-            let end = usize::try_from(token.span.end).ok()?;
-            let text = source.get(start..end)?;
-            Some(TokenView {
-                kind: token.kind,
-                start,
-                end,
-                text,
+    if !lexed.errors().is_empty() {
+        return None;
+    }
+    Some(
+        lexed
+            .tokens()
+            .iter()
+            .filter(|token| token.kind != TokenKind::Eof)
+            .filter_map(|token| {
+                let start = usize::try_from(token.span.start).ok()?;
+                let end = usize::try_from(token.span.end).ok()?;
+                let text = source.get(start..end)?;
+                Some(TokenView {
+                    kind: token.kind,
+                    start,
+                    end,
+                    text,
+                })
             })
-        })
-        .collect()
+            .collect(),
+    )
 }
 
 fn collect_top_level_statements(source: &str, tokens: &[TokenView<'_>]) -> Vec<ImportStatement> {
@@ -303,7 +304,9 @@ fn push_sorted_block(replacements: &mut Vec<Replacement>, block: &[ImportStateme
 }
 
 fn sort_import_destructure_fields(statement: &str) -> String {
-    let tokens = token_views(statement);
+    let Some(tokens) = token_views(statement) else {
+        return statement.to_owned();
+    };
     let Some(colon_eq_index) = tokens
         .iter()
         .position(|token| token.kind == TokenKind::ColonEq)
@@ -428,7 +431,9 @@ fn field_contains_comment(field: &str) -> bool {
 }
 
 fn sort_nested_record_fields(field: &str) -> String {
-    let tokens = token_views(field);
+    let Some(tokens) = token_views(field) else {
+        return field.to_owned();
+    };
     let Some(open_index) = tokens
         .iter()
         .position(|token| token.kind == TokenKind::LBrace)
@@ -448,6 +453,7 @@ fn sort_nested_record_fields(field: &str) -> String {
 
 fn field_sort_key(field: &str) -> String {
     token_views(field)
+        .unwrap_or_default()
         .into_iter()
         .find(|token| token.kind == TokenKind::Ident)
         .map_or_else(

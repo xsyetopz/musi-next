@@ -1,7 +1,7 @@
 let collections := import "@std/collections";
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("collections"),
     testing.it(

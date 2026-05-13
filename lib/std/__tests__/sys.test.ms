@@ -1,7 +1,7 @@
 let sys := import "#sys";
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("sys");
     testing.it("'os' is Some", sys.os /= "");

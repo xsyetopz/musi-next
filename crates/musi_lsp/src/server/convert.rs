@@ -91,6 +91,45 @@ pub(super) fn to_lsp_position_in_text(text: &str, line: usize, col: usize) -> Po
     Position::new(usize_to_u32(lsp_line), usize_to_u32(character))
 }
 
+struct LineIndex<'a> {
+    lines: Vec<&'a str>,
+}
+
+impl<'a> LineIndex<'a> {
+    fn new(text: &'a str) -> Self {
+        let mut lines = text
+            .split('\n')
+            .map(|line| line.strip_suffix('\r').unwrap_or(line))
+            .collect::<Vec<_>>();
+        if text.ends_with('\n') {
+            let _ = lines.pop();
+        }
+        Self { lines }
+    }
+
+    fn range(&self, range: &ToolRange) -> Range {
+        Range {
+            start: self.position(range.start_line, range.start_col),
+            end: self.position(range.end_line, range.end_col),
+        }
+    }
+
+    fn position(&self, line: usize, col: usize) -> Position {
+        let lsp_line = line.saturating_sub(1);
+        let character = self.lines.get(lsp_line).map_or_else(
+            || col.saturating_sub(1),
+            |line_text| {
+                line_text
+                    .chars()
+                    .take(col.saturating_sub(1))
+                    .map(char::len_utf16)
+                    .sum::<usize>()
+            },
+        );
+        Position::new(usize_to_u32(lsp_line), usize_to_u32(character))
+    }
+}
+
 fn text_line(text: &str, zero_based_line: usize) -> Option<&str> {
     let mut current = 0usize;
     let mut start = 0usize;
@@ -386,11 +425,12 @@ pub(super) fn encode_semantic_tokens(
     let mut encoded = Vec::new();
     let mut prev_line = 0u32;
     let mut prev_start = 0u32;
+    let lines = LineIndex::new(text);
     for token in tokens
         .iter()
-        .filter(|token| token_intersects_range(text, token, range))
+        .filter(|token| token_intersects_range(&lines, token, range))
     {
-        let lsp_range = to_lsp_range_in_text(text, &token.range);
+        let lsp_range = lines.range(&token.range);
         let line = lsp_range.start.line;
         let start = lsp_range.start.character;
         let end = lsp_range.end.character;
@@ -589,11 +629,15 @@ fn related_information(labels: &[CliDiagnosticLabel]) -> Option<Vec<DiagnosticRe
     (!items.is_empty()).then_some(items)
 }
 
-fn token_intersects_range(text: &str, token: &ToolSemanticToken, range: Option<&Range>) -> bool {
+fn token_intersects_range(
+    lines: &LineIndex<'_>,
+    token: &ToolSemanticToken,
+    range: Option<&Range>,
+) -> bool {
     let Some(range) = range else {
         return true;
     };
-    let token_range = to_lsp_range_in_text(text, &token.range);
+    let token_range = lines.range(&token.range);
     position_lt(token_range.start, range.end) && position_lt(range.start, token_range.end)
 }
 

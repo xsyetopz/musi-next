@@ -16,11 +16,11 @@ use music_session::{Session, SessionOptions};
 use musi_project::{Project, ProjectDiagKind, ProjectError, ProjectOptions};
 
 use crate::{
-    ToolCompletionKind, ToolDocumentHighlightKind, ToolFoldingRangeKind, ToolInlayHintKind,
-    ToolMonikerKind, ToolPosition, ToolSemanticModifier, ToolSemanticTokenKind, ToolingDiagKind,
-    ToolingError, artifact::write_output, collect_project_diagnostics_with_overlay,
-    completions_for_project_file_with_overlay, definition_for_project_file_with_overlay,
-    document_highlights_for_project_file_with_overlay,
+    NavigationWorkspace, ToolCompletionKind, ToolDocumentHighlightKind, ToolFoldingRangeKind,
+    ToolInlayHintKind, ToolMonikerKind, ToolPosition, ToolSemanticModifier, ToolSemanticTokenKind,
+    ToolingDiagKind, ToolingError, artifact::write_output,
+    collect_project_diagnostics_with_overlay, completions_for_project_file_with_overlay,
+    definition_for_project_file_with_overlay, document_highlights_for_project_file_with_overlay,
     document_links_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
     folding_ranges_for_project_file_with_overlay, hover_for_project_file_with_overlay,
     implementation_for_project_file_with_overlay, inlay_hints_for_project_file_with_overlay,
@@ -513,6 +513,80 @@ let bitEq := 2;
             .find(|lens| lens.range.start_line == 2 && lens.range.start_col == 5)
             .expect("after reference lens should exist");
         assert_eq!(after.reference_count, 0);
+    }
+
+    #[test]
+    fn navigation_workspace_reuses_analysis_for_reference_requests() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        write_file(
+            test_dir.path(),
+            "index.ms",
+            "let before := 1;\nlet after := before + before;\n",
+        );
+        let path = test_dir.path().join("index.ms");
+        let mut workspace = NavigationWorkspace::new();
+
+        let references =
+            workspace.references_for_project_file_with_overlay(&path, None, 1, 5, false);
+        assert_eq!(
+            workspace.cached_reference_data_len(&path),
+            Some((1, 1, false))
+        );
+        let lenses = workspace.reference_lenses_for_project_file_with_overlay(&path, None);
+        assert_eq!(
+            workspace.cached_reference_data_len(&path),
+            Some((1, 2, true))
+        );
+        let lenses_again = workspace.reference_lenses_for_project_file_with_overlay(&path, None);
+
+        assert_eq!(references.len(), 2);
+        assert_eq!(workspace.cached_paths_len(), 1);
+        assert!(lenses.iter().any(|lens| lens.reference_count == 2));
+        assert_eq!(lenses_again, lenses);
+
+        workspace.invalidate_path(&path);
+
+        assert_eq!(workspace.cached_paths_len(), 0);
+    }
+
+    #[test]
+    fn navigation_workspace_reuses_workspace_member_reference_data() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "export let value := 1;\n";
+        write_file(test_dir.path(), "index.ms", source);
+        write_file(
+            test_dir.path(),
+            "use.ms",
+            "let app := import \"./index\";\nlet result := app.value;\n",
+        );
+        let path = test_dir.path().join("index.ms");
+        let mut workspace = NavigationWorkspace::new();
+
+        let references =
+            workspace.references_for_project_file_with_overlay(&path, None, 1, 12, false);
+        assert_eq!(references.len(), 1);
+        assert_eq!(
+            workspace.cached_reference_data_len(&path),
+            Some((1, 1, false))
+        );
+
+        let lenses = workspace.reference_lenses_for_project_file_with_overlay(&path, None);
+        assert_eq!(lenses.len(), 1);
+        assert_eq!(lenses[0].reference_count, 1);
+        assert_eq!(
+            workspace.cached_reference_data_len(&path),
+            Some((1, 1, true))
+        );
+
+        let references_with_declaration =
+            workspace.references_for_project_file_with_overlay(&path, None, 1, 12, true);
+        assert_eq!(references_with_declaration.len(), 2);
+        assert_eq!(
+            workspace.cached_reference_data_len(&path),
+            Some((1, 1, true))
+        );
     }
 
     #[test]

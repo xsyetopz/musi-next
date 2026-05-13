@@ -1,7 +1,7 @@
 let crypto := import "@std/crypto";
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("crypto"),
     testing.it(

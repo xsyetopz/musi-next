@@ -2,7 +2,7 @@ let ascii := import "@std/ascii";
 let maybe := import "@std/maybe";
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("ascii");
     testing.it("'isAscii' accepts byte range", ascii.isAscii(127));

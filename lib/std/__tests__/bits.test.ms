@@ -1,7 +1,7 @@
 let bits := import "@std/bits";
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("bits");
     let a := bits.fromInt8(10);

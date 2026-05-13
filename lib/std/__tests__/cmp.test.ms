@@ -1,7 +1,7 @@
 let cmp := import "@std/cmp";
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("cmp");
     testing.it("'eq' compares equal values", cmp.eq[Int](3, 3),);

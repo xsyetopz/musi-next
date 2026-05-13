@@ -1,7 +1,7 @@
 let os := import "@std/os";
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("os/index");
     let currentOs := os.targetOs(os.current);

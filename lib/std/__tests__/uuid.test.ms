@@ -1,7 +1,7 @@
 let testing := import "@std/testing";
 let uuid := import "@std/uuid";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("uuid"),
     let text := "550e8400-e29b-41d4-a716-446655440000",

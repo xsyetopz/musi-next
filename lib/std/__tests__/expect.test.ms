@@ -1,7 +1,7 @@
 let expect := import "@std/expect";
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("expect");
     let successValue := expect.Success[Int, String](1);

@@ -1,10 +1,10 @@
 let math := import "@std/math";
 let testing := import "@std/testing";
 
-let close(actual : Float, expected : Float) : Bit :=
+let close (actual : Float, expected : Float) : Bit :=
   math.fabs(actual - expected) < 0.000001;
 
-export let test() :=
+export let test () :=
   (
     testing.describe("math");
     testing.it("'abs' keeps positive ints", testing.toBe(math.abs(3), 3));

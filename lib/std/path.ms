@@ -8,20 +8,20 @@ export hidden let Path := data {
 };
 
 --- Build a path from raw text.
-export let fromString(value : String) : Path := .PathText(value := value);
+export let fromString (value : String) : Path := .PathText(value := value);
 
 --- Core operation for `toString`.
-let pathToString(target : Path) : String :=
+let pathToString (target : Path) : String :=
   match target (
   | .PathText(value := value) => value
   );
 
---- Core operation for `toString`.
-export let toString(target : Path) : String := pathToString(target);
+--- Return raw path text.
+export let toString (target : Path) : String := pathToString(target);
 
 let slash : String := "/";
 
-let recur lastByteIndexFrom(
+let recur lastByteIndexFrom (
   source : String,
   needle : Int,
   index : Int,
@@ -38,11 +38,11 @@ let recur lastByteIndexFrom(
   | _ => lastByteIndexFrom(source, needle, index + 1, best)
   );
 
-let lastByteIndex(source : String, needle : Int) : Int :=
+let lastByteIndex (source : String, needle : Int) : Int :=
   lastByteIndexFrom(source, needle, 0, - 1);
 
 --- Core operation for `join`.
-let joinPath(target : Path, other : Path) : Path :=
+let joinPath (target : Path, other : Path) : Path :=
   (
     let left := pathToString(target);
     let right := pathToString(other);
@@ -58,10 +58,10 @@ let joinPath(target : Path, other : Path) : Path :=
   );
 
 --- Core operation for `normalize`.
-let normalizePath(target : Path) : Path := target;
+let normalizePath (target : Path) : Path := target;
 
 --- Core operation for `dirName`.
-let pathDirName(target : Path) : Path :=
+let pathDirName (target : Path) : Path :=
   (
     let source := pathToString(target);
     let index := lastByteIndex(source, 47);
@@ -73,7 +73,7 @@ let pathDirName(target : Path) : Path :=
   );
 
 --- Core operation for `baseName`.
-let pathBaseName(target : Path) : String :=
+let pathBaseName (target : Path) : String :=
   (
     let source := pathToString(target);
     let index := lastByteIndex(source, 47);
@@ -84,7 +84,7 @@ let pathBaseName(target : Path) : String :=
   );
 
 --- Core operation for `extName`.
-let pathExtName(target : Path) : String :=
+let pathExtName (target : Path) : String :=
   (
     let base := pathBaseName(target);
     let index := lastByteIndex(base, 46);
@@ -95,44 +95,44 @@ let pathExtName(target : Path) : String :=
   );
 
 --- Core operation for `isAbsolute`.
-let pathIsAbsolute(target : Path) : Bit :=
+let pathIsAbsolute (target : Path) : Bit :=
   text.byteAt(pathToString(target), 0) = 47;
 
---- Core operation for `join`.
-export let join(target : Path, other : Path) : Path := joinPath(target, other);
+--- Join two paths, using other unchanged when it is absolute.
+export let join (target : Path, other : Path) : Path := joinPath(target, other);
 
---- Core operation for `normalize`.
-export let normalize(target : Path) : Path := normalizePath(target);
+--- Return normalized path text.
+export let normalize (target : Path) : Path := normalizePath(target);
 
---- Core operation for `dirName`.
-export let dirName(target : Path) : Path := pathDirName(target);
+--- Return parent directory path.
+export let dirName (target : Path) : Path := pathDirName(target);
 
---- Core operation for `baseName`.
-export let baseName(target : Path) : String := pathBaseName(target);
+--- Return final path component.
+export let baseName (target : Path) : String := pathBaseName(target);
 
---- Core operation for `extName`.
-export let extName(target : Path) : String := pathExtName(target);
+--- Return extension from final path component.
+export let extName (target : Path) : String := pathExtName(target);
 
---- Core operation for `isAbsolute`.
-export let isAbsolute(target : Path) : Bit := pathIsAbsolute(target);
+--- Returns true when path starts at root.
+export let isAbsolute (target : Path) : Bit := pathIsAbsolute(target);
 
 --- Return raw path text.
-export let (self : Path).toString() : String := pathToString(self);
+export let (self : Path).toString () : String := pathToString(self);
 
 --- Join two paths.
-export let (self : Path).join(other : Path) : Path := joinPath(self, other);
+export let (self : Path).join (other : Path) : Path := joinPath(self, other);
 
 --- Normalize a path.
-export let (self : Path).normalize() : Path := normalizePath(self);
+export let (self : Path).normalize () : Path := normalizePath(self);
 
 --- Parent directory name.
-export let (self : Path).dirName() : Path := pathDirName(self);
+export let (self : Path).dirName () : Path := pathDirName(self);
 
 --- Base file name.
-export let (self : Path).baseName() : String := pathBaseName(self);
+export let (self : Path).baseName () : String := pathBaseName(self);
 
 --- Extension name, including leading `.` when Some.
-export let (self : Path).extName() : String := pathExtName(self);
+export let (self : Path).extName () : String := pathExtName(self);
 
 --- Returns true for absolute paths.
-export let (self : Path).isAbsolute() : Bit := pathIsAbsolute(self);
+export let (self : Path).isAbsolute () : Bit := pathIsAbsolute(self);

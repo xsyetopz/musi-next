@@ -4,48 +4,48 @@ let ascii := import "@std/ascii";
 let textHost := import "musi:text";
 
 --- Return byte length.
-let textLength(target : String) : Int := textHost.length(target);
+let textLength (target : String) : Int := textHost.length(target);
 
 --- Return byte length.
-export let length(target : String) : Int := textLength(target);
+export let length (target : String) : Int := textLength(target);
 
 --- Core operation for `isEmpty`.
-let textIsEmpty(target : String) : Bit := textLength(target) = 0;
+let textIsEmpty (target : String) : Bit := textLength(target) = 0;
 
---- Core operation for `isEmpty`.
-export let isEmpty(target : String) : Bit := textIsEmpty(target);
+--- Returns true when text has no bytes.
+export let isEmpty (target : String) : Bit := textIsEmpty(target);
 
 --- Concatenate text.
-let textConcat(left : String, right : String) : String :=
+let textConcat (left : String, right : String) : String :=
   textHost.concat(left, right);
 
 --- Concatenate text.
-export let concat(left : String, right : String) : String :=
+export let concat (left : String, right : String) : String :=
   textConcat(left, right);
 
 --- Return byte-range text slice on character boundaries.
-let textSlice(target : String, start : Int, end : Int) : String :=
+let textSlice (target : String, start : Int, end : Int) : String :=
   textHost.slice(target, start, end);
 
 --- Return byte-range text slice on character boundaries.
-export let slice(target : String, start : Int, end : Int) : String :=
+export let slice (target : String, start : Int, end : Int) : String :=
   textSlice(target, start, end);
 
 --- Return byte value at index.
-let textByteAt(target : String, index : Int) : Int :=
+let textByteAt (target : String, index : Int) : Int :=
   textHost.byteAt(target, index);
 
 --- Return byte value at index.
-export let byteAt(target : String, index : Int) : Int :=
+export let byteAt (target : String, index : Int) : Int :=
   textByteAt(target, index);
 
 --- Build one-byte text from byte value.
-let textFromByte(value : Int) : String := textHost.fromByte(value);
+let textFromByte (value : Int) : String := textHost.fromByte(value);
 
 --- Build one-byte text from byte value.
-export let fromByte(value : Int) : String := textFromByte(value);
+export let fromByte (value : Int) : String := textFromByte(value);
 
-let recur trimStartIndex(target : String, index : Int, end : Int) : Int :=
+let recur trimStartIndex (target : String, index : Int, end : Int) : Int :=
   match () (
   | _ where index >= end => end
   | _ where ascii.isWhitespace(textByteAt(target, index)) => trimStartIndex(
@@ -56,7 +56,7 @@ let recur trimStartIndex(target : String, index : Int, end : Int) : Int :=
   | _ => index
   );
 
-let recur trimEndIndex(target : String, start : Int, end : Int) : Int :=
+let recur trimEndIndex (target : String, start : Int, end : Int) : Int :=
   match () (
   | _ where end <= start => start
   | _ where ascii.isWhitespace(textByteAt(target, end - 1)) => trimEndIndex(
@@ -68,17 +68,17 @@ let recur trimEndIndex(target : String, start : Int, end : Int) : Int :=
   );
 
 --- Core operation for `trim`.
-let textTrim(target : String) : String :=
+let textTrim (target : String) : String :=
   (
     let end := textLength(target);
     let start := trimStartIndex(target, 0, end);
     textSlice(target, start, trimEndIndex(target, start, end))
   );
 
---- Core operation for `trim`.
-export let trim(target : String) : String := textTrim(target);
+--- Trim leading and trailing ASCII whitespace.
+export let trim (target : String) : String := textTrim(target);
 
-let recur transformAscii(
+let recur transformAscii (
   target : String,
   index : Int,
   end : Int,
@@ -93,27 +93,27 @@ let recur transformAscii(
   );
 
 --- Core operation for `toLowerCase`.
-let textToLowerCase(target : String) : String :=
+let textToLowerCase (target : String) : String :=
   transformAscii(target, 0, textLength(target), ascii.toLower);
 
---- Core operation for `toLowerCase`.
-export let toLowerCase(target : String) : String := textToLowerCase(target);
+--- Convert ASCII letters to lower case.
+export let toLowerCase (target : String) : String := textToLowerCase(target);
 
 --- Core operation for `toUpperCase`.
-let textToUpperCase(target : String) : String :=
+let textToUpperCase (target : String) : String :=
   transformAscii(target, 0, textLength(target), ascii.toUpper);
 
---- Core operation for `toUpperCase`.
-export let toUpperCase(target : String) : String := textToUpperCase(target);
+--- Convert ASCII letters to upper case.
+export let toUpperCase (target : String) : String := textToUpperCase(target);
 
-let bytesDifferAt(
+let bytesDifferAt (
   target : String,
   needle : String,
   targetIndex : Int,
   needleIndex : Int
 ) : Bit := textByteAt(target, targetIndex) /= textByteAt(needle, needleIndex);
 
-let recur matchesAt(
+let recur matchesAt (
   target : String,
   needle : String,
   targetIndex : Int,
@@ -126,7 +126,7 @@ let recur matchesAt(
   | _ => matchesAt(target, needle, targetIndex + 1, needleIndex + 1)
   );
 
-let recur indexOfFrom(target : String, needle : String, index : Int) : Int :=
+let recur indexOfFrom (target : String, needle : String, index : Int) : Int :=
   match () (
   | _ where textLength(needle) = 0 => index
   | _ where index > textLength(target) - textLength(needle) => - 1
@@ -135,38 +135,38 @@ let recur indexOfFrom(target : String, needle : String, index : Int) : Int :=
   );
 
 --- Core operation for `indexOf`.
-let textIndexOf(target : String, needle : String) : Int :=
+let textIndexOf (target : String, needle : String) : Int :=
   indexOfFrom(target, needle, 0);
 
---- Core operation for `indexOf`.
-export let indexOf(target : String, needle : String) : Int :=
+--- Return first byte index of needle, or -1 when missing.
+export let indexOf (target : String, needle : String) : Int :=
   textIndexOf(target, needle);
 
 --- Core operation for `contains`.
-let textContains(target : String, needle : String) : Bit :=
+let textContains (target : String, needle : String) : Bit :=
   textIndexOf(target, needle) >= 0;
 
---- Core operation for `contains`.
-export let contains(target : String, needle : String) : Bit :=
+--- Returns true when target contains needle.
+export let contains (target : String, needle : String) : Bit :=
   textContains(target, needle);
 
 --- Core operation for `startsWith`.
-let textStartsWith(target : String, prefix : String) : Bit :=
+let textStartsWith (target : String, prefix : String) : Bit :=
   matchesAt(target, prefix, 0, 0);
 
---- Core operation for `startsWith`.
-export let startsWith(target : String, prefix : String) : Bit :=
+--- Returns true when target starts with prefix.
+export let startsWith (target : String, prefix : String) : Bit :=
   textStartsWith(target, prefix);
 
 --- Core operation for `endsWith`.
-let textEndsWith(target : String, suffix : String) : Bit :=
+let textEndsWith (target : String, suffix : String) : Bit :=
   match () (
   | _ where textLength(suffix) > textLength(target) => 0 = 1
   | _ => matchesAt(target, suffix, textLength(target) - textLength(suffix), 0)
   );
 
---- Core operation for `endsWith`.
-export let endsWith(target : String, suffix : String) : Bit :=
+--- Returns true when target ends with suffix.
+export let endsWith (target : String, suffix : String) : Bit :=
   textEndsWith(target, suffix);
 
 --- Count Unicode scalar values in string.

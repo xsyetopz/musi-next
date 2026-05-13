@@ -1,7 +1,7 @@
 let maybe := import "@std/maybe";
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("maybe");
     let someOne := maybe.Some[Int](1);

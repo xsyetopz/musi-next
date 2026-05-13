@@ -1,7 +1,7 @@
 let log := import "@std/log";
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("log");
     testing.it(

@@ -1,7 +1,7 @@
 let assert := import "@std/assert";
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("assert/matchers");
     testing.it("'equal' passes on equal ints", assert.equal[Int](4, 4));

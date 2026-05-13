@@ -1,6 +1,6 @@
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("testing");
     testing.it("'pass' returns outcome", testing.toBe(1, 1));

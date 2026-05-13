@@ -215,7 +215,7 @@ impl MusiLanguageServer {
         (!locations.is_empty()).then_some(GotoDefinitionResponse::Array(locations))
     }
 
-    pub(super) fn references_at(&self, params: ReferenceParams) -> Option<Vec<Location>> {
+    pub(super) fn references_at(&mut self, params: ReferenceParams) -> Option<Vec<Location>> {
         let text_document = params.text_document_position.text_document;
         let position = params.text_document_position.position;
         let path = text_document.uri.to_file_path().ok()?;
@@ -223,8 +223,12 @@ impl MusiLanguageServer {
             return None;
         }
         let file_text;
-        let text = if let Some(text) = self.open_documents.get(&text_document.uri) {
-            text.as_str()
+        let overlay = self
+            .open_documents
+            .get(&text_document.uri)
+            .map(String::as_str);
+        let text = if let Some(overlay) = overlay {
+            overlay
         } else {
             file_text = read_to_string(&path).ok()?;
             file_text.as_str()
@@ -233,16 +237,16 @@ impl MusiLanguageServer {
             return Some(locations);
         }
         let tool_position = to_tool_position_in_text(text, position)?;
-        let locations = references_for_project_file_with_overlay(
-            &path,
-            Some(text),
-            tool_position.line,
-            tool_position.col,
-            params.context.include_declaration,
-        )
-        .into_iter()
-        .filter_map(|location| self.lsp_location_for_tool_location(&location))
-        .collect();
+        let tool_locations = self
+            .navigation_workspace
+            .references_for_project_file_with_overlay(
+                &path,
+                overlay,
+                tool_position.line,
+                tool_position.col,
+                params.context.include_declaration,
+            );
+        let locations = self.lsp_locations_for_tool_locations(tool_locations);
         Some(locations)
     }
 
@@ -544,7 +548,7 @@ impl MusiLanguageServer {
         resolve_lsp_document_link(link)
     }
 
-    pub(super) fn code_lenses(&self, params: CodeLensParams) -> Option<Vec<CodeLens>> {
+    pub(super) fn code_lenses(&mut self, params: CodeLensParams) -> Option<Vec<CodeLens>> {
         let uri = params.text_document.uri;
         let path = uri.to_file_path().ok()?;
         if path.file_name().is_some_and(|name| name == "musi.json") {
@@ -552,13 +556,16 @@ impl MusiLanguageServer {
         }
         let overlay = self.open_documents.get(&uri).map(String::as_str);
         let mut lenses = Vec::new();
-        for lens in reference_lenses_for_project_file_with_overlay(&path, overlay) {
-            push_reference_lens(&path, &lens, REFERENCES_COMMAND, &mut lenses);
+        for lens in self
+            .navigation_workspace
+            .reference_lenses_for_project_file_with_overlay(&path, overlay)
+        {
+            push_reference_lens(&path, &lens, &mut lenses);
         }
         Some(lenses)
     }
 
-    pub(super) fn resolve_code_lens(&self, mut lens: CodeLens) -> CodeLens {
+    pub(super) fn resolve_code_lens(&mut self, mut lens: CodeLens) -> CodeLens {
         if lens.command.is_some() {
             return lens;
         }
@@ -572,25 +579,44 @@ impl MusiLanguageServer {
             return lens;
         };
         let overlay = self.open_documents.get(&uri).map(String::as_str);
-        let references = references_for_project_file_with_overlay(
-            &path,
-            overlay,
-            line.saturating_add(1),
-            character.saturating_add(1),
-            false,
-        );
+        let tool_locations = self
+            .navigation_workspace
+            .references_for_project_file_with_overlay(
+                &path,
+                overlay,
+                line.saturating_add(1),
+                character.saturating_add(1),
+                false,
+            );
+        let references = self.lsp_locations_for_tool_locations(tool_locations);
+        let Ok(line) = u32::try_from(line) else {
+            return lens;
+        };
+        let Ok(character) = u32::try_from(character) else {
+            return lens;
+        };
+        let Ok(locations) = serde_json::to_value(&references) else {
+            return lens;
+        };
         if references.is_empty() {
             return lens;
         }
         lens.command = Some(Command::new(
             reference_lens_title(references.len()),
-            REFERENCES_COMMAND.to_owned(),
-            Some(vec![data.clone()]),
+            SHOW_REFERENCES_COMMAND.to_owned(),
+            Some(vec![
+                json!(uri.as_str()),
+                json!(Position::new(line, character)),
+                locations,
+            ]),
         ));
         lens
     }
 
-    pub(super) fn execute_command_request(&self, params: &ExecuteCommandParams) -> Option<Value> {
+    pub(super) fn execute_command_request(
+        &mut self,
+        params: &ExecuteCommandParams,
+    ) -> Option<Value> {
         if params.command != REFERENCES_COMMAND {
             return None;
         }
@@ -781,6 +807,36 @@ impl MusiLanguageServer {
             uri,
             range: to_lsp_range_in_text(text, &location.range),
         })
+    }
+
+    fn lsp_locations_for_tool_locations(&self, locations: Vec<ToolLocation>) -> Vec<Location> {
+        let mut documents = HashMap::<PathBuf, (Url, String)>::new();
+        locations
+            .into_iter()
+            .filter_map(|location| {
+                let (uri, text) = if let Some((uri, text)) =
+                    documents.get(&location.path).map(|(uri, text)| (uri, text))
+                {
+                    (uri.clone(), text.as_str())
+                } else {
+                    let open_document = self.open_document_for_path(&location.path);
+                    let uri = open_document.map_or_else(
+                        || Url::from_file_path(&location.path).ok(),
+                        |(uri, _)| Some(uri.clone()),
+                    )?;
+                    let text = open_document
+                        .map(|(_, text)| text.to_owned())
+                        .or_else(|| read_to_string(&location.path).ok())?;
+                    let _ = documents.insert(location.path.clone(), (uri.clone(), text));
+                    let (_, text) = documents.get(&location.path)?;
+                    (uri, text.as_str())
+                };
+                Some(Location {
+                    uri,
+                    range: to_lsp_range_in_text(text, &location.range),
+                })
+            })
+            .collect()
     }
 
     fn lsp_workspace_edit_for_tool_edit(&self, edit: ToolWorkspaceEdit) -> Option<WorkspaceEdit> {

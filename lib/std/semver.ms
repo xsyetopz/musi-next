@@ -8,21 +8,21 @@ export hidden let Version := data {
 };
 
 --- Parse semantic version text.
-export let parse(source : String) : Version := .VersionText(value := source);
+export let parse (source : String) : Version := .VersionText(value := source);
 
-let both(left : Bit, right : Bit) : Bit :=
+let both (left : Bit, right : Bit) : Bit :=
   match left (
   | success where success => right
   | _ => 0 = 1
   );
 
-let isDigit(value : Int) : Bit := both(value >= 48, value <= 57);
+let isDigit (value : Int) : Bit := both(value >= 48, value <= 57);
 
-let isDigitAt(source : String, index : Int) : Bit :=
+let isDigitAt (source : String, index : Int) : Bit :=
   isDigit(text.byteAt(source, index));
 
 --- Returns true when text is a valid semantic version.
-export let isValid(source : String) : Bit :=
+export let isValid (source : String) : Bit :=
   both(
     both(source.length() >= 5, isDigitAt(source, 0)),
     both(
@@ -31,13 +31,13 @@ export let isValid(source : String) : Bit :=
     ),
   );
 
-let byteOrZero(source : String, index : Int) : Int :=
+let byteOrZero (source : String, index : Int) : Int :=
   match text.byteAt(source, index) (
   | value where value < 0 => 0
   | value => value
   );
 
-let compareByte(left : String, right : String, index : Int) : Int :=
+let compareByte (left : String, right : String, index : Int) : Int :=
   match byteOrZero(left, index) - byteOrZero(right, index) (
   | diff where diff < 0 => - 1
   | diff where diff > 0 => 1
@@ -45,7 +45,7 @@ let compareByte(left : String, right : String, index : Int) : Int :=
   );
 
 --- Compare semantic versions.
-export let compare(left : Version, right : Version) : Int :=
+export let compare (left : Version, right : Version) : Int :=
   match left (
   | .VersionText(value := leftText) => match right (
   | .VersionText(value := rightText) =>
@@ -67,7 +67,7 @@ export let compare(left : Version, right : Version) : Int :=
 );
 
 --- Return normalized semantic version text.
-export let (self : Version).toString() : String :=
+export let (self : Version).toString () : String :=
   match self (
   | .VersionText(value := value) => value
   );

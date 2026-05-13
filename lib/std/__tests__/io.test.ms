@@ -1,7 +1,7 @@
 let io := import "@std/io";
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("io");
     testing.it("'write' returns without failure",

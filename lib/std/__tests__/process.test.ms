@@ -3,7 +3,7 @@ let path := import "@std/path";
 let process := import "@std/process";
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("process");
     testing.it(

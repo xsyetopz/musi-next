@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use async_lsp::lsp_types::{
-    CallHierarchyItem, CodeActionKind, CodeLens, Command, DocumentHighlight, DocumentHighlightKind,
+    CallHierarchyItem, CodeActionKind, CodeLens, DocumentHighlight, DocumentHighlightKind,
     LinkedEditingRanges, Location, Moniker, MonikerKind, Position, Range, UniquenessLevel, Url,
 };
 use musi_tooling::{
@@ -23,21 +23,15 @@ pub(super) fn reference_lens_title(count: usize) -> String {
 pub(super) fn push_reference_lens(
     path: &Path,
     lens: &ToolReferenceLens,
-    command_name: &str,
     lenses: &mut Vec<CodeLens>,
 ) {
     if lens.reference_count == 0 {
         return;
     }
     if let Some(data) = reference_lens_data(path, &lens.range) {
-        let command = Command::new(
-            reference_lens_title(lens.reference_count),
-            command_name.to_owned(),
-            Some(vec![data.clone()]),
-        );
         lenses.push(CodeLens {
             range: to_tool_range(&lens.range),
-            command: Some(command),
+            command: None,
             data: Some(data),
         });
     }

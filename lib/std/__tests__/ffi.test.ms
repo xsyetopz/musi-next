@@ -1,7 +1,7 @@
 let ffi := import "@std/ffi";
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("ffi");
     let pointer := ffi.ptr.null[Int]();

@@ -1,5 +1,6 @@
 use std::cmp::Reverse;
 use std::collections::HashMap;
+use std::fmt;
 use std::path::{Path, PathBuf};
 
 use musi_project::{PackageSource, Project, ProjectOptions, load_project, load_project_ancestor};
@@ -63,6 +64,92 @@ pub struct ToolWorkspaceSymbol {
     pub name: String,
     pub kind: ToolSymbolKind,
     pub location: ToolLocation,
+}
+
+#[derive(Default)]
+pub struct NavigationWorkspace {
+    analyses: HashMap<PathBuf, SymbolAnalysis>,
+}
+
+impl fmt::Debug for NavigationWorkspace {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NavigationWorkspace")
+            .field("cached_paths", &self.analyses.len())
+            .finish()
+    }
+}
+
+impl NavigationWorkspace {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn clear(&mut self) {
+        self.analyses.clear();
+    }
+
+    pub fn invalidate_path(&mut self, path: &Path) {
+        let key = navigation_cache_key(path);
+        let _ = self.analyses.remove(&key);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn cached_paths_len(&self) -> usize {
+        self.analyses.len()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn cached_reference_data_len(&self, path: &Path) -> Option<(usize, usize, bool)> {
+        let key = navigation_cache_key(path);
+        self.analyses
+            .get(&key)
+            .map(SymbolAnalysis::cached_reference_data_len)
+    }
+
+    #[must_use]
+    pub fn references_for_project_file_with_overlay(
+        &mut self,
+        path: &Path,
+        overlay_text: Option<&str>,
+        line: usize,
+        character: usize,
+        include_declaration: bool,
+    ) -> Vec<ToolLocation> {
+        let Some(context) = self.analysis(path, overlay_text) else {
+            return Vec::new();
+        };
+        let Some(binding_id) = context.binding_at(line, character) else {
+            return Vec::new();
+        };
+        context.references(binding_id, include_declaration)
+    }
+
+    #[must_use]
+    pub fn reference_lenses_for_project_file_with_overlay(
+        &mut self,
+        path: &Path,
+        overlay_text: Option<&str>,
+    ) -> Vec<ToolReferenceLens> {
+        let Some(context) = self.analysis(path, overlay_text) else {
+            return Vec::new();
+        };
+        context.reference_lenses()
+    }
+
+    fn analysis(&mut self, path: &Path, overlay_text: Option<&str>) -> Option<&mut SymbolAnalysis> {
+        let key = navigation_cache_key(path);
+        if self
+            .analyses
+            .get(&key)
+            .is_none_or(|analysis| !analysis.overlay_matches(overlay_text))
+        {
+            let analysis = SymbolAnalysis::new(path, overlay_text)?;
+            let _ = self.analyses.insert(key.clone(), analysis);
+        }
+        self.analyses.get_mut(&key)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -431,8 +518,12 @@ struct SymbolAnalysis {
     module_key: ModuleKey,
     source_id: SourceId,
     path: PathBuf,
+    overlay_text: Option<String>,
     path_map: HashMap<String, PathBuf>,
     workspace_modules: Vec<(ModuleKey, PathBuf)>,
+    binding_references: HashMap<NameBindingId, Vec<ToolLocation>>,
+    workspace_import_record_member_references: HashMap<Symbol, Vec<ToolLocation>>,
+    reference_lenses: Option<Vec<ToolReferenceLens>>,
 }
 
 impl SymbolAnalysis {
@@ -445,9 +536,26 @@ impl SymbolAnalysis {
             module_key,
             source_id,
             path: path.to_path_buf(),
+            overlay_text: overlay_text.map(str::to_owned),
             path_map: module_path_map(path),
             workspace_modules: workspace_modules(path),
+            binding_references: HashMap::new(),
+            workspace_import_record_member_references: HashMap::new(),
+            reference_lenses: None,
         })
+    }
+
+    #[cfg(test)]
+    fn cached_reference_data_len(&self) -> (usize, usize, bool) {
+        (
+            self.binding_references.len(),
+            self.workspace_import_record_member_references.len(),
+            self.reference_lenses.is_some(),
+        )
+    }
+
+    fn overlay_matches(&self, overlay_text: Option<&str>) -> bool {
+        self.overlay_text.as_deref() == overlay_text
     }
 
     fn source(&self) -> Option<&Source> {
@@ -649,14 +757,38 @@ impl SymbolAnalysis {
         binding_id: NameBindingId,
         include_declaration: bool,
     ) -> Vec<ToolLocation> {
+        let mut locations = self.references_without_declaration(binding_id);
+        if include_declaration && let Some(location) = self.binding_location(binding_id) {
+            locations.push(location);
+            locations.sort_by_key(|location| {
+                (
+                    location.path.clone(),
+                    location.range.start_line,
+                    location.range.start_col,
+                )
+            });
+            locations.dedup_by_key(|location| {
+                (
+                    location.path.clone(),
+                    location.range.start_line,
+                    location.range.start_col,
+                    location.range.end_line,
+                    location.range.end_col,
+                )
+            });
+        }
+        locations
+    }
+
+    fn references_without_declaration(&mut self, binding_id: NameBindingId) -> Vec<ToolLocation> {
+        if let Some(cached) = self.binding_references.get(&binding_id) {
+            return cached.clone();
+        }
         let Some(resolved) = self.resolved() else {
             return Vec::new();
         };
         let binding_name = resolved.bindings.get(binding_id).name;
         let mut locations = Vec::new();
-        if include_declaration && let Some(location) = self.binding_location(binding_id) {
-            locations.push(location);
-        }
         locations.extend(
             resolved
                 .refs
@@ -682,10 +814,16 @@ impl SymbolAnalysis {
                 location.range.end_col,
             )
         });
+        let _ = self
+            .binding_references
+            .insert(binding_id, locations.clone());
         locations
     }
 
     fn workspace_import_record_member_references(&mut self, name: Symbol) -> Vec<ToolLocation> {
+        if let Some(cached) = self.workspace_import_record_member_references.get(&name) {
+            return cached.clone();
+        }
         let mut modules = self.workspace_modules.clone();
         modules.retain(|(module_key, _)| module_key != &self.module_key);
         let mut locations = Vec::new();
@@ -696,6 +834,25 @@ impl SymbolAnalysis {
                 name,
             ));
         }
+        locations.sort_by_key(|location| {
+            (
+                location.path.clone(),
+                location.range.start_line,
+                location.range.start_col,
+            )
+        });
+        locations.dedup_by_key(|location| {
+            (
+                location.path.clone(),
+                location.range.start_line,
+                location.range.start_col,
+                location.range.end_line,
+                location.range.end_col,
+            )
+        });
+        let _ = self
+            .workspace_import_record_member_references
+            .insert(name, locations.clone());
         locations
     }
 
@@ -848,9 +1005,28 @@ impl SymbolAnalysis {
     }
 
     fn reference_lenses(&mut self) -> Vec<ToolReferenceLens> {
+        if let Some(cached) = &self.reference_lenses {
+            return cached.clone();
+        }
         let Some(resolved) = self.resolved() else {
             return Vec::new();
         };
+        let mut reference_counts = HashMap::<NameBindingId, usize>::new();
+        for binding_id in resolved.refs.values() {
+            *reference_counts.entry(*binding_id).or_default() += 1;
+        }
+        if let Some(sema) = self.sema() {
+            for (expr_id, expr) in &sema.module().store.exprs {
+                let HirExprKind::Field { .. } = expr.kind else {
+                    continue;
+                };
+                let Some(binding_id) = sema.expr_member_fact(expr_id).and_then(|fact| fact.binding)
+                else {
+                    continue;
+                };
+                *reference_counts.entry(binding_id).or_default() += 1;
+            }
+        }
         let mut bindings = resolved
             .bindings
             .iter()
@@ -861,18 +1037,39 @@ impl SymbolAnalysis {
                     NameBindingKind::Prelude | NameBindingKind::Import
                 )
             })
-            .map(|(binding_id, binding)| (binding_id, binding.site))
+            .map(|(binding_id, binding)| (binding_id, binding.site, binding.name))
             .collect::<Vec<_>>();
-        bindings.sort_by_key(|(_, site)| site.span.start);
-        bindings
+        bindings.sort_by_key(|(_, site, _)| site.span.start);
+        let workspace_reference_counts = bindings
+            .iter()
+            .map(|(_, _, name)| *name)
+            .collect::<std::collections::HashSet<_>>()
             .into_iter()
-            .filter_map(|(binding_id, site)| {
+            .map(|name| {
+                (
+                    name,
+                    self.workspace_import_record_member_references(name).len(),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        let lenses: Vec<ToolReferenceLens> = bindings
+            .into_iter()
+            .filter_map(|(binding_id, site, binding_name)| {
                 Some(ToolReferenceLens {
                     range: tool_range(self.source_for_site(site)?, site.span),
-                    reference_count: self.references(binding_id, false).len(),
+                    reference_count: reference_counts
+                        .get(&binding_id)
+                        .copied()
+                        .unwrap_or_default()
+                        + workspace_reference_counts
+                            .get(&binding_name)
+                            .copied()
+                            .unwrap_or_default(),
                 })
             })
-            .collect()
+            .collect();
+        self.reference_lenses = Some(lenses.clone());
+        lenses
     }
 
     fn outgoing_calls(&self, line: usize, character: usize) -> Vec<ToolOutgoingCall> {
@@ -1100,6 +1297,10 @@ fn workspace_modules(path: &Path) -> Vec<(ModuleKey, PathBuf)> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+fn navigation_cache_key(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
 fn is_valid_rename_name(name: &str) -> bool {

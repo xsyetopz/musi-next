@@ -1,7 +1,7 @@
 let iter := import "@std/collections/iter";
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("iter");
     testing.it(

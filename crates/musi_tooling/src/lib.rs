@@ -41,10 +41,10 @@ pub use folding::{
     folding_ranges_for_project_file_with_overlay,
 };
 pub use navigation::{
-    ToolCallHierarchyItem, ToolDocumentHighlight, ToolDocumentHighlightKind, ToolDocumentSymbol,
-    ToolLocation, ToolMoniker, ToolMonikerKind, ToolOutgoingCall, ToolReferenceLens, ToolTextEdit,
-    ToolWorkspaceEdit, ToolWorkspaceSymbol, definition_for_project_file_with_overlay,
-    document_highlights_for_project_file_with_overlay,
+    NavigationWorkspace, ToolCallHierarchyItem, ToolDocumentHighlight, ToolDocumentHighlightKind,
+    ToolDocumentSymbol, ToolLocation, ToolMoniker, ToolMonikerKind, ToolOutgoingCall,
+    ToolReferenceLens, ToolTextEdit, ToolWorkspaceEdit, ToolWorkspaceSymbol,
+    definition_for_project_file_with_overlay, document_highlights_for_project_file_with_overlay,
     document_symbols_for_project_file_with_overlay, implementation_for_project_file_with_overlay,
     moniker_for_project_file_with_overlay, outgoing_calls_for_project_file_with_overlay,
     prepare_rename_for_project_file_with_overlay, reference_lenses_for_project_file_with_overlay,

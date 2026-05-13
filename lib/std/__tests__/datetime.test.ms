@@ -1,7 +1,7 @@
 let time := import "@std/datetime";
 let testing := import "@std/testing";
 
-export let test() :=
+export let test () :=
   (
     testing.describe("time/index");
     testing.it(

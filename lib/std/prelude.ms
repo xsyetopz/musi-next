@@ -1,7 +1,7 @@
 --! Default std prelude exports.
 
-let bytes := import "@std/bytes";
 let bool := import "@std/bool";
+let bytes := import "@std/bytes";
 let cmp := import "@std/cmp";
 let collections := import "@std/collections";
 let expect := import "@std/expect";
@@ -9,7 +9,7 @@ let maybe := import "@std/maybe";
 let path := import "@std/path";
 let core := import "musi:core";
 
--- --- Type universe ---
+/- === Type universe === -/
 --- Prelude alias for core Type.
 export let Type := core.Type;
 --- Prelude alias for core Array.
@@ -67,7 +67,7 @@ export let CString := core.CString;
 --- Prelude alias for core CPtr.
 export let CPtr := core.CPtr;
 
--- --- Common named data types ---
+/- === Common named data types === -/
 --- Prelude maybe value type.
 export let Maybe := maybe.Maybe;
 --- Prelude expected success or failure type.
@@ -87,19 +87,19 @@ export let true : Bool := bool.true;
 --- Prelude lowercase false alias.
 export let false : Bool := bool.false;
 
--- --- Common constructors ---
+/- === Common constructors === -/
 --- Build Some maybe value.
-export let Some[T] (value : T) : Maybe[T] := maybe.Some[T](value);
+export let Some [T] (value : T) : Maybe[T] := maybe.Some[T](value);
 --- Build None maybe value.
-export let None[T] () : Maybe[T] := maybe.None[T]();
+export let None [T] () : Maybe[T] := maybe.None[T]();
 --- Build successful expected value.
-export let Success[T, E] (value : T) : Expect[T, E] :=
+export let Success [T, E] (value : T) : Expect[T, E] :=
   expect.Success[T, E](value);
 --- Build failed expected value.
-export let Failure[T, E] (error : E) : Expect[T, E] :=
+export let Failure [T, E] (error : E) : Expect[T, E] :=
   expect.Failure[T, E](error);
 --- Abort current computation.
-export let abort() : Empty := core.abort();
+export let abort () : Empty := core.abort();
 
 --- Prelude abort capability contract.
 export hidden let Abort := core.Abort;

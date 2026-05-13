@@ -35,16 +35,15 @@ use async_lsp::lsp_types::{
 };
 use async_lsp::{ClientSocket, LanguageServer, ResponseError};
 use musi_tooling::{
-    ToolMonikerKind, completions_for_project_file_with_overlay,
+    NavigationWorkspace, ToolMonikerKind, completions_for_project_file_with_overlay,
     definition_for_project_file_with_overlay, document_highlights_for_project_file_with_overlay,
     document_links_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
     folding_ranges_for_project_file_with_overlay, hover_for_project_file_with_overlay,
     implementation_for_project_file_with_overlay, module_docs_for_project_file_with_overlay,
     moniker_for_project_file_with_overlay, outgoing_calls_for_project_file_with_overlay,
-    prepare_rename_for_project_file_with_overlay, reference_lenses_for_project_file_with_overlay,
-    references_for_project_file_with_overlay, rename_for_project_file_with_overlay,
-    selection_ranges_for_project_file_with_overlay, signature_help_for_project_file_with_overlay,
-    type_definition_for_project_file_with_overlay,
+    prepare_rename_for_project_file_with_overlay, references_for_project_file_with_overlay,
+    rename_for_project_file_with_overlay, selection_ranges_for_project_file_with_overlay,
+    signature_help_for_project_file_with_overlay, type_definition_for_project_file_with_overlay,
 };
 use serde_json::{Value, json};
 
@@ -93,6 +92,7 @@ type DefinitionFuture = ServerFuture<Option<GotoDefinitionResponse>>;
 type TextEditListFuture = ServerFuture<Option<Vec<TextEdit>>>;
 type NotifyResult = ControlFlow<async_lsp::Result<()>>;
 const REFERENCES_COMMAND: &str = "musi.references";
+const SHOW_REFERENCES_COMMAND: &str = "editor.action.showReferences";
 
 #[derive(Debug)]
 pub struct MusiLanguageServer {
@@ -100,6 +100,7 @@ pub struct MusiLanguageServer {
     open_documents: HashMap<Url, String>,
     semantic_token_cache: HashMap<Url, SemanticTokenSnapshot>,
     format_options_cache: HashMap<PathBuf, formatting::FormatOptionsCacheEntry>,
+    navigation_workspace: NavigationWorkspace,
     workspace_roots: Vec<PathBuf>,
     config: LspConfig,
 }
@@ -112,6 +113,7 @@ impl MusiLanguageServer {
             open_documents: HashMap::new(),
             semantic_token_cache: HashMap::new(),
             format_options_cache: HashMap::new(),
+            navigation_workspace: NavigationWorkspace::new(),
             workspace_roots: Vec::new(),
             config: LspConfig::default(),
         }
@@ -124,12 +126,14 @@ impl MusiLanguageServer {
     fn configure(&mut self, params: &InitializeParams) {
         self.config = LspConfig::from_initialize_params(params);
         self.workspace_roots = workspace_roots(params);
+        self.navigation_workspace.clear();
     }
 
     fn did_open_document(&mut self, item: TextDocumentItem) {
         let uri = item.uri;
         let text = item.text;
         self.invalidate_format_options_cache_if_manifest(&uri);
+        self.invalidate_navigation_workspace_for_uri(&uri);
         let _ = self.open_documents.insert(uri, text);
     }
 
@@ -138,6 +142,7 @@ impl MusiLanguageServer {
             return;
         };
         self.invalidate_format_options_cache_if_manifest(uri);
+        self.invalidate_navigation_workspace_for_uri(uri);
         let _ = self.open_documents.insert(uri.clone(), change.text.clone());
     }
 
@@ -145,6 +150,7 @@ impl MusiLanguageServer {
         let _ = self.open_documents.remove(uri);
         let _ = self.semantic_token_cache.remove(uri);
         self.invalidate_format_options_cache_if_manifest(uri);
+        self.invalidate_navigation_workspace_for_uri(uri);
         drop(
             self.client
                 .notify::<PublishDiagnostics>(PublishDiagnosticsParams {
@@ -161,6 +167,7 @@ impl MusiLanguageServer {
 
     fn update_workspace_folders(&mut self, params: DidChangeWorkspaceFoldersParams) {
         self.format_options_cache.clear();
+        self.navigation_workspace.clear();
         for folder in params.event.removed {
             if let Ok(path) = folder.uri.to_file_path() {
                 self.workspace_roots
@@ -176,6 +183,12 @@ impl MusiLanguageServer {
             {
                 self.workspace_roots.push(path);
             }
+        }
+    }
+
+    fn invalidate_navigation_workspace_for_uri(&mut self, uri: &Url) {
+        if uri.to_file_path().is_ok() {
+            self.navigation_workspace.clear();
         }
     }
 }
@@ -214,6 +227,7 @@ impl LanguageServer for MusiLanguageServer {
 
     fn did_save(&mut self, params: DidSaveTextDocumentParams) -> NotifyResult {
         self.invalidate_format_options_cache_if_manifest(&params.text_document.uri);
+        self.invalidate_navigation_workspace_for_uri(&params.text_document.uri);
         ControlFlow::Continue(())
     }
 

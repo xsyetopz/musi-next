@@ -5,7 +5,7 @@ let Var := env.Var;
 
 let tempKey := env.key("__MUSI_STD_ENV_TEST__");
 
-export let test() :=
+export let test () :=
   (
     testing.describe("env");
     testing.it("missing key returns None", env.get(tempKey).isNone(),);

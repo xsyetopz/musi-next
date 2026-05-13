@@ -17,10 +17,10 @@ export hidden let ExitCode := data {
 };
 
 --- Build a shell command.
-export let command(value : String) : Command := .CommandText(value := value);
+export let command (value : String) : Command := .CommandText(value := value);
 
 --- Build an exit code.
-export let exitCode(value : Int) : ExitCode := .ExitStatus(value := value);
+export let exitCode (value : Int) : ExitCode := .ExitStatus(value := value);
 
 --- Command as raw string.
 export let (self : Command).toString () : String :=
@@ -35,21 +35,21 @@ export let (self : ExitCode).toInt () : Int :=
   );
 
 --- Number of process args.
-export let argsCount() : Int := processHost.argCount();
+export let argsCount () : Int := processHost.argCount();
 
 --- Process arg by index.
-export let argAt(index : Int) : Maybe[String] :=
+export let argAt (index : Int) : Maybe[String] :=
   match processHost.argAt(index) (
   | value where value = "" => maybe.None[String]()
   | value => maybe.Some[String](value)
   );
 
 --- Current working directory.
-export let cwd() : Path := path.fromString(processHost.cwd());
+export let cwd () : Path := path.fromString(processHost.cwd());
 
 --- Run a shell command.
-export let run(target : Command) : ExitCode :=
+export let run (target : Command) : ExitCode :=
   exitCode(processHost.run(target.toString()));
 
 --- Exit current process.
-export let exit(code : ExitCode) : Unit := processHost.exit(code.toInt());
+export let exit (code : ExitCode) : Unit := processHost.exit(code.toInt());
