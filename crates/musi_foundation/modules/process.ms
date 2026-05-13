@@ -5,47 +5,37 @@ let Int := Core.Int;
 let String := Core.String;
 let Unit := Core.Unit;
 
-@external(
-  abi := .musi
-)
-let argCountIntrinsic() : Int;
+@external(abi := .musi)
+let argCountIntrinsic () : Int;
 
-export let argCount() : Int := unsafe {
+export let argCount () : Int := unsafe {
   argCountIntrinsic();
 };
 
-@external(
-  abi := .musi
-)
-let argAtIntrinsic(index : Int) : String;
+@external(abi := .musi)
+let argAtIntrinsic (index : Int) : String;
 
-export let argAt(index : Int) : String := unsafe {
+export let argAt (index : Int) : String := unsafe {
   argAtIntrinsic(index);
 };
 
-@external(
-  abi := .musi
-)
-let cwdIntrinsic() : String;
+@external(abi := .musi)
+let cwdIntrinsic () : String;
 
-export let cwd() : String := unsafe {
+export let cwd () : String := unsafe {
   cwdIntrinsic();
 };
 
-@external(
-  abi := .musi
-)
-let runIntrinsic(command : String) : Int;
+@external(abi := .musi)
+let runIntrinsic (command : String) : Int;
 
-export let run(command : String) : Int := unsafe {
+export let run (command : String) : Int := unsafe {
   runIntrinsic(command);
 };
 
-@external(
-  abi := .musi
-)
-let exitIntrinsic(code : Int) : Unit;
+@external(abi := .musi)
+let exitIntrinsic (code : Int) : Unit;
 
-export let exit(code : Int) : Unit := unsafe {
+export let exit (code : Int) : Unit := unsafe {
   exitIntrinsic(code);
 };

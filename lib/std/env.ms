@@ -43,7 +43,8 @@ export let has (target : Key) : Bit := envHost.has(keyText(target)) > 0;
 
 --- Read an environment variable.
 export let get (target : Key) : Maybe[Var] :=
-  if has(target)then maybe.Some[Var](var(envHost.get(keyText(target))))else maybe.None[Var]();
+  if has(target) then maybe.Some[Var](var(envHost.get(keyText(target))))
+  else maybe.None[Var]();
 
 --- Set an environment variable.
 export let set (target : Key, value : Var) : Bit :=

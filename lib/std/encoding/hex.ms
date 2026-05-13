@@ -27,7 +27,8 @@ let hexDigit (value : Int) : String :=
   );
 
 let recur encodeFrom (source : String, index : Int, end : Int) : String :=
-  if index >= end then "" else
+  if index >= end then ""
+  else
   (
     let value := text.byteAt(source, index);
     text.concat(
@@ -41,26 +42,23 @@ export let encode (source : String) : String :=
   encodeFrom(source, 0, source.length());
 
 let hexValue (value : Int) : Int :=
-  if both(value >= 48, value <= 57)then value - 48 else if both(
-    value >= 65,
-    value <= 70,
-  )then value - 55 else if both(value >= 97, value <= 102)then value - 87 else
-  - 1;
+  if both(value >= 48, value <= 57) then value - 48
+  else if both(value >= 65, value <= 70,) then value - 55
+  else if both(value >= 97, value <= 102) then value - 87 else - 1;
 
 let recur isValidFrom (source : String, index : Int, end : Int) : Bit :=
-  if index >= end then 0 = 0 else if hexValue(text.byteAt(source, index)) < 0 then 0
-  = 1 else isValidFrom(source, index + 1, end);
+  if index >= end then 0 = 0
+  else if hexValue(text.byteAt(source, index)) < 0 then 0 = 1
+  else isValidFrom(source, index + 1, end);
 
 --- Returns true when source is valid for this format.
 export let isValid (source : String) : Bit :=
-  if source.length() % 2 /= 0 then 0 = 1 else isValidFrom(
-    source,
-    0,
-    source.length(),
-  );
+  if source.length() % 2 /= 0 then 0 = 1
+  else isValidFrom(source, 0, source.length(),);
 
 let recur decodeFrom (source : String, index : Int, end : Int) : String :=
-  if index >= end then "" else
+  if index >= end then ""
+  else
   (
     let hi := hexValue(text.byteAt(source, index));
     let lo := hexValue(text.byteAt(source, index + 1));
@@ -69,6 +67,6 @@ let recur decodeFrom (source : String, index : Int, end : Int) : String :=
 
 --- Decode a value from this format.
 export let decode (source : String) : Maybe[String] :=
-  if isValid(source)then maybe.Some[String](
+  if isValid(source) then maybe.Some[String](
     decodeFrom(source, 0, source.length())
-  )else maybe.None[String]();
+  ) else maybe.None[String]();

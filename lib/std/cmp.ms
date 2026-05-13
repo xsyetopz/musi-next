@@ -55,7 +55,7 @@ export let notEq [T] (left : T, right : T) : Bit := left /= right;
 
 --- Compare two integers.
 export let compareInt (left : Int, right : Int) : Ordering :=
-  if left < right then less()else if left > right then greater()else equal();
+  if left < right then less() else if left > right then greater() else equal();
 
 @external(abi := .musi)
 let compareFloatTotalIntrinsic (left : Float, right : Float) : Int;
@@ -72,7 +72,7 @@ export let compareFloat (left : Float, right : Float) : Ordering :=
 
 --- Compare two strings.
 export let compareString (left : String, right : String) : Ordering :=
-  if left < right then less()else if left > right then greater()else equal();
+  if left < right then less() else if left > right then greater() else equal();
 
 --- Return smaller integer.
 export let minInt (left : Int, right : Int) : Int :=

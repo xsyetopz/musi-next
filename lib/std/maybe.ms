@@ -44,14 +44,14 @@ export let unwrapOr [T] (target : Maybe[T], fallback : T) : T :=
   maybeUnwrapOr[T](target, fallback);
 
 --- Core operation for `unwrapOrElse`.
-let maybeUnwrapOrElse [T] (target : Maybe[T], fallback :() -> T) : T :=
+let maybeUnwrapOrElse [T] (target : Maybe[T], fallback : () -> T) : T :=
   match target (
   | .Some(item) => item
   | .None => fallback()
   );
 
 --- Return contained Some value, or compute fallback when target is None.
-export let unwrapOrElse [T] (target : Maybe[T], fallback :() -> T) : T :=
+export let unwrapOrElse [T] (target : Maybe[T], fallback : () -> T) : T :=
   maybeUnwrapOrElse[T](target, fallback);
 
 --- Core operation for `map`.
@@ -79,7 +79,7 @@ export let mapOr [T, U] (target : Maybe[T], fallback : U, f : T -> U) : U :=
 --- Core operation for `mapOrElse`.
 let maybeMapOrElse [T, U] (
   target : Maybe[T],
-  fallback :() -> U,
+  fallback : () -> U,
   f : T -> U
 ) : U :=
   match target (
@@ -90,7 +90,7 @@ let maybeMapOrElse [T, U] (
 --- Transform a Some value, or compute fallback when target is None.
 export let mapOrElse [T, U] (
   target : Maybe[T],
-  fallback :() -> U,
+  fallback : () -> U,
   f : T -> U
 ) : U := maybeMapOrElse[T, U](target, fallback, f);
 
@@ -150,7 +150,7 @@ export let (self : Maybe[T]).unwrapOr [T] (fallback : T) : T :=
   maybeUnwrapOr[T](self, fallback);
 
 --- Return the contained value or compute the fallback.
-export let (self : Maybe[T]).unwrapOrElse [T] (fallback :() -> T) : T :=
+export let (self : Maybe[T]).unwrapOrElse [T] (fallback : () -> T) : T :=
   maybeUnwrapOrElse[T](self, fallback);
 
 --- Transform a Some value.
@@ -163,7 +163,7 @@ export let (self : Maybe[T]).mapOr [T, U] (fallback : U, f : T -> U) : U :=
 
 --- Transform a Some value or compute the fallback.
 export let (self : Maybe[T]).mapOrElse [T, U] (
-  fallback :() -> U,
+  fallback : () -> U,
   f : T -> U
 ) : U := maybeMapOrElse[T, U](self, fallback, f);
 

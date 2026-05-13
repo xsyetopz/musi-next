@@ -45,19 +45,19 @@ export let isUpper (value : Int) : Bit := inRange(value, 65, 90);
 
 --- Returns true for ASCII letters.
 export let isAlpha (value : Int) : Bit :=
-  if isLower(value)then 0 = 0 else isUpper(value);
+  if isLower(value) then 0 = 0 else isUpper(value);
 
 --- Returns true for ASCII letters or decimal digits.
 export let isAlphanumeric (value : Int) : Bit :=
-  if isAlpha(value)then 0 = 0 else isDigit(value);
+  if isAlpha(value) then 0 = 0 else isDigit(value);
 
 --- Convert ASCII uppercase byte to lowercase.
 export let toLower (value : Int) : Int :=
-  if isUpper(value)then value + 32 else value;
+  if isUpper(value) then value + 32 else value;
 
 --- Convert ASCII lowercase byte to uppercase.
 export let toUpper (value : Int) : Int :=
-  if isLower(value)then value - 32 else value;
+  if isLower(value) then value - 32 else value;
 
 --- Returns true for ASCII hexadecimal digits.
 export let isHexDigit (value : Int) : Bit :=

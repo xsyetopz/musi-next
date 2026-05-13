@@ -5,47 +5,37 @@ let Float := Core.Float;
 let Int := Core.Int;
 let String := Core.String;
 
-@external(
-  abi := .musi
-)
-let intIntrinsic() : Int;
+@external(abi := .musi)
+let intIntrinsic () : Int;
 
-export let int() : Int := unsafe {
+export let int () : Int := unsafe {
   intIntrinsic();
 };
 
-@external(
-  abi := .musi
-)
-let intInRangeIntrinsic(lowerBound : Int, upperBound : Int) : Int;
+@external(abi := .musi)
+let intInRangeIntrinsic (lowerBound : Int, upperBound : Int) : Int;
 
-export let intInRange(lowerBound : Int, upperBound : Int) : Int := unsafe {
+export let intInRange (lowerBound : Int, upperBound : Int) : Int := unsafe {
   intInRangeIntrinsic(lowerBound, upperBound);
 };
 
-@external(
-  abi := .musi
-)
-let boolIntrinsic() : Int;
+@external(abi := .musi)
+let boolIntrinsic () : Int;
 
-export let bool() : Int := unsafe {
+export let bool () : Int := unsafe {
   boolIntrinsic();
 };
 
-@external(
-  abi := .musi
-)
-let float01Intrinsic() : Float;
+@external(abi := .musi)
+let float01Intrinsic () : Float;
 
-export let float01() : Float := unsafe {
+export let float01 () : Float := unsafe {
   float01Intrinsic();
 };
 
-@external(
-  abi := .musi
-)
-let entropyHexIntrinsic(count : Int) : String;
+@external(abi := .musi)
+let entropyHexIntrinsic (count : Int) : String;
 
-export let entropyHex(count : Int) : String := unsafe {
+export let entropyHex (count : Int) : String := unsafe {
   entropyHexIntrinsic(count);
 };

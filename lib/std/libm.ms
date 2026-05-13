@@ -83,14 +83,16 @@ export let acos (value : Float) : Float := unsafe {
 };
 --- Arc cosine when input is inside [-1, 1].
 export let checkedAcos (value : Float) : Maybe[Float] :=
-  if isUnitDomain(value)then maybe.Some[Float](acos(value))else maybe.None[Float]();
+  if isUnitDomain(value) then maybe.Some[Float](acos(value))
+  else maybe.None[Float]();
 --- Arc sine.
 export let asin (value : Float) : Float := unsafe {
   cAsin(value);
 };
 --- Arc sine when input is inside [-1, 1].
 export let checkedAsin (value : Float) : Maybe[Float] :=
-  if isUnitDomain(value)then maybe.Some[Float](asin(value))else maybe.None[Float]();
+  if isUnitDomain(value) then maybe.Some[Float](asin(value))
+  else maybe.None[Float]();
 --- Arc tangent.
 export let atan (value : Float) : Float := unsafe {
   cAtan(value);
@@ -125,9 +127,9 @@ export let fmod (left : Float, right : Float) : Float := unsafe {
 };
 --- Floating-point remainder when divisor is non-zero.
 export let checkedFmod (left : Float, right : Float) : Maybe[Float] :=
-  if both(isFinite(left), isFiniteNonZero(right))then maybe.Some[Float](
+  if both(isFinite(left), isFiniteNonZero(right)) then maybe.Some[Float](
     fmod(left, right)
-  )else maybe.None[Float]();
+  ) else maybe.None[Float]();
 --- Euclidean hypotenuse.
 export let hypot (left : Float, right : Float) : Float := unsafe {
   cHypot(left, right);
@@ -138,14 +140,16 @@ export let log (value : Float) : Float := unsafe {
 };
 --- Natural logarithm when input is positive.
 export let checkedLog (value : Float) : Maybe[Float] :=
-  if isPositive(value)then maybe.Some[Float](log(value))else maybe.None[Float]();
+  if isPositive(value) then maybe.Some[Float](log(value))
+  else maybe.None[Float]();
 --- Base-10 logarithm.
 export let log10 (value : Float) : Float := unsafe {
   cLog10(value);
 };
 --- Base-10 logarithm when input is positive.
 export let checkedLog10 (value : Float) : Maybe[Float] :=
-  if isPositive(value)then maybe.Some[Float](log10(value))else maybe.None[Float]();
+  if isPositive(value) then maybe.Some[Float](log10(value))
+  else maybe.None[Float]();
 --- Base raised to exponent.
 export let pow (base : Float, exponent : Float) : Float := unsafe {
   cPow(base, exponent);
@@ -164,7 +168,8 @@ export let sqrt (value : Float) : Float := unsafe {
 };
 --- Square root when input is non-negative.
 export let checkedSqrt (value : Float) : Maybe[Float] :=
-  if isNonNegative(value)then maybe.Some[Float](sqrt(value))else maybe.None[Float]();
+  if isNonNegative(value) then maybe.Some[Float](sqrt(value))
+  else maybe.None[Float]();
 --- Tangent.
 export let tan (value : Float) : Float := unsafe {
   cTan(value);

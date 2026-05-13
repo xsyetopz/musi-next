@@ -14,4 +14,5 @@ export let isValid (source : String) : Bit :=
 
 --- Decode a value from this format.
 export let decode (source : String) : Maybe[String] :=
-  if isValid(source)then maybe.Some[String](encodingHost.base64Decode(source))else maybe.None[String]();
+  if isValid(source) then maybe.Some[String](encodingHost.base64Decode(source))
+  else maybe.None[String]();

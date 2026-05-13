@@ -16,7 +16,7 @@ export let collect [T] (values : []T) : []T := [...values];
 export let equalsInt (left : []Int, right : []Int) : Bit := left = right;
 --- Returns true when iterator has no values.
 export let isEmpty [T] (values : []T) : Bit :=
-  if values =[]then 0 = 0 else 0 = 1;
+  if values =[] then 0 = 0 else 0 = 1;
 --- Returns true when iterator has values.
 export let nonEmpty [T] (values : []T) : Bit :=
-  if values =[]then 0 = 1 else 0 = 0;
+  if values =[] then 0 = 1 else 0 = 0;

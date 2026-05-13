@@ -23,19 +23,17 @@ export let isTrue (actual : Bit) : Bit :=
 
 --- Assert a boolean is false.
 export let isFalse (actual : Bit) : Bit :=
-  if actual then fail("expected condition to be false")else pass;
+  if actual then fail("expected condition to be false") else pass;
 
 --- Assert an integer is greater than a lower bound.
 export let greaterThan (actual : Int, lowerBound : Int) : Bit :=
-  if actual > lowerBound then pass else fail(
-    "expected value to be greater than lower bound"
-  );
+  if actual > lowerBound then pass
+  else fail("expected value to be greater than lower bound");
 
 --- Assert an integer is less than an upper bound.
 export let lessThan (actual : Int, upperBound : Int) : Bit :=
-  if actual < upperBound then pass else fail(
-    "expected value to be less than upper bound"
-  );
+  if actual < upperBound then pass
+  else fail("expected value to be less than upper bound");
 
 --- Assert an integer is inside inclusive bounds.
 export let betweenInclusive (
@@ -44,9 +42,10 @@ export let betweenInclusive (
   upperBound : Int
 ) : Bit := if actual < lowerBound then fail(
     "expected value to be inside inclusive bounds"
-  )else if actual > upperBound then fail(
+  )
+  else if actual > upperBound then fail(
     "expected value to be inside inclusive bounds"
-  )else pass;
+  ) else pass;
 
 --- Build integer matcher helpers for one actual value.
 export let expectInt (actual : Int) :=

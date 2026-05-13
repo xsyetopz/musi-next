@@ -78,8 +78,8 @@ export let familyText (target : Family) : String :=
 --- Convert byte-order text into Endian.
 export let endianFromString (value : String) : Endian :=
   match value (
-  | "big" =>.Big
-  | _ =>.Little
+  | "big" => .Big
+  | _ => .Little
   );
 
 --- Core operation for `isSupported`.
@@ -94,10 +94,10 @@ export let isSupported (target : Jit) : Bit := jitIsSupported(target);
 
 --- Return current JIT backend and ISA when supported.
 export let currentJit : Jit :=
-  if sys.jit.supported then.Supported(
+  if sys.jit.supported then .Supported(
     backend := sys.jit.backend,
     isa := sys.jit.isa,
-  )else.Unsupported;
+  ) else .Unsupported;
 
 let jitSupportedFlag : Int := if sys.jit.supported then 1 else 0;
 
@@ -202,8 +202,8 @@ export let targetJit (target : Target) : Jit :=
     jitBackend := backend,
     jitIsa := isa,
   ) => match supported (
-  | success where success > 0 =>.Supported(backend := backend, isa := isa)
-  | _ =>.Unsupported
+  | success where success > 0 => .Supported(backend := backend, isa := isa)
+  | _ => .Unsupported
   )
   );
 

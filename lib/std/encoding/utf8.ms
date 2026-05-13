@@ -13,4 +13,5 @@ export let isValid (bytes : String) : Bit :=
 
 --- Decode a value from this format.
 export let decode (bytes : String) : Maybe[String] :=
-  if isValid(bytes)then maybe.Some[String](encodingHost.utf8Decode(bytes))else maybe.None[String]();
+  if isValid(bytes) then maybe.Some[String](encodingHost.utf8Decode(bytes))
+  else maybe.None[String]();
