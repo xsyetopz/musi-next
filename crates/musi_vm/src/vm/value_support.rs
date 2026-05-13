@@ -167,8 +167,7 @@ impl Vm {
                             .zip(right.fields.iter())
                             .all(|(left, right)| self.values_equal(left, right))
                 }),
-            (Value::Closure(left), Value::Closure(right))
-            | (Value::Continuation(left), Value::Continuation(right)) => left == right,
+            (Value::Closure(left), Value::Closure(right)) => left == right,
             (Value::Module(left), Value::Module(right)) => self
                 .heap
                 .module(*left)

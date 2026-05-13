@@ -3,10 +3,10 @@ use std::process::Command;
 
 use musi_foundation::process as foundation_process;
 use musi_native::NativeHost;
-use musi_vm::{EffectCall, Value, VmError};
+use musi_vm::{ForeignCall, Value, VmError};
 
 use super::errors::{
-    foreign_rejected, invalid_runtime_args, runtime_effect_failed, runtime_effect_unsupported,
+    foreign_rejected, invalid_runtime_args, runtime_foreign_failed, runtime_foreign_unsupported,
 };
 use super::values::{foreign_string_arg, saturating_usize_to_i64, string_arg};
 
@@ -75,7 +75,7 @@ fn register_foreign_handlers(host: &mut NativeHost) {
 }
 
 fn register_effect_handlers(host: &mut NativeHost) {
-    host.register_effect_handler(
+    host.register_foundation_handler(
         foundation_process::EFFECT,
         foundation_process::ARG_COUNT_OP,
         |effect, args| {
@@ -86,7 +86,7 @@ fn register_effect_handlers(host: &mut NativeHost) {
         },
     );
 
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_process::EFFECT,
         foundation_process::ARG_AT_OP,
         |ctx, effect, args| {
@@ -106,19 +106,19 @@ fn register_effect_handlers(host: &mut NativeHost) {
         },
     );
 
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_process::EFFECT,
         foundation_process::CWD_OP,
         |ctx, effect, args| {
             if !args.is_empty() {
                 return Err(invalid_runtime_args(effect, "no arguments", args.len()));
             }
-            let cwd = current_dir().map_err(|error| runtime_effect_failed(effect, error))?;
+            let cwd = current_dir().map_err(|error| runtime_foreign_failed(effect, error))?;
             ctx.alloc_string(cwd.to_string_lossy().into_owned())
         },
     );
 
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_process::EFFECT,
         foundation_process::RUN_OP,
         |ctx, effect, args| {
@@ -127,19 +127,19 @@ fn register_effect_handlers(host: &mut NativeHost) {
         },
     );
 
-    host.register_effect_handler(
+    host.register_foundation_handler(
         foundation_process::EFFECT,
         foundation_process::EXIT_OP,
         |effect, args| {
             let [Value::Int(_code)] = args else {
                 return Err(invalid_runtime_args(effect, "integer code", args.len()));
             };
-            Err(runtime_effect_unsupported(effect))
+            Err(runtime_foreign_unsupported(effect))
         },
     );
 }
 
-fn run_shell_command(command: &str, effect: &EffectCall) -> Result<i64, VmError> {
+fn run_shell_command(command: &str, effect: &ForeignCall) -> Result<i64, VmError> {
     let status = if cfg!(windows) {
         Command::new("cmd")
             .args([windows_shell_flag().as_str(), command])
@@ -147,7 +147,7 @@ fn run_shell_command(command: &str, effect: &EffectCall) -> Result<i64, VmError>
     } else {
         Command::new("sh").args(["-c", command]).status()
     }
-    .map_err(|error| runtime_effect_failed(effect, error))?;
+    .map_err(|error| runtime_foreign_failed(effect, error))?;
     Ok(i64::from(status.code().unwrap_or(-1)))
 }
 

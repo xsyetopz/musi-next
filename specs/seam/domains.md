@@ -80,7 +80,7 @@ Rules:
 - multi-shot continuations are not part of this domain
 - generators, coroutine schedulers, and async task systems are not part of this domain
 
-This domain is named for runtime behavior, not source syntax. SEAM bytecode uses `hdl.push`, `hdl.pop`, `raise`, `resume`, and `drop.cont` for the portable substrate.
+This domain is named for runtime behavior, not source syntax. Host behavior enters SEAM through native calls and module loading.
 
 ## `native`
 

@@ -58,7 +58,7 @@ pub(super) fn register(host: &mut NativeHost) {
             Ok(Value::Int(i64::from(from_utf8(source.as_bytes()).is_ok())))
         },
     );
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_encoding::EFFECT,
         foundation_encoding::BASE64_ENCODE_OP,
         |ctx, effect, args| {
@@ -66,7 +66,7 @@ pub(super) fn register(host: &mut NativeHost) {
             ctx.alloc_string(BASE64_STANDARD.encode(source.as_bytes()))
         },
     );
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_encoding::EFFECT,
         foundation_encoding::BASE64_DECODE_OP,
         |ctx, effect, args| {
@@ -77,7 +77,7 @@ pub(super) fn register(host: &mut NativeHost) {
             })
         },
     );
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_encoding::EFFECT,
         foundation_encoding::BASE64_IS_VALID_OP,
         |ctx, effect, args| {
@@ -87,17 +87,17 @@ pub(super) fn register(host: &mut NativeHost) {
             )))
         },
     );
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_encoding::EFFECT,
         foundation_encoding::UTF8_ENCODE_OP,
         |ctx, effect, args| transform_string_arg(ctx, effect, args, "utf8Encode", str::to_owned),
     );
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_encoding::EFFECT,
         foundation_encoding::UTF8_DECODE_OP,
         |ctx, effect, args| transform_string_arg(ctx, effect, args, "utf8Decode", str::to_owned),
     );
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_encoding::EFFECT,
         foundation_encoding::UTF8_IS_VALID_OP,
         |ctx, effect, args| {

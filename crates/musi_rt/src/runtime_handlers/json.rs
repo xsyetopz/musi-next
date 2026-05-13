@@ -23,7 +23,7 @@ pub(super) fn register(host: &mut NativeHost) {
             ctx.alloc_string(normalized)
         },
     );
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_json::EFFECT,
         foundation_json::IS_VALID_OP,
         |ctx, effect, args| {
@@ -34,7 +34,7 @@ pub(super) fn register(host: &mut NativeHost) {
         },
     );
 
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_json::EFFECT,
         foundation_json::NORMALIZE_OP,
         |ctx, effect, args| {

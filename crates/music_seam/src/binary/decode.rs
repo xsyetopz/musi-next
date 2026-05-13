@@ -25,7 +25,6 @@ pub fn decode_binary(bytes: &[u8]) -> AssemblyResult<Artifact> {
     decode_constants(&mut cursor, &mut artifact)?;
     decode_globals(&mut cursor, &mut artifact)?;
     decode_procedures(&mut cursor, &mut artifact)?;
-    decode_effects(&mut cursor, &mut artifact)?;
     decode_shapes(&mut cursor, &mut artifact)?;
     decode_foreigns(&mut cursor, &mut artifact)?;
     decode_exports(&mut cursor, &mut artifact)?;
@@ -171,31 +170,6 @@ fn decode_procedures(cursor: &mut Cursor<'_>, artifact: &mut Artifact) -> Assemb
     Ok(())
 }
 
-fn decode_effects(cursor: &mut Cursor<'_>, artifact: &mut Artifact) -> AssemblyResult {
-    require_section(cursor, SectionTag::Effects)?;
-    for _ in 0..cursor.read_u32()? {
-        let name = cursor.read_idx()?;
-        let ops_len = usize::from(cursor.read_u16()?);
-        let mut ops = Vec::with_capacity(ops_len);
-        for _ in 0..ops_len {
-            let name = cursor.read_idx()?;
-            let param_len = usize::from(cursor.read_u16()?);
-            let mut param_tys = Vec::with_capacity(param_len);
-            for _ in 0..param_len {
-                param_tys.push(cursor.read_idx()?);
-            }
-            ops.push(
-                EffectOpDescriptor::new(name, param_tys.into_boxed_slice(), cursor.read_idx()?)
-                    .with_comptime_safe(cursor.read_u8()? != 0),
-            );
-        }
-        let _ = artifact
-            .effects
-            .alloc(EffectDescriptor::new(name, ops.into_boxed_slice()));
-    }
-    Ok(())
-}
-
 fn decode_shapes(cursor: &mut Cursor<'_>, artifact: &mut Artifact) -> AssemblyResult {
     require_section(cursor, SectionTag::Shapes)?;
     for _ in 0..cursor.read_u32()? {
@@ -252,8 +226,7 @@ fn decode_exports(cursor: &mut Cursor<'_>, artifact: &mut Artifact) -> AssemblyR
             1 => ExportTarget::Global(Idx::from_raw(target_raw)),
             2 => ExportTarget::Foreign(Idx::from_raw(target_raw)),
             3 => ExportTarget::Type(Idx::from_raw(target_raw)),
-            4 => ExportTarget::Effect(Idx::from_raw(target_raw)),
-            5 => ExportTarget::Shape(Idx::from_raw(target_raw)),
+            4 => ExportTarget::Shape(Idx::from_raw(target_raw)),
             _ => return Err(AssemblyError::InvalidBinaryHeader),
         };
         let opaque = cursor.read_u8()? != 0;
@@ -354,11 +327,6 @@ fn decode_operand(cursor: &mut Cursor<'_>) -> AssemblyResult<Operand> {
             procedure: cursor.read_idx()?,
             captures: cursor.read_u8()?,
         },
-        9 => Operand::Effect {
-            effect: cursor.read_idx()?,
-            op: cursor.read_u16()?,
-        },
-        14 => Operand::EffectId(cursor.read_idx()?),
         10 => Operand::Label(cursor.read_u16()?),
         11 => Operand::TypeLen {
             ty: cursor.read_idx()?,

@@ -54,7 +54,7 @@ fn register_foreign_handlers(host: &mut NativeHost) {
 }
 
 fn register_effect_handlers(host: &mut NativeHost) {
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_env::EFFECT,
         foundation_env::GET_OP,
         |ctx, effect, args| {
@@ -63,7 +63,7 @@ fn register_effect_handlers(host: &mut NativeHost) {
         },
     );
 
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_env::EFFECT,
         foundation_env::HAS_OP,
         |ctx, effect, args| {
@@ -72,7 +72,7 @@ fn register_effect_handlers(host: &mut NativeHost) {
         },
     );
 
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_env::EFFECT,
         foundation_env::SET_OP,
         |ctx, effect, args| {
@@ -103,7 +103,7 @@ fn register_effect_handlers(host: &mut NativeHost) {
         },
     );
 
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_env::EFFECT,
         foundation_env::REMOVE_OP,
         |ctx, effect, args| {

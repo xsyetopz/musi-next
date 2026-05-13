@@ -2,9 +2,8 @@
 
 use crate::artifact::Artifact;
 use crate::descriptor::{
-    ConstantDescriptor, ConstantValue, DataDescriptor, DataVariantDescriptor, EffectDescriptor,
-    EffectOpDescriptor, ForeignDescriptor, GlobalDescriptor, ProcedureDescriptor, ShapeDescriptor,
-    TypeDescriptor,
+    ConstantDescriptor, ConstantValue, DataDescriptor, DataVariantDescriptor, ForeignDescriptor,
+    GlobalDescriptor, ProcedureDescriptor, ShapeDescriptor, TypeDescriptor,
 };
 use crate::instruction::{CodeEntry, Instruction, Label, Operand};
 use crate::opcode::Opcode;
@@ -32,8 +31,7 @@ mod success {
         let answer_name = artifact.intern_string("answer");
         let int_name = artifact.intern_string("Int");
         let const_name = artifact.intern_string("answer.const");
-        let abort_name = artifact.intern_string("Abort");
-        let abort_op_name = artifact.intern_string("abort");
+        let capability_name = artifact.intern_string("Abort");
         let puts_name = artifact.intern_string("puts");
         let c_name = artifact.intern_string("c");
         let symbol_name = artifact.intern_string("puts");
@@ -45,10 +43,6 @@ mod success {
         let const_id = artifact
             .constants
             .alloc(ConstantDescriptor::new(const_name, ConstantValue::Int(41)));
-        let effect_id = artifact.effects.alloc(EffectDescriptor::new(
-            abort_name,
-            Box::new([EffectOpDescriptor::new(abort_op_name, Box::new([]), int_ty)]),
-        ));
         let foreign_id = artifact.foreigns.alloc(ForeignDescriptor::new(
             puts_name,
             Box::new([int_ty]),
@@ -92,13 +86,6 @@ mod success {
                         Opcode::CallFfi,
                         Operand::Foreign(foreign_id),
                     )),
-                    CodeEntry::Instruction(Instruction::new(
-                        Opcode::Raise,
-                        Operand::Effect {
-                            effect: effect_id,
-                            op: 0,
-                        },
-                    )),
                     CodeEntry::Instruction(Instruction::new(Opcode::Ret, Operand::None)),
                 ]),
             )
@@ -109,8 +96,7 @@ mod success {
                 .with_export(true)
                 .with_initializer(procedure_id),
         );
-        let _ = effect_id;
-        let _shape_id = artifact.shapes.alloc(ShapeDescriptor::new(abort_name));
+        let _shape_id = artifact.shapes.alloc(ShapeDescriptor::new(capability_name));
         let _ = foreign_id;
 
         assert!(artifact.validate().is_ok());

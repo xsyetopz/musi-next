@@ -28,7 +28,6 @@ impl TextBuilder {
             ".data" => self.parse_data(&parts),
             ".const" => self.parse_const(&parts),
             ".global" => self.parse_global(&parts),
-            ".effect" => self.parse_effect(&parts),
             ".capability" => self.parse_capability(&parts),
             ".native" => self.parse_foreign(&parts),
             ".export" => self.parse_export(&parts),

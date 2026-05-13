@@ -1,6 +1,5 @@
 mod constant;
 mod data;
-mod effect;
 mod export;
 mod foreign;
 mod global;
@@ -11,7 +10,6 @@ mod type_desc;
 
 pub use constant::{ConstantDescriptor, ConstantValue};
 pub use data::{DataDescriptor, DataVariantDescriptor};
-pub use effect::{EffectDescriptor, EffectOpDescriptor};
 pub use export::{ExportDescriptor, ExportTarget};
 pub use foreign::ForeignDescriptor;
 pub use global::GlobalDescriptor;

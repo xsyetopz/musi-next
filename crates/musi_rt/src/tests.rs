@@ -6,10 +6,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use musi_native::{NativeHost, NativeTestCaseResult, NativeTestReport};
 use musi_vm::{
-    EffectCall, ForeignCall, Value, ValueView, VmDiagKind, VmError, VmErrorKind, VmHost,
-    VmHostCallContext, VmHostContext, VmResult,
+    ForeignCall, Value, ValueView, VmError, VmErrorKind, VmHost, VmHostCallContext, VmHostContext,
+    VmResult,
 };
-use music_base::diag::DiagContext;
 use music_module::ImportMap;
 use music_session::SessionOptions;
 use music_term::{SyntaxShape, SyntaxTerm, SyntaxTermError};
@@ -31,25 +30,6 @@ impl VmHost for TestHost {
         }))
     }
 
-    fn handle_effect(
-        &mut self,
-        _ctx: VmHostCallContext<'_, '_>,
-        effect: &EffectCall,
-        _args: &[Value],
-    ) -> VmResult<Value> {
-        Err(VmError::new(VmErrorKind::EffectRejected {
-            effect: effect.effect_name().into(),
-            op: Some(effect.op_name().into()),
-            reason: VmDiagKind::EffectRejected
-                .message_with(
-                    &DiagContext::new()
-                        .with("effect", effect.effect_name())
-                        .with("op", effect.op_name())
-                        .with("reason", "test host"),
-                )
-                .into(),
-        }))
-    }
 }
 
 fn expr_syntax(runtime: &mut Runtime, text: &str) -> Value {

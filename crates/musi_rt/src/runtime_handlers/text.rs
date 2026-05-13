@@ -59,7 +59,7 @@ fn register_foreign_handlers(host: &mut NativeHost) {
 }
 
 fn register_effect_handlers(host: &mut NativeHost) {
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_text::EFFECT,
         foundation_text::LENGTH_OP,
         |ctx, effect, args| {
@@ -69,7 +69,7 @@ fn register_effect_handlers(host: &mut NativeHost) {
             )))
         },
     );
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_text::EFFECT,
         foundation_text::CONCAT_OP,
         |ctx, effect, args| {
@@ -93,7 +93,7 @@ fn register_effect_handlers(host: &mut NativeHost) {
             ctx.alloc_string(text)
         },
     );
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_text::EFFECT,
         foundation_text::SLICE_OP,
         |ctx, effect, args| {
@@ -110,7 +110,7 @@ fn register_effect_handlers(host: &mut NativeHost) {
             ctx.alloc_string(text_slice(text_value.as_str(), *start, *end))
         },
     );
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_text::EFFECT,
         foundation_text::BYTE_AT_OP,
         |ctx, effect, args| {
@@ -131,7 +131,7 @@ fn register_effect_handlers(host: &mut NativeHost) {
             Ok(Value::Int(byte))
         },
     );
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_text::EFFECT,
         foundation_text::FROM_BYTE_OP,
         |ctx, effect, args| {

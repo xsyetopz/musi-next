@@ -77,16 +77,6 @@ impl Vm {
                     )
                 }
             }
-            Value::Continuation(continuation) => {
-                let [value] = args else {
-                    return Err(VmError::new(VmErrorKind::CallArityMismatch {
-                        callee: "continuation".into(),
-                        expected: 1,
-                        found: args.len(),
-                    }));
-                };
-                self.invoke_continuation(continuation, value.clone())
-            }
             Value::Foreign(foreign_value) => {
                 let ForeignValue {
                     module_slot,
@@ -138,11 +128,9 @@ impl Vm {
             | Value::Syntax(_)
             | Value::Seq(_)
             | Value::Data(_)
-            | Value::Continuation(_)
             | Value::Type(_)
             | Value::Module(_)
             | Value::Foreign(_)
-            | Value::Effect(_)
             | Value::Shape(_) => Ok(None),
         }
     }
@@ -209,7 +197,6 @@ impl Value {
                 | Self::Seq(_)
                 | Self::Data(_)
                 | Self::Closure(_)
-                | Self::Continuation(_)
                 | Self::Module(_)
         )
     }

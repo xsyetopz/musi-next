@@ -61,9 +61,6 @@ impl Vm {
             Opcode::Ret => self.return_from_frame(),
             Opcode::NewArr | Opcode::LdElem | Opcode::StElem => self.exec_fast_seq(runtime),
             Opcode::NewObj | Opcode::LdFld | Opcode::StFld => self.exec_fast_data(runtime),
-            Opcode::HdlPush | Opcode::HdlPop | Opcode::Raise | Opcode::Resume => {
-                self.exec_fast_effect(runtime)
-            }
             _ => {
                 let instruction =
                     if let Some(instruction) = runtime.operand.to_instruction(runtime.opcode) {
@@ -121,9 +118,6 @@ impl Vm {
             }
             Opcode::NewObj | Opcode::LdFld | Opcode::StFld => self.exec_data(instruction),
             Opcode::LdType | Opcode::IsInst | Opcode::Cast => self.exec_type(instruction),
-            Opcode::HdlPush | Opcode::HdlPop | Opcode::Raise | Opcode::Resume => {
-                self.exec_effect(instruction)
-            }
             Opcode::CallFfi | Opcode::LdFfi | Opcode::MdlLoad | Opcode::MdlGet => {
                 self.exec_host_edge(instruction)
             }

@@ -138,34 +138,11 @@ fn decode_runtime_instruction(
             labels,
             procedure_shapes,
         ),
-        Opcode::HdlPush => decode_handler_pop(runtime, index, instructions),
         Opcode::Ceq | Opcode::Cne | Opcode::CltS | Opcode::CgtS | Opcode::CleS | Opcode::CgeS => {
             decode_compare_branch(runtime, index, instructions, labels)
         }
         _ => runtime,
     }
-}
-
-fn decode_handler_pop(
-    runtime: RuntimeInstruction,
-    index: usize,
-    instructions: &[Instruction],
-) -> RuntimeInstruction {
-    find_matching_handler_pop(index.saturating_add(1), instructions)
-        .map_or(runtime, |pop_ip| runtime.with_branch_target(pop_ip))
-}
-
-fn find_matching_handler_pop(start: usize, instructions: &[Instruction]) -> Option<usize> {
-    let mut depth = 0usize;
-    for (index, instruction) in instructions.iter().enumerate().skip(start) {
-        match instruction.opcode {
-            Opcode::HdlPush => depth = depth.saturating_add(1),
-            Opcode::HdlPop if depth == 0 => return Some(index),
-            Opcode::HdlPop => depth = depth.saturating_sub(1),
-            _ => {}
-        }
-    }
-    None
 }
 
 fn decode_fused_op(

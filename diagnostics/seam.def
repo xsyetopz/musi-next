@@ -32,9 +32,6 @@ diag DuplicateLabel 5408
 diag MissingLabel 5409
   message "procedure `{procedure}` label reference missing"
 
-diag InvalidEffectOp 5410
-  message "effect operation reference `effect.op` invalid"
-
 diag OperandShapeMismatch 5411
   message "opcode `{opcode}` operand shape mismatch"
 
@@ -131,7 +128,6 @@ map artifact_error_kind crate::ArtifactError required
   case "InvalidReference { .. }" InvalidReference
   case "DuplicateLabel { .. }" DuplicateLabel
   case "MissingLabel { .. }" MissingLabel
-  case "InvalidEffectOp" InvalidEffectOp
   case "OperandShapeMismatch { .. }" OperandShapeMismatch
 end
 

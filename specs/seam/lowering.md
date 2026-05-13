@@ -107,7 +107,7 @@ Address-like stack operations are `ld.fld.a`, `ld.elem.a`, `ld.ind`, `st.ind`, `
 
 Suspending operations lower to `resumable` machinery:
 
-- driver frame push and pop through `hdl.push` and `hdl.pop`
+- host behavior through native calls and module loading
 - operation invocation through `raise`
 - one-shot continuation transfer through `resume`
 - unwind restoration

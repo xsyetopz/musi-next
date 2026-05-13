@@ -11,16 +11,16 @@ use crate::diag::artifact_error_kind;
 
 use crate::Opcode;
 use crate::descriptor::{
-    ConstantDescriptor, ConstantValue, DataDescriptor, EffectDescriptor, ExportDescriptor,
-    ExportTarget, ForeignDescriptor, GlobalDescriptor, MetaDescriptor, ProcedureDescriptor,
-    ShapeDescriptor, TypeDescriptor,
+    ConstantDescriptor, ConstantValue, DataDescriptor, ExportDescriptor, ExportTarget,
+    ForeignDescriptor, GlobalDescriptor, MetaDescriptor, ProcedureDescriptor, ShapeDescriptor,
+    TypeDescriptor,
 };
 use crate::instruction::{CodeEntry, Instruction, Label, LabelId, Operand, OperandShape};
 
 pub const SEAM_MAGIC: [u8; 4] = *b"SEAM";
-const BINARY_MAJOR_VERSION_U32: u32 = 13;
+const BINARY_MAJOR_VERSION_U32: u32 = 14;
 const BINARY_MINOR_VERSION_U32: u32 = 0;
-pub const BINARY_MAJOR_VERSION: u16 = 13;
+pub const BINARY_MAJOR_VERSION: u16 = 14;
 pub const BINARY_MINOR_VERSION: u16 = 0;
 pub const BINARY_VERSION: u32 = (BINARY_MAJOR_VERSION_U32 << 16) | BINARY_MINOR_VERSION_U32;
 
@@ -32,12 +32,11 @@ pub enum SectionTag {
     Constants = 3,
     Globals = 4,
     Procedures = 5,
-    Effects = 6,
-    Shapes = 7,
-    Foreigns = 8,
-    Exports = 9,
-    Data = 10,
-    Meta = 11,
+    Shapes = 6,
+    Foreigns = 7,
+    Exports = 8,
+    Data = 9,
+    Meta = 10,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -131,7 +130,6 @@ pub type TypeId = Idx<TypeDescriptor>;
 pub type ConstantId = Idx<ConstantDescriptor>;
 pub type GlobalId = Idx<GlobalDescriptor>;
 pub type ProcedureId = Idx<ProcedureDescriptor>;
-pub type EffectId = Idx<EffectDescriptor>;
 pub type ShapeId = Idx<ShapeDescriptor>;
 pub type ForeignId = Idx<ForeignDescriptor>;
 pub type ExportId = Idx<ExportDescriptor>;
@@ -145,7 +143,6 @@ pub struct Artifact {
     pub constants: Table<ConstantDescriptor>,
     pub globals: Table<GlobalDescriptor>,
     pub procedures: Table<ProcedureDescriptor>,
-    pub effects: Table<EffectDescriptor>,
     pub shapes: Table<ShapeDescriptor>,
     pub foreigns: Table<ForeignDescriptor>,
     pub exports: Table<ExportDescriptor>,
@@ -158,7 +155,6 @@ pub enum ArtifactError {
     InvalidReference { table: &'static str },
     DuplicateLabel { procedure: String },
     MissingLabel { procedure: String },
-    InvalidEffectOp,
     OperandShapeMismatch { opcode: &'static str },
 }
 
@@ -179,7 +175,6 @@ impl ArtifactError {
             Self::DuplicateLabel { procedure } | Self::MissingLabel { procedure } => {
                 DiagContext::new().with("procedure", procedure)
             }
-            Self::InvalidEffectOp => DiagContext::new(),
             Self::OperandShapeMismatch { opcode } => DiagContext::new().with("opcode", *opcode),
         }
     }
@@ -258,7 +253,6 @@ impl Artifact {
         self.validate_types()?;
         self.validate_constants()?;
         self.validate_globals()?;
-        self.validate_effects()?;
         self.validate_shapes()?;
         self.validate_foreigns()?;
         self.validate_data()?;
@@ -342,16 +336,6 @@ impl Artifact {
             Operand::Foreign(id) => {
                 self.require_foreign(*id)?;
             }
-            Operand::Effect { effect, op } => {
-                let effect = self.effects.get(*effect);
-                let op_index = usize::from(*op & 0x7FFF);
-                if effect.ops.get(op_index).is_none() {
-                    return Err(ArtifactError::InvalidEffectOp);
-                }
-            }
-            Operand::EffectId(effect) => {
-                self.require_effect(*effect)?;
-            }
             Operand::Label(id) => {
                 require_label(procedure, *id)?;
             }
@@ -392,20 +376,6 @@ impl Artifact {
             self.require_string(descriptor.name)?;
             if let Some(procedure) = descriptor.initializer {
                 self.require_procedure(procedure)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn validate_effects(&self) -> Result<(), ArtifactError> {
-        for (_, descriptor) in self.effects.iter() {
-            self.require_string(descriptor.name)?;
-            for op in &descriptor.ops {
-                self.require_string(op.name)?;
-                for ty in &op.param_tys {
-                    self.require_type(*ty)?;
-                }
-                self.require_type(op.result_ty)?;
             }
         }
         Ok(())
@@ -464,7 +434,6 @@ impl Artifact {
             ExportTarget::Global(global) => self.require_global(global),
             ExportTarget::Foreign(foreign) => self.require_foreign(foreign),
             ExportTarget::Type(ty) => self.require_type(ty),
-            ExportTarget::Effect(effect) => self.require_effect(effect),
             ExportTarget::Shape(shape) => self.require_shape(shape),
         }
     }
@@ -549,15 +518,6 @@ impl Artifact {
         Ok(())
     }
 
-    fn require_effect(&self, id: EffectId) -> Result<(), ArtifactError> {
-        let _ = self
-            .effects
-            .as_slice()
-            .get(usize::try_from(id.raw()).unwrap_or(usize::MAX))
-            .ok_or(ArtifactError::InvalidReference { table: "effects" })?;
-        Ok(())
-    }
-
     fn require_shape(&self, id: ShapeId) -> Result<(), ArtifactError> {
         let _ = self
             .shapes
@@ -603,8 +563,6 @@ const fn operand_matches_shape(operand: &Operand, shape: OperandShape) -> bool {
                 OperandShape::WideProcedureCaptures
             )
             | (Operand::Foreign(_), OperandShape::Foreign)
-            | (Operand::Effect { .. }, OperandShape::Effect)
-            | (Operand::EffectId(_), OperandShape::EffectId)
             | (Operand::Label(_), OperandShape::Label)
             | (Operand::TypeLen { .. }, OperandShape::TypeLen)
             | (Operand::BranchTable(_), OperandShape::BranchTable)

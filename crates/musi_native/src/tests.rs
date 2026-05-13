@@ -3,8 +3,8 @@
 
 use musi_foundation::{register_modules, test};
 use musi_vm::{
-    EffectCall, ForeignCall, NativeFailureStage, Program, ProgramTypeAbiKind, RejectingLoader,
-    Value, Vm, VmError, VmErrorKind, VmHost, VmHostCallContext, VmHostContext, VmOptions, VmResult,
+    ForeignCall, NativeFailureStage, Program, ProgramTypeAbiKind, RejectingLoader, Value, Vm,
+    VmError, VmErrorKind, VmHost, VmHostCallContext, VmHostContext, VmOptions, VmResult,
 };
 use music_module::ModuleKey;
 use music_session::{Session, SessionOptions};
@@ -37,21 +37,6 @@ impl VmHost for FallbackHost {
         }))
     }
 
-    fn handle_effect(
-        &mut self,
-        _ctx: VmHostCallContext<'_, '_>,
-        effect: &EffectCall,
-        _args: &[Value],
-    ) -> VmResult<Value> {
-        if effect.effect_name() == "main::Console" && effect.op_name() == "readLine" {
-            return Ok(Value::Int(9));
-        }
-        Err(VmError::new(VmErrorKind::EffectRejected {
-            effect: effect.effect_name().into(),
-            op: Some(effect.op_name().into()),
-            reason: "fallback rejected effect".into(),
-        }))
-    }
 }
 
 fn compile_program(modules: &[(&str, &str)], entry: &str) -> Program {

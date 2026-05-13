@@ -1,17 +1,14 @@
-use std::sync::{Arc, Mutex};
-
 use musi_vm::{
-    EffectCall, ForeignCall, Program, RejectingHost, RejectingLoader, Value, ValueView, Vm,
-    VmError, VmErrorKind, VmHost, VmHostCallContext, VmOptions, VmResult,
+    ForeignCall, Program, RejectingLoader, Value, ValueView, Vm, VmError, VmErrorKind, VmHost,
+    VmHostCallContext, VmOptions, VmResult,
 };
 use music_base::{Diag, SourceId};
 use music_hir::{HirExprId, HirExprKind, HirPrefixOp};
 use music_module::ModuleKey;
 use music_names::{NameBindingId, NameSite};
 use music_sema::{
-    ComptimeClosureValue, ComptimeDataValue, ComptimeEffectValue, ComptimeForeignValue,
-    ComptimeImportRecordValue, ComptimeSeqValue, ComptimeShapeValue, ComptimeTypeValue,
-    ComptimeValue, SemaModule,
+    ComptimeClosureValue, ComptimeDataValue, ComptimeForeignValue, ComptimeImportRecordValue,
+    ComptimeSeqValue, ComptimeShapeValue, ComptimeTypeValue, ComptimeValue, SemaModule,
 };
 use music_term::TypeTerm;
 
@@ -190,13 +187,11 @@ impl Session {
 }
 
 #[derive(Clone)]
-struct SafeCtfeHost {
-    host: Option<Arc<Mutex<Box<dyn VmHost>>>>,
-}
+struct SafeCtfeHost;
 
 impl SafeCtfeHost {
-    const fn new(host: Option<Arc<Mutex<Box<dyn VmHost>>>>) -> Self {
-        Self { host }
+    fn new(_host: Option<std::sync::Arc<std::sync::Mutex<Box<dyn VmHost>>>>) -> Self {
+        Self
     }
 }
 
@@ -212,31 +207,6 @@ impl VmHost for SafeCtfeHost {
         }))
     }
 
-    fn handle_effect(
-        &mut self,
-        ctx: VmHostCallContext<'_, '_>,
-        effect: &EffectCall,
-        args: &[Value],
-    ) -> VmResult<Value> {
-        if !effect.is_comptime_safe() {
-            return Err(VmError::new(VmErrorKind::EffectRejected {
-                effect: effect.effect_name().into(),
-                op: Some(effect.op_name().into()),
-                reason: "effect op lacks knownSafe marker".into(),
-            }));
-        }
-        let Some(host) = &self.host else {
-            return RejectingHost.handle_effect(ctx, effect, args);
-        };
-        let Ok(mut host) = host.lock() else {
-            return Err(VmError::new(VmErrorKind::EffectRejected {
-                effect: effect.effect_name().into(),
-                op: Some(effect.op_name().into()),
-                reason: "ctfe host lock poisoned".into(),
-            }));
-        };
-        host.handle_effect(ctx, effect, args)
-    }
 }
 
 fn value_to_comptime(
@@ -268,15 +238,10 @@ fn value_to_comptime(
         })),
         Value::Module(_) => module_to_comptime(root_key, vm, value),
         Value::Foreign(_) => foreign_to_comptime(root_key, vm, value),
-        Value::Effect(value) => Ok(ComptimeValue::Effect(ComptimeEffectValue {
-            module: root_key.clone(),
-            name: root_program(vm)?.effect_source_name(*value).into(),
-        })),
         Value::Shape(value) => Ok(ComptimeValue::Shape(ComptimeShapeValue {
             module: root_key.clone(),
             name: root_program(vm)?.shape_source_name(*value).into(),
         })),
-        Value::Continuation(_) => Err("continuation escape rejected".into()),
     }
 }
 

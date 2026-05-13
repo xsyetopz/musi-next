@@ -26,7 +26,7 @@ pub use diag::VmDiagKind;
 pub use error::{
     NativeFailureStage, OperandShape, VmError, VmErrorKind, VmIndexSpace, VmStackKind, VmValueKind,
 };
-pub use host::{EffectCall, ForeignCall};
+pub use host::ForeignCall;
 pub use types::VmResult;
 
 #[cfg(test)]

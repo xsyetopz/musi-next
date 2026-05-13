@@ -211,7 +211,6 @@ fn print_artifact_metadata(path: &Path) -> MusicResult {
     println!("types: {}", artifact.types.len());
     println!("globals: {}", artifact.globals.len());
     println!("procedures: {}", artifact.procedures.len());
-    println!("effects: {}", artifact.effects.len());
     println!("shapes: {}", artifact.shapes.len());
     println!("foreigns: {}", artifact.foreigns.len());
     println!("exports: {}", artifact.exports.len());
@@ -284,7 +283,6 @@ const fn export_kind_name(target: ExportTarget) -> &'static str {
         ExportTarget::Global(_) => "global",
         ExportTarget::Foreign(_) => "foreign",
         ExportTarget::Type(_) => "type",
-        ExportTarget::Effect(_) => "effect",
         ExportTarget::Shape(_) => "capability",
     }
 }

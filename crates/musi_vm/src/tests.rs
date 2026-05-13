@@ -21,9 +21,9 @@ use music_session::{Session, SessionOptions};
 use music_term::{TypeTerm, TypeTermKind};
 
 use super::{
-    BitsValue, EffectCall, ForeignCall, Program, ProgramTypeAbiKind, RejectingLoader, Value,
-    ValueView, Vm, VmError, VmErrorKind, VmHost, VmHostCallContext, VmHostContext, VmLoader,
-    VmOptions, VmResult, render_value_view,
+    BitsValue, ForeignCall, Program, ProgramTypeAbiKind, RejectingLoader, Value, ValueView, Vm,
+    VmError, VmErrorKind, VmHost, VmHostCallContext, VmHostContext, VmLoader, VmOptions, VmResult,
+    render_value_view,
 };
 
 #[derive(Default)]
@@ -55,18 +55,6 @@ impl VmHost for TestHost {
         }))
     }
 
-    fn handle_effect(
-        &mut self,
-        _ctx: &mut VmHostContext<'_>,
-        effect: &EffectCall,
-        _args: &[Value],
-    ) -> VmResult<Value> {
-        Err(VmError::new(VmErrorKind::EffectRejected {
-            effect: effect.effect_name().into(),
-            op: Some(effect.op_name().into()),
-            reason: "test host rejected effect call".into(),
-        }))
-    }
 }
 
 #[derive(Default)]
@@ -75,12 +63,9 @@ struct SignatureHost {
 }
 
 type ForeignSignatureRecord = (Box<str>, Box<[Box<str>]>, Box<str>);
-type EffectSignatureRecord = (Box<str>, Box<str>, Box<[Box<str>]>, Box<str>, bool);
-
 #[derive(Default)]
 struct SignatureLog {
     foreign_calls: Vec<ForeignSignatureRecord>,
-    effect_calls: Vec<EffectSignatureRecord>,
 }
 
 impl VmHost for SignatureHost {
@@ -109,32 +94,6 @@ impl VmHost for SignatureHost {
         Ok(Value::Int(7))
     }
 
-    fn handle_effect(
-        &mut self,
-        _ctx: VmHostCallContext<'_, '_>,
-        effect: &EffectCall,
-        _args: &[Value],
-    ) -> VmResult<Value> {
-        let mut log = self.log.lock().map_err(|_| {
-            VmError::new(VmErrorKind::InvalidProgramShape {
-                detail: "signature log lock poisoned".into(),
-            })
-        })?;
-        log.effect_calls.push((
-            effect.effect_name().into(),
-            effect.op_name().into(),
-            effect
-                .param_tys()
-                .iter()
-                .map(|ty| effect.type_name(*ty).into())
-                .collect::<Vec<Box<str>>>()
-                .into_boxed_slice(),
-            effect.result_ty_name().into(),
-            effect.is_comptime_safe(),
-        ));
-        drop(log);
-        Ok(Value::Int(42))
-    }
 }
 
 fn session() -> Session {
@@ -1716,7 +1675,6 @@ mod success {
         assert_eq!(log.foreign_calls[1].1.len(), 1);
         assert_eq!(log.foreign_calls[1].1[0].as_ref(), "String");
         assert_eq!(log.foreign_calls[1].2.as_ref(), "Int");
-        assert!(log.effect_calls.is_empty());
         drop(log);
     }
 

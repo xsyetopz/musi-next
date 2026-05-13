@@ -1,8 +1,8 @@
 #![allow(unused_imports)]
 
 use musi_vm::{
-    EffectCall, ForeignCall, Program, Value, ValueView, Vm, VmError, VmErrorKind, VmHost,
-    VmHostCallContext, VmHostContext, VmOptions, VmResult,
+    ForeignCall, Program, Value, ValueView, Vm, VmError, VmErrorKind, VmHost, VmHostCallContext,
+    VmHostContext, VmOptions, VmResult,
 };
 use music_base::diag::Diag;
 use music_emit::{EmitDiagKind, emit_diag_kind};
@@ -97,21 +97,6 @@ impl VmHost for CtfeTestHost {
         }))
     }
 
-    fn handle_effect(
-        &mut self,
-        _ctx: VmHostCallContext<'_, '_>,
-        effect: &EffectCall,
-        _args: &[Value],
-    ) -> VmResult<Value> {
-        match (effect.effect_name(), effect.op_name()) {
-            ("main::Clock", "tick") => Ok(Value::Int(42)),
-            _ => Err(VmError::new(VmErrorKind::EffectRejected {
-                effect: effect.effect_name().into(),
-                op: Some(effect.op_name().into()),
-                reason: "test host rejected effect".into(),
-            })),
-        }
-    }
 }
 
 fn assert_output_contains(output: &CompiledOutput, needles: &[&str]) {

@@ -1,6 +1,5 @@
 use crate::descriptor::{
-    ConstantDescriptor, ConstantValue, DataDescriptor, DataVariantDescriptor, EffectDescriptor,
-    EffectOpDescriptor, ExportDescriptor, ExportTarget, ForeignDescriptor, GlobalDescriptor,
+    ConstantDescriptor, ConstantValue, DataDescriptor, DataVariantDescriptor, ExportDescriptor, ExportTarget, ForeignDescriptor, GlobalDescriptor,
     MetaDescriptor, ProcedureDescriptor, ShapeDescriptor, TypeDescriptor,
 };
 use crate::{

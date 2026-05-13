@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 use crate::descriptor::{
-    ConstantDescriptor, ConstantValue, DataDescriptor, DataVariantDescriptor, EffectDescriptor,
-    EffectOpDescriptor, ExportDescriptor, ExportTarget, ForeignDescriptor, GlobalDescriptor,
-    MetaDescriptor, ProcedureDescriptor, ShapeDescriptor, TypeDescriptor,
+    ConstantDescriptor, ConstantValue, DataDescriptor, DataVariantDescriptor, ExportDescriptor,
+    ExportTarget, ForeignDescriptor, GlobalDescriptor, MetaDescriptor, ProcedureDescriptor,
+    ShapeDescriptor, TypeDescriptor,
 };
 use crate::{
-    Artifact, AssemblyError, AssemblyResult, CodeEntry, ConstantId, DataId, EffectId, ExportId,
-    ForeignId, GlobalId, Instruction, Label, Opcode, Operand, OperandShape, ProcedureId, ShapeId,
-    StringId, TypeId,
+    Artifact, AssemblyError, AssemblyResult, CodeEntry, ConstantId, DataId, ExportId, ForeignId,
+    GlobalId, Instruction, Label, Opcode, Operand, OperandShape, ProcedureId, ShapeId, StringId,
+    TypeId,
 };
 use music_term::SyntaxShape;
 
@@ -28,7 +28,6 @@ struct TextBuilder {
     constants: HashMap<String, ConstantId>,
     globals: HashMap<String, GlobalId>,
     procedures: HashMap<String, ProcedureId>,
-    effects: HashMap<String, EffectId>,
     shapes: HashMap<String, ShapeId>,
     foreigns: HashMap<String, ForeignId>,
     exports: HashMap<String, ExportId>,

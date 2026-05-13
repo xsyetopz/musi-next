@@ -6,11 +6,9 @@ use super::*;
 mod branch;
 mod call;
 mod core;
-mod effects;
 mod info;
 mod module;
 mod object;
-mod refs;
 mod scalar;
 mod storage;
 mod types;
@@ -18,10 +16,8 @@ mod types;
 use branch::OPCODES as BRANCH_OPCODES;
 use call::OPCODES as CALL_OPCODES;
 use core::OPCODES as CORE_OPCODES;
-use effects::OPCODES as EFFECT_OPCODES;
 use module::OPCODES as MODULE_OPCODES;
 use object::OPCODES as OBJECT_OPCODES;
-use refs::OPCODES as REF_OPCODES;
 use scalar::OPCODES as SCALAR_OPCODES;
 use storage::OPCODES as STORAGE_OPCODES;
 use types::OPCODES as TYPE_OPCODES;
@@ -34,8 +30,6 @@ const OPCODE_TABLES: &[&[OpcodeInfo]] = &[
     CALL_OPCODES,
     OBJECT_OPCODES,
     TYPE_OPCODES,
-    REF_OPCODES,
-    EFFECT_OPCODES,
     MODULE_OPCODES,
 ];
 

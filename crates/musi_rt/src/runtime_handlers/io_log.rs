@@ -3,12 +3,12 @@ use std::sync::Arc;
 
 use musi_foundation::io as foundation_io;
 use musi_native::NativeHost;
-use musi_vm::{EffectCall, ForeignCall, Value, VmError, VmHostContext};
+use musi_vm::{ForeignCall, Value, VmError, VmHostContext};
 
 use crate::output::RuntimeOutputSinkCell;
 
 use super::errors::{
-    foreign_rejected, invalid_runtime_args, runtime_effect_failed, runtime_host_unavailable,
+    foreign_rejected, invalid_runtime_args, runtime_foreign_failed, runtime_host_unavailable,
 };
 
 pub(super) fn register(host: &mut NativeHost, output: &RuntimeOutputSinkCell) {
@@ -83,7 +83,7 @@ fn register_foreign_io_handlers(host: &mut NativeHost, output: &RuntimeOutputSin
 
 fn register_io_effect_handlers(host: &mut NativeHost, output: &RuntimeOutputSinkCell) {
     let stdout_output = Arc::clone(output);
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_io::EFFECT,
         foundation_io::WRITE_OP,
         move |ctx, effect, args| {
@@ -91,7 +91,7 @@ fn register_io_effect_handlers(host: &mut NativeHost, output: &RuntimeOutputSink
         },
     );
     let stdout_line_output = Arc::clone(output);
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_io::EFFECT,
         foundation_io::WRITE_LN_OP,
         move |ctx, effect, args| {
@@ -106,7 +106,7 @@ fn register_io_effect_handlers(host: &mut NativeHost, output: &RuntimeOutputSink
         },
     );
     let stderr_output = Arc::clone(output);
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_io::EFFECT,
         foundation_io::WRITE_ERR_OP,
         move |ctx, effect, args| {
@@ -114,7 +114,7 @@ fn register_io_effect_handlers(host: &mut NativeHost, output: &RuntimeOutputSink
         },
     );
     let stderr_line_output = Arc::clone(output);
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_io::EFFECT,
         foundation_io::WRITE_ERR_LN_OP,
         move |ctx, effect, args| {
@@ -128,7 +128,7 @@ fn register_io_effect_handlers(host: &mut NativeHost, output: &RuntimeOutputSink
             )
         },
     );
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_io::EFFECT,
         foundation_io::READ_LINE_OP,
         |ctx, effect, args| {
@@ -148,7 +148,7 @@ enum StreamKind {
 
 fn write_stream(
     ctx: &VmHostContext<'_>,
-    effect: &EffectCall,
+    effect: &ForeignCall,
     args: &[Value],
     stream: StreamKind,
     line: bool,
@@ -170,15 +170,15 @@ fn write_stream(
             .map_err(|_| runtime_host_unavailable(effect, "runtime output lock"))?
             .write_stderr(text.as_str(), line),
     };
-    write_result.map_err(|error| runtime_effect_failed(effect, error))?;
+    write_result.map_err(|error| runtime_foreign_failed(effect, error))?;
     Ok(Value::Unit)
 }
 
-fn read_line(effect: &EffectCall) -> Result<String, VmError> {
+fn read_line(effect: &ForeignCall) -> Result<String, VmError> {
     let mut line = String::new();
     let _bytes = io::stdin()
         .read_line(&mut line)
-        .map_err(|error| runtime_effect_failed(effect, error))?;
+        .map_err(|error| runtime_foreign_failed(effect, error))?;
     if line.ends_with('\n') {
         let _ = line.pop();
         if line.ends_with('\r') {

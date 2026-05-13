@@ -96,14 +96,6 @@ const ENTRIES: &[CatalogEntry] = &[
         help: None,
     },
     CatalogEntry {
-        kind: SeamDiagKind::InvalidEffectOp,
-        code: 5410,
-        message: "effect operation reference `effect.op` invalid",
-        primary: "effect operation reference `effect.op` invalid",
-        secondary: None,
-        help: None,
-    },
-    CatalogEntry {
         kind: SeamDiagKind::OperandShapeMismatch,
         code: 5411,
         message: "opcode `{opcode}` operand shape mismatch",
@@ -346,7 +338,6 @@ pub const fn artifact_error_kind(source: &crate::ArtifactError) -> SeamDiagKind 
         crate::ArtifactError::InvalidReference { .. } => SeamDiagKind::InvalidReference,
         crate::ArtifactError::DuplicateLabel { .. } => SeamDiagKind::DuplicateLabel,
         crate::ArtifactError::MissingLabel { .. } => SeamDiagKind::MissingLabel,
-        crate::ArtifactError::InvalidEffectOp => SeamDiagKind::InvalidEffectOp,
         crate::ArtifactError::OperandShapeMismatch { .. } => SeamDiagKind::OperandShapeMismatch,
     }
 }

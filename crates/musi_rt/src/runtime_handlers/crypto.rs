@@ -6,7 +6,7 @@ use musi_vm::Value;
 use sha2::{Digest, Sha256};
 
 use super::encoding::hex_encode;
-use super::errors::{invalid_runtime_args, runtime_effect_failed};
+use super::errors::{invalid_runtime_args, runtime_foreign_failed};
 use super::values::{foreign_string_arg, string_arg};
 
 pub(super) fn register(host: &mut NativeHost) {
@@ -26,7 +26,7 @@ pub(super) fn register(host: &mut NativeHost) {
             ctx.alloc_string(BASE64_STANDARD.encode(digest))
         },
     );
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_random::EFFECT,
         foundation_random::ENTROPY_HEX_OP,
         |ctx, effect, args| {
@@ -35,11 +35,11 @@ pub(super) fn register(host: &mut NativeHost) {
             };
             let count = usize::try_from((*count).max(0)).unwrap_or(0);
             let mut bytes = vec![0u8; count];
-            getrandom::fill(&mut bytes).map_err(|error| runtime_effect_failed(effect, error))?;
+            getrandom::fill(&mut bytes).map_err(|error| runtime_foreign_failed(effect, error))?;
             ctx.alloc_string(hex_encode(&bytes))
         },
     );
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_crypto::EFFECT,
         foundation_crypto::SHA256_HEX_OP,
         |ctx, effect, args| {
@@ -48,7 +48,7 @@ pub(super) fn register(host: &mut NativeHost) {
             ctx.alloc_string(hex_encode(&digest))
         },
     );
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_crypto::EFFECT,
         foundation_crypto::SHA256_BASE64_OP,
         |ctx, effect, args| {

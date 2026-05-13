@@ -1,8 +1,8 @@
 #![allow(unused_imports)]
 
 use crate::descriptor::{
-    ConstantDescriptor, ConstantValue, EffectDescriptor, EffectOpDescriptor, ForeignDescriptor,
-    GlobalDescriptor, MetaDescriptor, ProcedureDescriptor, TypeDescriptor,
+    ConstantDescriptor, ConstantValue, ForeignDescriptor, GlobalDescriptor, MetaDescriptor,
+    ProcedureDescriptor, TypeDescriptor,
 };
 use crate::{Artifact, CodeEntry, Instruction, Label, Opcode, Operand, SeamDiagKind};
 use crate::{decode_binary, encode_binary, format_text, parse_text};
@@ -288,21 +288,12 @@ mod success {
             ))]),
         ));
 
-        let effect_name = artifact.intern_string("Abort");
-        let op_name = artifact.intern_string("abort");
         let int_ty = artifact
             .types
             .iter()
             .next()
             .map(|(id, _)| id)
             .expect("sample artifact type");
-        let effect = artifact.effects.alloc(EffectDescriptor::new(
-            effect_name,
-            Box::new(
-                [EffectOpDescriptor::new(op_name, Box::new([int_ty]), int_ty)
-                    .with_comptime_safe(true)],
-            ),
-        ));
 
         let foreign_name = artifact.intern_string("puts");
         let c_abi = artifact.intern_string("c");
@@ -334,10 +325,6 @@ mod success {
                         Opcode::CallFfi,
                         Operand::Foreign(foreign),
                     )),
-                    CodeEntry::Instruction(Instruction::new(
-                        Opcode::Raise,
-                        Operand::Effect { effect, op: 0 },
-                    )),
                     CodeEntry::Instruction(Instruction::new(Opcode::Ret, Operand::None)),
                 ]),
             )
@@ -347,7 +334,6 @@ mod success {
         let text = format_text(&artifact);
         let parsed = parse_text(&text).unwrap();
         assert_eq!(format_text(&parsed), text);
-        assert!(parsed.effects.get(effect).ops[0].is_comptime_safe);
 
         let bytes = encode_binary(&artifact).unwrap();
         let decoded = decode_binary(&bytes).unwrap();

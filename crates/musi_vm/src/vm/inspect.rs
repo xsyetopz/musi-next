@@ -38,14 +38,12 @@ impl Vm {
                 self.heap.closure(*closure).expect("live closure"),
             )),
             Value::Procedure(procedure) => ValueView::Procedure(*procedure),
-            Value::Continuation(_) => ValueView::Continuation,
             Value::Type(ty) => ValueView::Type(*ty),
             Value::Module(module) => {
                 let module = self.heap.module(*module).expect("live module");
                 ValueView::Module(ModuleView::new(&module.spec, module.slot))
             }
             Value::Foreign(foreign) => ValueView::Foreign(foreign.foreign),
-            Value::Effect(effect) => ValueView::Effect(*effect),
             Value::Shape(shape) => ValueView::Shape(*shape),
         }
     }

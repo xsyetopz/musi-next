@@ -18,7 +18,6 @@ pub enum SeamDiagKind {
     InvalidReference,
     DuplicateLabel,
     MissingLabel,
-    InvalidEffectOp,
     OperandShapeMismatch,
     HilMissingEntryBlock,
     HilDuplicateBlock,

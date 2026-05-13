@@ -243,49 +243,6 @@ impl TextBuilder {
         Ok(())
     }
 
-    pub(crate) fn parse_effect(&mut self, parts: &[String]) -> AssemblyResult {
-        if parts.len() < 2 {
-            return Err(text_expected_form(".effect $Name ..."));
-        }
-        let name = parse_symbol(&parts[1])?;
-        let name_id = self.intern_string(&name);
-        let mut ops = Vec::<EffectOpDescriptor>::new();
-        let mut idx = 2;
-        while idx < parts.len() {
-            let op_name = parse_symbol(must_get(parts.get(idx), "effect op")?)?;
-            idx += 1;
-            let mut param_tys = Vec::new();
-            while idx < parts.len() && parts[idx] == "param" {
-                let ty = parse_symbol(must_get(parts.get(idx + 1), "effect op param type")?)?;
-                param_tys.push(self.ensure_type_symbol(&ty, &ty));
-                idx += 2;
-            }
-            if parts.get(idx).map(String::as_str) != Some("result") {
-                return Err(text_expected_form("result $Type in .effect"));
-            }
-            let result_ty = parse_symbol(must_get(parts.get(idx + 1), "effect op result type")?)?;
-            idx += 2;
-            let is_comptime_safe = parts.get(idx).map(String::as_str) == Some("known-safe");
-            if is_comptime_safe {
-                idx += 1;
-            }
-            ops.push(
-                EffectOpDescriptor::new(
-                    self.intern_string(&op_name),
-                    param_tys.into_boxed_slice(),
-                    self.ensure_type_symbol(&result_ty, &result_ty),
-                )
-                .with_comptime_safe(is_comptime_safe),
-            );
-        }
-        let id = self
-            .artifact
-            .effects
-            .alloc(EffectDescriptor::new(name_id, ops.into_boxed_slice()));
-        let _ = self.effects.insert(name, id);
-        Ok(())
-    }
-
     pub(crate) fn parse_capability(&mut self, parts: &[String]) -> AssemblyResult {
         if parts.len() != 2 {
             return Err(text_expected_form(".capability $Name"));
@@ -421,13 +378,6 @@ impl TextBuilder {
                     .get(&name)
                     .ok_or_else(|| text_unknown_symbol("type", &name))?;
                 ExportTarget::Type(ty)
-            }
-            "effect" => {
-                let effect = *self
-                    .effects
-                    .get(&name)
-                    .ok_or_else(|| text_unknown_symbol("effect", &name))?;
-                ExportTarget::Effect(effect)
             }
             "capability" => {
                 let shape = *self

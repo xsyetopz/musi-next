@@ -17,7 +17,7 @@ pub(super) fn register(host: &mut NativeHost) {
         };
         ctx.alloc_string(value.to_string())
     });
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_fmt::EFFECT,
         foundation_fmt::INT_OP,
         |ctx, effect, args| {
@@ -27,7 +27,7 @@ pub(super) fn register(host: &mut NativeHost) {
             ctx.alloc_string(value.to_string())
         },
     );
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_fmt::EFFECT,
         foundation_fmt::FLOAT_OP,
         |ctx, effect, args| {

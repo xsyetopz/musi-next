@@ -6,7 +6,7 @@ use musi_foundation::fs as foundation_fs;
 use musi_native::NativeHost;
 use musi_vm::Value;
 
-use super::errors::{foreign_rejected, invalid_runtime_args, runtime_effect_failed};
+use super::errors::{foreign_rejected, invalid_runtime_args, runtime_foreign_failed};
 use super::values::{foreign_string_arg, string_arg};
 
 pub(super) fn register(host: &mut NativeHost) {
@@ -70,18 +70,18 @@ fn register_foreign_handlers(host: &mut NativeHost) {
 }
 
 fn register_effect_handlers(host: &mut NativeHost) {
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_fs::EFFECT,
         foundation_fs::READ_TEXT_OP,
         |ctx, effect, args| {
             let path = string_arg(ctx, effect, args, "fsReadText")?.to_owned();
             let text =
-                fs::read_to_string(path).map_err(|error| runtime_effect_failed(effect, error))?;
+                fs::read_to_string(path).map_err(|error| runtime_foreign_failed(effect, error))?;
             ctx.alloc_string(text)
         },
     );
 
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_fs::EFFECT,
         foundation_fs::WRITE_TEXT_OP,
         |ctx, effect, args| {
@@ -99,12 +99,12 @@ fn register_effect_handlers(host: &mut NativeHost) {
                 .string(text)
                 .ok_or_else(|| invalid_runtime_args(effect, "text string", text.kind()))?;
             fs::write(path.as_str(), text.as_str())
-                .map_err(|error| runtime_effect_failed(effect, error))?;
+                .map_err(|error| runtime_foreign_failed(effect, error))?;
             Ok(Value::Unit)
         },
     );
 
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_fs::EFFECT,
         foundation_fs::EXISTS_OP,
         |ctx, effect, args| {
@@ -113,7 +113,7 @@ fn register_effect_handlers(host: &mut NativeHost) {
         },
     );
 
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_fs::EFFECT,
         foundation_fs::APPEND_TEXT_OP,
         |ctx, effect, args| {
@@ -139,7 +139,7 @@ fn register_effect_handlers(host: &mut NativeHost) {
         },
     );
 
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_fs::EFFECT,
         foundation_fs::REMOVE_OP,
         |ctx, effect, args| {
@@ -155,7 +155,7 @@ fn register_effect_handlers(host: &mut NativeHost) {
         },
     );
 
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_fs::EFFECT,
         foundation_fs::CREATE_DIR_ALL_OP,
         |ctx, effect, args| {

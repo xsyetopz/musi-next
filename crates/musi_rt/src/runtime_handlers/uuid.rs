@@ -9,7 +9,7 @@ pub(super) fn register(host: &mut NativeHost) {
         }
         ctx.alloc_string(uuid::Uuid::new_v4().to_string())
     });
-    host.register_effect_handler_with_context(
+    host.register_foundation_handler_with_context(
         foundation_uuid::EFFECT,
         foundation_uuid::V4_OP,
         |ctx, effect, args| {

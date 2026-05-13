@@ -4,10 +4,10 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use musi_foundation::{random as foundation_random, time as foundation_time};
 use musi_native::NativeHost;
-use musi_vm::{EffectCall, Value, VmError};
+use musi_vm::{ForeignCall, Value, VmError};
 
 use super::encoding::hex_encode;
-use super::errors::{foreign_rejected, invalid_runtime_args, runtime_effect_failed};
+use super::errors::{foreign_rejected, invalid_runtime_args, runtime_foreign_failed};
 
 type RandomStateCell = Arc<Mutex<u64>>;
 
@@ -47,7 +47,7 @@ pub(super) fn register(host: &mut NativeHost) {
         Ok(Value::Unit)
     });
 
-    host.register_effect_handler(
+    host.register_foundation_handler(
         foundation_time::EFFECT,
         foundation_time::NOW_UNIX_MS_OP,
         |effect, args| {
@@ -58,7 +58,7 @@ pub(super) fn register(host: &mut NativeHost) {
         },
     );
 
-    host.register_effect_handler(
+    host.register_foundation_handler(
         foundation_time::EFFECT,
         foundation_time::MONOTONIC_MS_OP,
         |effect, args| {
@@ -71,7 +71,7 @@ pub(super) fn register(host: &mut NativeHost) {
         },
     );
 
-    host.register_effect_handler(
+    host.register_foundation_handler(
         foundation_time::EFFECT,
         foundation_time::SLEEP_MS_OP,
         |effect, args| {
@@ -153,7 +153,7 @@ fn register_random_foreign_handlers(host: &mut NativeHost, random_state: &Random
 
 fn register_random_effect_handlers(host: &mut NativeHost, random_state: &RandomStateCell) {
     let int_random_state = Arc::clone(random_state);
-    host.register_effect_handler(
+    host.register_foundation_handler(
         foundation_random::EFFECT,
         foundation_random::INT_OP,
         move |effect, args| {
@@ -165,7 +165,7 @@ fn register_random_effect_handlers(host: &mut NativeHost, random_state: &RandomS
     );
 
     let ranged_random_state = Arc::clone(random_state);
-    host.register_effect_handler(
+    host.register_foundation_handler(
         foundation_random::EFFECT,
         foundation_random::INT_IN_RANGE_OP,
         move |effect, args| {
@@ -185,7 +185,7 @@ fn register_random_effect_handlers(host: &mut NativeHost, random_state: &RandomS
     );
 
     let bool_random_state = Arc::clone(random_state);
-    host.register_effect_handler(
+    host.register_foundation_handler(
         foundation_random::EFFECT,
         foundation_random::BOOL_OP,
         move |effect, args| {
@@ -197,7 +197,7 @@ fn register_random_effect_handlers(host: &mut NativeHost, random_state: &RandomS
     );
 
     let float_random_state = Arc::clone(random_state);
-    host.register_effect_handler(
+    host.register_foundation_handler(
         foundation_random::EFFECT,
         foundation_random::FLOAT_01_OP,
         move |effect, args| {
@@ -209,10 +209,10 @@ fn register_random_effect_handlers(host: &mut NativeHost, random_state: &RandomS
     );
 }
 
-fn current_unix_millis(effect: &EffectCall) -> Result<i64, VmError> {
+fn current_unix_millis(effect: &ForeignCall) -> Result<i64, VmError> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|error| runtime_effect_failed(effect, error))?;
+        .map_err(|error| runtime_foreign_failed(effect, error))?;
     Ok(i64::try_from(now.as_millis()).unwrap_or(i64::MAX))
 }
 

@@ -33,7 +33,6 @@ pub fn format_text(artifact: &Artifact) -> String {
     format_types(&mut out, artifact);
     format_data(&mut out, artifact);
     format_constants(&mut out, artifact);
-    format_effects(&mut out, artifact);
     format_shapes(&mut out, artifact);
     format_foreigns(&mut out, artifact);
     format_globals(&mut out, artifact);
@@ -202,27 +201,6 @@ fn format_constants(out: &mut String, artifact: &Artifact) {
     }
 }
 
-fn format_effects(out: &mut String, artifact: &Artifact) {
-    for (_, descriptor) in artifact.effects.iter() {
-        out.push_str(".effect ");
-        push_symbol_ref(out, artifact.string_text(descriptor.name));
-        for op in &descriptor.ops {
-            out.push(' ');
-            push_symbol_ref(out, artifact.string_text(op.name));
-            for ty in &op.param_tys {
-                out.push_str(" param ");
-                push_symbol_ref(out, artifact.type_name(*ty));
-            }
-            out.push_str(" result ");
-            push_symbol_ref(out, artifact.type_name(op.result_ty));
-            if op.is_comptime_safe {
-                out.push_str(" known-safe");
-            }
-        }
-        out.push('\n');
-    }
-}
-
 fn format_shapes(out: &mut String, artifact: &Artifact) {
     for (_, descriptor) in artifact.shapes.iter() {
         out.push_str(".capability ");
@@ -343,7 +321,6 @@ fn format_exports(out: &mut String, artifact: &Artifact) {
             ExportTarget::Global(_) => out.push_str("global"),
             ExportTarget::Foreign(_) => out.push_str("native"),
             ExportTarget::Type(_) => out.push_str("type"),
-            ExportTarget::Effect(_) => out.push_str("effect"),
             ExportTarget::Shape(_) => out.push_str("capability"),
         }
         if descriptor.opaque {
@@ -391,16 +368,6 @@ fn format_operand(
         }
         Operand::Foreign(id) => {
             push_symbol_ref(out, artifact.string_text(artifact.foreigns.get(*id).name));
-        }
-        Operand::Effect { effect, op } => {
-            let effect = artifact.effects.get(*effect);
-            push_symbol_ref(out, artifact.string_text(effect.name));
-            out.push(' ');
-            push_symbol_ref(out, artifact.string_text(effect.ops[usize::from(*op)].name));
-        }
-        Operand::EffectId(effect) => {
-            let effect = artifact.effects.get(*effect);
-            push_symbol_ref(out, artifact.string_text(effect.name));
         }
         Operand::Label(id) => {
             out.push_str(artifact.string_text(procedure.labels[usize::from(*id)]));

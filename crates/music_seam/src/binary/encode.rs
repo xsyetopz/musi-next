@@ -16,7 +16,6 @@ pub fn encode_binary(artifact: &Artifact) -> AssemblyResult<Vec<u8>> {
     encode_constants(&mut out, artifact);
     encode_globals(&mut out, artifact);
     encode_procedures(&mut out, artifact);
-    encode_effects(&mut out, artifact);
     encode_shapes(&mut out, artifact);
     encode_foreigns(&mut out, artifact);
     encode_exports(&mut out, artifact);
@@ -141,33 +140,6 @@ fn encode_procedures(out: &mut Vec<u8>, artifact: &Artifact) {
     }
 }
 
-fn encode_effects(out: &mut Vec<u8>, artifact: &Artifact) {
-    push_section_tag(out, SectionTag::Effects);
-    push_u32(
-        out,
-        u32::try_from(artifact.effects.len()).expect("section overflow"),
-    );
-    for (_, entry) in artifact.effects.iter() {
-        push_u32(out, entry.name.raw());
-        push_u16(
-            out,
-            u16::try_from(entry.ops.len()).expect("too many effect ops"),
-        );
-        for op in &entry.ops {
-            push_u32(out, op.name.raw());
-            push_u16(
-                out,
-                u16::try_from(op.param_tys.len()).expect("too many effect op params"),
-            );
-            for ty in &op.param_tys {
-                push_u32(out, ty.raw());
-            }
-            push_u32(out, op.result_ty.raw());
-            out.push(u8::from(op.is_comptime_safe));
-        }
-    }
-}
-
 fn encode_shapes(out: &mut Vec<u8>, artifact: &Artifact) {
     push_section_tag(out, SectionTag::Shapes);
     push_u32(
@@ -234,12 +206,8 @@ fn encode_exports(out: &mut Vec<u8>, artifact: &Artifact) {
                 out.push(3);
                 push_u32(out, id.raw());
             }
-            ExportTarget::Effect(id) => {
-                out.push(4);
-                push_u32(out, id.raw());
-            }
             ExportTarget::Shape(id) => {
-                out.push(5);
+                out.push(4);
                 push_u32(out, id.raw());
             }
         }
@@ -361,15 +329,6 @@ fn encode_operand(out: &mut Vec<u8>, operand: &Operand) {
         Operand::Foreign(id) => {
             out.push(8);
             push_u32(out, id.raw());
-        }
-        Operand::Effect { effect, op } => {
-            out.push(9);
-            push_u32(out, effect.raw());
-            push_u16(out, *op);
-        }
-        Operand::EffectId(effect) => {
-            out.push(14);
-            push_u32(out, effect.raw());
         }
         Operand::Label(id) => {
             out.push(10);

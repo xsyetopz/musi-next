@@ -11,8 +11,8 @@ mod types;
 
 pub use artifact::{
     Artifact, ArtifactError, BINARY_MAJOR_VERSION, BINARY_MINOR_VERSION, BINARY_VERSION,
-    ConstantId, DataId, EffectId, ExportId, ForeignId, GlobalId, MetaId, ProcedureId, SEAM_MAGIC,
-    SectionTag, ShapeId, StringId, StringRecord, Table, TypeId,
+    ConstantId, DataId, ExportId, ForeignId, GlobalId, MetaId, ProcedureId, SEAM_MAGIC, SectionTag,
+    ShapeId, StringId, StringRecord, Table, TypeId,
 };
 pub use binary::{decode_binary, encode_binary, validate_binary};
 pub use diag::SeamDiagKind;
