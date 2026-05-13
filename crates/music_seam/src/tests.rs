@@ -5,7 +5,7 @@ use crate::descriptor::{
     ConstantDescriptor, ConstantValue, DataDescriptor, DataVariantDescriptor, ForeignDescriptor,
     GlobalDescriptor, ProcedureDescriptor, ShapeDescriptor, TypeDescriptor,
 };
-use crate::instruction::{CodeEntry, Instruction, Label, Operand};
+use crate::instruction::{CodeEntry, Instruction, Label, Operand, OperandShape};
 use crate::opcode::Opcode;
 use crate::{
     AssemblyError, decode_binary, encode_binary, format_hil_projection, format_text, parse_text,
@@ -216,6 +216,9 @@ mod success {
             let Some(mnemonic_cell) = cells.next() else {
                 continue;
             };
+            let Some(operand_cell) = cells.next() else {
+                continue;
+            };
             if !hex_cell.starts_with('`') || mnemonic_cell == "reserved" {
                 continue;
             }
@@ -230,13 +233,17 @@ mod success {
             if mnemonic.is_empty() {
                 continue;
             }
-            expected.push((code, mnemonic));
+            let Some(operand_shape) = spec_operand_shape(operand_cell) else {
+                continue;
+            };
+            expected.push((code, mnemonic, operand_shape));
         }
 
-        assert_eq!(expected.len(), 130);
-        for (code, mnemonic) in expected {
+        assert_eq!(expected.len(), 44);
+        for (code, mnemonic, operand_shape) in expected {
             let opcode = Opcode::from_wire_code(code).expect("opcode from spec code");
             assert_eq!(opcode.mnemonic(), mnemonic);
+            assert_eq!(opcode.operand_shape(), operand_shape);
             assert_eq!(Opcode::from_mnemonic(mnemonic), Some(opcode));
         }
         assert_eq!(Opcode::from_mnemonic("range.new"), None);
@@ -374,6 +381,25 @@ mod success {
         assert!(projection.contains("@profile(level := .cold)"));
         assert!(!projection.contains(concat!("@", "hot")));
         assert!(!projection.contains(concat!("@", "cold")));
+    }
+}
+
+fn spec_operand_shape(text: &str) -> Option<OperandShape> {
+    match text {
+        "none" => Some(OperandShape::None),
+        "i16" => Some(OperandShape::I16),
+        "u16" => Some(OperandShape::Local),
+        "str" => Some(OperandShape::String),
+        "type" => Some(OperandShape::Type),
+        "const" => Some(OperandShape::Constant),
+        "global" => Some(OperandShape::Global),
+        "method" => Some(OperandShape::Procedure),
+        "method,u8" => Some(OperandShape::WideProcedureCaptures),
+        "foreign" => Some(OperandShape::Foreign),
+        "block" => Some(OperandShape::Label),
+        "type,u16" => Some(OperandShape::TypeLen),
+        "btbl" => Some(OperandShape::BranchTable),
+        _ => None,
     }
 }
 
