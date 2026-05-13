@@ -1,3 +1,4 @@
+let assert := import "@std/assert";
 let time := import "@std/datetime";
 let testing := import "@std/testing";
 
@@ -15,11 +16,11 @@ export let test () :=
     );
     testing.it(
       "'seconds' converts to millis",
-      testing.toBe(time.seconds(2).toMillis(), 2000),
+      assert.toBe(time.seconds(2).toMillis(), 2000),
     );
     testing.it(
       "'minutes' converts to seconds",
-      testing.toBe(time.minutes(2).toSeconds(), 120),
+      assert.toBe(time.minutes(2).toSeconds(), 120),
     );
     testing.endDescribe()
   );

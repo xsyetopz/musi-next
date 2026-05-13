@@ -1,4 +1,4 @@
---! Text helper namespace.
+--! Text module.
 
 let ascii := import "@std/ascii";
 let textHost := import "musi:text";
@@ -9,7 +9,7 @@ let textLength (target : String) : Int := textHost.length(target);
 --- Return byte length.
 export let length (target : String) : Int := textLength(target);
 
---- Core operation for `isEmpty`.
+--- Function for `isEmpty`.
 let textIsEmpty (target : String) : Bit := textLength(target) = 0;
 
 --- Returns true when text has no bytes.
@@ -67,7 +67,7 @@ let recur trimEndIndex (target : String, start : Int, end : Int) : Int :=
   | _ => end
   );
 
---- Core operation for `trim`.
+--- Function for `trim`.
 let textTrim (target : String) : String :=
   (
     let end := textLength(target);
@@ -92,14 +92,14 @@ let recur transformAscii (
   )
   );
 
---- Core operation for `toLowerCase`.
+--- Function for `toLowerCase`.
 let textToLowerCase (target : String) : String :=
   transformAscii(target, 0, textLength(target), ascii.toLower);
 
 --- Convert ASCII letters to lower case.
 export let toLowerCase (target : String) : String := textToLowerCase(target);
 
---- Core operation for `toUpperCase`.
+--- Function for `toUpperCase`.
 let textToUpperCase (target : String) : String :=
   transformAscii(target, 0, textLength(target), ascii.toUpper);
 
@@ -134,7 +134,7 @@ let recur indexOfFrom (target : String, needle : String, index : Int) : Int :=
   | _ => indexOfFrom(target, needle, index + 1)
   );
 
---- Core operation for `indexOf`.
+--- Function for `indexOf`.
 let textIndexOf (target : String, needle : String) : Int :=
   indexOfFrom(target, needle, 0);
 
@@ -142,7 +142,7 @@ let textIndexOf (target : String, needle : String) : Int :=
 export let indexOf (target : String, needle : String) : Int :=
   textIndexOf(target, needle);
 
---- Core operation for `contains`.
+--- Function for `contains`.
 let textContains (target : String, needle : String) : Bit :=
   textIndexOf(target, needle) >= 0;
 
@@ -150,7 +150,7 @@ let textContains (target : String, needle : String) : Bit :=
 export let contains (target : String, needle : String) : Bit :=
   textContains(target, needle);
 
---- Core operation for `startsWith`.
+--- Function for `startsWith`.
 let textStartsWith (target : String, prefix : String) : Bit :=
   matchesAt(target, prefix, 0, 0);
 
@@ -158,7 +158,7 @@ let textStartsWith (target : String, prefix : String) : Bit :=
 export let startsWith (target : String, prefix : String) : Bit :=
   textStartsWith(target, prefix);
 
---- Core operation for `endsWith`.
+--- Function for `endsWith`.
 let textEndsWith (target : String, suffix : String) : Bit :=
   match () (
   | _ where textLength(suffix) > textLength(target) => 0 = 1

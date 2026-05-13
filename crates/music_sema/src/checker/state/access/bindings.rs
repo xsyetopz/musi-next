@@ -4,7 +4,6 @@ use music_names::{NameBindingId, Symbol};
 
 use crate::api::{ComptimeValue, ConstraintKey, DefinitionKey, ForeignLinkInfo};
 use crate::checker::schemes::BindingScheme;
-use crate::effects::EffectRow;
 
 use crate::checker::state::PassBase;
 
@@ -23,14 +22,6 @@ impl PassBase<'_, '_, '_> {
 
     pub fn insert_type_alias(&mut self, symbol: Symbol, ty: HirTyId) {
         let _prev = self.typing.type_aliases.insert(symbol, ty);
-    }
-
-    pub fn binding_effects(&self, id: NameBindingId) -> Option<EffectRow> {
-        self.typing.binding_effects.get(&id).cloned()
-    }
-
-    pub fn insert_binding_effects(&mut self, id: NameBindingId, effects: EffectRow) {
-        let _prev = self.typing.binding_effects.insert(id, effects);
     }
 
     pub fn binding_scheme(&self, id: NameBindingId) -> Option<&BindingScheme> {
@@ -80,10 +71,6 @@ impl PassBase<'_, '_, '_> {
 
     pub fn mark_sealed_shape(&mut self, key: DefinitionKey) {
         let _ = self.typing.sealed_shapes.insert(key);
-    }
-
-    pub fn is_sealed_shape(&self, key: &DefinitionKey) -> bool {
-        self.typing.sealed_shapes.contains(key)
     }
 
     pub fn mark_gated_binding(&mut self, id: NameBindingId) {

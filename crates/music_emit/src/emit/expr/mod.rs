@@ -4,7 +4,6 @@ use music_base::diag::DiagContext;
 
 mod callable;
 mod control;
-mod effects;
 mod literals;
 mod names;
 mod records;
@@ -32,7 +31,6 @@ impl ProcedureEmitter<'_, '_> {
             || self.compile_expr_sequence_and_data(expr, diags)
             || self.compile_expr_storage_ops(expr, diags)
             || self.compile_expr_control_ops(expr, diags)
-            || self.compile_expr_effect_ops(expr, diags)
             || self.compile_expr_type_ops(expr, diags);
         if !matched {
             support::push_expr_diag_with(
@@ -138,14 +136,6 @@ impl ProcedureEmitter<'_, '_> {
                 args,
             } => {
                 self.compile_variant_new(data_key, *tag_value, *field_count, args, diags);
-                true
-            }
-            IrExprKind::AnswerLit {
-                effect_key,
-                value,
-                ops,
-            } => {
-                self.compile_answer_lit(effect_key, value, ops, &expr.origin, diags);
                 true
             }
             IrExprKind::Index { base, indices } => {
@@ -314,6 +304,14 @@ impl ProcedureEmitter<'_, '_> {
                 self.compile_bool_or(left, right, diags);
                 true
             }
+            IrExprKind::If {
+                condition,
+                then_expr,
+                else_expr,
+            } => {
+                self.compile_if(condition, then_expr, else_expr, diags);
+                true
+            }
             IrExprKind::Not { expr: inner } => {
                 self.compile_expr(inner, true, diags);
                 self.code.push(CodeEntry::Instruction(Instruction::new(
@@ -342,40 +340,6 @@ impl ProcedureEmitter<'_, '_> {
             }
             IrExprKind::CallParts { callee, args } => {
                 self.compile_call_parts(callee, args, diags);
-                true
-            }
-            _ => false,
-        }
-    }
-
-    fn compile_expr_effect_ops(&mut self, expr: &IrExpr, diags: &mut EmitDiagList) -> bool {
-        match &expr.kind {
-            IrExprKind::Request {
-                effect_key,
-                op_index,
-                args,
-            } => {
-                self.compile_perform(effect_key, *op_index, args, diags);
-                true
-            }
-            IrExprKind::RequestSeq {
-                effect_key,
-                op_index,
-                args,
-            } => {
-                self.compile_perform_seq(effect_key, *op_index, args, diags);
-                true
-            }
-            IrExprKind::Handle {
-                effect_key,
-                answer,
-                body,
-            } => {
-                self.compile_handle(effect_key, answer, body, diags);
-                true
-            }
-            IrExprKind::Resume { expr } => {
-                self.compile_resume(expr.as_deref(), diags);
                 true
             }
             _ => false,

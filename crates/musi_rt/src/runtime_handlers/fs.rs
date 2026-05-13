@@ -15,32 +15,26 @@ pub(super) fn register(host: &mut NativeHost) {
 }
 
 fn register_foreign_handlers(host: &mut NativeHost) {
-    host.register_foreign_handler_with_context(
-        "musi:fs::readTextIntrinsic",
-        |ctx, foreign, args| {
-            let path = foreign_string_arg(ctx, foreign, args)?.to_owned();
-            let text = fs::read_to_string(path).map_err(|_| foreign_rejected(foreign))?;
-            ctx.alloc_string(text)
-        },
-    );
-    host.register_foreign_handler_with_context(
-        "musi:fs::writeTextIntrinsic",
-        |ctx, foreign, args| {
-            let [path, text] = args else {
-                return Err(foreign_rejected(foreign));
-            };
-            let path = ctx.string(path).ok_or_else(|| foreign_rejected(foreign))?;
-            let text = ctx.string(text).ok_or_else(|| foreign_rejected(foreign))?;
-            fs::write(path.as_str(), text.as_str()).map_err(|_| foreign_rejected(foreign))?;
-            Ok(Value::Unit)
-        },
-    );
-    host.register_foreign_handler_with_context("musi:fs::existsIntrinsic", |ctx, foreign, args| {
+    host.register_foreign_handler_with_context("musi:fs::Musi__readText", |ctx, foreign, args| {
+        let path = foreign_string_arg(ctx, foreign, args)?.to_owned();
+        let text = fs::read_to_string(path).map_err(|_| foreign_rejected(foreign))?;
+        ctx.alloc_string(text)
+    });
+    host.register_foreign_handler_with_context("musi:fs::Musi__writeText", |ctx, foreign, args| {
+        let [path, text] = args else {
+            return Err(foreign_rejected(foreign));
+        };
+        let path = ctx.string(path).ok_or_else(|| foreign_rejected(foreign))?;
+        let text = ctx.string(text).ok_or_else(|| foreign_rejected(foreign))?;
+        fs::write(path.as_str(), text.as_str()).map_err(|_| foreign_rejected(foreign))?;
+        Ok(Value::Unit)
+    });
+    host.register_foreign_handler_with_context("musi:fs::Musi__exists", |ctx, foreign, args| {
         let path = foreign_string_arg(ctx, foreign, args)?;
         Ok(Value::Int(i64::from(Path::new(path).exists())))
     });
     host.register_foreign_handler_with_context(
-        "musi:fs::appendTextIntrinsic",
+        "musi:fs::Musi__appendText",
         |ctx, foreign, args| {
             let [path, text] = args else {
                 return Err(foreign_rejected(foreign));
@@ -55,7 +49,7 @@ fn register_foreign_handlers(host: &mut NativeHost) {
             Ok(Value::Int(i64::from(append_result.is_ok())))
         },
     );
-    host.register_foreign_handler_with_context("musi:fs::removeIntrinsic", |ctx, foreign, args| {
+    host.register_foreign_handler_with_context("musi:fs::Musi__remove", |ctx, foreign, args| {
         let path = foreign_string_arg(ctx, foreign, args)?;
         let path = Path::new(path);
         let removed = if path.is_dir() {
@@ -67,7 +61,7 @@ fn register_foreign_handlers(host: &mut NativeHost) {
         Ok(Value::Int(i64::from(removed)))
     });
     host.register_foreign_handler_with_context(
-        "musi:fs::createDirAllIntrinsic",
+        "musi:fs::Musi__createDirAll",
         |ctx, foreign, args| {
             let path = foreign_string_arg(ctx, foreign, args)?;
             Ok(Value::Int(i64::from(fs::create_dir_all(path).is_ok())))

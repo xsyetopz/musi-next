@@ -47,16 +47,14 @@ fn find_nth_name_site(
             let tok = node
                 .child_tokens()
                 .find(|t| matches!(t.kind(), TokenKind::Ident | TokenKind::OpIdent));
-            if let Some(tok) = tok {
-                if let Some(raw) = tok.text() {
-                    let canon = canonical_name_text(tok.kind(), raw);
-                    if canon == spelling {
-                        if hits == nth {
-                            return Some(NameSite::new(source_id, tok.span()));
-                        }
-                        hits += 1;
-                    }
+            if let Some(tok) = tok
+                && let Some(raw) = tok.text()
+            {
+                let canon = canonical_name_text(tok.kind(), raw);
+                if canon == spelling && hits == nth {
+                    return Some(NameSite::new(source_id, tok.span()));
                 }
+                hits += 1;
             }
         }
         for child in node.child_nodes() {

@@ -1,3 +1,4 @@
+let assert := import "@std/assert";
 let expect := import "@std/expect";
 let testing := import "@std/testing";
 
@@ -10,11 +11,11 @@ export let test () :=
     testing.it("'isFailure' detects failure value", failureValue.isFailure(),);
     testing.it(
       "'unwrapOr' returns fallback for failure",
-      testing.toBe(failureValue.unwrapOr(9), 9),
+      assert.toBe(failureValue.unwrapOr(9), 9),
     );
     testing.it(
       "'mapOrElse' handles success value",
-      testing.toBe(
+      assert.toBe(
         expect.mapOrElse[Int, String, Int](
           expect.Success[Int, String](2),
           \(error) => 0,
@@ -25,7 +26,7 @@ export let test () :=
     );
     testing.it(
       "'fold' handles failure value",
-      testing.toBe(
+      assert.toBe(
         expect.fold[Int, String, Int](
           failureValue,
           \(value) => value,

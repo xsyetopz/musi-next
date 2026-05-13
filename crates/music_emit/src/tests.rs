@@ -438,14 +438,12 @@ mod success {
                 if instruction.opcode == Opcode::CallInd {
                     has_indirect_call = true;
                 }
-                if instruction.opcode == Opcode::NewFn {
-                    if let music_seam::Operand::WideProcedureCaptures { captures, .. } =
+                if instruction.opcode == Opcode::NewFn
+                    && let music_seam::Operand::WideProcedureCaptures { captures, .. } =
                         &instruction.operand
-                    {
-                        if *captures != 0 {
-                            has_capturing_closure = true;
-                        }
-                    }
+                    && *captures != 0
+                {
+                    has_capturing_closure = true;
                 }
             }
         }
@@ -527,7 +525,10 @@ mod success {
 
     #[test]
     fn emit_diag_kind_extracts_every_known_emit_code() {
-        for code in 3500u16..=3517u16 {
+        for code in [
+            3500u16, 3501, 3502, 3503, 3504, 3505, 3506, 3507, 3510, 3511, 3512, 3513, 3514, 3515,
+            3516, 3517, 3518, 3519,
+        ] {
             let diag = Diag::error(EmitDiagKind::EmitInvariantViolated.message())
                 .with_code(DiagCode::new(code));
             let kind = emit_diag_kind(&diag).expect("all emit diagnostic codes must map to a kind");
@@ -538,9 +539,9 @@ mod success {
     #[test]
     fn emit_diag_kind_is_code_based_not_message_based() {
         let diag = Diag::error(EmitDiagKind::EmitInvariantViolated.message())
-            .with_code(EmitDiagKind::UnknownEffect.code());
+            .with_code(EmitDiagKind::UnknownRecordType.code());
         let kind = emit_diag_kind(&diag).expect("emit diagnostic code should map");
-        assert_eq!(kind, EmitDiagKind::UnknownEffect);
+        assert_eq!(kind, EmitDiagKind::UnknownRecordType);
     }
 }
 

@@ -13,8 +13,8 @@ use music_resolve::{ResolveOptions, resolve_module};
 use music_syntax::{Lexer, parse};
 
 use super::{
-    EffectKey, EffectRow, ExprMemberKind, ModuleSurface, SemaDataVariantDef, SemaDiagKind, SemaEnv,
-    SemaModule, SemaOptions, SurfaceTyKind, check_module, sema_diag_kind,
+    ExprMemberKind, ModuleSurface, SemaDataVariantDef, SemaDiagKind, SemaEnv, SemaModule,
+    SemaOptions, SurfaceTyKind, TargetInfo, check_module, sema_diag_kind,
 };
 
 #[derive(Default)]
@@ -60,12 +60,46 @@ fn check(src: &str) -> SemaModule {
     check_module_src(1, "main", src, None, None)
 }
 
+fn check_with_target(src: &str, target: TargetInfo) -> SemaModule {
+    check_module_src_with_options(
+        1,
+        "main",
+        src,
+        None,
+        SemaOptions {
+            target: Some(target),
+            env: None,
+            prelude: None,
+        },
+    )
+}
+
 fn check_module_src(
     source_id_raw: u32,
     module_key: &str,
     src: &str,
     import_env: Option<&dyn ImportEnv>,
     sema_env: Option<&dyn SemaEnv>,
+) -> SemaModule {
+    check_module_src_with_options(
+        source_id_raw,
+        module_key,
+        src,
+        import_env,
+        SemaOptions {
+            target: None,
+            env: sema_env,
+            prelude: None,
+        },
+    )
+}
+
+fn check_module_src_with_options(
+    source_id_raw: u32,
+    module_key: &str,
+    src: &str,
+    import_env: Option<&dyn ImportEnv>,
+    options: SemaOptions<'_>,
 ) -> SemaModule {
     let lexed = Lexer::new(src).lex();
     let parsed = parse(lexed);
@@ -84,15 +118,7 @@ fn check_module_src(
             ..ResolveOptions::default()
         },
     );
-    let module = check_module(
-        resolved,
-        &mut interner,
-        SemaOptions {
-            target: None,
-            env: sema_env,
-            prelude: None,
-        },
-    );
+    let module = check_module(resolved, &mut interner, options);
     assert_no_unrendered_templates(&module);
     module
 }
@@ -144,7 +170,7 @@ fn check_with_imported_surface(
     (module_a, module_b)
 }
 
-fn assert_effect_alias_request(binding: &str, source_id: u32) {
+fn assert_imported_record_method_request(binding: &str, source_id: u32) {
     let import_env = TestImportEnv::default().with_module("std/io", "std/io");
     let io = check_module_src(
         source_id,
@@ -262,7 +288,7 @@ mod success {
     }
 
     #[test]
-    fn imported_effect_alias_exposes_ops() {
+    fn imported_record_alias_exposes_methods() {
         let (_module_a, module_b) = check_with_imported_surface(
             42,
             r"
@@ -877,12 +903,12 @@ mod success {
     }
 
     #[test]
-    fn imported_effect_alias_handles_perform_and_handle() {
-        assert_effect_alias_request("let Console := IO.Console;", 16);
+    fn imported_record_alias_supports_method_calling() {
+        assert_imported_record_method_request("let Console := IO.Console;", 16);
     }
 
     #[test]
-    fn perform_effects_expose_textual_names() {
+    fn record_method_calls_expose_textual_names() {
         let sema = check(
             r#"
         let Console := { readLine := \() : String => "" };
@@ -902,31 +928,8 @@ mod success {
     }
 
     #[test]
-    fn destructured_effect_alias_handles_perform_and_handle() {
-        assert_effect_alias_request("let {Console} := IO;", 25);
-    }
-
-    #[test]
-    fn effect_rows_union_and_remove_by_text() {
-        let mut row = EffectRow::empty();
-        row.add(EffectKey {
-            name: "Console".into(),
-            arg: None,
-        });
-
-        let mut other = EffectRow::empty();
-        other.add(EffectKey {
-            name: "State".into(),
-            arg: None,
-        });
-        other.open = Some("rest".into());
-
-        row.union_with(&other);
-        row.remove_by_name("Console");
-
-        assert!(!row.items.iter().any(|item| item.name.as_ref() == "Console"));
-        assert!(row.items.iter().any(|item| item.name.as_ref() == "State"));
-        assert_eq!(row.open.as_deref(), Some("rest"));
+    fn destructured_record_alias_supports_method_calling() {
+        assert_imported_record_method_request("let {Console} := IO;", 25);
     }
 
     #[test]
@@ -950,14 +953,13 @@ mod success {
     }
 
     #[test]
-    fn old_capability_forms_return_no_facts() {
+    fn plain_values_create_no_shape_facts() {
         let sema = check("let value := 1; value;");
         assert!(find_expr(&sema, |kind| matches!(kind, HirExprKind::Shape { .. })).is_none());
-        assert!(find_expr(&sema, |kind| matches!(kind, HirExprKind::Given { .. })).is_none());
     }
 
     #[test]
-    fn exported_effect_ops_keep_structured_params() {
+    fn exported_record_keeps_structured_fields() {
         let sema = check(
             r"
         export let Console := { readLine := \(prompt : String) : String => prompt };
@@ -966,11 +968,10 @@ mod success {
 
         let surface = sema.surface();
         assert!(surface.exported_value("Console").is_some());
-        assert!(surface.exported_effects().is_empty());
     }
 
     #[test]
-    fn handle_with_non_handler_answer_reports_diag() {
+    fn non_callable_record_value_reports_invalid_call_target() {
         let sema = check(
             r#"
         let value := "x";
@@ -1379,6 +1380,147 @@ mod success {
     }
 
     #[test]
+    fn bits_zero_width_typechecks_as_empty_pattern() {
+        let sema = check(
+            r"
+        export let empty (value : Bits[0]) : Bits[0] := value;
+    ",
+        );
+        let surface = sema.surface();
+        let exported = surface
+            .exported_value("empty")
+            .expect("empty export should exist");
+        let SurfaceTyKind::Arrow { params, ret, .. } =
+            &surface.try_ty(exported.ty).expect("empty type exists").kind
+        else {
+            panic!("empty export should have function type");
+        };
+        assert!(
+            matches!(
+                surface.try_ty(params[0]).expect("param type exists").kind,
+                SurfaceTyKind::Bits { width: 0 }
+            ),
+            "{:?}",
+            surface.try_ty(params[0])
+        );
+        assert!(
+            matches!(
+                surface.try_ty(*ret).expect("return type exists").kind,
+                SurfaceTyKind::Bits { width: 0 }
+            ),
+            "{:?}",
+            surface.try_ty(*ret)
+        );
+        assert!(
+            !has_diag(&sema, SemaDiagKind::InvalidBitsWidth),
+            "{:?}",
+            sema.diags()
+        );
+    }
+
+    #[test]
+    fn word_types_canonicalize_to_bits_widths() {
+        let sema = check_with_target(
+            r"
+        export let native (value : Word) : Word := value;
+        export let fixed32 (value : Word32) : Word32 := value;
+        export let fixed64 (value : Word64) : Word64 := value;
+    ",
+            TargetInfo::new().with_pointer_width(64),
+        );
+        let surface = sema.surface();
+        let native = surface
+            .exported_value("native")
+            .expect("native export should exist");
+        let SurfaceTyKind::Arrow {
+            params: native_params,
+            ret: native_ret,
+            ..
+        } = &surface.try_ty(native.ty).expect("native type exists").kind
+        else {
+            panic!("native export should have function type");
+        };
+        assert!(matches!(
+            surface
+                .try_ty(native_params[0])
+                .expect("native param exists")
+                .kind,
+            SurfaceTyKind::Bits { width: 64 }
+        ));
+        assert!(matches!(
+            surface
+                .try_ty(*native_ret)
+                .expect("native return exists")
+                .kind,
+            SurfaceTyKind::Bits { width: 64 }
+        ));
+
+        let fixed = surface
+            .exported_value("fixed32")
+            .expect("fixed32 export should exist");
+        let SurfaceTyKind::Arrow {
+            params: fixed_params,
+            ret: fixed_ret,
+            ..
+        } = &surface.try_ty(fixed.ty).expect("fixed type exists").kind
+        else {
+            panic!("fixed export should have function type");
+        };
+        assert!(matches!(
+            surface
+                .try_ty(fixed_params[0])
+                .expect("fixed param exists")
+                .kind,
+            SurfaceTyKind::Bits { width: 32 }
+        ));
+        assert!(matches!(
+            surface
+                .try_ty(*fixed_ret)
+                .expect("fixed return exists")
+                .kind,
+            SurfaceTyKind::Bits { width: 32 }
+        ));
+        let fixed64 = surface
+            .exported_value("fixed64")
+            .expect("fixed64 export should exist");
+        let SurfaceTyKind::Arrow {
+            params: fixed64_params,
+            ret: fixed64_ret,
+            ..
+        } = &surface
+            .try_ty(fixed64.ty)
+            .expect("fixed64 type exists")
+            .kind
+        else {
+            panic!("fixed64 export should have function type");
+        };
+        assert!(matches!(
+            surface
+                .try_ty(fixed64_params[0])
+                .expect("fixed64 param exists")
+                .kind,
+            SurfaceTyKind::Bits { width: 64 }
+        ));
+        assert!(matches!(
+            surface
+                .try_ty(*fixed64_ret)
+                .expect("fixed64 return exists")
+                .kind,
+            SurfaceTyKind::Bits { width: 64 }
+        ));
+        assert!(
+            !has_diag(&sema, SemaDiagKind::InvalidBitsWidth),
+            "{:?}",
+            sema.diags()
+        );
+        assert!(
+            !has_diag(&sema, SemaDiagKind::TypeMismatch),
+            "{:?}",
+            sema.diags()
+        );
+    }
+
+    #[test]
     fn logical_operator_family_rejects_mismatched_domains() {
         let sema = check(
             r"
@@ -1442,7 +1584,7 @@ mod success {
     }
 
     #[test]
-    fn request_effect_rows_capture_declared_effects() {
+    fn record_method_calls_preserve_result_type() {
         let sema = check(
             r#"
         let State := { readLine := \() : String => "" };
@@ -1463,7 +1605,7 @@ mod success {
     }
 
     #[test]
-    fn handle_with_bound_answer_value_parses_current_syntax() {
+    fn bound_record_method_call_parses_current_syntax() {
         let sema = check(
             r"
         let Console := { readLine := \() : Int => 42 };
@@ -1986,7 +2128,7 @@ mod failure {
     }
 
     #[test]
-    fn handle_with_non_handler_answer_reports_diag() {
+    fn non_callable_value_reports_invalid_call_target() {
         let sema = check(
             r#"
         let value := "ok";
@@ -2230,6 +2372,55 @@ mod failure {
         let sema = check("@link(name := \"c\") let x := 1;");
         assert!(
             has_diag(&sema, SemaDiagKind::AttrLinkRequiresForeignLet),
+            "{:?}",
+            sema.diags()
+        );
+    }
+
+    #[test]
+    fn target_attr_accepts_matching_plain_module_let() {
+        let sema = check_with_target(
+            r#"
+        @target(os := "linux", arch := "x86_64", pointerWidth := 64)
+        let linuxValue : Int := 1;
+        let result : Int := linuxValue;
+    "#,
+            TargetInfo::new()
+                .with_os("linux")
+                .with_arch("x86_64")
+                .with_pointer_width(64),
+        );
+
+        assert!(
+            !has_diag(&sema, SemaDiagKind::TargetGateRejected),
+            "{:?}",
+            sema.diags()
+        );
+        assert!(
+            !has_diag(&sema, SemaDiagKind::AttrLinkRequiresForeignLet),
+            "{:?}",
+            sema.diags()
+        );
+    }
+
+    #[test]
+    fn target_attr_rejects_non_matching_plain_module_let_use() {
+        let sema = check_with_target(
+            r#"
+        @target(os := "macos")
+        let macosValue : Int := 1;
+        let result : Int := macosValue;
+    "#,
+            TargetInfo::new().with_os("linux"),
+        );
+
+        assert!(
+            has_diag(&sema, SemaDiagKind::TargetGateRejected),
+            "{:?}",
+            sema.diags()
+        );
+        assert!(
+            !has_diag(&sema, SemaDiagKind::AttrLinkRequiresForeignLet),
             "{:?}",
             sema.diags()
         );

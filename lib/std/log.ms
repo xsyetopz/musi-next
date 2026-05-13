@@ -1,4 +1,4 @@
---! Logging helper namespace.
+--! Logging module.
 
 let io := import "@std/io";
 let text := import "@std/text";
@@ -10,9 +10,6 @@ export hidden let Level := data {
   | Warn := 30
   | Error := 40
 };
-
-@external(abi := .musi)
-let levelTagIntrinsic (level : Level) : Int;
 
 --- Debug log level.
 export let debugLevel : Level := .Debug;
@@ -27,9 +24,13 @@ export let warnLevel : Level := .Warn;
 export let errorLevel : Level := .Error;
 
 --- Numeric level value.
-export let (self : Level).value () : Int := unsafe {
-  levelTagIntrinsic(self);
-};
+export let (self : Level).value () : Int :=
+  match self (
+  | .Debug => 10
+  | .Info => 20
+  | .Warn => 30
+  | .Error => 40
+  );
 
 --- Lower-case level name.
 export let (self : Level).name () : String :=

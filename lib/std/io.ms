@@ -1,4 +1,4 @@
---! Input and output helper namespace.
+--! Input and output module.
 
 let ioHost := import "musi:io";
 

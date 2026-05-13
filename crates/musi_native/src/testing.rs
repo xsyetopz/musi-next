@@ -99,7 +99,7 @@ impl TestHost {
         let op = foreign
             .name()
             .strip_prefix("musi:test::")
-            .and_then(|name| name.strip_suffix("Intrinsic"))?;
+            .and_then(|name| name.strip_prefix("Musi__"))?;
         let Some(collector) = self.collector.as_mut() else {
             return Some(Err(VmError::new(VmErrorKind::ForeignCallRejected {
                 foreign: foreign.name().into(),

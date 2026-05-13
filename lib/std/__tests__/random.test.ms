@@ -1,3 +1,4 @@
+let assert := import "@std/assert";
 let random := import "@std/random";
 let testing := import "@std/testing";
 
@@ -16,7 +17,7 @@ export let test () :=
     testing.it("'nextFloat' stays below one", random.nextFloat() <= 1.0,);
     testing.it(
       "'chance' always fails below zero",
-      testing.toBeFalse(random.chance(- 1)),
+      assert.toBeFalse(random.chance(- 1)),
     );
     testing.it("'chance' always passes above one hundred", random.chance(101),);
     testing.endDescribe()

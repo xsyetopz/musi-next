@@ -19,7 +19,7 @@ export let pair [T] (first : T, second : T) : List[T] :=
 export let fromArray [T] (values : []T) : List[T] :=
   .ListValues(values := [...values]);
 
---- Core operation for `toArray`.
+--- Function for `toArray`.
 let listToArray [T] (target : List[T]) : []T :=
   match target (
   | .ListValues(values := values) =>[...values]
@@ -28,14 +28,14 @@ let listToArray [T] (target : List[T]) : []T :=
 --- Return a copy of list values.
 export let toArray [T] (target : List[T]) : []T := listToArray[T](target);
 
---- Core operation for `copy`.
+--- Function for `copy`.
 let copyList [T] (target : List[T]) : List[T] :=
   fromArray[T](listToArray[T](target));
 
 --- Copy a list.
 export let copy [T] (target : List[T]) : List[T] := copyList[T](target);
 
---- Core operation for `concat`.
+--- Function for `concat`.
 let concatList [T] (target : List[T], other : List[T]) : List[T] :=
   fromArray[T]([...listToArray[T](target), ...listToArray[T](other)]);
 
@@ -43,7 +43,7 @@ let concatList [T] (target : List[T], other : List[T]) : List[T] :=
 export let concat [T] (target : List[T], other : List[T]) : List[T] :=
   concatList[T](target, other);
 
---- Core operation for `append`.
+--- Function for `append`.
 let appendList [T] (target : List[T], value : T) : List[T] :=
   fromArray[T]([...listToArray[T](target), value]);
 
@@ -51,7 +51,7 @@ let appendList [T] (target : List[T], value : T) : List[T] :=
 export let append [T] (target : List[T], value : T) : List[T] :=
   appendList[T](target, value);
 
---- Core operation for `prepend`.
+--- Function for `prepend`.
 let prependList [T] (target : List[T], value : T) : List[T] :=
   fromArray[T]([value, ...listToArray[T](target)]);
 
@@ -59,7 +59,7 @@ let prependList [T] (target : List[T], value : T) : List[T] :=
 export let prepend [T] (target : List[T], value : T) : List[T] :=
   prependList[T](target, value);
 
---- Core operation for `equalsInt`.
+--- Function for `equalsInt`.
 let listsEqualInt (target : List[Int], other : List[Int]) : Bit :=
   listToArray[Int](target) = listToArray[Int](other);
 
@@ -67,14 +67,14 @@ let listsEqualInt (target : List[Int], other : List[Int]) : Bit :=
 export let equalsInt (target : List[Int], other : List[Int]) : Bit :=
   listsEqualInt(target, other);
 
---- Core operation for `isEmpty`.
+--- Function for `isEmpty`.
 let listIsEmpty [T] (target : List[T]) : Bit :=
   match listToArray[T](target) (
   | [] => 0 = 0
   | _ => 0 = 1
   );
 
---- Core operation for `nonEmpty`.
+--- Function for `nonEmpty`.
 let listNonEmpty [T] (target : List[T]) : Bit :=
   match listToArray[T](target) (
   | [] => 0 = 1

@@ -12,7 +12,7 @@ export let Some [T] (value : T) : Maybe[T] := .Some(value);
 --- Build None maybe value.
 export let None [T] () : Maybe[T] := .None;
 
---- Core operation for `isSome`.
+--- Function for `isSome`.
 let maybeIsSome [T] (target : Maybe[T]) : Bit :=
   match target (
   | .Some(_) => 0 = 0
@@ -22,7 +22,7 @@ let maybeIsSome [T] (target : Maybe[T]) : Bit :=
 --- Returns true when target contains a value.
 export let isSome [T] (target : Maybe[T]) : Bit := maybeIsSome[T](target);
 
---- Core operation for `isNone`.
+--- Function for `isNone`.
 let maybeIsNone [T] (target : Maybe[T]) : Bit :=
   match target (
   | .Some(_) => 0 = 1
@@ -32,7 +32,7 @@ let maybeIsNone [T] (target : Maybe[T]) : Bit :=
 --- Returns true when target is None.
 export let isNone [T] (target : Maybe[T]) : Bit := maybeIsNone[T](target);
 
---- Core operation for `unwrapOr`.
+--- Function for `unwrapOr`.
 let maybeUnwrapOr [T] (target : Maybe[T], fallback : T) : T :=
   match target (
   | .Some(item) => item
@@ -43,7 +43,7 @@ let maybeUnwrapOr [T] (target : Maybe[T], fallback : T) : T :=
 export let unwrapOr [T] (target : Maybe[T], fallback : T) : T :=
   maybeUnwrapOr[T](target, fallback);
 
---- Core operation for `unwrapOrElse`.
+--- Function for `unwrapOrElse`.
 let maybeUnwrapOrElse [T] (target : Maybe[T], fallback : () -> T) : T :=
   match target (
   | .Some(item) => item
@@ -54,7 +54,7 @@ let maybeUnwrapOrElse [T] (target : Maybe[T], fallback : () -> T) : T :=
 export let unwrapOrElse [T] (target : Maybe[T], fallback : () -> T) : T :=
   maybeUnwrapOrElse[T](target, fallback);
 
---- Core operation for `map`.
+--- Function for `map`.
 let maybeMap [T, U] (target : Maybe[T], f : T -> U) : Maybe[U] :=
   match target (
   | .Some(item) => Some[U](f(item))
@@ -65,7 +65,7 @@ let maybeMap [T, U] (target : Maybe[T], f : T -> U) : Maybe[U] :=
 export let map [T, U] (target : Maybe[T], f : T -> U) : Maybe[U] :=
   maybeMap[T, U](target, f);
 
---- Core operation for `mapOr`.
+--- Function for `mapOr`.
 let maybeMapOr [T, U] (target : Maybe[T], fallback : U, f : T -> U) : U :=
   match target (
   | .Some(item) => f(item)
@@ -76,7 +76,7 @@ let maybeMapOr [T, U] (target : Maybe[T], fallback : U, f : T -> U) : U :=
 export let mapOr [T, U] (target : Maybe[T], fallback : U, f : T -> U) : U :=
   maybeMapOr[T, U](target, fallback, f);
 
---- Core operation for `mapOrElse`.
+--- Function for `mapOrElse`.
 let maybeMapOrElse [T, U] (
   target : Maybe[T],
   fallback : () -> U,
@@ -94,7 +94,7 @@ export let mapOrElse [T, U] (
   f : T -> U
 ) : U := maybeMapOrElse[T, U](target, fallback, f);
 
---- Core operation for `andThen`.
+--- Function for `andThen`.
 let maybeAndThen [T, U] (target : Maybe[T], f : T -> Maybe[U]) : Maybe[U] :=
   match target (
   | .Some(item) => f(item)
@@ -105,7 +105,7 @@ let maybeAndThen [T, U] (target : Maybe[T], f : T -> Maybe[U]) : Maybe[U] :=
 export let andThen [T, U] (target : Maybe[T], f : T -> Maybe[U]) : Maybe[U] :=
   maybeAndThen[T, U](target, f);
 
---- Core operation for `orElse`.
+--- Function for `orElse`.
 let maybeOrElse [T] (target : Maybe[T], fallback : Maybe[T]) : Maybe[T] :=
   match target (
   | .Some(_) => target
@@ -116,7 +116,7 @@ let maybeOrElse [T] (target : Maybe[T], fallback : Maybe[T]) : Maybe[T] :=
 export let orElse [T] (target : Maybe[T], fallback : Maybe[T]) : Maybe[T] :=
   maybeOrElse[T](target, fallback);
 
---- Core operation for `filter`.
+--- Function for `filter`.
 let maybeFilter [T] (target : Maybe[T], predicate : T -> Bit) : Maybe[T] :=
   match target (
   | .Some(item)where predicate(item) => target
@@ -128,7 +128,7 @@ let maybeFilter [T] (target : Maybe[T], predicate : T -> Bit) : Maybe[T] :=
 export let filter [T] (target : Maybe[T], predicate : T -> Bit) : Maybe[T] :=
   maybeFilter[T](target, predicate);
 
---- Core operation for `fold`.
+--- Function for `fold`.
 let maybeFold [T, U] (target : Maybe[T], onNone : U, onSome : T -> U) : U :=
   match target (
   | .Some(item) => onSome(item)

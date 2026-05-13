@@ -1,4 +1,4 @@
---! Process helper namespace.
+--! Process module.
 
 let maybe := import "@std/maybe";
 let Maybe := maybe.Maybe;

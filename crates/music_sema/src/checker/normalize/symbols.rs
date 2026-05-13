@@ -39,8 +39,14 @@ fn simple_named_type_for_symbol(
 }
 
 impl PassBase<'_, '_, '_> {
-    pub(in crate::checker) fn builtin_type_alias_for_name(&self, name: &str) -> Option<HirTyId> {
+    pub(in crate::checker) fn builtin_type_alias_for_name(
+        &mut self,
+        name: &str,
+    ) -> Option<HirTyId> {
         let builtins = self.builtins();
+        if let Some(width) = self.word_width_for_name(name) {
+            return Some(self.alloc_ty(HirTyKind::Bits { width }));
+        }
         [
             ("Nat", builtins.nat),
             ("Int", builtins.int_),
@@ -98,6 +104,10 @@ impl PassBase<'_, '_, '_> {
         if let Some(ty) = simple_named_type_for_symbol(known, builtins, symbol) {
             return ty;
         }
+        let symbol_name = self.resolve_symbol(symbol).to_owned();
+        if let Some(ty) = self.builtin_type_alias_for_name(&symbol_name) {
+            return ty;
+        }
         if let Some(ty) = self.type_alias(symbol) {
             return ty;
         }
@@ -125,6 +135,11 @@ impl PassBase<'_, '_, '_> {
             known.unit,
             known.bool_,
             known.bits,
+            known.word,
+            known.word8,
+            known.word16,
+            known.word32,
+            known.word64,
             known.range,
             known.pin,
             known.closed_range,
@@ -154,6 +169,20 @@ impl PassBase<'_, '_, '_> {
             builtins.type_
         } else {
             builtins.unknown
+        }
+    }
+
+    fn word_width_for_name(&self, name: &str) -> Option<u32> {
+        match name {
+            "Word" => self
+                .target()
+                .and_then(|target| target.pointer_width)
+                .map(u32::from),
+            "Word8" => Some(8),
+            "Word16" => Some(16),
+            "Word32" => Some(32),
+            "Word64" => Some(64),
+            _ => None,
         }
     }
 }

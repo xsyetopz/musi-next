@@ -1,4 +1,4 @@
---! Encoding helper namespace.
+--! Encoding module.
 
 --- Hex encoding module.
 export let hex := import "./encoding/hex.ms";

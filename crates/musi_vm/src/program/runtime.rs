@@ -58,14 +58,6 @@ pub enum RuntimeKernel {
         ty: TypeId,
         cells: [i64; 8],
     },
-    InlineEffectResume {
-        resume_value: i16,
-        value_add: i16,
-    },
-    InlineEffectResumeClauses {
-        value_clause: ProcedureId,
-        op_clause: ProcedureId,
-    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

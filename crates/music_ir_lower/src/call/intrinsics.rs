@@ -14,7 +14,7 @@ pub(super) fn lower_std_cmp_intrinsic(
     let HirExprKind::Name { name } = ctx.sema.module().store.exprs.get(callee).kind else {
         return None;
     };
-    if ctx.interner.resolve(name.name) != "compareFloatTotalIntrinsic" {
+    if ctx.interner.resolve(name.name) != "Musi__compareFloatTotal" {
         return None;
     }
     let lowered_args = args
@@ -43,13 +43,13 @@ pub(super) fn lower_std_libm_intrinsic(
         return None;
     };
     let target = match ctx.interner.resolve(name.name) {
-        "floatIsNanIntrinsic" => (IrIntrinsicKind::FloatIsNan, "float.is_nan", "Bool"),
-        "floatIsInfiniteIntrinsic" => (
+        "Musi__floatIsNan" => (IrIntrinsicKind::FloatIsNan, "float.is_nan", "Bool"),
+        "Musi__floatIsInfinite" => (
             IrIntrinsicKind::FloatIsInfinite,
             "float.is_infinite",
             "Bool",
         ),
-        "floatIsFiniteIntrinsic" => (IrIntrinsicKind::FloatIsFinite, "float.is_finite", "Bool"),
+        "Musi__floatIsFinite" => (IrIntrinsicKind::FloatIsFinite, "float.is_finite", "Bool"),
         _ => return None,
     };
     let lowered_args = args
@@ -112,20 +112,18 @@ fn pointer_intrinsic_target(
     };
     let name = ctx.interner.resolve(name.name);
     match name {
-        "ptrNullIntrinsic" if is_std_ffi_module(&ctx.module_key) => Some(PointerIntrinsicTarget {
+        "Musi__ptrNull" if is_std_ffi_module(&ctx.module_key) => Some(PointerIntrinsicTarget {
             kind: IrIntrinsicKind::FfiPtrNull,
             symbol: "ffi.ptr.null".into(),
             param_tys: Box::default(),
             result_ty: "CPtr".into(),
         }),
-        "ptrIsNullIntrinsic" if is_std_ffi_module(&ctx.module_key) => {
-            Some(PointerIntrinsicTarget {
-                kind: IrIntrinsicKind::FfiPtrIsNull,
-                symbol: "ffi.ptr.is_null".into(),
-                param_tys: Box::new(["CPtr".into()]),
-                result_ty: "Bool".into(),
-            })
-        }
+        "Musi__ptrIsNull" if is_std_ffi_module(&ctx.module_key) => Some(PointerIntrinsicTarget {
+            kind: IrIntrinsicKind::FfiPtrIsNull,
+            symbol: "ffi.ptr.is_null".into(),
+            param_tys: Box::new(["CPtr".into()]),
+            result_ty: "Bool".into(),
+        }),
         "offset" if is_std_ffi_public_pointer_callee(ctx, callee) => {
             pointer_public_offset_target(ctx, type_arg?)
         }

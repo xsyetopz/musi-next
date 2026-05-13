@@ -324,7 +324,7 @@ pub fn member_class(sema: &SemaModule, fact: &ExprMemberFact) -> ToolMemberShape
                 ToolMemberShape::Property
             }
         }
-        ExprMemberKind::EffectOperation | ExprMemberKind::ShapeMember => ToolMemberShape::Procedure,
+        ExprMemberKind::ShapeMember => ToolMemberShape::Procedure,
         ExprMemberKind::ImportRecordExport | ExprMemberKind::FfiPointerExport => {
             exported_member_class(sema, fact.ty)
         }
@@ -352,9 +352,7 @@ pub fn binding_symbol_kind(
     sema: Option<&SemaModule>,
 ) -> ToolSymbolKind {
     match binding.kind {
-        NameBindingKind::Param
-        | NameBindingKind::HandleClauseParam
-        | NameBindingKind::HandleClauseResult => ToolSymbolKind::Parameter,
+        NameBindingKind::Param => ToolSymbolKind::Parameter,
         NameBindingKind::PiBinder | NameBindingKind::TypeParam => ToolSymbolKind::TypeParameter,
         NameBindingKind::Prelude
         | NameBindingKind::Import

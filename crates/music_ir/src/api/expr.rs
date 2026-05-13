@@ -467,6 +467,11 @@ pub enum IrExprKind {
         left: Box<IrExpr>,
         right: Box<IrExpr>,
     },
+    If {
+        condition: Box<IrExpr>,
+        then_expr: Box<IrExpr>,
+        else_expr: Box<IrExpr>,
+    },
     Range {
         ty_name: Box<str>,
         kind: IrRangeKind,
@@ -521,48 +526,4 @@ pub enum IrExprKind {
         callee: Box<IrExpr>,
         args: Box<[IrSeqPart]>,
     },
-    Request {
-        effect_key: DefinitionKey,
-        op_index: u16,
-        args: Box<[IrExpr]>,
-    },
-    RequestSeq {
-        effect_key: DefinitionKey,
-        op_index: u16,
-        args: Box<[IrSeqPart]>,
-    },
-    AnswerLit {
-        effect_key: DefinitionKey,
-        value: Box<IrExpr>,
-        ops: Box<[IrHandleOp]>,
-    },
-    Handle {
-        effect_key: DefinitionKey,
-        answer: Box<IrExpr>,
-        body: Box<IrExpr>,
-    },
-    Resume {
-        expr: Option<Box<IrExpr>>,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IrHandleOp {
-    pub op_index: u16,
-    pub name: Box<str>,
-    pub closure: IrExpr,
-}
-
-impl IrHandleOp {
-    #[must_use]
-    pub fn new<Name>(op_index: u16, name: Name, closure: IrExpr) -> Self
-    where
-        Name: Into<Box<str>>,
-    {
-        Self {
-            op_index,
-            name: name.into(),
-            closure,
-        }
-    }
 }

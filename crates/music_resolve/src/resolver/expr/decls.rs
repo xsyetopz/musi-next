@@ -135,7 +135,6 @@ where
                 has_param_clause,
                 params,
                 constraints,
-                effects: None,
                 sig,
                 value: body_expr,
             },
@@ -262,14 +261,6 @@ where
         HirFieldDef::new(origin, attrs, name, ty, default_value)
     }
 
-    pub(super) fn lower_effect_expr(&mut self, node: SyntaxNode<'tree, 'src>) -> HirExprId {
-        let origin = self.origin_node(node);
-        self.push_scope();
-        let members = self.lower_members(node);
-        self.pop_scope();
-        self.alloc_expr(origin, HirExprKind::Effect { members })
-    }
-
     pub(super) fn lower_shape_expr(&mut self, node: SyntaxNode<'tree, 'src>) -> HirExprId {
         let origin = self.origin_node(node);
         self.push_scope();
@@ -280,30 +271,6 @@ where
             origin,
             HirExprKind::Shape {
                 constraints,
-                members,
-            },
-        )
-    }
-
-    pub(super) fn lower_given_expr(&mut self, node: SyntaxNode<'tree, 'src>) -> HirExprId {
-        let origin = self.origin_node(node);
-        self.push_scope();
-
-        let type_params = self.lower_type_params_clause(node);
-        let constraints = self.lower_constraints_clause(node);
-        let shape = match node.child_nodes().find(|n| is_expr_or_ty(n.kind())) {
-            Some(expr) => self.lower_expr(expr),
-            None => self.error_expr(origin),
-        };
-        let members = self.lower_members(node);
-
-        self.pop_scope();
-        self.alloc_expr(
-            origin,
-            HirExprKind::Given {
-                type_params,
-                constraints,
-                capability: shape,
                 members,
             },
         )
@@ -378,9 +345,6 @@ where
         let has_param_clause = child_of_kind(node, SyntaxNodeKind::ParamList).is_some();
         let params = self.lower_let_params_clause(node);
         let constraints = self.lower_constraints_clause(node);
-        let effects = child_of_kind(node, SyntaxNodeKind::EffectSet)
-            .map(|effect_set| self.lower_effect_set(effect_set));
-
         let mut exprs = node
             .child_nodes()
             .filter(|child| is_expr_or_ty(child.kind()));
@@ -414,7 +378,6 @@ where
                 has_param_clause,
                 params,
                 constraints,
-                effects,
                 sig,
                 value: value_expr,
             },
@@ -444,8 +407,6 @@ where
         }
         let params = self.store.params.alloc_from_iter(params);
         let constraints = self.lower_constraints_clause(node);
-        let effects = child_of_kind(node, SyntaxNodeKind::EffectSet)
-            .map(|effect_set| self.lower_effect_set(effect_set));
         let mut exprs = node
             .child_nodes()
             .filter(|child| is_expr_or_ty(child.kind()));
@@ -474,7 +435,6 @@ where
                 has_param_clause: true,
                 params,
                 constraints,
-                effects,
                 sig,
                 value: value_expr,
             },

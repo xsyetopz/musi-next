@@ -50,4 +50,20 @@ where
         self.pop_scope();
         HirMatchArm::new(attrs, pat, guard, expr)
     }
+
+    pub(super) fn lower_if_expr(&mut self, node: SyntaxNode<'tree, 'src>) -> HirExprId {
+        let origin = self.origin_node(node);
+        let mut exprs = node.child_nodes().filter(|child| child.kind().is_expr());
+        let condition = self.lower_opt_expr(origin, exprs.next());
+        let then_expr = self.lower_opt_expr(origin, exprs.next());
+        let else_expr = self.lower_opt_expr(origin, exprs.next());
+        self.alloc_expr(
+            origin,
+            HirExprKind::If {
+                condition,
+                then_expr,
+                else_expr,
+            },
+        )
+    }
 }

@@ -1,10 +1,8 @@
-use music_module::ModuleKey;
-use music_sema::{DefinitionKey, ExportedValue, SurfaceTy};
-
 use super::{
-    IrCallable, IrDataDef, IrEffectDef, IrForeignDef, IrGivenDef, IrGlobal, IrMetaRecord,
-    IrModuleInitPart, IrShapeDef,
+    IrCallable, IrDataDef, IrForeignDef, IrGlobal, IrMetaRecord, IrModuleInitPart, IrShapeDef,
 };
+use music_module::ModuleKey;
+use music_sema::{ExportedValue, SurfaceTy};
 
 #[derive(Debug, Clone)]
 pub struct IrModule {
@@ -17,9 +15,7 @@ pub struct IrModule {
     init_parts: Box<[IrModuleInitPart]>,
     data_defs: Box<[IrDataDef]>,
     foreigns: Box<[IrForeignDef]>,
-    effects: Box<[IrEffectDef]>,
     shapes: Box<[IrShapeDef]>,
-    givens: Box<[IrGivenDef]>,
     meta: Box<[IrMetaRecord]>,
 }
 
@@ -31,9 +27,7 @@ pub struct IrModuleParts {
     pub init_parts: Box<[IrModuleInitPart]>,
     pub data_defs: Box<[IrDataDef]>,
     pub foreigns: Box<[IrForeignDef]>,
-    pub effects: Box<[IrEffectDef]>,
     pub shapes: Box<[IrShapeDef]>,
-    pub givens: Box<[IrGivenDef]>,
     pub meta: Box<[IrMetaRecord]>,
 }
 
@@ -55,9 +49,7 @@ impl IrModule {
             init_parts: parts.init_parts,
             data_defs: parts.data_defs,
             foreigns: parts.foreigns,
-            effects: parts.effects,
             shapes: parts.shapes,
-            givens: parts.givens,
             meta: parts.meta,
         }
     }
@@ -108,18 +100,8 @@ impl IrModule {
     }
 
     #[must_use]
-    pub fn effects(&self) -> &[IrEffectDef] {
-        &self.effects
-    }
-
-    #[must_use]
     pub fn shapes(&self) -> &[IrShapeDef] {
         &self.shapes
-    }
-
-    #[must_use]
-    pub fn givens(&self) -> &[IrGivenDef] {
-        &self.givens
     }
 
     #[must_use]
@@ -132,15 +114,5 @@ impl IrModule {
         self.exports
             .iter()
             .find(|value| value.name.as_ref() == name)
-    }
-
-    #[must_use]
-    pub fn effect(&self, key: &DefinitionKey) -> Option<&IrEffectDef> {
-        self.effects.iter().find(|effect| &effect.key == key)
-    }
-
-    #[must_use]
-    pub fn shape(&self, key: &DefinitionKey) -> Option<&IrShapeDef> {
-        self.shapes.iter().find(|shape| &shape.key == key)
     }
 }

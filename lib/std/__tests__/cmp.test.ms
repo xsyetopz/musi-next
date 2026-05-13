@@ -1,3 +1,4 @@
+let assert := import "@std/assert";
 let cmp := import "@std/cmp";
 let testing := import "@std/testing";
 
@@ -41,7 +42,7 @@ export let test () :=
     );
     testing.it(
       "'clampInt' clamps values",
-      testing.toBe(cmp.clampInt(11, 0, 10), 10),
+      assert.toBe(cmp.clampInt(11, 0, 10), 10),
     );
     testing.endDescribe()
   );

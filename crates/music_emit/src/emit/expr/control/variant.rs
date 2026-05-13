@@ -232,12 +232,11 @@ pub(super) fn group_variant_arms_by_tag(
 ) -> Vec<Vec<&IrMatchArm>> {
     let mut out = vec![Vec::<&IrMatchArm>::new(); usize::from(variant_count)];
     for arm in arms {
-        if let Some(info) = pattern_variantish(&arm.pattern) {
-            if let Ok(idx) = usize::try_from(info.tag_value)
-                && idx < out.len()
-            {
-                out[idx].push(arm);
-            }
+        if let Some(info) = pattern_variantish(&arm.pattern)
+            && let Ok(idx) = usize::try_from(info.tag_value)
+            && idx < out.len()
+        {
+            out[idx].push(arm);
         }
     }
     out

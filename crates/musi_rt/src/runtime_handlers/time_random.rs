@@ -6,12 +6,13 @@ use musi_foundation::{random as foundation_random, time as foundation_time};
 use musi_native::NativeHost;
 use musi_vm::{EffectCall, Value, VmError};
 
-use super::errors::{invalid_runtime_args, runtime_effect_failed};
+use super::encoding::hex_encode;
+use super::errors::{foreign_rejected, invalid_runtime_args, runtime_effect_failed};
 
 type RandomStateCell = Arc<Mutex<u64>>;
 
 pub(super) fn register(host: &mut NativeHost) {
-    host.register_foreign_handler("musi:time::nowUnixMsIntrinsic", |foreign, args| {
+    host.register_foreign_handler("musi:time::Musi__nowUnixMs", |foreign, args| {
         if !args.is_empty() {
             return Err(VmError::new(musi_vm::VmErrorKind::ForeignCallRejected {
                 foreign: foreign.name().into(),
@@ -26,7 +27,7 @@ pub(super) fn register(host: &mut NativeHost) {
             i64::try_from(now.as_millis()).unwrap_or(i64::MAX),
         ))
     });
-    host.register_foreign_handler("musi:time::monotonicMsIntrinsic", |foreign, args| {
+    host.register_foreign_handler("musi:time::Musi__monotonicMs", |foreign, args| {
         if !args.is_empty() {
             return Err(VmError::new(musi_vm::VmErrorKind::ForeignCallRejected {
                 foreign: foreign.name().into(),
@@ -36,7 +37,7 @@ pub(super) fn register(host: &mut NativeHost) {
             i64::try_from(monotonic_origin().elapsed().as_millis()).unwrap_or(i64::MAX),
         ))
     });
-    host.register_foreign_handler("musi:time::sleepMsIntrinsic", |foreign, args| {
+    host.register_foreign_handler("musi:time::Musi__sleepMs", |foreign, args| {
         let [Value::Int(ms)] = args else {
             return Err(VmError::new(musi_vm::VmErrorKind::ForeignCallRejected {
                 foreign: foreign.name().into(),
@@ -91,8 +92,13 @@ pub(super) fn register(host: &mut NativeHost) {
 }
 
 fn register_random(host: &mut NativeHost, random_state: &RandomStateCell) {
+    register_random_foreign_handlers(host, random_state);
+    register_random_effect_handlers(host, random_state);
+}
+
+fn register_random_foreign_handlers(host: &mut NativeHost, random_state: &RandomStateCell) {
     let foreign_int_random_state = Arc::clone(random_state);
-    host.register_foreign_handler("musi:random::intIntrinsic", move |foreign, args| {
+    host.register_foreign_handler("musi:random::Musi__int", move |foreign, args| {
         if !args.is_empty() {
             return Err(VmError::new(musi_vm::VmErrorKind::ForeignCallRejected {
                 foreign: foreign.name().into(),
@@ -101,7 +107,7 @@ fn register_random(host: &mut NativeHost, random_state: &RandomStateCell) {
         Ok(Value::Int(next_random_int(&foreign_int_random_state)))
     });
     let foreign_ranged_random_state = Arc::clone(random_state);
-    host.register_foreign_handler("musi:random::intInRangeIntrinsic", move |foreign, args| {
+    host.register_foreign_handler("musi:random::Musi__intInRange", move |foreign, args| {
         let [Value::Int(lower_bound), Value::Int(upper_bound)] = args else {
             return Err(VmError::new(musi_vm::VmErrorKind::ForeignCallRejected {
                 foreign: foreign.name().into(),
@@ -114,7 +120,7 @@ fn register_random(host: &mut NativeHost, random_state: &RandomStateCell) {
         )))
     });
     let foreign_bool_random_state = Arc::clone(random_state);
-    host.register_foreign_handler("musi:random::boolIntrinsic", move |foreign, args| {
+    host.register_foreign_handler("musi:random::Musi__bool", move |foreign, args| {
         if !args.is_empty() {
             return Err(VmError::new(musi_vm::VmErrorKind::ForeignCallRejected {
                 foreign: foreign.name().into(),
@@ -123,7 +129,7 @@ fn register_random(host: &mut NativeHost, random_state: &RandomStateCell) {
         Ok(Value::Int(next_random_int(&foreign_bool_random_state) & 1))
     });
     let foreign_float_random_state = Arc::clone(random_state);
-    host.register_foreign_handler("musi:random::float01Intrinsic", move |foreign, args| {
+    host.register_foreign_handler("musi:random::Musi__float01", move |foreign, args| {
         if !args.is_empty() {
             return Err(VmError::new(musi_vm::VmErrorKind::ForeignCallRejected {
                 foreign: foreign.name().into(),
@@ -131,7 +137,21 @@ fn register_random(host: &mut NativeHost, random_state: &RandomStateCell) {
         }
         Ok(Value::Float(random_float01(&foreign_float_random_state)))
     });
+    host.register_foreign_handler_with_context(
+        "musi:random::Musi__entropyHex",
+        |ctx, foreign, args| {
+            let [Value::Int(count)] = args else {
+                return Err(foreign_rejected(foreign));
+            };
+            let count = usize::try_from((*count).max(0)).unwrap_or(0);
+            let mut bytes = vec![0u8; count];
+            getrandom::fill(&mut bytes).map_err(|_| foreign_rejected(foreign))?;
+            ctx.alloc_string(hex_encode(&bytes))
+        },
+    );
+}
 
+fn register_random_effect_handlers(host: &mut NativeHost, random_state: &RandomStateCell) {
     let int_random_state = Arc::clone(random_state);
     host.register_effect_handler(
         foundation_random::EFFECT,

@@ -14,8 +14,6 @@ pub enum EmitDiagKind {
     UnknownDataType,
     SpreadCallArgsNotEmitted,
     UnknownClosureTarget,
-    UnknownEffect,
-    UnknownHandlerType,
     UnknownRecordType,
     RecordLiteralMissingFieldValue,
     RecordUpdateMissingFieldValue,

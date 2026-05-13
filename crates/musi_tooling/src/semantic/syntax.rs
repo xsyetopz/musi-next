@@ -89,7 +89,6 @@ const fn is_typed_context_node(kind: SyntaxNodeKind) -> bool {
             | SyntaxNodeKind::Member
             | SyntaxNodeKind::LambdaExpr
             | SyntaxNodeKind::Constraint
-            | SyntaxNodeKind::EffectItem
     )
 }
 

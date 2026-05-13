@@ -6,8 +6,8 @@ use music_seam::{ForeignId, Instruction, Opcode, Operand, TypeId};
 use crate::VmValueKind;
 
 use super::target::{
-    jit_backend, jit_isa, jit_supported, normalize_arch_text, normalize_target_text, target_arch,
-    target_arch_family, target_endian, target_family, target_os,
+    normalize_arch_text, normalize_target_text, target_arch, target_arch_family, target_endian,
+    target_family, target_os,
 };
 use super::{ForeignCall, StepOutcome, Value, Vm, VmError, VmErrorKind, VmResult};
 
@@ -239,9 +239,6 @@ impl Vm {
             "sys.target.family" => self.alloc_string(target_family()),
             "sys.target.pointer_width" => Ok(Value::Int(i64::from(usize::BITS))),
             "sys.target.endian" => self.alloc_string(target_endian()),
-            "sys.jit.supported" => Ok(Value::Int(i64::from(jit_supported()))),
-            "sys.jit.backend" => self.alloc_string(jit_backend()),
-            "sys.jit.isa" => self.alloc_string(jit_isa()),
             "sys.matches.os" => {
                 self.sys_match(module_slot, foreign, args, target_os, normalize_target_text)
             }

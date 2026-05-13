@@ -1,7 +1,7 @@
 use std::io;
 use std::sync::Arc;
 
-use musi_foundation::{io as foundation_io, log as foundation_log};
+use musi_foundation::io as foundation_io;
 use musi_native::NativeHost;
 use musi_vm::{EffectCall, ForeignCall, Value, VmError, VmHostContext};
 
@@ -10,55 +10,16 @@ use crate::output::RuntimeOutputSinkCell;
 use super::errors::{
     foreign_rejected, invalid_runtime_args, runtime_effect_failed, runtime_host_unavailable,
 };
-use super::values::string_arg;
 
 pub(super) fn register(host: &mut NativeHost, output: &RuntimeOutputSinkCell) {
-    register_foreign_log_handlers(host, output);
     register_foreign_io_handlers(host, output);
-    register_log_effect_handlers(host, output);
     register_io_effect_handlers(host, output);
-}
-
-fn register_foreign_log_handlers(host: &mut NativeHost, output: &RuntimeOutputSinkCell) {
-    let foreign_log_info_output = Arc::clone(output);
-    host.register_foreign_handler_with_context(
-        "musi:log::infoIntrinsic",
-        move |ctx, foreign, args| {
-            let message = foreign_string_arg(ctx, foreign, args)?;
-            let line = format!("[musi:log] {message}");
-            foreign_log_info_output
-                .lock()
-                .map_err(|_| foreign_rejected(foreign))?
-                .write_stderr(&line, true)
-                .map_err(|_| foreign_rejected(foreign))?;
-            Ok(Value::Unit)
-        },
-    );
-    let foreign_log_write_output = Arc::clone(output);
-    host.register_foreign_handler_with_context(
-        "musi:log::writeIntrinsic",
-        move |ctx, foreign, args| {
-            let [Value::Int(level), message] = args else {
-                return Err(foreign_rejected(foreign));
-            };
-            let message = ctx
-                .string(message)
-                .ok_or_else(|| foreign_rejected(foreign))?;
-            let line = format!("[std:{level}] {}", message.as_str());
-            foreign_log_write_output
-                .lock()
-                .map_err(|_| foreign_rejected(foreign))?
-                .write_stderr(&line, true)
-                .map_err(|_| foreign_rejected(foreign))?;
-            Ok(Value::Unit)
-        },
-    );
 }
 
 fn register_foreign_io_handlers(host: &mut NativeHost, output: &RuntimeOutputSinkCell) {
     let foreign_stdout_output = Arc::clone(output);
     host.register_foreign_handler_with_context(
-        "musi:io::writeIntrinsic",
+        "musi:io::Musi__write",
         move |ctx, foreign, args| {
             write_foreign_stream(
                 ctx,
@@ -72,7 +33,7 @@ fn register_foreign_io_handlers(host: &mut NativeHost, output: &RuntimeOutputSin
     );
     let foreign_stdout_line_output = Arc::clone(output);
     host.register_foreign_handler_with_context(
-        "musi:io::writeLnIntrinsic",
+        "musi:io::Musi__writeLn",
         move |ctx, foreign, args| {
             write_foreign_stream(
                 ctx,
@@ -86,7 +47,7 @@ fn register_foreign_io_handlers(host: &mut NativeHost, output: &RuntimeOutputSin
     );
     let foreign_stderr_output = Arc::clone(output);
     host.register_foreign_handler_with_context(
-        "musi:io::writeErrIntrinsic",
+        "musi:io::Musi__writeErr",
         move |ctx, foreign, args| {
             write_foreign_stream(
                 ctx,
@@ -100,7 +61,7 @@ fn register_foreign_io_handlers(host: &mut NativeHost, output: &RuntimeOutputSin
     );
     let foreign_stderr_line_output = Arc::clone(output);
     host.register_foreign_handler_with_context(
-        "musi:io::writeErrLnIntrinsic",
+        "musi:io::Musi__writeErrLn",
         move |ctx, foreign, args| {
             write_foreign_stream(
                 ctx,
@@ -112,58 +73,12 @@ fn register_foreign_io_handlers(host: &mut NativeHost, output: &RuntimeOutputSin
             )
         },
     );
-    host.register_foreign_handler_with_context(
-        "musi:io::readLineIntrinsic",
-        |ctx, foreign, args| {
-            if !args.is_empty() {
-                return Err(foreign_rejected(foreign));
-            }
-            ctx.alloc_string(read_line_foreign(foreign)?)
-        },
-    );
-}
-
-fn register_log_effect_handlers(host: &mut NativeHost, output: &RuntimeOutputSinkCell) {
-    let log_info_output = Arc::clone(output);
-    host.register_effect_handler_with_context(
-        foundation_log::EFFECT,
-        foundation_log::INFO_OP,
-        move |ctx, effect, args| {
-            let message = string_arg(ctx, effect, args, "logInfo")?;
-            let line = format!("[musi:log] {message}");
-            log_info_output
-                .lock()
-                .map_err(|_| runtime_host_unavailable(effect, "runtime output lock"))?
-                .write_stderr(&line, true)
-                .map_err(|error| runtime_effect_failed(effect, error))?;
-            Ok(Value::Unit)
-        },
-    );
-
-    let log_write_output = Arc::clone(output);
-    host.register_effect_handler_with_context(
-        foundation_log::EFFECT,
-        foundation_log::WRITE_OP,
-        move |ctx, effect, args| {
-            let [Value::Int(level), message] = args else {
-                return Err(invalid_runtime_args(
-                    effect,
-                    "integer level and string message",
-                    args.len(),
-                ));
-            };
-            let message = ctx
-                .string(message)
-                .ok_or_else(|| invalid_runtime_args(effect, "string message", message.kind()))?;
-            let line = format!("[std:{level}] {}", message.as_str());
-            log_write_output
-                .lock()
-                .map_err(|_| runtime_host_unavailable(effect, "runtime output lock"))?
-                .write_stderr(&line, true)
-                .map_err(|error| runtime_effect_failed(effect, error))?;
-            Ok(Value::Unit)
-        },
-    );
+    host.register_foreign_handler_with_context("musi:io::Musi__readLine", |ctx, foreign, args| {
+        if !args.is_empty() {
+            return Err(foreign_rejected(foreign));
+        }
+        ctx.alloc_string(read_line_foreign(foreign)?)
+    });
 }
 
 fn register_io_effect_handlers(host: &mut NativeHost, output: &RuntimeOutputSinkCell) {

@@ -1,4 +1,4 @@
---! File system helper namespace.
+--! File system module.
 
 let path := import "@std/path";
 let Path := path.Path;

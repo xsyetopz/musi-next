@@ -1,3 +1,4 @@
+let assert := import "@std/assert";
 let ascii := import "@std/ascii";
 let maybe := import "@std/maybe";
 let testing := import "@std/testing";
@@ -8,7 +9,7 @@ export let test () :=
     testing.it("'isAscii' accepts byte range", ascii.isAscii(127));
     testing.it(
       "'isAscii' rejects outside byte range",
-      testing.toBeFalse(ascii.isAscii(128)),
+      assert.toBeFalse(ascii.isAscii(128)),
     );
     testing.it("'isControl' detects delete", ascii.isControl(127));
     testing.it("'isPrintable' detects letters", ascii.isPrintable(65));
@@ -20,19 +21,19 @@ export let test () :=
     testing.it("'isHexDigit' detects uppercase hex", ascii.isHexDigit(70));
     testing.it(
       "'toLower' lowers uppercase letters",
-      testing.toBe(ascii.toLower(65), 97),
+      assert.toBe(ascii.toLower(65), 97),
     );
     testing.it(
       "'toUpper' raises lowercase letters",
-      testing.toBe(ascii.toUpper(97), 65),
+      assert.toBe(ascii.toUpper(97), 65),
     );
     testing.it(
       "'digitValue' returns decimal value",
-      testing.toBe(maybe.unwrapOr[Int](ascii.digitValue(57), - 1), 9),
+      assert.toBe(maybe.unwrapOr[Int](ascii.digitValue(57), - 1), 9),
     );
     testing.it(
       "'hexValue' returns hex value",
-      testing.toBe(maybe.unwrapOr[Int](ascii.hexValue(70), - 1), 15),
+      assert.toBe(maybe.unwrapOr[Int](ascii.hexValue(70), - 1), 15),
     );
     testing.it(
       "'hexValue' rejects non-hex",

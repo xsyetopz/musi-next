@@ -2,194 +2,193 @@
 
 let core := import "musi:core";
 
---- Fixed-width bit-vector type constructor.
-export let Bits := core.Bits;
+let Bits := core.Bits;
 
 @external(abi := .musi)
-let zero1Intrinsic () : Bits[1];
+let Musi__zero1 () : Bits[1];
 @external(abi := .musi)
-let zero8Intrinsic () : Bits[8];
+let Musi__zero8 () : Bits[8];
 @external(abi := .musi)
-let zero16Intrinsic () : Bits[16];
+let Musi__zero16 () : Bits[16];
 @external(abi := .musi)
-let zero32Intrinsic () : Bits[32];
+let Musi__zero32 () : Bits[32];
 @external(abi := .musi)
-let zero64Intrinsic () : Bits[64];
+let Musi__zero64 () : Bits[64];
 @external(abi := .musi)
-let ones1Intrinsic () : Bits[1];
+let Musi__ones1 () : Bits[1];
 @external(abi := .musi)
-let ones8Intrinsic () : Bits[8];
+let Musi__ones8 () : Bits[8];
 @external(abi := .musi)
-let ones16Intrinsic () : Bits[16];
+let Musi__ones16 () : Bits[16];
 @external(abi := .musi)
-let ones32Intrinsic () : Bits[32];
+let Musi__ones32 () : Bits[32];
 @external(abi := .musi)
-let ones64Intrinsic () : Bits[64];
+let Musi__ones64 () : Bits[64];
 @external(abi := .musi)
-let fromNat1Intrinsic (value : Nat) : Bits[1];
+let Musi__fromNat1 (value : Nat) : Bits[1];
 @external(abi := .musi)
-let fromNat8Intrinsic (value : Nat) : Bits[8];
+let Musi__fromNat8 (value : Nat) : Bits[8];
 @external(abi := .musi)
-let fromNat16Intrinsic (value : Nat) : Bits[16];
+let Musi__fromNat16 (value : Nat) : Bits[16];
 @external(abi := .musi)
-let fromNat32Intrinsic (value : Nat) : Bits[32];
+let Musi__fromNat32 (value : Nat) : Bits[32];
 @external(abi := .musi)
-let fromNat64Intrinsic (value : Nat) : Bits[64];
+let Musi__fromNat64 (value : Nat) : Bits[64];
 @external(abi := .musi)
-let fromInt1Intrinsic (value : Int) : Bits[1];
+let Musi__fromInt1 (value : Int) : Bits[1];
 @external(abi := .musi)
-let fromInt8Intrinsic (value : Int) : Bits[8];
+let Musi__fromInt8 (value : Int) : Bits[8];
 @external(abi := .musi)
-let fromInt16Intrinsic (value : Int) : Bits[16];
+let Musi__fromInt16 (value : Int) : Bits[16];
 @external(abi := .musi)
-let fromInt32Intrinsic (value : Int) : Bits[32];
+let Musi__fromInt32 (value : Int) : Bits[32];
 @external(abi := .musi)
-let fromInt64Intrinsic (value : Int) : Bits[64];
+let Musi__fromInt64 (value : Int) : Bits[64];
 @external(abi := .musi)
-let toNat1Intrinsic (value : Bits[1]) : Nat;
+let Musi__toNat1 (value : Bits[1]) : Nat;
 @external(abi := .musi)
-let toNat8Intrinsic (value : Bits[8]) : Nat;
+let Musi__toNat8 (value : Bits[8]) : Nat;
 @external(abi := .musi)
-let toNat16Intrinsic (value : Bits[16]) : Nat;
+let Musi__toNat16 (value : Bits[16]) : Nat;
 @external(abi := .musi)
-let toNat32Intrinsic (value : Bits[32]) : Nat;
+let Musi__toNat32 (value : Bits[32]) : Nat;
 @external(abi := .musi)
-let toNat64Intrinsic (value : Bits[64]) : Nat;
+let Musi__toNat64 (value : Bits[64]) : Nat;
 @external(abi := .musi)
-let toInt1Intrinsic (value : Bits[1]) : Int;
+let Musi__toInt1 (value : Bits[1]) : Int;
 @external(abi := .musi)
-let toInt8Intrinsic (value : Bits[8]) : Int;
+let Musi__toInt8 (value : Bits[8]) : Int;
 @external(abi := .musi)
-let toInt16Intrinsic (value : Bits[16]) : Int;
+let Musi__toInt16 (value : Bits[16]) : Int;
 @external(abi := .musi)
-let toInt32Intrinsic (value : Bits[32]) : Int;
+let Musi__toInt32 (value : Bits[32]) : Int;
 @external(abi := .musi)
-let toInt64Intrinsic (value : Bits[64]) : Int;
+let Musi__toInt64 (value : Bits[64]) : Int;
 
 --- Build zero-valued 1-bit bits.
 export let zero1 () : Bits[1] := unsafe {
-  zero1Intrinsic();
+  Musi__zero1();
 };
 --- Build zero-valued 8-bit bits.
 export let zero8 () : Bits[8] := unsafe {
-  zero8Intrinsic();
+  Musi__zero8();
 };
 --- Build zero-valued 16-bit bits.
 export let zero16 () : Bits[16] := unsafe {
-  zero16Intrinsic();
+  Musi__zero16();
 };
 --- Build zero-valued 32-bit bits.
 export let zero32 () : Bits[32] := unsafe {
-  zero32Intrinsic();
+  Musi__zero32();
 };
 --- Build zero-valued 64-bit bits.
 export let zero64 () : Bits[64] := unsafe {
-  zero64Intrinsic();
+  Musi__zero64();
 };
 
 --- Build all-ones 1-bit bits.
 export let ones1 () : Bits[1] := unsafe {
-  ones1Intrinsic();
+  Musi__ones1();
 };
 --- Build all-ones 8-bit bits.
 export let ones8 () : Bits[8] := unsafe {
-  ones8Intrinsic();
+  Musi__ones8();
 };
 --- Build all-ones 16-bit bits.
 export let ones16 () : Bits[16] := unsafe {
-  ones16Intrinsic();
+  Musi__ones16();
 };
 --- Build all-ones 32-bit bits.
 export let ones32 () : Bits[32] := unsafe {
-  ones32Intrinsic();
+  Musi__ones32();
 };
 --- Build all-ones 64-bit bits.
 export let ones64 () : Bits[64] := unsafe {
-  ones64Intrinsic();
+  Musi__ones64();
 };
 
 --- Convert natural number to 1-bit bits.
 export let fromNat1 (value : Nat) : Bits[1] := unsafe {
-  fromNat1Intrinsic(value);
+  Musi__fromNat1(value);
 };
 --- Convert natural number to 8-bit bits.
 export let fromNat8 (value : Nat) : Bits[8] := unsafe {
-  fromNat8Intrinsic(value);
+  Musi__fromNat8(value);
 };
 --- Convert natural number to 16-bit bits.
 export let fromNat16 (value : Nat) : Bits[16] := unsafe {
-  fromNat16Intrinsic(value);
+  Musi__fromNat16(value);
 };
 --- Convert natural number to 32-bit bits.
 export let fromNat32 (value : Nat) : Bits[32] := unsafe {
-  fromNat32Intrinsic(value);
+  Musi__fromNat32(value);
 };
 --- Convert natural number to 64-bit bits.
 export let fromNat64 (value : Nat) : Bits[64] := unsafe {
-  fromNat64Intrinsic(value);
+  Musi__fromNat64(value);
 };
 
 --- Convert integer to 1-bit bits.
 export let fromInt1 (value : Int) : Bits[1] := unsafe {
-  fromInt1Intrinsic(value);
+  Musi__fromInt1(value);
 };
 --- Convert integer to 8-bit bits.
 export let fromInt8 (value : Int) : Bits[8] := unsafe {
-  fromInt8Intrinsic(value);
+  Musi__fromInt8(value);
 };
 --- Convert integer to 16-bit bits.
 export let fromInt16 (value : Int) : Bits[16] := unsafe {
-  fromInt16Intrinsic(value);
+  Musi__fromInt16(value);
 };
 --- Convert integer to 32-bit bits.
 export let fromInt32 (value : Int) : Bits[32] := unsafe {
-  fromInt32Intrinsic(value);
+  Musi__fromInt32(value);
 };
 --- Convert integer to 64-bit bits.
 export let fromInt64 (value : Int) : Bits[64] := unsafe {
-  fromInt64Intrinsic(value);
+  Musi__fromInt64(value);
 };
 
 --- Convert 1-bit bits to natural number.
 export let toNat1 (value : Bits[1]) : Nat := unsafe {
-  toNat1Intrinsic(value);
+  Musi__toNat1(value);
 };
 --- Convert 8-bit bits to natural number.
 export let toNat8 (value : Bits[8]) : Nat := unsafe {
-  toNat8Intrinsic(value);
+  Musi__toNat8(value);
 };
 --- Convert 16-bit bits to natural number.
 export let toNat16 (value : Bits[16]) : Nat := unsafe {
-  toNat16Intrinsic(value);
+  Musi__toNat16(value);
 };
 --- Convert 32-bit bits to natural number.
 export let toNat32 (value : Bits[32]) : Nat := unsafe {
-  toNat32Intrinsic(value);
+  Musi__toNat32(value);
 };
 --- Convert 64-bit bits to natural number.
 export let toNat64 (value : Bits[64]) : Nat := unsafe {
-  toNat64Intrinsic(value);
+  Musi__toNat64(value);
 };
 
 --- Convert 1-bit bits to integer.
 export let toInt1 (value : Bits[1]) : Int := unsafe {
-  toInt1Intrinsic(value);
+  Musi__toInt1(value);
 };
 --- Convert 8-bit bits to integer.
 export let toInt8 (value : Bits[8]) : Int := unsafe {
-  toInt8Intrinsic(value);
+  Musi__toInt8(value);
 };
 --- Convert 16-bit bits to integer.
 export let toInt16 (value : Bits[16]) : Int := unsafe {
-  toInt16Intrinsic(value);
+  Musi__toInt16(value);
 };
 --- Convert 32-bit bits to integer.
 export let toInt32 (value : Bits[32]) : Int := unsafe {
-  toInt32Intrinsic(value);
+  Musi__toInt32(value);
 };
 --- Convert 64-bit bits to integer.
 export let toInt64 (value : Bits[64]) : Int := unsafe {
-  toInt64Intrinsic(value);
+  Musi__toInt64(value);
 };
 
 --- Return true when 1-bit bit-vectors are equal.

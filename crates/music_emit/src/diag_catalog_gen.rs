@@ -80,22 +80,6 @@ const ENTRIES: &[CatalogEntry] = &[
         help: None,
     },
     CatalogEntry {
-        kind: EmitDiagKind::UnknownEffect,
-        code: 3508,
-        message: "emitted effect `{effect}` unknown",
-        primary: "emitted effect `{effect}` unknown",
-        secondary: None,
-        help: None,
-    },
-    CatalogEntry {
-        kind: EmitDiagKind::UnknownHandlerType,
-        code: 3509,
-        message: "emitted answer type `{type}` unknown",
-        primary: "emitted answer type `{type}` unknown",
-        secondary: None,
-        help: None,
-    },
-    CatalogEntry {
         kind: EmitDiagKind::UnknownRecordType,
         code: 3510,
         message: "emitted record type `{type}` unknown",

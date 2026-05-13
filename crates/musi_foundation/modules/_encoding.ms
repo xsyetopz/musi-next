@@ -5,43 +5,43 @@ let Int := Core.Int;
 let String := Core.String;
 
 @external(abi := .musi)
-let base64EncodeIntrinsic (source : String) : String;
+let Musi__base64Encode (source : String) : String;
 
 export let base64Encode (source : String) : String := unsafe {
-  base64EncodeIntrinsic(source);
+  Musi__base64Encode(source);
 };
 
 @external(abi := .musi)
-let base64DecodeIntrinsic (source : String) : String;
+let Musi__base64Decode (source : String) : String;
 
 export let base64Decode (source : String) : String := unsafe {
-  base64DecodeIntrinsic(source);
+  Musi__base64Decode(source);
 };
 
 @external(abi := .musi)
-let base64IsValidIntrinsic (source : String) : Int;
+let Musi__base64IsValid (source : String) : Int;
 
 export let base64IsValid (source : String) : Int := unsafe {
-  base64IsValidIntrinsic(source);
+  Musi__base64IsValid(source);
 };
 
 @external(abi := .musi)
-let utf8EncodeIntrinsic (source : String) : String;
+let Musi__utf8Encode (source : String) : String;
 
 export let utf8Encode (source : String) : String := unsafe {
-  utf8EncodeIntrinsic(source);
+  Musi__utf8Encode(source);
 };
 
 @external(abi := .musi)
-let utf8DecodeIntrinsic (source : String) : String;
+let Musi__utf8Decode (source : String) : String;
 
 export let utf8Decode (source : String) : String := unsafe {
-  utf8DecodeIntrinsic(source);
+  Musi__utf8Decode(source);
 };
 
 @external(abi := .musi)
-let utf8IsValidIntrinsic (source : String) : Int;
+let Musi__utf8IsValid (source : String) : Int;
 
 export let utf8IsValid (source : String) : Int := unsafe {
-  utf8IsValidIntrinsic(source);
+  Musi__utf8IsValid(source);
 };

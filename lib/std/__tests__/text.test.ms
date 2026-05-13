@@ -1,3 +1,4 @@
+let assert := import "@std/assert";
 let testing := import "@std/testing";
 let text := import "@std/text";
 
@@ -6,7 +7,7 @@ export let test () :=
     testing.describe("text/index");
     testing.it(
       "'length' returns character count",
-      testing.toBe("trim".length(), 4),
+      assert.toBe("trim".length(), 4),
     );
     testing.it("'isEmpty' detects empty string", "".isEmpty(),);
     testing.it("'trim' strips surrounding spaces", "  trim  ".trim() = "trim",);

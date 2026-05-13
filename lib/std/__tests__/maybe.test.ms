@@ -1,3 +1,4 @@
+let assert := import "@std/assert";
 let maybe := import "@std/maybe";
 let testing := import "@std/testing";
 
@@ -10,37 +11,37 @@ export let test () :=
     testing.it("'isNone' detects None value", noneInt.isNone(),);
     testing.it(
       "'unwrapOr' returns fallback for None",
-      testing.toBe(noneInt.unwrapOr(7), 7),
+      assert.toBe(noneInt.unwrapOr(7), 7),
     );
     testing.it(
       "'unwrapOrElse' computes fallback for None",
-      testing.toBe(noneInt.unwrapOrElse(\() => 9), 9),
+      assert.toBe(noneInt.unwrapOrElse(\() => 9), 9),
     );
     testing.it(
       "'unwrapOrElse' skips fallback for Some",
-      testing.toBe(someOne.unwrapOrElse(\() => 9), 1),
+      assert.toBe(someOne.unwrapOrElse(\() => 9), 1),
     );
     testing.it(
       "'map' transforms Some values",
-      testing.toBe(
+      assert.toBe(
         maybe.unwrapOr[Int](maybe.map[Int, Int](someOne, \(x) => x + 1), 0),
         2,
       ),
     );
     testing.it(
       "'fold' maps Some values",
-      testing.toBe(maybe.fold[Int, Int](someOne, 0, \(x) => x + 2), 3),
+      assert.toBe(maybe.fold[Int, Int](someOne, 0, \(x) => x + 2), 3),
     );
     testing.it(
       "'mapOrElse' computes fallback for None",
-      testing.toBe(
+      assert.toBe(
         maybe.mapOrElse[Int, Int](noneInt, \() => 8, \(x) => x + 1),
         8,
       ),
     );
     testing.it(
       "'mapOrElse' maps Some values",
-      testing.toBe(
+      assert.toBe(
         maybe.mapOrElse[Int, Int](someOne, \() => 8, \(x) => x + 1),
         2,
       ),

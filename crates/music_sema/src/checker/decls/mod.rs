@@ -1,9 +1,6 @@
-mod effects;
-mod givens;
 mod imports;
 mod lets;
 
-pub(super) use effects::call_effects_for_expr;
 pub(super) use imports::{
     expr_has_structural_target, import_record_export_for_expr, import_record_target_for_expr,
     seed_import_bindings, seed_prelude_bindings,
@@ -25,24 +22,16 @@ use super::exprs::check_expr;
 use super::schemes::BindingScheme;
 use super::surface::surface_key;
 use super::variant_payload::{lower_data_variant, variant_payload_style_is_mixed};
-use super::{CheckPass, DiagKind, EffectDef, EffectOpDef, PassBase};
+use super::{CheckPass, DiagKind, PassBase};
 use crate::api::{
     ExprFacts, ForeignLinkInfo, LawFacts, LawParamFacts, ShapeFacts, ShapeMemberFacts, TargetInfo,
     normalize_arch_text, normalize_target_text,
 };
-use crate::effects::EffectRow;
 
 type VariantDefRange = SliceRange<HirVariantDef>;
 type FieldDefRange = SliceRange<HirFieldDef>;
 type ConstraintRange = SliceRange<HirConstraint>;
 type MemberDefRange = SliceRange<HirMemberDef>;
-
-fn member_has_attr(ctx: &CheckPass<'_, '_, '_>, member: &HirMemberDef, name: &str) -> bool {
-    ctx.attrs(member.attrs.clone()).iter().any(|attr| {
-        let parts = ctx.idents(attr.path);
-        parts.len() == 1 && ctx.resolve_symbol(parts[0].name) == name
-    })
-}
 
 fn matches_target_value(target: Option<&str>, values: &[String]) -> bool {
     target.is_some_and(|target| {
@@ -142,7 +131,7 @@ impl CheckPass<'_, '_, '_> {
                 let _ = check_expr(self, value);
             }
         }
-        ExprFacts::new(builtins.type_, EffectRow::empty())
+        ExprFacts::new(builtins.type_)
     }
 
     fn check_shape_expr(
@@ -160,9 +149,6 @@ impl CheckPass<'_, '_, '_> {
                     let law_facts = check_expr(self, value);
                     let origin = self.expr(value).origin;
                     self.type_mismatch(origin, builtins.bool_, law_facts.ty);
-                    if !law_facts.effects.is_pure() {
-                        self.diag(origin.span, DiagKind::LawMustBePure, "");
-                    }
                 } else {
                     let _ = member_signature(self, &member, true);
                 }
@@ -174,7 +160,7 @@ impl CheckPass<'_, '_, '_> {
                 let _ = member_signature(self, &member, true);
             }
         }
-        ExprFacts::new(self.builtins().type_, EffectRow::empty())
+        ExprFacts::new(self.builtins().type_)
     }
 
     fn check_native_let(
@@ -249,11 +235,9 @@ impl CheckPass<'_, '_, '_> {
                 comptime_params: Box::default(),
                 constraints: Box::default(),
                 ty,
-                effects: EffectRow::empty(),
             };
             let value_ty = self.scheme_value_ty(&scheme);
             self.insert_binding_type(binding, value_ty);
-            self.insert_binding_effects(binding, EffectRow::empty());
             self.insert_binding_scheme(binding, scheme);
             self.validate_native_let(expr_id, abi.as_ref());
             return Some(value_ty);
@@ -317,23 +301,6 @@ impl CheckPass<'_, '_, '_> {
                     .pointer_width
                     .is_some_and(|width| values.iter().any(|value| value == &format!("{width}"))),
                 "endian" => matches_target_value(target.endian.as_deref(), &values),
-                "jit" => {
-                    target.jit.supported
-                        && matches_target_value(target.jit.backend.as_deref(), &values)
-                }
-                "jitIsa" => {
-                    target.jit.supported && matches_target_value(target.jit.isa.as_deref(), &values)
-                }
-                "jitCallConv" => {
-                    target.jit.supported
-                        && matches_target_value(target.jit.call_conv.as_deref(), &values)
-                }
-                "jitFeature" => values.iter().any(|value| {
-                    target
-                        .jit
-                        .features
-                        .contains(normalize_target_text(value).as_str())
-                }),
                 _ => true,
             };
             if !matched {
@@ -349,10 +316,10 @@ impl CheckPass<'_, '_, '_> {
             HirExprKind::Array { items } => {
                 let mut out = Vec::<String>::new();
                 for item in self.array_items(items) {
-                    if let HirExprKind::Lit { lit } = self.expr(item.expr).kind {
-                        if let Some(value) = self.when_lit_value(lit) {
-                            out.push(value);
-                        }
+                    if let HirExprKind::Lit { lit } = self.expr(item.expr).kind
+                        && let Some(value) = self.when_lit_value(lit)
+                    {
+                        out.push(value);
                     }
                 }
                 Some(out)
@@ -526,73 +493,6 @@ impl CheckPass<'_, '_, '_> {
                 super::DataVariantDef::new(0, None, None, field_tys, field_names),
             );
         }
-    }
-
-    pub(super) fn check_bound_effect(
-        &mut self,
-        expr_id: HirExprId,
-        name: Ident,
-        members: MemberDefRange,
-    ) -> ExprFacts {
-        let builtins = self.builtins();
-        let effect_name: Box<str> = self.resolve_symbol(name.name).into();
-        if self.effect_def(&effect_name).is_none() {
-            let members_vec = self.members(members.clone());
-            let ops = members_vec
-                .iter()
-                .filter(|member| member.kind == HirMemberKind::Let)
-                .map(|member| {
-                    let facts = member_signature(self, member, false);
-                    (
-                        Box::<str>::from(self.resolve_symbol(member.name.name)),
-                        EffectOpDef::new(
-                            facts.params.clone(),
-                            self.params(member.params.clone())
-                                .into_iter()
-                                .map(|param| param.name.name)
-                                .collect::<Vec<_>>()
-                                .into_boxed_slice(),
-                            facts.result,
-                        )
-                        .with_comptime_safe(member_has_attr(
-                            self,
-                            member,
-                            "knownSafe",
-                        )),
-                    )
-                })
-                .collect::<BTreeMap<_, _>>();
-            let laws = members_vec
-                .iter()
-                .filter(|member| member.kind == HirMemberKind::Law)
-                .map(|member| member_law_facts(self, member))
-                .collect::<Vec<_>>()
-                .into_boxed_slice();
-            let key = surface_key(self.module_key(), self.interner(), name.name);
-            self.insert_effect_def(effect_name, EffectDef::new(key, ops, laws));
-        }
-        let _ = expr_id;
-        for member in self.members(members) {
-            match member.kind {
-                HirMemberKind::Let => {
-                    let _ = member_signature(self, &member, true);
-                    if let Some(value) = member.value {
-                        let _ = check_expr(self, value);
-                    }
-                }
-                HirMemberKind::Law => {
-                    if let Some(value) = member.value {
-                        let law_facts = check_expr(self, value);
-                        let origin = self.expr(value).origin;
-                        self.type_mismatch(origin, builtins.bool_, law_facts.ty);
-                        if !law_facts.effects.is_pure() {
-                            self.diag(origin.span, DiagKind::LawMustBePure, "");
-                        }
-                    }
-                }
-            }
-        }
-        ExprFacts::new(builtins.type_, EffectRow::empty())
     }
 
     pub(super) fn check_bound_shape(

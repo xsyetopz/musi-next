@@ -7,8 +7,7 @@ use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 
 use musi_foundation::register_modules;
 use musi_vm::{
-    BoundI64Call, BoundInitCall, BoundSeq2x2Call, BoundSeq8Call, MvmMode, Program, Value, Vm,
-    VmOptions,
+    BoundI64Call, BoundSeq2x2Call, BoundSeq8Call, MvmMode, Program, Value, Vm, VmOptions,
 };
 use music_module::ModuleKey;
 use music_seam::TypeId;
@@ -59,11 +58,6 @@ fn batch_capacity(batch: u64) -> usize {
 
 fn bind_result_i64(vm: &mut Vm) -> BoundI64Call {
     vm.bind_export_i64_i64("result")
-        .expect("result export should bind")
-}
-
-fn bind_result_init(vm: &mut Vm) -> BoundInitCall {
-    vm.bind_export_init0("result")
         .expect("result export should bind")
 }
 
@@ -595,88 +589,6 @@ fn bench_vm_data_match_option(c: &mut Criterion) {
     );
 }
 
-fn bench_vm_effect_resume(c: &mut Criterion) {
-    let source = r"
-        export let Console := effect {
-          let readLine () : Int;
-        };
-        let consoleAnswer := answer Console {
-          value => value + 1;
-          readLine(k) => resume 41;
-        };
-        export let result () : Int :=
-          handle ask Console.readLine() answer consoleAnswer;
-        ";
-    let program = compile_program(source);
-    let mut vm = initialized_vm(&program, VmOptions);
-    let bound_call = bind_result_init(&mut vm);
-
-    _ = c.bench_function("bench_vm_hot_vm_mode_effect_resume_equivalent", |b| {
-        b.iter(|| {
-            let returned_int = vm
-                .call_init0_i64(black_box(bound_call))
-                .expect("effect resume should succeed");
-            black_box(returned_int)
-        });
-    });
-
-    let mut vm = initialized_vm(&program, VmOptions);
-    let bound_call = bind_result_init(&mut vm);
-    _ = c.bench_function("bench_vm_normal_vm_mode_effect_resume_equivalent", |b| {
-        b.iter(|| {
-            let returned_value = vm
-                .call_init0_i64(black_box(bound_call))
-                .expect("effect resume should succeed");
-            black_box(returned_value)
-        });
-    });
-
-    let mut vm = initialized_vm(&program, VmOptions);
-    let bound_call = bind_result_init(&mut vm);
-    _ = c.bench_function("bench_vm_generic_vm_mode_effect_resume_equivalent", |b| {
-        b.iter(|| {
-            let returned_int = vm
-                .call_init0_i64(black_box(bound_call))
-                .expect("effect resume should succeed");
-            black_box(returned_int)
-        });
-    });
-
-    let mut vm = initialized_vm(&program, interpreter_options());
-    let bound_call = bind_result_init(&mut vm);
-    _ = c.bench_function(
-        "bench_vm_interpreter_vm_mode_effect_resume_equivalent",
-        |b| {
-            b.iter(|| {
-                let returned_value = vm
-                    .call_init0_i64(black_box(bound_call))
-                    .expect("effect resume should succeed");
-                black_box(returned_value)
-            });
-        },
-    );
-
-    let mut vm = initialized_vm(&program, debug_interpreter_options());
-    _ = c.bench_function(
-        "bench_vm_debug_interpreter_vm_mode_effect_resume_equivalent",
-        |b| {
-            b.iter(|| {
-                let returned_value = call_result_unit(&mut vm, "effect resume should succeed");
-                black_box(returned_value)
-            });
-        },
-    );
-
-    let program_bytes = compile_program_bytes(source);
-    _ = c.bench_function("bench_vm_cold_vm_mode_effect_resume_equivalent", |b| {
-        b.iter(|| {
-            let mut vm = load_initialized_vm(black_box(&program_bytes), VmOptions);
-            let returned_value = call_result_unit(&mut vm, "effect resume should succeed");
-            black_box((returned_value, vm.executed_instructions()))
-        });
-    });
-}
-
 #[allow(clippy::too_many_lines)]
 fn bench_vm_sequence_return_gc(c: &mut Criterion) {
     let source = r"
@@ -835,7 +747,6 @@ criterion_group!(
     bench_vm_closure_capture,
     bench_vm_sequence_index_mutation,
     bench_vm_data_match_option,
-    bench_vm_effect_resume,
     bench_vm_sequence_return_gc,
 );
 criterion_main!(benches);

@@ -5,7 +5,7 @@
   "description": "The Musi standard library.",
   "entry": "./std.ms",
   "imports": {
-    "#sys": "./sys.ms"
+    "#sys": "./_sys.ms"
   },
   "exports": {
     ".": "./std.ms",
@@ -17,8 +17,6 @@
     "./collections": "./collections.ms",
     "./collections/array": "./collections/array.ms",
     "./collections/list": "./collections/list.ms",
-    "./collections/slice": "./collections/slice.ms",
-    "./collections/iter": "./collections/iter.ms",
     "./bytes": "./bytes.ms",
     "./text": "./text.ms",
     "./encoding": "./encoding.ms",
@@ -30,6 +28,7 @@
     "./libm": "./libm.ms",
     "./libc": "./libc.ms",
     "./bits": "./bits.ms",
+    "./word": "./word.ms",
     "./bool": "./bool.ms",
     "./fmt": "./fmt.ms",
     "./errors": "./errors.ms",

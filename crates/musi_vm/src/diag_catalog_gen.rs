@@ -170,8 +170,8 @@ const ENTRIES: &[CatalogEntry] = &[
     CatalogEntry {
         kind: VmDiagKind::InvalidRangeEvidence,
         code: 6119,
-        message: "range answer invalid for value kind `{found}`",
-        primary: "range answer invalid for value kind `{found}`",
+        message: "range endpoint evidence invalid for value kind `{found}`",
+        primary: "range endpoint evidence invalid for value kind `{found}`",
         secondary: None,
         help: None,
     },
@@ -282,8 +282,8 @@ const ENTRIES: &[CatalogEntry] = &[
     CatalogEntry {
         kind: VmDiagKind::HandlerFrameMissing,
         code: 6133,
-        message: "answer `{handler_id}` frame depth `{frame_depth}` missing",
-        primary: "answer `{handler_id}` frame missing",
+        message: "handler `{handler_id}` frame depth `{frame_depth}` missing",
+        primary: "handler `{handler_id}` frame missing",
         secondary: None,
         help: None,
     },

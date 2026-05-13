@@ -52,11 +52,6 @@ pub fn render_hir_ty(sema: &SemaModule, session: &Session, ty: HirTyId) -> Strin
         HirTyKind::Array { dims, item } => render_array_hir_ty(sema, session, dims, *item),
         HirTyKind::Seq { item } => format!("[]{}", render_hir_ty(sema, session, *item)),
         HirTyKind::Range { bound } => render_applied_hir_ty("Range", sema, session, *bound),
-        HirTyKind::Handler {
-            effect,
-            input,
-            output,
-        } => render_handler_hir_ty(sema, session, *effect, *input, *output),
         HirTyKind::Mut { inner } => render_prefixed_hir_ty("mut", sema, session, *inner),
         HirTyKind::AnyShape { capability } => {
             render_prefixed_hir_ty("any", sema, session, *capability)
@@ -118,21 +113,6 @@ fn render_applied_hir_ty(
     bound: HirTyId,
 ) -> String {
     format!("{name}[{}]", render_hir_ty(sema, session, bound))
-}
-
-fn render_handler_hir_ty(
-    sema: &SemaModule,
-    session: &Session,
-    effect: HirTyId,
-    input: HirTyId,
-    output: HirTyId,
-) -> String {
-    format!(
-        "answer {} ({} -> {})",
-        render_hir_ty(sema, session, effect),
-        render_hir_ty(sema, session, input),
-        render_hir_ty(sema, session, output)
-    )
 }
 
 fn render_record_hir_ty(

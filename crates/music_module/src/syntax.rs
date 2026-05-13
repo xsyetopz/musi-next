@@ -107,7 +107,7 @@ pub fn collect_import_sites(source_id: SourceId, tree: &SyntaxTree) -> Vec<Impor
 }
 
 #[must_use]
-pub fn collect_export_summary(source_id: SourceId, tree: &SyntaxTree) -> ModuleExportSummary {
+pub fn collect_export_summary(_source_id: SourceId, tree: &SyntaxTree) -> ModuleExportSummary {
     let mut summary = ModuleExportSummary::new();
     walk_nodes(tree.root(), &mut |node| {
         if node.kind() != SyntaxNodeKind::AttributedExpr {
@@ -151,16 +151,6 @@ pub fn collect_export_summary(source_id: SourceId, tree: &SyntaxTree) -> ModuleE
             .find(|child| child.kind() == SyntaxNodeKind::SequenceExpr)
         {
             collect_exported_sequence(sequence, &mut summary, is_opaque);
-            return;
-        }
-
-        if node
-            .child_nodes()
-            .any(|child| child.kind() == SyntaxNodeKind::GivenExpr)
-        {
-            summary
-                .exported_givens
-                .push(ExportedGivenSite::new(source_id, node.span()));
         }
     });
     summary
@@ -243,9 +233,6 @@ fn walk_nodes<'tree, 'src>(
     f: &mut impl FnMut(SyntaxNode<'tree, 'src>),
 ) {
     f(node);
-    if node.kind() == SyntaxNodeKind::QuoteExpr {
-        return;
-    }
     for child in node.children() {
         if let Some(node) = child.into_node() {
             walk_nodes(node, f);

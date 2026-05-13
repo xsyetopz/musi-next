@@ -1,13 +1,7 @@
---! Boolean aliases over primitive Bit values.
+--! Boolean values.
 
---- Boolean data surface with Bit-valued variants.
-export hidden let Bool := data {
-  | True := 1
-  | False := 0
-};
+--- Lowercase true value.
+export let true : Bit := 0 = 0;
 
---- Lowercase true alias.
-export let true : Bool := .True;
-
---- Lowercase false alias.
-export let false : Bool := .False;
+--- Lowercase false value.
+export let false : Bit := 0 = 1;

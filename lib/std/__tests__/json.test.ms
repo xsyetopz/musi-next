@@ -1,3 +1,4 @@
+let assert := import "@std/assert";
 let json := import "@std/json";
 let testing := import "@std/testing";
 
@@ -6,7 +7,7 @@ export let test () :=
     testing.describe("json");
     testing.it(
       "'isValid' rejects invalid json",
-      testing.toBeFalse(json.isValid("{")),
+      assert.toBeFalse(json.isValid("{")),
     );
     testing.it(
       "'stringify' keeps normalized source",

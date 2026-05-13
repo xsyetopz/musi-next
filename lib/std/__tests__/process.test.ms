@@ -1,3 +1,4 @@
+let assert := import "@std/assert";
 let maybe := import "@std/maybe";
 let path := import "@std/path";
 let process := import "@std/process";
@@ -14,7 +15,7 @@ export let test () :=
     testing.it("'cwd' returns non-empty path", process.cwd().toString() /= "",);
     testing.it(
       "'exitCode' exposes integer value",
-      testing.toBe(process.exitCode(7).toInt(), 7),
+      assert.toBe(process.exitCode(7).toInt(), 7),
     );
     testing.endDescribe()
   );

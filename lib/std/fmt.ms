@@ -1,4 +1,4 @@
---! Formatting helper namespace.
+--! Formatting module.
 
 let datetime := import "@std/datetime";
 let text := import "@std/text";

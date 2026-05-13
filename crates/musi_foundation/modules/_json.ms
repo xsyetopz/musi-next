@@ -5,15 +5,15 @@ let Int := Core.Int;
 let String := Core.String;
 
 @external(abi := .musi)
-let isValidIntrinsic (source : String) : Int;
+let Musi__isValid (source : String) : Int;
 
 export let isValid (source : String) : Int := unsafe {
-  isValidIntrinsic(source);
+  Musi__isValid(source);
 };
 
 @external(abi := .musi)
-let normalizeIntrinsic (source : String) : String;
+let Musi__normalize (source : String) : String;
 
 export let normalize (source : String) : String := unsafe {
-  normalizeIntrinsic(source);
+  Musi__normalize(source);
 };

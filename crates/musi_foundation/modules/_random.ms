@@ -6,36 +6,36 @@ let Int := Core.Int;
 let String := Core.String;
 
 @external(abi := .musi)
-let intIntrinsic () : Int;
+let Musi__int () : Int;
 
 export let int () : Int := unsafe {
-  intIntrinsic();
+  Musi__int();
 };
 
 @external(abi := .musi)
-let intInRangeIntrinsic (lowerBound : Int, upperBound : Int) : Int;
+let Musi__intInRange (lowerBound : Int, upperBound : Int) : Int;
 
 export let intInRange (lowerBound : Int, upperBound : Int) : Int := unsafe {
-  intInRangeIntrinsic(lowerBound, upperBound);
+  Musi__intInRange(lowerBound, upperBound);
 };
 
 @external(abi := .musi)
-let boolIntrinsic () : Int;
+let Musi__bool () : Int;
 
 export let bool () : Int := unsafe {
-  boolIntrinsic();
+  Musi__bool();
 };
 
 @external(abi := .musi)
-let float01Intrinsic () : Float;
+let Musi__float01 () : Float;
 
 export let float01 () : Float := unsafe {
-  float01Intrinsic();
+  Musi__float01();
 };
 
 @external(abi := .musi)
-let entropyHexIntrinsic (count : Int) : String;
+let Musi__entropyHex (count : Int) : String;
 
 export let entropyHex (count : Int) : String := unsafe {
-  entropyHexIntrinsic(count);
+  Musi__entropyHex(count);
 };

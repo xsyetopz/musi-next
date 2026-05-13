@@ -1,3 +1,4 @@
+let assert := import "@std/assert";
 let bytes := import "@std/bytes";
 let testing := import "@std/testing";
 
@@ -18,7 +19,7 @@ export let test () :=
     testing.it("'equals' returns true for equal bytes", left.equals(same),);
     testing.it(
       "'equals' returns false for different bytes",
-      testing.toBeFalse(left.equals(right)),
+      assert.toBeFalse(left.equals(right)),
     );
     testing.it(
       "'append' adds trailing byte",

@@ -253,8 +253,8 @@ mod success {
         @external(
           abi := .c
         )
-        let cPow(base : Float, exponent : Float) : Float;
-        let pow (base : Float, exponent : Float) : Float := unsafe { cPow(base, exponent); };
+        let C__pow(base : Float, exponent : Float) : Float;
+        let pow (base : Float, exponent : Float) : Float := unsafe { C__pow(base, exponent); };
         export let result () : Float := pow(2.0, 5.0);
     "#;
         let value = call_export_with_host(NativeHost::default(), source)

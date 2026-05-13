@@ -10,7 +10,7 @@ This workspace splits language pipeline, runtime, tooling, and user-facing binar
 - `music_syntax` — lexer, parser, syntax tree
 - `music_module` — module keys, import maps, module syntax helpers
 - `music_resolve` — name and import resolution
-- `music_sema` — semantic checking, exported surface, effect rows
+- `music_sema` — semantic checking, exported surface, constraints, shape facts, and FFI validation
 - `music_ir` — IR model and diagnostics
 - `music_ir_lower` — sema-to-IR lowering
 - `music_emit` — SEAM emission from IR

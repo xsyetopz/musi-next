@@ -1,13 +1,7 @@
---! Collection type namespace.
+--! Collection types module.
 
---- Array helpers surface.
+--- Array tools.
 export let array := import "@std/collections/array";
 
---- List helpers surface.
+--- List tools.
 export let list := import "@std/collections/list";
-
---- Slice helpers surface.
-export let slice := import "@std/collections/slice";
-
---- Iterator-style sequence helpers surface.
-export let iter := import "@std/collections/iter";

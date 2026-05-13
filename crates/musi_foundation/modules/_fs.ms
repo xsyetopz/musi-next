@@ -6,43 +6,43 @@ let String := Core.String;
 let Unit := Core.Unit;
 
 @external(abi := .musi)
-let readTextIntrinsic (path : String) : String;
+let Musi__readText (path : String) : String;
 
 export let readText (path : String) : String := unsafe {
-  readTextIntrinsic(path);
+  Musi__readText(path);
 };
 
 @external(abi := .musi)
-let writeTextIntrinsic (path : String, text : String) : Unit;
+let Musi__writeText (path : String, text : String) : Unit;
 
 export let writeText (path : String, text : String) : Unit := unsafe {
-  writeTextIntrinsic(path, text);
+  Musi__writeText(path, text);
 };
 
 @external(abi := .musi)
-let existsIntrinsic (path : String) : Int;
+let Musi__exists (path : String) : Int;
 
 export let exists (path : String) : Int := unsafe {
-  existsIntrinsic(path);
+  Musi__exists(path);
 };
 
 @external(abi := .musi)
-let appendTextIntrinsic (path : String, text : String) : Int;
+let Musi__appendText (path : String, text : String) : Int;
 
 export let appendText (path : String, text : String) : Int := unsafe {
-  appendTextIntrinsic(path, text);
+  Musi__appendText(path, text);
 };
 
 @external(abi := .musi)
-let removeIntrinsic (path : String) : Int;
+let Musi__remove (path : String) : Int;
 
 export let remove (path : String) : Int := unsafe {
-  removeIntrinsic(path);
+  Musi__remove(path);
 };
 
 @external(abi := .musi)
-let createDirAllIntrinsic (path : String) : Int;
+let Musi__createDirAll (path : String) : Int;
 
 export let createDirAll (path : String) : Int := unsafe {
-  createDirAllIntrinsic(path);
+  Musi__createDirAll(path);
 };

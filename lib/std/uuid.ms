@@ -1,4 +1,4 @@
---! UUID helper namespace.
+--! UUID module.
 
 let text := import "@std/text";
 let uuidHost := import "musi:uuid";

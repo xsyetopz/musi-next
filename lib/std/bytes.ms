@@ -12,7 +12,7 @@ export let empty () : Bytes := .ByteValues(values := []);
 export let fromArray (values : []Int) : Bytes :=
   .ByteValues(values := [...values]);
 
---- Core operation for `toArray`.
+--- Function for `toArray`.
 let bytesToArray (target : Bytes) : []Int :=
   match target (
   | .ByteValues(values := values) =>[...values]
@@ -21,13 +21,13 @@ let bytesToArray (target : Bytes) : []Int :=
 --- Return a copy of raw byte values.
 export let toArray (target : Bytes) : []Int := bytesToArray(target);
 
---- Core operation for `copy`.
+--- Function for `copy`.
 let copyBytes (target : Bytes) : Bytes := fromArray(bytesToArray(target));
 
 --- Copy bytes.
 export let copy (target : Bytes) : Bytes := copyBytes(target);
 
---- Core operation for `concat`.
+--- Function for `concat`.
 let concatBytes (target : Bytes, other : Bytes) : Bytes :=
   fromArray([...bytesToArray(target), ...bytesToArray(other)]);
 
@@ -35,7 +35,7 @@ let concatBytes (target : Bytes, other : Bytes) : Bytes :=
 export let concat (target : Bytes, other : Bytes) : Bytes :=
   concatBytes(target, other);
 
---- Core operation for `append`.
+--- Function for `append`.
 let appendByte (target : Bytes, value : Int) : Bytes :=
   fromArray([...bytesToArray(target), value]);
 
@@ -43,7 +43,7 @@ let appendByte (target : Bytes, value : Int) : Bytes :=
 export let append (target : Bytes, value : Int) : Bytes :=
   appendByte(target, value);
 
---- Core operation for `prepend`.
+--- Function for `prepend`.
 let prependByte (target : Bytes, value : Int) : Bytes :=
   fromArray([value, ...bytesToArray(target)]);
 
@@ -51,7 +51,7 @@ let prependByte (target : Bytes, value : Int) : Bytes :=
 export let prepend (target : Bytes, value : Int) : Bytes :=
   prependByte(target, value);
 
---- Core operation for `equals`.
+--- Function for `equals`.
 let bytesEqual (target : Bytes, other : Bytes) : Bit :=
   bytesToArray(target) = bytesToArray(other);
 
@@ -59,7 +59,7 @@ let bytesEqual (target : Bytes, other : Bytes) : Bit :=
 export let equals (target : Bytes, other : Bytes) : Bit :=
   bytesEqual(target, other);
 
---- Core operation for `notEquals`.
+--- Function for `notEquals`.
 let bytesNotEqual (target : Bytes, other : Bytes) : Bit :=
   bytesToArray(target) /= bytesToArray(other);
 
@@ -67,14 +67,14 @@ let bytesNotEqual (target : Bytes, other : Bytes) : Bit :=
 export let notEquals (target : Bytes, other : Bytes) : Bit :=
   bytesNotEqual(target, other);
 
---- Core operation for `isEmpty`.
+--- Function for `isEmpty`.
 let bytesIsEmpty (target : Bytes) : Bit :=
   match bytesToArray(target) (
   | [] => 0 = 0
   | _ => 0 = 1
   );
 
---- Core operation for `nonEmpty`.
+--- Function for `nonEmpty`.
 let bytesNonEmpty (target : Bytes) : Bit :=
   match bytesToArray(target) (
   | [] => 0 = 1

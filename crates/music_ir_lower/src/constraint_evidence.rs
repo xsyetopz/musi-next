@@ -1,60 +1,60 @@
 use music_hir::{HirExprId, HirTyKind};
 use music_names::NameBindingId;
-use music_sema::{ConstraintAnswer, ConstraintKey, SemaModule};
+use music_sema::{ConstraintEvidence, ConstraintKey, SemaModule};
 
 use music_ir::{IrArg, IrExpr, IrExprKind, IrNameRef, IrOrigin, IrParam};
 
 use super::types::render_ty_name;
-use super::{ConstraintAnswerBindingMap, LowerCtx, lowering_invariant_violation};
+use super::{ConstraintEvidenceBindingMap, LowerCtx, lowering_invariant_violation};
 
-pub(crate) fn hidden_constraint_answer_name(owner: &str, index: usize) -> Box<str> {
-    format!("__answer::{owner}::{index}").into_boxed_str()
+pub(crate) fn hidden_constraint_evidence_name(owner: &str, index: usize) -> Box<str> {
+    format!("__evidence::{owner}::{index}").into_boxed_str()
 }
 
-pub(crate) fn hidden_constraint_answer_params_for_keys(
+pub(crate) fn hidden_constraint_evidence_params_for_keys(
     owner: &str,
     keys: &[ConstraintKey],
-) -> (Vec<IrParam>, ConstraintAnswerBindingMap) {
+) -> (Vec<IrParam>, ConstraintEvidenceBindingMap) {
     let mut params = Vec::new();
-    let mut bindings = ConstraintAnswerBindingMap::new();
+    let mut bindings = ConstraintEvidenceBindingMap::new();
     for (index, key) in keys.iter().cloned().enumerate() {
-        let name = hidden_constraint_answer_name(owner, index);
+        let name = hidden_constraint_evidence_name(owner, index);
         let _ = bindings.insert(key, name.clone());
         params.push(IrParam::synthetic(name));
     }
     (params, bindings)
 }
 
-pub(crate) fn hidden_constraint_answer_params_for_binding(
+pub(crate) fn hidden_constraint_evidence_params_for_binding(
     sema: &SemaModule,
     owner: &str,
     binding: Option<NameBindingId>,
-) -> (Vec<IrParam>, ConstraintAnswerBindingMap) {
+) -> (Vec<IrParam>, ConstraintEvidenceBindingMap) {
     let keys = binding
         .and_then(|binding| sema.binding_constraint_keys(binding))
         .unwrap_or(&[]);
-    hidden_constraint_answer_params_for_keys(owner, keys)
+    hidden_constraint_evidence_params_for_keys(owner, keys)
 }
 
-pub(crate) fn push_constraint_answer_bindings(
+pub(crate) fn push_constraint_evidence_bindings(
     ctx: &mut LowerCtx<'_>,
-    bindings: ConstraintAnswerBindingMap,
+    bindings: ConstraintEvidenceBindingMap,
 ) {
-    ctx.constraint_answer_bindings.push(bindings);
+    ctx.constraint_evidence_bindings.push(bindings);
 }
 
-pub(crate) fn pop_constraint_answer_bindings(ctx: &mut LowerCtx<'_>) {
-    let _ = ctx.constraint_answer_bindings.pop();
+pub(crate) fn pop_constraint_evidence_bindings(ctx: &mut LowerCtx<'_>) {
+    let _ = ctx.constraint_evidence_bindings.pop();
 }
 
-pub(crate) fn lower_constraint_answer_expr(
+pub(crate) fn lower_constraint_evidence_expr(
     ctx: &mut LowerCtx<'_>,
     origin: IrOrigin,
-    constraint_answer: &ConstraintAnswer,
+    constraint_evidence: &ConstraintEvidence,
 ) -> IrExpr {
-    match constraint_answer {
-        ConstraintAnswer::Param { key } => {
-            let Some(name) = resolve_constraint_answer_binding_name(ctx, key) else {
+    match constraint_evidence {
+        ConstraintEvidence::Param { key } => {
+            let Some(name) = resolve_constraint_evidence_binding_name(ctx, key) else {
                 lowering_invariant_violation("missing evidence binding for constraint");
             };
             IrExpr::new(
@@ -66,7 +66,7 @@ pub(crate) fn lower_constraint_answer_expr(
                 },
             )
         }
-        ConstraintAnswer::Provider { module, name, args } => IrExpr::new(
+        ConstraintEvidence::Provider { module, name, args } => IrExpr::new(
             origin,
             IrExprKind::Call {
                 callee: Box::new(IrExpr::new(
@@ -79,7 +79,7 @@ pub(crate) fn lower_constraint_answer_expr(
                 )),
                 args: args
                     .iter()
-                    .map(|arg| IrArg::new(false, lower_constraint_answer_expr(ctx, origin, arg)))
+                    .map(|arg| IrArg::new(false, lower_constraint_evidence_expr(ctx, origin, arg)))
                     .collect::<Vec<_>>()
                     .into_boxed_slice(),
             },
@@ -87,11 +87,11 @@ pub(crate) fn lower_constraint_answer_expr(
     }
 }
 
-pub(crate) fn resolve_constraint_answer_binding_name(
+pub(crate) fn resolve_constraint_evidence_binding_name(
     ctx: &LowerCtx<'_>,
     key: &ConstraintKey,
 ) -> Option<Box<str>> {
-    ctx.constraint_answer_bindings
+    ctx.constraint_evidence_bindings
         .iter()
         .rev()
         .find_map(|bindings| {
@@ -116,13 +116,13 @@ pub(crate) fn constraint_keys_equiv(
             == render_ty_name(ctx.sema, right.value, ctx.interner)
 }
 
-pub(crate) fn bind_expr_constraint_answers(
+pub(crate) fn bind_expr_constraint_evidence(
     ctx: &mut LowerCtx<'_>,
     expr_id: HirExprId,
     origin: IrOrigin,
     lowered: IrExpr,
 ) -> IrExpr {
-    let Some(evidence) = ctx.sema.expr_constraint_answers(expr_id) else {
+    let Some(evidence) = ctx.sema.expr_constraint_evidence(expr_id) else {
         return lowered;
     };
     if evidence.is_empty() {
@@ -172,7 +172,7 @@ pub(crate) fn bind_expr_constraint_answers(
             },
             captures: evidence
                 .iter()
-                .map(|item| lower_constraint_answer_expr(ctx, origin, item))
+                .map(|item| lower_constraint_evidence_expr(ctx, origin, item))
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
         },

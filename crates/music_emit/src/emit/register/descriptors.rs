@@ -66,17 +66,6 @@ pub(super) fn register_data_defs(
     }
 }
 
-pub(super) fn register_effects(
-    state: &mut ProgramState,
-    module: &IrModule,
-    layout: &mut ModuleLayout,
-) {
-    for effect in module.effects() {
-        let effect_id = ensure_effect(state, effect, layout);
-        let _ = layout.effects.insert(effect.key.clone(), effect_id);
-    }
-}
-
 pub(super) fn register_shapes(
     state: &mut ProgramState,
     module: &IrModule,

@@ -311,6 +311,16 @@ impl<'a> VmHostContext<'a> {
 
     #[must_use]
     pub fn bool_flag(&self, value: &Value) -> Option<bool> {
+        if let Value::Int(value) = value {
+            return (*value == 0 || *value == 1).then_some(*value != 0);
+        }
+        if let Value::Nat(value) = value {
+            return (*value == 0 || *value == 1).then_some(*value != 0);
+        }
+        if let Value::Bits(bits) = value {
+            let value = bits.to_u64()?;
+            return (value == 0 || value == 1).then_some(value != 0);
+        }
         let record = self.record(value)?;
         (record.is_empty() && (record.tag() == 0 || record.tag() == 1)).then_some(record.tag() != 0)
     }

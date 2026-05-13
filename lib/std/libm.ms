@@ -1,53 +1,53 @@
---! C math library surface.
+--! C math library module.
 
 let maybe := import "@std/maybe";
 let Maybe := maybe.Maybe;
 
-@external(abi := .c)
-let cAcos (value : Float) : Float;
-@external(abi := .c)
-let cAsin (value : Float) : Float;
-@external(abi := .c)
-let cAtan (value : Float) : Float;
-@external(abi := .c)
-let cAtan2 (y : Float, x : Float) : Float;
-@external(abi := .c)
-let cCeil (value : Float) : Float;
-@external(abi := .c)
-let cCos (value : Float) : Float;
-@external(abi := .c)
-let cExp (value : Float) : Float;
-@external(abi := .c)
-let cFabs (value : Float) : Float;
-@external(abi := .c)
-let cFloor (value : Float) : Float;
-@external(abi := .c)
-let cFmod (left : Float, right : Float) : Float;
-@external(abi := .c)
-let cHypot (left : Float, right : Float) : Float;
-@external(abi := .c)
-let cLog (value : Float) : Float;
-@external(abi := .c)
-let cLog10 (value : Float) : Float;
-@external(abi := .c)
-let cPow (base : Float, exponent : Float) : Float;
-@external(abi := .c)
-let cRound (value : Float) : Float;
-@external(abi := .c)
-let cSin (value : Float) : Float;
-@external(abi := .c)
-let cSqrt (value : Float) : Float;
-@external(abi := .c)
-let cTan (value : Float) : Float;
-@external(abi := .c)
-let cTrunc (value : Float) : Float;
+@external(abi := .c, symbol := "acos")
+let C__acos (value : Float) : Float;
+@external(abi := .c, symbol := "asin")
+let C__asin (value : Float) : Float;
+@external(abi := .c, symbol := "atan")
+let C__atan (value : Float) : Float;
+@external(abi := .c, symbol := "atan2")
+let C__atan2 (y : Float, x : Float) : Float;
+@external(abi := .c, symbol := "ceil")
+let C__ceil (value : Float) : Float;
+@external(abi := .c, symbol := "cos")
+let C__cos (value : Float) : Float;
+@external(abi := .c, symbol := "exp")
+let C__exp (value : Float) : Float;
+@external(abi := .c, symbol := "fabs")
+let C__fabs (value : Float) : Float;
+@external(abi := .c, symbol := "floor")
+let C__floor (value : Float) : Float;
+@external(abi := .c, symbol := "fmod")
+let C__fmod (left : Float, right : Float) : Float;
+@external(abi := .c, symbol := "hypot")
+let C__hypot (left : Float, right : Float) : Float;
+@external(abi := .c, symbol := "log")
+let C__log (value : Float) : Float;
+@external(abi := .c, symbol := "log10")
+let C__log10 (value : Float) : Float;
+@external(abi := .c, symbol := "pow")
+let C__pow (base : Float, exponent : Float) : Float;
+@external(abi := .c, symbol := "round")
+let C__round (value : Float) : Float;
+@external(abi := .c, symbol := "sin")
+let C__sin (value : Float) : Float;
+@external(abi := .c, symbol := "sqrt")
+let C__sqrt (value : Float) : Float;
+@external(abi := .c, symbol := "tan")
+let C__tan (value : Float) : Float;
+@external(abi := .c, symbol := "trunc")
+let C__trunc (value : Float) : Float;
 
 @external(abi := .musi)
-let floatIsNanIntrinsic (value : Float) : Bit;
+let Musi__floatIsNan (value : Float) : Bit;
 @external(abi := .musi)
-let floatIsInfiniteIntrinsic (value : Float) : Bit;
+let Musi__floatIsInfinite (value : Float) : Bit;
 @external(abi := .musi)
-let floatIsFiniteIntrinsic (value : Float) : Bit;
+let Musi__floatIsFinite (value : Float) : Bit;
 
 --- Archimedes constant.
 export let pi : Float := 3.141592653589793;
@@ -58,15 +58,15 @@ let both (left : Bit, right : Bit) : Bit := if left then right else 0 = 1;
 
 --- Returns true when value is NaN.
 export let isNan (value : Float) : Bit := unsafe {
-  floatIsNanIntrinsic(value);
+  Musi__floatIsNan(value);
 };
 --- Returns true when value is positive or negative infinity.
 export let isInfinite (value : Float) : Bit := unsafe {
-  floatIsInfiniteIntrinsic(value);
+  Musi__floatIsInfinite(value);
 };
 --- Returns true when value is neither NaN nor infinite.
 export let isFinite (value : Float) : Bit := unsafe {
-  floatIsFiniteIntrinsic(value);
+  Musi__floatIsFinite(value);
 };
 
 let finiteBoth (value : Float, condition : Bit) : Bit :=
@@ -79,7 +79,7 @@ let isFiniteNonZero (value : Float) : Bit := finiteBoth(value, value /= 0.0);
 
 --- Arc cosine.
 export let acos (value : Float) : Float := unsafe {
-  cAcos(value);
+  C__acos(value);
 };
 --- Arc cosine when input is inside [-1, 1].
 export let checkedAcos (value : Float) : Maybe[Float] :=
@@ -87,7 +87,7 @@ export let checkedAcos (value : Float) : Maybe[Float] :=
   else maybe.None[Float]();
 --- Arc sine.
 export let asin (value : Float) : Float := unsafe {
-  cAsin(value);
+  C__asin(value);
 };
 --- Arc sine when input is inside [-1, 1].
 export let checkedAsin (value : Float) : Maybe[Float] :=
@@ -95,35 +95,35 @@ export let checkedAsin (value : Float) : Maybe[Float] :=
   else maybe.None[Float]();
 --- Arc tangent.
 export let atan (value : Float) : Float := unsafe {
-  cAtan(value);
+  C__atan(value);
 };
 --- Arc tangent from `y` and `x`.
 export let atan2 (y : Float, x : Float) : Float := unsafe {
-  cAtan2(y, x);
+  C__atan2(y, x);
 };
 --- Smallest integer value not less than input.
 export let ceil (value : Float) : Float := unsafe {
-  cCeil(value);
+  C__ceil(value);
 };
 --- Cosine.
 export let cos (value : Float) : Float := unsafe {
-  cCos(value);
+  C__cos(value);
 };
 --- Natural exponential.
 export let exp (value : Float) : Float := unsafe {
-  cExp(value);
+  C__exp(value);
 };
 --- Absolute floating-point value.
 export let fabs (value : Float) : Float := unsafe {
-  cFabs(value);
+  C__fabs(value);
 };
 --- Largest integer value not greater than input.
 export let floor (value : Float) : Float := unsafe {
-  cFloor(value);
+  C__floor(value);
 };
 --- Floating-point remainder.
 export let fmod (left : Float, right : Float) : Float := unsafe {
-  cFmod(left, right);
+  C__fmod(left, right);
 };
 --- Floating-point remainder when divisor is non-zero.
 export let checkedFmod (left : Float, right : Float) : Maybe[Float] :=
@@ -132,11 +132,11 @@ export let checkedFmod (left : Float, right : Float) : Maybe[Float] :=
   ) else maybe.None[Float]();
 --- Euclidean hypotenuse.
 export let hypot (left : Float, right : Float) : Float := unsafe {
-  cHypot(left, right);
+  C__hypot(left, right);
 };
 --- Natural logarithm.
 export let log (value : Float) : Float := unsafe {
-  cLog(value);
+  C__log(value);
 };
 --- Natural logarithm when input is positive.
 export let checkedLog (value : Float) : Maybe[Float] :=
@@ -144,7 +144,7 @@ export let checkedLog (value : Float) : Maybe[Float] :=
   else maybe.None[Float]();
 --- Base-10 logarithm.
 export let log10 (value : Float) : Float := unsafe {
-  cLog10(value);
+  C__log10(value);
 };
 --- Base-10 logarithm when input is positive.
 export let checkedLog10 (value : Float) : Maybe[Float] :=
@@ -152,19 +152,19 @@ export let checkedLog10 (value : Float) : Maybe[Float] :=
   else maybe.None[Float]();
 --- Base raised to exponent.
 export let pow (base : Float, exponent : Float) : Float := unsafe {
-  cPow(base, exponent);
+  C__pow(base, exponent);
 };
 --- Nearest integer, halfway away from zero.
 export let round (value : Float) : Float := unsafe {
-  cRound(value);
+  C__round(value);
 };
 --- Sine.
 export let sin (value : Float) : Float := unsafe {
-  cSin(value);
+  C__sin(value);
 };
 --- Square root.
 export let sqrt (value : Float) : Float := unsafe {
-  cSqrt(value);
+  C__sqrt(value);
 };
 --- Square root when input is non-negative.
 export let checkedSqrt (value : Float) : Maybe[Float] :=
@@ -172,9 +172,9 @@ export let checkedSqrt (value : Float) : Maybe[Float] :=
   else maybe.None[Float]();
 --- Tangent.
 export let tan (value : Float) : Float := unsafe {
-  cTan(value);
+  C__tan(value);
 };
 --- Integer part, rounded toward zero.
 export let trunc (value : Float) : Float := unsafe {
-  cTrunc(value);
+  C__trunc(value);
 };

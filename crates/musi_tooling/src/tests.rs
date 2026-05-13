@@ -376,7 +376,7 @@ boxedName.value;
     }
 
     #[test]
-    fn implementation_ignores_removed_shape_givens() {
+    fn implementation_query_returns_no_shape_adapters() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
         let source = "\
@@ -399,7 +399,7 @@ let bitEq := 2;
     }
 
     #[test]
-    fn implementation_ignores_removed_workspace_shape_givens() {
+    fn implementation_query_ignores_workspace_shape_adapters() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
         let shape_source = "\
@@ -407,24 +407,24 @@ export let Eq [T] := shape {
   let equals (left : T, right : T) : Bit;
 };
 ";
-        let given_source = "\
+        let adapter_source = "\
 let shapes := import \"./shapes\";
 let Eq := shapes.Eq;
 let intEq := 1;
 ";
-        let other_given_source = "\
+        let other_adapter_source = "\
 let shapes := import \"./shapes\";
 let Eq := shapes.Eq;
 let bitEq := 2;
 ";
         write_file(test_dir.path(), "index.ms", "import \"./shapes\";\n");
         write_file(test_dir.path(), "shapes.ms", shape_source);
-        write_file(test_dir.path(), "impls.ms", given_source);
-        write_file(test_dir.path(), "more_impls.ms", other_given_source);
+        write_file(test_dir.path(), "impls.ms", adapter_source);
+        write_file(test_dir.path(), "more_impls.ms", other_adapter_source);
 
         let diagnostics = collect_project_diagnostics_with_overlay(
             &test_dir.path().join("impls.ms"),
-            Some(given_source),
+            Some(adapter_source),
         );
         assert!(diagnostics.is_empty(), "{diagnostics:?}");
 
@@ -1668,12 +1668,12 @@ let envSet (name : String, value : String) : Int;
 "#;
         write_file(
             test_dir.path(),
-            "crates/musi_foundation/modules/env.ms",
+            "crates/musi_foundation/modules/_env.ms",
             source,
         );
         let path = test_dir
             .path()
-            .join("crates/musi_foundation/modules/env.ms");
+            .join("crates/musi_foundation/modules/_env.ms");
 
         let tokens = semantic_tokens_for_project_file_with_overlay(&path, Some(source));
 
@@ -1712,12 +1712,12 @@ export let float01 () : Float := unsafe { float01Intrinsic(); };
 ";
         write_file(
             test_dir.path(),
-            "crates/musi_foundation/modules/env.ms",
+            "crates/musi_foundation/modules/_env.ms",
             source,
         );
         let path = test_dir
             .path()
-            .join("crates/musi_foundation/modules/env.ms");
+            .join("crates/musi_foundation/modules/_env.ms");
 
         let tokens = semantic_tokens_for_project_file_with_overlay(&path, Some(source));
 
@@ -1817,12 +1817,12 @@ let float01Intrinsic () : Float;
 ";
         write_file(
             test_dir.path(),
-            "crates/musi_foundation/modules/env.ms",
+            "crates/musi_foundation/modules/_env.ms",
             source,
         );
         let path = test_dir
             .path()
-            .join("crates/musi_foundation/modules/env.ms");
+            .join("crates/musi_foundation/modules/_env.ms");
 
         let hover = hover_for_project_file_with_overlay(&path, Some(source), 7, 27)
             .expect("return annotation should hover");

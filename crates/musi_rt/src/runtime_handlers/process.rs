@@ -16,16 +16,16 @@ pub(super) fn register(host: &mut NativeHost) {
 }
 
 fn register_foreign_handlers(host: &mut NativeHost) {
-    host.register_foreign_handler("musi:process::argCountIntrinsic", |_foreign, args| {
+    host.register_foreign_handler("musi:process::Musi__argCount", |_foreign, args| {
         if !args.is_empty() {
             return Err(VmError::new(musi_vm::VmErrorKind::ForeignCallRejected {
-                foreign: "musi:process::argCountIntrinsic".into(),
+                foreign: "musi:process::Musi__argCount".into(),
             }));
         }
         Ok(Value::Int(saturating_usize_to_i64(args_os().count())))
     });
     host.register_foreign_handler_with_context(
-        "musi:process::argAtIntrinsic",
+        "musi:process::Musi__argAt",
         |ctx, foreign, args| {
             let [Value::Int(index)] = args else {
                 return Err(foreign_rejected(foreign));
@@ -42,38 +42,32 @@ fn register_foreign_handlers(host: &mut NativeHost) {
             ctx.alloc_string(arg_value)
         },
     );
-    host.register_foreign_handler_with_context(
-        "musi:process::cwdIntrinsic",
-        |ctx, foreign, args| {
-            if !args.is_empty() {
-                return Err(foreign_rejected(foreign));
-            }
-            current_dir()
-                .map(|cwd| cwd.to_string_lossy().into_owned())
-                .map_err(|_| foreign_rejected(foreign))
-                .and_then(|cwd| ctx.alloc_string(cwd))
-        },
-    );
-    host.register_foreign_handler_with_context(
-        "musi:process::runIntrinsic",
-        |ctx, foreign, args| {
-            let command = foreign_string_arg(ctx, foreign, args)?;
-            let status = if cfg!(windows) {
-                Command::new("cmd")
-                    .args([windows_shell_flag().as_str(), command])
-                    .status()
-            } else {
-                Command::new("sh").args(["-c", command]).status()
-            };
-            Ok(Value::Int(i64::from(
-                status
-                    .map_err(|_| foreign_rejected(foreign))?
-                    .code()
-                    .unwrap_or(-1),
-            )))
-        },
-    );
-    host.register_foreign_handler("musi:process::exitIntrinsic", |foreign, _args| {
+    host.register_foreign_handler_with_context("musi:process::Musi__cwd", |ctx, foreign, args| {
+        if !args.is_empty() {
+            return Err(foreign_rejected(foreign));
+        }
+        current_dir()
+            .map(|cwd| cwd.to_string_lossy().into_owned())
+            .map_err(|_| foreign_rejected(foreign))
+            .and_then(|cwd| ctx.alloc_string(cwd))
+    });
+    host.register_foreign_handler_with_context("musi:process::Musi__run", |ctx, foreign, args| {
+        let command = foreign_string_arg(ctx, foreign, args)?;
+        let status = if cfg!(windows) {
+            Command::new("cmd")
+                .args([windows_shell_flag().as_str(), command])
+                .status()
+        } else {
+            Command::new("sh").args(["-c", command]).status()
+        };
+        Ok(Value::Int(i64::from(
+            status
+                .map_err(|_| foreign_rejected(foreign))?
+                .code()
+                .unwrap_or(-1),
+        )))
+    });
+    host.register_foreign_handler("musi:process::Musi__exit", |foreign, _args| {
         Err(VmError::new(musi_vm::VmErrorKind::ForeignCallRejected {
             foreign: foreign.name().into(),
         }))

@@ -6,15 +6,15 @@ let Int := Core.Int;
 let String := Core.String;
 
 @external(abi := .musi)
-let intIntrinsic (value : Int) : String;
+let Musi__int (value : Int) : String;
 
 export let int (value : Int) : String := unsafe {
-  intIntrinsic(value);
+  Musi__int(value);
 };
 
 @external(abi := .musi)
-let floatIntrinsic (value : Float) : String;
+let Musi__float (value : Float) : String;
 
 export let float (value : Float) : String := unsafe {
-  floatIntrinsic(value);
+  Musi__float(value);
 };

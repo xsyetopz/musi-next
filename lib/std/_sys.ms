@@ -1,79 +1,56 @@
---! System helper namespace.
+--! System module.
 
 @external(abi := .musi)
-let targetOsIntrinsic () : String;
+let Musi__targetOs () : String;
 
 @external(abi := .musi)
-let targetArchIntrinsic () : String;
+let Musi__targetArch () : String;
 
 @external(abi := .musi)
-let targetArchFamilyIntrinsic () : String;
+let Musi__targetArchFamily () : String;
 
 @external(abi := .musi)
-let targetFamilyIntrinsic () : String;
+let Musi__targetFamily () : String;
 
 @external(abi := .musi)
-let targetPointerWidthIntrinsic () : Int;
+let Musi__targetPointerWidth () : Int;
 
 @external(abi := .musi)
-let targetEndianIntrinsic () : String;
+let Musi__targetEndian () : String;
 
 @external(abi := .musi)
-let jitSupportedIntrinsic () : Int;
+let Musi__matchesOs (value : String) : Bit;
 
 @external(abi := .musi)
-let jitBackendIntrinsic () : String;
+let Musi__matchesArch (value : String) : Bit;
 
 @external(abi := .musi)
-let jitIsaIntrinsic () : String;
-
-@external(abi := .musi)
-let matchesOsIntrinsic (value : String) : Bit;
-
-@external(abi := .musi)
-let matchesArchIntrinsic (value : String) : Bit;
-
-@external(abi := .musi)
-let matchesFamilyIntrinsic (value : String) : Bit;
+let Musi__matchesFamily (value : String) : Bit;
 
 --- Raw target operating system name.
 export let os : String := unsafe {
-  targetOsIntrinsic();
+  Musi__targetOs();
 };
 --- Raw target architecture name.
 export let arch : String := unsafe {
-  targetArchIntrinsic();
+  Musi__targetArch();
 };
 --- Raw target architecture family name.
 export let archFamily : String := unsafe {
-  targetArchFamilyIntrinsic();
+  Musi__targetArchFamily();
 };
 --- Raw target platform family name.
 export let family : String := unsafe {
-  targetFamilyIntrinsic();
+  Musi__targetFamily();
 };
 --- Target pointer width in bits.
 export let pointerWidth : Int := unsafe {
-  targetPointerWidthIntrinsic();
+  Musi__targetPointerWidth();
 };
 --- Target byte order name.
 export let endian : String := unsafe {
-  targetEndianIntrinsic();
+  Musi__targetEndian();
 };
-
---- Raw JIT support facts.
-export let jit :=
-  {
-    supported := unsafe {
-    jitSupportedIntrinsic();
-  } > 0,
-    backend := unsafe {
-    jitBackendIntrinsic();
-  },
-    isa := unsafe {
-    jitIsaIntrinsic();
-  },
-  };
 
 --- Raw target fact record.
 export let target :=
@@ -84,20 +61,19 @@ export let target :=
     family := family,
     pointerWidth := pointerWidth,
     endian := endian,
-    jit := jit,
   };
 
 --- Returns true when value names current OS.
 export let matchesOs (value : String) : Bit := unsafe {
-  matchesOsIntrinsic(value);
+  Musi__matchesOs(value);
 };
 --- Returns true when value names current architecture.
 export let matchesArch (value : String) : Bit := unsafe {
-  matchesArchIntrinsic(value);
+  Musi__matchesArch(value);
 };
 --- Returns true when value names current platform family.
 export let matchesFamily (value : String) : Bit := unsafe {
-  matchesFamilyIntrinsic(value);
+  Musi__matchesFamily(value);
 };
 
 --- Returns true on Unix-family targets.
@@ -108,5 +84,3 @@ export let isDarwin () : Bit := matchesFamily("darwin");
 export let isWindows () : Bit := matchesFamily("windows");
 --- Returns true on WebAssembly-family targets.
 export let isWebAssembly () : Bit := matchesFamily("webassembly");
---- Returns true when current target supports JIT.
-export let supportsJit () : Bit := jit.supported;

@@ -10,62 +10,66 @@ let path := import "@std/path";
 let core := import "musi:core";
 
 /- === Type universe === -/
---- Prelude alias for core Type.
+--- Type universe value.
 export let Type := core.Type;
---- Prelude alias for core Array.
+--- Array type constructor.
 export let Array := core.Array;
---- Prelude alias for core Any.
+--- Any value type.
 export let Any := core.Any;
---- Prelude alias for core Unknown.
+--- Unknown value type.
 export let Unknown := core.Unknown;
---- Prelude alias for core Syntax.
+--- Syntax value type.
 export let Syntax := core.Syntax;
---- Prelude alias for core Empty.
+--- Empty result type.
 export let Empty := core.Empty;
---- Prelude alias for core Unit.
+--- Unit value type.
 export let Unit := core.Unit;
---- Prelude alias for core Bit.
+--- Bit condition type.
 export let Bit := core.Bit;
---- Prelude alias for core Nat.
+--- Natural number type.
 export let Nat := core.Nat;
---- Prelude alias for core Int.
+--- Integer type.
 export let Int := core.Int;
---- Prelude alias for core Int8.
+--- 8-bit signed integer type.
 export let Int8 := core.Int8;
---- Prelude alias for core Int16.
+--- 16-bit signed integer type.
 export let Int16 := core.Int16;
---- Prelude alias for core Int32.
+--- 32-bit signed integer type.
 export let Int32 := core.Int32;
---- Prelude alias for core Int64.
+--- 64-bit signed integer type.
 export let Int64 := core.Int64;
---- Prelude alias for core Nat8.
+--- 8-bit natural number type.
 export let Nat8 := core.Nat8;
---- Prelude alias for core Nat16.
+--- 16-bit natural number type.
 export let Nat16 := core.Nat16;
---- Prelude alias for core Nat32.
+--- 32-bit natural number type.
 export let Nat32 := core.Nat32;
---- Prelude alias for core Nat64.
+--- 64-bit natural number type.
 export let Nat64 := core.Nat64;
---- Prelude alias for core Float.
+--- Floating-point number type.
 export let Float := core.Float;
---- Prelude alias for core Float32.
+--- 32-bit floating-point number type.
 export let Float32 := core.Float32;
---- Prelude alias for core Float64.
+--- 64-bit floating-point number type.
 export let Float64 := core.Float64;
---- Prelude alias for core String.
+--- Text string type.
 export let String := core.String;
---- Prelude alias for core Rune.
+--- Unicode scalar value type.
 export let Rune := core.Rune;
---- Prelude alias for core Bits.
+--- Exact-width bit pattern type constructor.
 export let Bits := core.Bits;
---- Prelude alias for core Range.
+--- Target-sized machine word type.
+export let Word := core.Word;
+--- 8-bit machine word type.
+export let Word8 := core.Word8;
+--- 16-bit machine word type.
+export let Word16 := core.Word16;
+--- 32-bit machine word type.
+export let Word32 := core.Word32;
+--- 64-bit machine word type.
+export let Word64 := core.Word64;
+--- Range type.
 export let Range := core.Range;
---- Prelude alias for core Pin.
-export let Pin := core.Pin;
---- Prelude alias for core CString.
-export let CString := core.CString;
---- Prelude alias for core CPtr.
-export let CPtr := core.CPtr;
 
 /- === Common named data types === -/
 --- Prelude maybe value type.
@@ -80,12 +84,10 @@ export let List := collections.list.List;
 export let Path := path.Path;
 --- Prelude bytes type.
 export let Bytes := bytes.Bytes;
---- Prelude boolean alias type.
-export let Bool := bool.Bool;
---- Prelude lowercase true alias.
-export let true : Bool := bool.true;
---- Prelude lowercase false alias.
-export let false : Bool := bool.false;
+--- Lowercase true value.
+export let true : core.Bit := bool.true;
+--- Lowercase false value.
+export let false : core.Bit := bool.false;
 
 /- === Common constructors === -/
 --- Build Some maybe value.

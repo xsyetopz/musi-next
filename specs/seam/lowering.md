@@ -137,11 +137,9 @@ It is the readable textual twin of the same lowered contract.
 
 If something cannot round-trip to `.seam`, it is not part of SEAM’s public target contract.
 
-## JIT Boundary
+## Backend Boundary
 
-If a JIT exists, it consumes verified SEAM modules.
-
-Cranelift lowering happens after SEAM verification and decoding. Cranelift IR is internal backend machinery, not a public targeting format.
+Backend lowering consumes verified SEAM modules after verification and decoding.
 
 ## See Also
 

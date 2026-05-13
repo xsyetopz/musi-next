@@ -1,4 +1,4 @@
---! Operating system helper namespace.
+--! Operating system module.
 
 let sys := import "#sys";
 
@@ -23,12 +23,6 @@ export hidden let Endian := data {
   | Big
 };
 
---- JIT backend availability.
-export hidden let Jit := data {
-  | Supported(backend : String, isa : String)
-  | Unsupported
-};
-
 --- Current compilation/runtime target facts.
 export hidden let Target := data {
   | TargetInfo(
@@ -37,21 +31,18 @@ export hidden let Target := data {
     family : String,
     pointerWidth : Int,
     endian : String,
-    jitSupported : Int,
-    jitBackend : String,
-    jitIsa : String,
   )
 };
 
---- Core operation for `os`.
+--- Function for `os`.
 let makeOs (value : String) : Os := .OsName(value := value);
 
---- Core operation for `arch`.
+--- Function for `arch`.
 let makeArch (value : String) : Arch := .ArchName(value := value);
 
 --- Build CPU architecture value.
 export let arch (value : String) : Arch := makeArch(value);
---- Core operation for `family`.
+--- Function for `family`.
 let makeFamily (value : String) : Family := .FamilyName(value := value);
 
 --- Build platform family value.
@@ -82,25 +73,6 @@ export let endianFromString (value : String) : Endian :=
   | _ => .Little
   );
 
---- Core operation for `isSupported`.
-let jitIsSupported (target : Jit) : Bit :=
-  match target (
-  | .Supported(backend := _, isa := _) => 0 = 0
-  | .Unsupported => 0 = 1
-  );
-
---- Returns true when JIT backend is available.
-export let isSupported (target : Jit) : Bit := jitIsSupported(target);
-
---- Return current JIT backend and ISA when supported.
-export let currentJit : Jit :=
-  if sys.jit.supported then .Supported(
-    backend := sys.jit.backend,
-    isa := sys.jit.isa,
-  ) else .Unsupported;
-
-let jitSupportedFlag : Int := if sys.jit.supported then 1 else 0;
-
 --- Return current target facts from system bindings.
 export let current : Target :=
   .TargetInfo(
@@ -109,9 +81,6 @@ export let current : Target :=
     family := sys.family,
     pointerWidth := sys.pointerWidth,
     endian := sys.endian,
-    jitSupported := jitSupportedFlag,
-    jitBackend := sys.jit.backend,
-    jitIsa := sys.jit.isa,
   );
 
 --- Return target operating system.
@@ -123,9 +92,6 @@ export let targetOs (target : Target) : Os :=
     family := _,
     pointerWidth := _,
     endian := _,
-    jitSupported := _,
-    jitBackend := _,
-    jitIsa := _,
   ) => makeOs(value)
   );
 
@@ -138,9 +104,6 @@ export let targetArch (target : Target) : Arch :=
     family := _,
     pointerWidth := _,
     endian := _,
-    jitSupported := _,
-    jitBackend := _,
-    jitIsa := _,
   ) => makeArch(value)
   );
 
@@ -153,9 +116,6 @@ export let targetFamily (target : Target) : Family :=
     family := value,
     pointerWidth := _,
     endian := _,
-    jitSupported := _,
-    jitBackend := _,
-    jitIsa := _,
   ) => makeFamily(value)
   );
 
@@ -168,9 +128,6 @@ export let targetPointerWidth (target : Target) : Int :=
     family := _,
     pointerWidth := value,
     endian := _,
-    jitSupported := _,
-    jitBackend := _,
-    jitIsa := _,
   ) => value
   );
 
@@ -183,28 +140,7 @@ export let targetEndian (target : Target) : Endian :=
     family := _,
     pointerWidth := _,
     endian := value,
-    jitSupported := _,
-    jitBackend := _,
-    jitIsa := _,
   ) => endianFromString(value)
-  );
-
---- Return target JIT backend and ISA when supported.
-export let targetJit (target : Target) : Jit :=
-  match target (
-  | .TargetInfo(
-    os := _,
-    arch := _,
-    family := _,
-    pointerWidth := _,
-    endian := _,
-    jitSupported := supported,
-    jitBackend := backend,
-    jitIsa := isa,
-  ) => match supported (
-  | success where success > 0 => .Supported(backend := backend, isa := isa)
-  | _ => .Unsupported
-  )
   );
 
 --- Returns true when current OS matches value.
@@ -222,8 +158,6 @@ export let isDarwin () : Bit := matchesFamily(makeFamily("darwin"));
 export let isWindows () : Bit := matchesFamily(makeFamily("windows"));
 --- Returns true on WebAssembly-family targets.
 export let isWebAssembly () : Bit := matchesFamily(makeFamily("webassembly"));
---- Returns true when current target supports JIT.
-export let supportsJit () : Bit := jitIsSupported(currentJit);
 
 --- Convert value to string.
 export let (self : Os).toString () : String := osText(self);
@@ -233,9 +167,6 @@ export let (self : Arch).toString () : String := archText(self);
 
 --- Convert value to string.
 export let (self : Family).toString () : String := familyText(self);
-
---- Returns true when JIT support exists.
-export let (self : Jit).isSupported () : Bit := jitIsSupported(self);
 
 --- Target architecture.
 export let (self : Target).arch () : Arch := targetArch(self);
@@ -248,6 +179,3 @@ export let (self : Target).pointerWidth () : Int := targetPointerWidth(self);
 
 --- Target endian value.
 export let (self : Target).endian () : Endian := targetEndian(self);
-
---- Target JIT facts.
-export let (self : Target).jit () : Jit := targetJit(self);

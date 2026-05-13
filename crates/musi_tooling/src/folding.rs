@@ -112,27 +112,21 @@ const fn is_foldable_node(kind: SyntaxNodeKind) -> bool {
         kind,
         SyntaxNodeKind::SequenceExpr
             | SyntaxNodeKind::DataExpr
-            | SyntaxNodeKind::EffectExpr
             | SyntaxNodeKind::ShapeExpr
-            | SyntaxNodeKind::GivenExpr
             | SyntaxNodeKind::ForeignBlockExpr
             | SyntaxNodeKind::MatchExpr
             | SyntaxNodeKind::MatchArm
-            | SyntaxNodeKind::AnswerLitExpr
-            | SyntaxNodeKind::HandleExpr
             | SyntaxNodeKind::TupleExpr
             | SyntaxNodeKind::ArrayExpr
             | SyntaxNodeKind::RecordExpr
             | SyntaxNodeKind::RecordUpdateExpr
             | SyntaxNodeKind::VariantPayloadList
             | SyntaxNodeKind::VariantFieldDef
-            | SyntaxNodeKind::EffectSet
             | SyntaxNodeKind::ParamList
             | SyntaxNodeKind::FieldList
             | SyntaxNodeKind::VariantList
             | SyntaxNodeKind::TypeParamList
             | SyntaxNodeKind::ConstraintList
-            | SyntaxNodeKind::HandlerClauseList
             | SyntaxNodeKind::MemberList
     )
 }

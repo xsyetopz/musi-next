@@ -1,3 +1,4 @@
+let assert := import "@std/assert";
 let libc := import "@std/libc";
 let testing := import "@std/testing";
 
@@ -29,11 +30,11 @@ export let test () :=
     testing.it("'isSpace' classifies ASCII whitespace", libc.isSpace(10));
     testing.it(
       "'toLower' lowers ASCII letters",
-      testing.toBe(libc.toLower(65), 97),
+      assert.toBe(libc.toLower(65), 97),
     );
     testing.it(
       "'toUpper' raises ASCII letters",
-      testing.toBe(libc.toUpper(97), 65),
+      assert.toBe(libc.toUpper(97), 65),
     );
     testing.endDescribe()
   );

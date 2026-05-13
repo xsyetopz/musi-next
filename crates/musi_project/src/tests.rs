@@ -129,10 +129,12 @@ fn assert_builtin_std_root_compiles(manifest: &str, suite_name: &str) {
         &format!(
             r#"
 let Testing := import "@std/testing";
+let Assert := import "@std/assert";
+let Assert := import "@std/assert";
 export let test () :=
   (
     Testing.describe("{suite_name}");
-    Testing.it("adds values", Testing.toBe(1 + 2, 3));
+    Testing.it("adds values", Assert.toBe(1 + 2, 3));
     Testing.endDescribe()
   );
 "#
@@ -189,6 +191,57 @@ fn collect_missing_std_export_docs_in_file(root: &Path, path: &Path, missing: &m
                 .strip_prefix(root)
                 .expect("std path should be under root");
             missing.push(format!("{}:{}", relative.display(), index + 1));
+        }
+    }
+}
+
+fn collect_plain_std_doc_issues(root: &Path, dir: &Path, issues: &mut Vec<String>) {
+    let mut entries = fs::read_dir(dir)
+        .expect("std dir should be readable")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("std dir entries should be readable");
+    entries.sort_by_key(DirEntry::path);
+    for entry in entries {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_plain_std_doc_issues(root, &path, issues);
+            continue;
+        }
+        if path.extension().is_none_or(|ext| ext != "ms")
+            || path
+                .file_name()
+                .is_some_and(|name| name.to_string_lossy().ends_with(".test.ms"))
+        {
+            continue;
+        }
+        collect_plain_std_doc_issues_in_file(root, &path, issues);
+    }
+}
+
+fn collect_plain_std_doc_issues_in_file(root: &Path, path: &Path, issues: &mut Vec<String>) {
+    let banned = [
+        "alias",
+        "typedef",
+        "wrapper",
+        "helper namespace",
+        "helpers surface",
+        "surface",
+        "core operation",
+        "implementation",
+        "internal",
+    ];
+    let text = fs::read_to_string(path).expect("std module should be readable");
+    for (index, line) in text.lines().enumerate() {
+        let trimmed = line.trim_start();
+        if !(trimmed.starts_with("---") || trimmed.starts_with("--!")) {
+            continue;
+        }
+        let lower = trimmed.to_lowercase();
+        if banned.iter().any(|word| lower.contains(word)) {
+            let relative = path
+                .strip_prefix(root)
+                .expect("std path should be under root");
+            issues.push(format!("{}:{}: {}", relative.display(), index + 1, trimmed));
         }
     }
 }
@@ -598,14 +651,14 @@ mod success {
   "name": "app",
   "version": "1.0.0",
   "dependencies": { "util": "*" },
-  "imports": { "alias": "util" },
+  "imports": { "tool": "util" },
   "workspace": ["packages/util"]
 }"#,
         );
         write_file(
             test_dir.path(),
             "index.ms",
-            r#"import "alias"; export let expect : Int := 42;"#,
+            r#"import "tool"; export let expect : Int := 42;"#,
         );
         write_file(
             test_dir.path(),
@@ -770,6 +823,23 @@ export let test () : Unit := 0;
     }
 
     #[test]
+    fn std_docs_use_plain_public_wording() {
+        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repo root should resolve");
+        let std_root = repo_root.join("lib/std");
+        let mut issues = Vec::<String>::new();
+        collect_plain_std_doc_issues(&std_root, &std_root, &mut issues);
+
+        assert!(
+            issues.is_empty(),
+            "std docs use implementation-framed wording:\n{}",
+            issues.join("\n")
+        );
+    }
+
+    #[test]
     fn std_manifest_uses_restructured_public_paths() {
         let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
@@ -782,7 +852,11 @@ export let test () : Unit := 0;
             "\"./array\"",
             "\"./list\"",
             "\"./slice\"",
+            "\"./collections/slice\"",
             "\"./iter\"",
+            "\"./collections/iter\"",
+            "\"./math/float\"",
+            "\"./math/integer\"",
             "\"./time\"",
             "\"./io/prompt\"",
             "\"./sys\"",
@@ -795,16 +869,237 @@ export let test () : Unit := 0;
         for current in [
             "\"./collections/array\"",
             "\"./collections/list\"",
-            "\"./collections/slice\"",
-            "\"./collections/iter\"",
             "\"./datetime\"",
             "\"./encoding\"",
             "\"./cli/prompt\"",
             "\"./crypto\"",
+            "\"./word\"",
             "\"./uuid\"",
             "\"./semver\"",
         ] {
             assert!(manifest.contains(current), "std export missing: {current}");
+        }
+    }
+
+    #[test]
+    fn std_private_implementation_files_use_underscore_names() {
+        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repo root should resolve");
+        let std_root = repo_root.join("lib/std");
+
+        for private_file in ["_sys.ms", "math/_float.ms", "math/_integer.ms"] {
+            assert!(
+                std_root.join(private_file).is_file(),
+                "private std file missing: {private_file}"
+            );
+        }
+    }
+
+    #[test]
+    fn std_prelude_keeps_ffi_types_in_ffi_module() {
+        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repo root should resolve");
+        let prelude = fs::read_to_string(repo_root.join("lib/std/prelude.ms"))
+            .expect("std prelude should be readable");
+
+        for ffi_type in ["Pin", "CString", "CPtr"] {
+            assert!(
+                !prelude.contains(&format!("export let {ffi_type}")),
+                "prelude exports FFI type: {ffi_type}"
+            );
+        }
+    }
+
+    #[test]
+    fn std_assertion_api_keeps_one_integer_equality_matcher() {
+        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repo root should resolve");
+        let assert = fs::read_to_string(repo_root.join("lib/std/assert.ms"))
+            .expect("std assert module should be readable");
+        let testing = fs::read_to_string(repo_root.join("lib/std/testing.ms"))
+            .expect("std testing module should be readable");
+        assert!(
+            assert.contains("export let toBe "),
+            "std assert module missing toBe matcher"
+        );
+        assert!(
+            !assert.contains("export let toEqual ") && !testing.contains("export let toEqual "),
+            "std assertion modules export duplicate integer equality matcher"
+        );
+    }
+
+    #[test]
+    fn std_testing_keeps_assertions_in_assert_module() {
+        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repo root should resolve");
+        let testing = fs::read_to_string(repo_root.join("lib/std/testing.ms"))
+            .expect("std testing module should be readable");
+
+        for assertion_export in [
+            "export let toBe ",
+            "export let toBeTrue ",
+            "export let toBeFalse ",
+            "export let equal ",
+            "export let fail ",
+            "export let expect ",
+        ] {
+            assert!(
+                !testing.contains(assertion_export),
+                "std testing should leave assertions in @std/assert: {assertion_export}"
+            );
+        }
+    }
+
+    #[test]
+    fn std_cli_keeps_process_env_io_at_root() {
+        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repo root should resolve");
+        let cli = fs::read_to_string(repo_root.join("lib/std/cli.ms"))
+            .expect("std cli module should be readable");
+
+        for duplicate in ["export let process", "export let env", "export let io"] {
+            assert!(
+                !cli.contains(duplicate),
+                "std cli should leave root module to own duplicate export: {duplicate}"
+            );
+        }
+        assert!(
+            cli.contains("export let prompt"),
+            "std cli should keep prompt tools"
+        );
+    }
+
+    #[test]
+    fn std_math_keeps_c_math_in_libm() {
+        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repo root should resolve");
+        let math = fs::read_to_string(repo_root.join("lib/std/math.ms"))
+            .expect("std math module should be readable");
+
+        assert!(
+            !math.contains("import \"@std/libm\""),
+            "std math should keep C math functions in @std/libm"
+        );
+        for c_math_export in [
+            "export let fabs",
+            "export let pow",
+            "export let sqrt",
+            "export let isNan",
+            "export let isFinite",
+        ] {
+            assert!(
+                !math.contains(c_math_export),
+                "std math re-exports C math item: {c_math_export}"
+            );
+        }
+    }
+
+    #[test]
+    fn std_bits_keeps_type_constructor_in_prelude() {
+        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repo root should resolve");
+        let bits = fs::read_to_string(repo_root.join("lib/std/bits.ms"))
+            .expect("std bits module should be readable");
+
+        assert!(
+            !bits.contains("export let Bits :="),
+            "std bits should keep Bits as a core/prelude type"
+        );
+    }
+
+    #[test]
+    fn std_type_name_exports_stay_in_owned_modules() {
+        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repo root should resolve");
+        let std_root = repo_root.join("lib/std");
+        let allowed = ["prelude.ms", "ffi.ms"];
+        let mut unexpected = Vec::<String>::new();
+
+        for entry in fs::read_dir(&std_root).expect("std root should be readable") {
+            let entry = entry.expect("std root entry should be readable");
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("ms") {
+                continue;
+            }
+            let relative = path
+                .strip_prefix(&std_root)
+                .expect("std path should be under root")
+                .to_string_lossy();
+            if allowed.contains(&relative.as_ref()) {
+                continue;
+            }
+            let text = fs::read_to_string(&path).expect("std module should be readable");
+            for (line_index, line) in text.lines().enumerate() {
+                let trimmed = line.trim_start();
+                if !trimmed.starts_with("export let ") || !trimmed.contains(":=") {
+                    continue;
+                }
+                let name = trimmed
+                    .trim_start_matches("export let ")
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("");
+                let rhs = trimmed.split_once(":=").map_or("", |(_, rhs)| rhs.trim());
+                let direct_member_export = rhs.ends_with(';')
+                    && rhs.contains('.')
+                    && !rhs.starts_with('.')
+                    && !rhs.contains('(');
+                if name.chars().next().is_some_and(char::is_uppercase) && direct_member_export {
+                    unexpected.push(format!("{relative}:{}: {trimmed}", line_index + 1));
+                }
+            }
+        }
+
+        assert!(
+            unexpected.is_empty(),
+            "std type name exports should stay in owning modules:\n{}",
+            unexpected.join("\n")
+        );
+    }
+
+    #[test]
+    fn std_core_imports_stay_in_low_level_modules() {
+        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repo root should resolve");
+        let std_root = repo_root.join("lib/std");
+        let allowed = ["bits.ms", "ffi.ms", "prelude.ms", "word.ms"];
+
+        for entry in fs::read_dir(&std_root).expect("std root should be readable") {
+            let entry = entry.expect("std root entry should be readable");
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("ms") {
+                continue;
+            }
+            let relative = path
+                .strip_prefix(&std_root)
+                .expect("std path should be under root")
+                .to_string_lossy();
+            let text = fs::read_to_string(&path).expect("std module should be readable");
+
+            if !allowed.contains(&relative.as_ref()) {
+                assert!(
+                    !text.contains("import \"musi:core\""),
+                    "std module imports core directly: {relative}"
+                );
+            }
         }
     }
 
@@ -830,6 +1125,35 @@ export let expect : Int := 1;
 
         let error = Project::load(test_dir.path(), ProjectOptions::default())
             .expect_err("@std/sys should not resolve as public export");
+
+        assert_eq!(
+            error.diag_code(),
+            Some(ProjectDiagKind::SourceImportUnresolved.code())
+        );
+    }
+
+    #[test]
+    fn foundation_host_specs_stay_behind_std() {
+        let test_dir = TempDir::new();
+        write_file(
+            test_dir.path(),
+            "musi.json",
+            r#"{
+  "name": "app",
+  "version": "1.0.0",
+  "dependencies": { "@std": "*" }
+}"#,
+        );
+        write_file(
+            test_dir.path(),
+            "index.ms",
+            r#"let Env := import "musi:env";
+export let expect : Int := 1;
+"#,
+        );
+
+        let error = Project::load(test_dir.path(), ProjectOptions::default())
+            .expect_err("host foundation spec should not resolve from user package");
 
         assert_eq!(
             error.diag_code(),
@@ -901,7 +1225,7 @@ export let equals (left : []Int, right : []Int) : Bit := left = right;
             Project::load(test_dir.path(), ProjectOptions::default()).expect("project loads");
         let artifact = project
             .compile_root_entry_artifact()
-            .expect("root entry compiles through static reexport chain");
+            .expect("root entry compiles through static export chain");
 
         assert!(artifact.validate().is_ok());
     }
@@ -920,20 +1244,23 @@ export let equals (left : []Int, right : []Int) : Bit := left = right;
         let sema = session
             .check_module(&entry.module_key)
             .expect("@std sema should succeed");
-        let surface = sema.surface();
+        let exports = sema.surface();
 
-        let bytes = surface
+        let bytes = exports
             .exported_value("bytes")
             .expect("bytes export should exist");
-        let encoding = surface
+        let encoding = exports
             .exported_value("encoding")
             .expect("encoding export should exist");
-        let math = surface
+        let math = exports
             .exported_value("math")
             .expect("math export should exist");
-        let maybe = surface
+        let maybe = exports
             .exported_value("maybe")
             .expect("maybe export should exist");
+        let os = exports
+            .exported_value("os")
+            .expect("os export should exist");
 
         assert_eq!(
             bytes.import_record_target.as_ref(),
@@ -950,6 +1277,10 @@ export let equals (left : []Int, right : []Int) : Bit := left = right;
         assert_eq!(
             maybe.import_record_target.as_ref(),
             Some(&ModuleKey::new("@@std@0.1.0/maybe.ms"))
+        );
+        assert_eq!(
+            os.import_record_target.as_ref(),
+            Some(&ModuleKey::new("@@std@0.1.0/os.ms"))
         );
     }
 
@@ -976,7 +1307,7 @@ export let equals (left : []Int, right : []Int) : Bit := left = right;
     }
 
     #[test]
-    fn std_root_member_alias_keeps_import_record_target() {
+    fn std_root_member_binding_keeps_import_record_target() {
         let test_dir = TempDir::new();
         write_file(
             test_dir.path(),
@@ -1135,7 +1466,8 @@ export let none[T] () : Maybe[T] := .None;
             test_dir.path(),
             "index.ms",
             r#"let Testing := import "@std/testing";
-export let test () := Testing.it("adds values", Testing.toBe(1 + 2, 3));
+let Assert := import "@std/assert";
+export let test () := Testing.it("adds values", Assert.toBe(1 + 2, 3));
 "#,
         );
 

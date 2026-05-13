@@ -329,14 +329,6 @@ fn member_completions_for_base(
     let mut completions = Vec::new();
     let mut seen = HashSet::new();
     if let HirExprKind::Name { name } = sema.module().store.exprs.get(base).kind {
-        push_effect_operation_completions(
-            session,
-            sema,
-            name.name,
-            &replace_range,
-            &mut completions,
-            &mut seen,
-        );
         push_shape_member_completions(
             session,
             sema,
@@ -404,7 +396,7 @@ fn completion_kind_for_export(
     surface: &ModuleSurface,
     export: &ExportedValue,
 ) -> ToolCompletionKind {
-    if export.shape_key.is_some() || export.effect_key.is_some() || export.data_key.is_some() {
+    if export.shape_key.is_some() || export.data_key.is_some() {
         return ToolCompletionKind::Type;
     }
     surface
@@ -421,32 +413,6 @@ const fn completion_detail_for_export(kind: ToolCompletionKind) -> &'static str 
         ToolCompletionKind::Function => "function",
         ToolCompletionKind::Type => "type",
         _ => "export",
-    }
-}
-
-fn push_effect_operation_completions(
-    session: &Session,
-    sema: &SemaModule,
-    name: Symbol,
-    replace_range: &ToolRange,
-    completions: &mut ToolCompletionList,
-    seen: &mut HashSet<String>,
-) {
-    let Some(effect) = sema.effect_def(session.resolve_symbol(name)) else {
-        return;
-    };
-    for (index, (label, _)) in effect.ops().enumerate() {
-        push_completion(
-            completions,
-            seen,
-            ToolCompletion::new(
-                label.to_owned(),
-                ToolCompletionKind::Procedure,
-                Some("effect operation".to_owned()),
-                *replace_range,
-            )
-            .with_sort_text(format!("1_{index:03}_{label}")),
-        );
     }
 }
 
@@ -537,9 +503,8 @@ fn push_property_completion(
 }
 
 const COMPLETION_KEYWORDS: &[&str] = &[
-    "answer", "any", "ask", "as", "catch", "data", "effect", "export", "given", "handle", "if",
-    "import", "in", "known", "law", "let", "match", "mut", "native", "opaque", "partial", "pin",
-    "quote", "rec", "require", "resume", "shape", "some", "unsafe", "where",
+    "as", "catch", "data", "export", "if", "import", "in", "known", "law", "let", "match", "mut",
+    "native", "partial", "pin", "rec", "require", "shape", "unsafe", "where",
 ];
 
 fn push_completion(
@@ -581,8 +546,6 @@ const fn binding_kind_label(kind: NameBindingKind) -> &'static str {
         NameBindingKind::PiBinder | NameBindingKind::TypeParam => "type parameter",
         NameBindingKind::PatternBind => "pattern binding",
         NameBindingKind::Pin => "pin",
-        NameBindingKind::HandleClauseResult => "answer result",
-        NameBindingKind::HandleClauseParam => "answer parameter",
     }
 }
 
@@ -596,13 +559,9 @@ const fn completion_sort_group(kind: ToolCompletionKind) -> u8 {
 const fn completion_kind_for_binding(kind: NameBindingKind) -> ToolCompletionKind {
     match kind {
         NameBindingKind::Prelude | NameBindingKind::Import => ToolCompletionKind::Module,
-        NameBindingKind::Let | NameBindingKind::Pin | NameBindingKind::HandleClauseResult => {
-            ToolCompletionKind::Variable
-        }
+        NameBindingKind::Let | NameBindingKind::Pin => ToolCompletionKind::Variable,
         NameBindingKind::AttachedMethod => ToolCompletionKind::Function,
-        NameBindingKind::Param
-        | NameBindingKind::PatternBind
-        | NameBindingKind::HandleClauseParam => ToolCompletionKind::Parameter,
+        NameBindingKind::Param | NameBindingKind::PatternBind => ToolCompletionKind::Parameter,
         NameBindingKind::PiBinder | NameBindingKind::TypeParam => ToolCompletionKind::TypeParameter,
     }
 }

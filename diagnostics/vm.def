@@ -68,7 +68,7 @@ diag InvalidRangeBounds 6118
   message "range bounds `{start}` and `{end}` invalid"
 
 diag InvalidRangeEvidence 6119
-  message "range answer invalid for value kind `{found}`"
+  message "range endpoint evidence invalid for value kind `{found}`"
 
 diag InvalidRangeStep 6120
   message "range step invalid (`{detail}`)"
@@ -118,8 +118,8 @@ diag CallArityMismatch 6132
   primary "call `{callee}` has `{found}` arguments here"
 
 diag HandlerFrameMissing 6133
-  message "answer `{handler_id}` frame depth `{frame_depth}` missing"
-  primary "answer `{handler_id}` frame missing"
+  message "handler `{handler_id}` frame depth `{frame_depth}` missing"
+  primary "handler `{handler_id}` frame missing"
 
 diag MissingMatchingHandlerPop 6134
   message "procedure `{procedure}` missing matching `hdl.pop`"

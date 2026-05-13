@@ -11,9 +11,5 @@ export let test () :=
     testing.it("'pointerWidth' is supported", sys.pointerWidth > 0,);
     testing.it("'matchesArch' ignores casing", sys.matchesArch(sys.arch),);
     testing.it("'matchesOs' ignores casing", sys.matchesOs(sys.os),);
-    testing.it(
-      "'supportsJit' mirrors jit record",
-      sys.supportsJit() = sys.jit.supported,
-    );
     testing.endDescribe()
   );

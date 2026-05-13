@@ -80,11 +80,6 @@ pub enum HirTyKind {
     Range {
         bound: HirTyId,
     },
-    Handler {
-        effect: HirTyId,
-        input: HirTyId,
-        output: HirTyId,
-    },
     Mut {
         inner: HirTyId,
     },

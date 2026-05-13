@@ -1,95 +1,32 @@
---! Safe C library wrapper surface.
+--! Safe C library module.
 
 let ascii := import "@std/ascii";
 let cmp := import "@std/cmp";
 let ffi := import "@std/ffi";
+let CInt := ffi.CInt;
+let CString := ffi.CString;
+let Int32 := ffi.CInt;
+let Nat := ffi.CSize;
 let Ordering := cmp.Ordering;
 
---- C char ABI type.
-export let CChar := ffi.CChar;
---- C signed char ABI type.
-export let CSChar := ffi.CSChar;
---- C unsigned char ABI type.
-export let CUChar := ffi.CUChar;
---- C signed short ABI type.
-export let CShort := ffi.CShort;
---- C unsigned short ABI type.
-export let CUShort := ffi.CUShort;
---- C signed int ABI type.
-export let CInt := ffi.CInt;
---- C unsigned int ABI type.
-export let CUInt := ffi.CUInt;
---- C signed long ABI type.
-export let CLong := ffi.CLong;
---- C unsigned long ABI type.
-export let CULong := ffi.CULong;
---- C signed long long ABI type.
-export let CLongLong := ffi.CLongLong;
---- C unsigned long long ABI type.
-export let CULongLong := ffi.CULongLong;
---- C size_t ABI type.
-export let CSize := ffi.CSize;
---- C ptrdiff_t ABI type.
-export let CSizeDiff := ffi.CSizeDiff;
---- C float ABI type.
-export let CFloat := ffi.CFloat;
---- C double ABI type.
-export let CDouble := ffi.CDouble;
---- Null-terminated C string ABI value.
-export let CString := ffi.CString;
---- Raw C pointer ABI value.
-export let CPtr := ffi.CPtr;
---- C char ABI typedef.
-export let char := ffi.char;
---- C bool ABI typedef.
-export let bool := ffi.bool;
---- C int8_t ABI typedef.
-export let int8_t := ffi.int8_t;
---- C int16_t ABI typedef.
-export let int16_t := ffi.int16_t;
---- C int32_t ABI typedef.
-export let int32_t := ffi.int32_t;
---- C int64_t ABI typedef.
-export let int64_t := ffi.int64_t;
---- C uint8_t ABI typedef.
-export let uint8_t := ffi.uint8_t;
---- C uint16_t ABI typedef.
-export let uint16_t := ffi.uint16_t;
---- C uint32_t ABI typedef.
-export let uint32_t := ffi.uint32_t;
---- C uint64_t ABI typedef.
-export let uint64_t := ffi.uint64_t;
---- C intptr_t ABI typedef.
-export let intptr_t := ffi.intptr_t;
---- C uintptr_t ABI typedef.
-export let uintptr_t := ffi.uintptr_t;
---- C size_t ABI typedef.
-export let size_t := ffi.size_t;
---- C ptrdiff_t ABI typedef.
-export let ptrdiff_t := ffi.ptrdiff_t;
---- Typed C pointer view.
-export let Ptr := ffi.Ptr;
---- Pointer helper namespace.
-export let ptr := ffi.ptr;
-
 @external(abi := .c, symbol := "strcmp")
-let cStrcmp (left : CString, right : CString) : Int32;
+let C__strcmp (left : CString, right : CString) : Int32;
 @external(abi := .c, symbol := "strerror")
-let cStrerror (code : CInt) : CString;
+let C__strerror (code : CInt) : CString;
 @external(abi := .c, symbol := "strlen")
-let cStrlen (value : CString) : Nat;
+let C__strlen (value : CString) : Nat;
 
 --- C `strcmp`.
 export let strcmp (left : CString, right : CString) : Int32 := unsafe {
-  cStrcmp(left, right);
+  C__strcmp(left, right);
 };
 --- C `strerror`.
 export let strerror (code : CInt) : CString := unsafe {
-  cStrerror(code);
+  C__strerror(code);
 };
 --- C `strlen`.
 export let strlen (value : CString) : Nat := unsafe {
-  cStrlen(value);
+  C__strlen(value);
 };
 
 --- C string byte length.

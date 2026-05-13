@@ -288,13 +288,14 @@ mod success {
             test_dir.path(),
             "add.test.ms",
             r#"let Testing := import "@std/testing";
+let Assert := import "@std/assert";
 
 let add (left : Int, right : Int) : Int := left + right;
 
 export let test () :=
   (
     Testing.describe("add");
-    Testing.it("adds values", Testing.toBe(add(2, 3), 5));
+    Testing.it("adds values", Assert.toBe(add(2, 3), 5));
     Testing.endDescribe()
   );
 "#,
@@ -341,11 +342,12 @@ export let test () :=
             test_dir.path(),
             "index.test.ms",
             r#"let Testing := import "@std/testing";
+let Assert := import "@std/assert";
 
 export let test () :=
   (
     Testing.describe("target");
-    Testing.it("passes", Testing.toBe(1, 1));
+    Testing.it("passes", Assert.toBe(1, 1));
     Testing.endDescribe()
   );
 "#,
@@ -391,16 +393,15 @@ export let test () :=
             test_dir.path(),
             "io.test.ms",
             r#"let Testing := import "@std/testing";
-let Io := import "musi:io";
-let Log := import "musi:log";
-
+let Assert := import "@std/assert";
+let Io := import "@std/io";
 export let test () :=
   (
     Testing.describe("io");
     Io.writeLn("hidden stdout");
     Io.writeErrLn("hidden stderr");
-    Log.write(40, "hidden log");
-    Testing.it("passes", Testing.toBe(1, 1));
+    Io.writeErrLn("hidden log");
+    Testing.it("passes", Assert.toBe(1, 1));
     Testing.endDescribe()
   );
 "#,
@@ -734,11 +735,12 @@ export let test () :=
                 test_dir.path(),
                 &format!("{package}/add.test.ms"),
                 r#"let Testing := import "@std/testing";
+let Assert := import "@std/assert";
 
 export let test () :=
   (
     Testing.describe("workspace");
-    Testing.it("passes", Testing.toBe(1, 1));
+    Testing.it("passes", Assert.toBe(1, 1));
     Testing.endDescribe()
   );
 "#,
@@ -820,11 +822,12 @@ export let test () :=
             test_dir.path(),
             "root.test.ms",
             r#"let Testing := import "@std/testing";
+let Assert := import "@std/assert";
 
 export let test () :=
   (
     Testing.describe("root");
-    Testing.it("passes", Testing.toBe(1, 1));
+    Testing.it("passes", Assert.toBe(1, 1));
     Testing.endDescribe()
   );
 "#,
@@ -839,11 +842,12 @@ export let test () :=
             test_dir.path(),
             "member/member.test.ms",
             r#"let Testing := import "@std/testing";
+let Assert := import "@std/assert";
 
 export let test () :=
   (
     Testing.describe("member");
-    Testing.it("passes", Testing.toBe(1, 1));
+    Testing.it("passes", Assert.toBe(1, 1));
     Testing.endDescribe()
   );
 "#,

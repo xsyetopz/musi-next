@@ -9,12 +9,12 @@ Each feature should have one current-language explanation and at least one snipp
 - `let`, `let recur`, blocks, no `return`, and no loop statements: `start/values-and-let.md`, `start/blocks-and-expressions.md`
 - `mut`, reassignment, and mutation by value: `start/mutation.md`
 
-## Syntax surface
+## Syntax
 
 - First-class everything and comparison references: `specs/language/first-class-everything.md`
 - Delimiter rules, arrays, tuples, sequences, records, indexing, semicolon rules, structural `let` members, and named arguments: `specs/language/syntax.md`, `specs/language/type-core.md`
 - `:=`, `/=`, `=`, `=>`, and `->` as source separators and operators: `core/operators.md`, `types/type-annotations.md`
-- `?T` and `E!T` as optional and error-shaped type surfaces: `types/type-annotations.md`, `types/generics.md`
+- `?T` and `E!T` as optional and error-shaped type forms: `types/type-annotations.md`, `types/generics.md`
 - Comments, item docs, and module docs with `--!` or `/-! ... -/`: `reference/comments.md`
 
 ## Core expressions

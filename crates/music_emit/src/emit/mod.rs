@@ -8,20 +8,19 @@ use music_base::{
     diag::{Diag, DiagContext},
 };
 use music_ir::{
-    DefinitionKey, IrArg, IrAssignTarget, IrEffectDef, IrExpr, IrExprKind, IrHandleOp, IrLit,
-    IrMatchArm, IrModule, IrModuleInitPart, IrNameRef, IrOrigin, IrParam, IrRecordField,
-    IrRecordLayoutField, IrSeqPart, IrTempId,
+    DefinitionKey, IrArg, IrAssignTarget, IrExpr, IrExprKind, IrLit, IrMatchArm, IrModule,
+    IrModuleInitPart, IrNameRef, IrOrigin, IrParam, IrRecordField, IrRecordLayoutField, IrSeqPart,
+    IrTempId,
 };
 use music_module::ModuleKey;
 use music_names::NameBindingId;
 use music_seam::descriptor::{
-    ConstantDescriptor, ConstantValue, DataDescriptor, EffectDescriptor, EffectOpDescriptor,
-    ExportDescriptor, ExportTarget, ForeignDescriptor, GlobalDescriptor, MetaDescriptor,
-    ProcedureDescriptor, TypeDescriptor,
+    ConstantDescriptor, ConstantValue, DataDescriptor, ExportDescriptor, ExportTarget,
+    ForeignDescriptor, GlobalDescriptor, MetaDescriptor, ProcedureDescriptor, TypeDescriptor,
 };
 use music_seam::{
-    Artifact, CodeEntry, EffectId, ForeignId, GlobalId, Instruction, Label, Opcode, Operand,
-    ProcedureId, ShapeId, StringId, TypeId,
+    Artifact, CodeEntry, ForeignId, GlobalId, Instruction, Label, Opcode, Operand, ProcedureId,
+    ShapeId, StringId, TypeId,
 };
 
 use crate::api::{EmitDiagList, EmitOptions, EmittedBinding, EmittedModule, EmittedProgram};
@@ -44,7 +43,6 @@ type QualifiedGlobalTable = HashMap<(ModuleKey, Box<str>), GlobalId>;
 type UniqueProcedureTable = HashMap<Box<str>, ProcedureId>;
 type UniqueForeignTable = HashMap<Box<str>, ForeignId>;
 type UniqueGlobalTable = HashMap<Box<str>, GlobalId>;
-type EffectTable = HashMap<DefinitionKey, EffectId>;
 type ExprEmitter<'artifact, 'module> = ProcedureEmitter<'artifact, 'module>;
 type ExprEmitterMut<'emitter, 'artifact, 'module> = &'emitter mut ExprEmitter<'artifact, 'module>;
 type ExprEmitterRef<'emitter, 'artifact, 'module> = &'emitter ExprEmitter<'artifact, 'module>;
@@ -71,7 +69,6 @@ struct ModuleLayout {
     globals: GlobalTable,
     global_init_procedures: HashMap<Box<str>, ProcedureId>,
     types: TypeTable,
-    effects: EffectTable,
     shapes: HashMap<DefinitionKey, ShapeId>,
 }
 
@@ -80,7 +77,6 @@ struct ProgramState {
     artifact: Artifact,
     diags: EmitDiagList,
     types_by_name: HashMap<Box<str>, TypeId>,
-    effects_by_key: HashMap<DefinitionKey, EffectId>,
     unique: UniqueTables,
     qualified: QualifiedTables,
 }
@@ -637,9 +633,4 @@ fn finalize_procedure(
 
 fn qualified_name(module: &ModuleKey, local: &str) -> Box<str> {
     format!("{}::{local}", module.as_str()).into()
-}
-
-fn answer_type_name(effect: &DefinitionKey) -> Box<str> {
-    let base = qualified_name(&effect.module, &effect.name);
-    format!("{base}::answer").into()
 }

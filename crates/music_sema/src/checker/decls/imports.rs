@@ -7,14 +7,12 @@ use music_names::{Ident, NameBindingId, Symbol};
 
 use super::super::pats::{bind_pat, bound_name_from_pat};
 use super::super::surface::import_surface_ty;
-use super::super::{
-    CheckPass, DataDef, DataVariantDef, DiagKind, EffectDef, EffectOpDef, PassBase,
-};
+use super::super::{CheckPass, DataDef, DataVariantDef, DiagKind, PassBase};
 use crate::api::{
     ConstraintFacts, ConstraintSurface, ExportedValue, LawFacts, LawParamFacts, LawSurface,
     ModuleSurface, PatFacts, ShapeFacts, ShapeMemberFacts,
 };
-use crate::api::{DataSurface, EffectSurface, ExprFacts, ShapeSurface};
+use crate::api::{DataSurface, ExprFacts, ShapeSurface};
 
 type ImportRecordTargetCtx<'a, 'ctx, 'interner, 'env> = &'a PassBase<'ctx, 'interner, 'env>;
 type ImportRecordExportCtx<'a, 'ctx, 'interner, 'env> = &'a PassBase<'ctx, 'interner, 'env>;
@@ -41,7 +39,7 @@ impl CheckPass<'_, '_, '_> {
         } else {
             self.runtime_import_result_ty()
         };
-        ExprFacts::new(ty, arg_facts.effects)
+        ExprFacts::new(ty)
     }
 }
 
@@ -155,21 +153,15 @@ impl CheckPass<'_, '_, '_> {
 
     fn expr_has_structural_target_impl(&self, expr: HirExprId) -> bool {
         match self.expr(expr).kind {
-            HirExprKind::Data { .. } | HirExprKind::Effect { .. } | HirExprKind::Shape { .. } => {
-                true
-            }
+            HirExprKind::Data { .. } | HirExprKind::Shape { .. } => true,
             HirExprKind::Let { value, .. } => self.expr_has_structural_target_impl(value),
             HirExprKind::Name { name } => {
                 let text = self.resolve_symbol(name.name);
-                self.data_def(text).is_some()
-                    || self.effect_def(text).is_some()
-                    || self.shape_facts_by_name(name.name).is_some()
+                self.data_def(text).is_some() || self.shape_facts_by_name(name.name).is_some()
             }
             HirExprKind::Field { base, name, .. } => {
                 import_record_export_for_expr(self, base, name).is_some_and(|(_, export)| {
-                    export.data_key.is_some()
-                        || export.effect_key.is_some()
-                        || export.shape_key.is_some()
+                    export.data_key.is_some() || export.shape_key.is_some()
                 })
             }
             _ => false,
@@ -211,11 +203,6 @@ impl CheckPass<'_, '_, '_> {
                 && let Some(shape) = surface.exported_shape(shape_key)
             {
                 self.import_shape_alias_as(symbol, surface, shape, export.opaque);
-            }
-            if let Some(effect_key) = export.effect_key.as_ref()
-                && let Some(effect) = surface.exported_effect(effect_key)
-            {
-                self.import_effect_alias_as(symbol, surface, effect, export.opaque);
             }
             if let Some(data_key) = export.data_key.as_ref()
                 && let Some(data) = surface.exported_data(data_key)
@@ -283,10 +270,7 @@ impl CheckPass<'_, '_, '_> {
                 let source_text: Box<str> = self.resolve_symbol(name.name).into();
                 self.bind_builtin_type_alias(alias.name, name.name);
                 if let Some(data) = self.data_def(source_text.as_ref()).cloned() {
-                    self.insert_data_def(alias_text.clone(), data);
-                }
-                if let Some(effect) = self.effect_def(source_text.as_ref()).cloned() {
-                    self.insert_effect_def(alias_text, effect);
+                    self.insert_data_def(alias_text, data);
                 }
                 if let Some(facts) = self.shape_facts_by_name(name.name).cloned() {
                     self.insert_shape_facts_by_name(alias.name, facts);
@@ -297,8 +281,8 @@ impl CheckPass<'_, '_, '_> {
     }
 
     fn bind_builtin_type_alias(&mut self, alias: Symbol, source: Symbol) {
-        let source_name = self.resolve_symbol(source);
-        let Some(ty) = self.builtin_type_alias_for_name(source_name) else {
+        let source_name = self.resolve_symbol(source).to_owned();
+        let Some(ty) = self.builtin_type_alias_for_name(&source_name) else {
             return;
         };
         self.insert_type_alias(alias, ty);
@@ -322,11 +306,6 @@ impl CheckPass<'_, '_, '_> {
             && let Some(shape) = surface.exported_shape(shape_key)
         {
             self.import_shape_alias(alias, surface, shape, export.opaque);
-        }
-        if let Some(effect_key) = export.effect_key.as_ref()
-            && let Some(effect) = surface.exported_effect(effect_key)
-        {
-            self.import_effect_alias(alias, surface, effect, export.opaque);
         }
         if let Some(data_key) = export.data_key.as_ref()
             && let Some(data) = surface.exported_data(data_key)
@@ -472,74 +451,6 @@ impl CheckPass<'_, '_, '_> {
             .into_boxed_slice()
     }
 
-    fn import_effect_alias(
-        &mut self,
-        alias: Ident,
-        module_surface: &ModuleSurface,
-        surface: &EffectSurface,
-        is_opaque: bool,
-    ) {
-        self.import_effect_alias_as(alias.name, module_surface, surface, is_opaque);
-    }
-
-    fn import_effect_alias_as(
-        &mut self,
-        alias_name: Symbol,
-        module_surface: &ModuleSurface,
-        surface: &EffectSurface,
-        is_opaque: bool,
-    ) {
-        if is_opaque {
-            return;
-        }
-        let ops = surface
-            .ops
-            .iter()
-            .map(|op| {
-                (
-                    op.name.clone(),
-                    EffectOpDef::new(
-                        op.params
-                            .iter()
-                            .copied()
-                            .map(|ty| import_surface_ty(self, module_surface, ty))
-                            .collect::<Vec<_>>()
-                            .into_boxed_slice(),
-                        op.param_names
-                            .iter()
-                            .map(|name| self.intern(name))
-                            .collect::<Vec<_>>()
-                            .into_boxed_slice(),
-                        import_surface_ty(self, module_surface, op.result),
-                    )
-                    .with_comptime_safe(op.is_comptime_safe),
-                )
-            })
-            .collect::<BTreeMap<_, _>>();
-        let laws = surface
-            .laws
-            .iter()
-            .map(|law| {
-                LawFacts::new(
-                    self.intern(&law.name),
-                    law.params
-                        .iter()
-                        .map(|param| {
-                            LawParamFacts::new(
-                                self.intern(&param.name),
-                                import_surface_ty(self, module_surface, param.ty),
-                            )
-                        })
-                        .collect::<Vec<_>>()
-                        .into_boxed_slice(),
-                )
-            })
-            .collect::<Vec<_>>()
-            .into_boxed_slice();
-        let alias_name: Box<str> = self.resolve_symbol(alias_name).into();
-        self.insert_effect_def(alias_name, EffectDef::new(surface.key.clone(), ops, laws));
-    }
-
     fn import_data_alias(
         &mut self,
         alias: Ident,
@@ -641,16 +552,10 @@ impl CheckPass<'_, '_, '_> {
         };
         let imported_ty = import_surface_ty(self, surface, export.ty);
         self.insert_binding_type(binding, imported_ty);
-        self.insert_binding_effects(
-            binding,
-            instantiated.map_or_else(
-                || scheme.effects.clone(),
-                |instantiated| instantiated.effects,
-            ),
-        );
+        let _ = instantiated;
         let method_name = self.intern(export.name.as_ref());
         let evidence_keys = self
-            .answer_scope_for_constraints(&scheme.constraints)
+            .evidence_scope_for_constraints(&scheme.constraints)
             .into_keys()
             .collect::<Vec<_>>()
             .into_boxed_slice();

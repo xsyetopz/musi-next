@@ -1,4 +1,4 @@
---! Compiler-owned FFI builtin surface.
+--! Compiler-owned FFI builtin module.
 
 let Core := import "musi:core";
 

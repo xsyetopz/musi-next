@@ -3,11 +3,9 @@
 let maybe := import "@std/maybe";
 let Maybe := maybe.Maybe;
 
-let both (left : Bit, right : Bit) : Bit := if left then right else 0 = 1;
-
 --- Returns true when value is in inclusive ASCII byte range.
-export let inRange (value : Int, start : Int, end : Int) : Bit :=
-  both(value >= start, value <= end);
+export let inRange (value : Int, lowerBound : Int, upperBound : Int) : Bit :=
+  if value < lowerBound then 0 = 1 else value <= upperBound;
 
 --- Returns true for ASCII byte values.
 export let isAscii (value : Int) : Bit := inRange(value, 0, 127);

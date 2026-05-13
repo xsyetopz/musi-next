@@ -5,36 +5,36 @@ let Int := Core.Int;
 let String := Core.String;
 
 @external(abi := .musi)
-let lengthIntrinsic (value : String) : Int;
+let Musi__length (value : String) : Int;
 
 export let length (value : String) : Int := unsafe {
-  lengthIntrinsic(value);
+  Musi__length(value);
 };
 
 @external(abi := .musi)
-let concatIntrinsic (left : String, right : String) : String;
+let Musi__concat (left : String, right : String) : String;
 
 export let concat (left : String, right : String) : String := unsafe {
-  concatIntrinsic(left, right);
+  Musi__concat(left, right);
 };
 
 @external(abi := .musi)
-let sliceIntrinsic (value : String, start : Int, end : Int) : String;
+let Musi__slice (value : String, start : Int, end : Int) : String;
 
 export let slice (value : String, start : Int, end : Int) : String := unsafe {
-  sliceIntrinsic(value, start, end);
+  Musi__slice(value, start, end);
 };
 
 @external(abi := .musi)
-let byteAtIntrinsic (value : String, index : Int) : Int;
+let Musi__byteAt (value : String, index : Int) : Int;
 
 export let byteAt (value : String, index : Int) : Int := unsafe {
-  byteAtIntrinsic(value, index);
+  Musi__byteAt(value, index);
 };
 
 @external(abi := .musi)
-let fromByteIntrinsic (value : Int) : String;
+let Musi__fromByte (value : Int) : String;
 
 export let fromByte (value : Int) : String := unsafe {
-  fromByteIntrinsic(value);
+  Musi__fromByte(value);
 };

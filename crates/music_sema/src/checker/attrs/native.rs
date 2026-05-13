@@ -255,10 +255,6 @@ impl CheckPass<'_, '_, '_> {
             "feature",
             "pointerWidth",
             "endian",
-            "jit",
-            "jitIsa",
-            "jitCallConv",
-            "jitFeature",
         ]
         .into_iter()
         .map(|name| self.intern(name))
@@ -279,7 +275,7 @@ impl CheckPass<'_, '_, '_> {
                 self.attr_value_is_string(&arg) || self.attr_value_is_string_array(&arg)
             };
             if !valid {
-                let kind = if matches!(arg_name, Some("feature" | "family" | "jitFeature")) {
+                let kind = if matches!(arg_name, Some("feature" | "family")) {
                     DiagKind::AttrWhenRequiresStringList
                 } else {
                     DiagKind::AttrWhenRequiresStringValue

@@ -1,4 +1,4 @@
---! Random value helper namespace.
+--! Random values module.
 
 let randomHost := import "musi:random";
 

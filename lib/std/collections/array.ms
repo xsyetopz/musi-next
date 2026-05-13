@@ -12,7 +12,7 @@ export let copy [T] (values : []T) : []T := [...values];
 export let concat [T] (left : []T, right : []T) : []T := [...left, ...right];
 --- Append one value to an array.
 export let append [T] (values : []T, value : T) : []T := [...values, value];
---- Core operation for `prepend`.
+--- Function for `prepend`.
 let prependValue [T] (values : []T, value : T) : []T := [value, ...values];
 --- Compare integer arrays for equality.
 export let equalsInt (left : []Int, right : []Int) : Bit := left = right;

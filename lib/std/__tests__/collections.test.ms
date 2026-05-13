@@ -14,13 +14,5 @@ export let test () :=
         collections.list.fromArray[Int]([2])
       ),
     ),
-    testing.it(
-      "slice namespace works",
-      collections.slice.equalsInt([3], collections.slice.copy[Int]([3])),
-    ),
-    testing.it(
-      "iter namespace works",
-      collections.iter.equalsInt([4], collections.iter.once[Int](4)),
-    ),
     testing.endDescribe(),
   );

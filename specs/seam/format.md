@@ -33,7 +33,7 @@ It is:
 - deterministic
 - suitable for direct frontend targeting
 - suitable for VM loading
-- suitable for JIT input after verification
+- suitable for backend input after verification
 
 It is not:
 

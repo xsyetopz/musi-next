@@ -10,7 +10,7 @@ export hidden let Path := data {
 --- Build a path from raw text.
 export let fromString (value : String) : Path := .PathText(value := value);
 
---- Core operation for `toString`.
+--- Function for `toString`.
 let pathToString (target : Path) : String :=
   match target (
   | .PathText(value := value) => value
@@ -41,7 +41,7 @@ let recur lastByteIndexFrom (
 let lastByteIndex (source : String, needle : Int) : Int :=
   lastByteIndexFrom(source, needle, 0, - 1);
 
---- Core operation for `join`.
+--- Function for `join`.
 let joinPath (target : Path, other : Path) : Path :=
   (
     let left := pathToString(target);
@@ -57,10 +57,10 @@ let joinPath (target : Path, other : Path) : Path :=
     )
   );
 
---- Core operation for `normalize`.
+--- Function for `normalize`.
 let normalizePath (target : Path) : Path := target;
 
---- Core operation for `dirName`.
+--- Function for `dirName`.
 let pathDirName (target : Path) : Path :=
   (
     let source := pathToString(target);
@@ -72,7 +72,7 @@ let pathDirName (target : Path) : Path :=
     )
   );
 
---- Core operation for `baseName`.
+--- Function for `baseName`.
 let pathBaseName (target : Path) : String :=
   (
     let source := pathToString(target);
@@ -83,7 +83,7 @@ let pathBaseName (target : Path) : String :=
     )
   );
 
---- Core operation for `extName`.
+--- Function for `extName`.
 let pathExtName (target : Path) : String :=
   (
     let base := pathBaseName(target);
@@ -94,7 +94,7 @@ let pathExtName (target : Path) : String :=
     )
   );
 
---- Core operation for `isAbsolute`.
+--- Function for `isAbsolute`.
 let pathIsAbsolute (target : Path) : Bit :=
   text.byteAt(pathToString(target), 0) = 47;
 

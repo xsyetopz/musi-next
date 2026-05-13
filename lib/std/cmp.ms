@@ -21,21 +21,21 @@ export let equal () : Ordering := .Equal;
 --- Greater-than ordering value.
 export let greater () : Ordering := .Greater;
 
---- Core operation for `isLess`.
+--- Function for `isLess`.
 let orderingIsLess (target : Ordering) : Bit :=
   match target (
   | .Less => 0 = 0
   | _ => 0 = 1
   );
 
---- Core operation for `isEqual`.
+--- Function for `isEqual`.
 let orderingIsEqual (target : Ordering) : Bit :=
   match target (
   | .Equal => 0 = 0
   | _ => 0 = 1
   );
 
---- Core operation for `isGreater`.
+--- Function for `isGreater`.
 let orderingIsGreater (target : Ordering) : Bit :=
   match target (
   | .Greater => 0 = 0
@@ -58,12 +58,12 @@ export let compareInt (left : Int, right : Int) : Ordering :=
   if left < right then less() else if left > right then greater() else equal();
 
 @external(abi := .musi)
-let compareFloatTotalIntrinsic (left : Float, right : Float) : Int;
+let Musi__compareFloatTotal (left : Float, right : Float) : Int;
 
 --- Compare two floats with total ordering.
 export let compareFloat (left : Float, right : Float) : Ordering :=
   match unsafe {
-  compareFloatTotalIntrinsic(left, right);
+  Musi__compareFloatTotal(left, right);
 } (
 | value where value < 0 => less()
 | value where value > 0 => greater()

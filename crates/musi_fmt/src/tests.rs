@@ -410,13 +410,13 @@ mod success {
 
     #[test]
     fn keeps_call_arguments_on_one_line_when_they_fit_width() {
-        let source = "let success := testing.it(\"adds values\", testing.toBeTrue(add(1, 2)));";
+        let source = "let success := testing.it(\"adds values\", assert.toBeTrue(add(1, 2)));";
 
         let formatted_result = format_source(source, &options()).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            "let success := testing.it(\"adds values\", testing.toBeTrue(add(1, 2)));\n"
+            "let success := testing.it(\"adds values\", assert.toBeTrue(add(1, 2)));\n"
         );
         assert!(
             formatted_result
@@ -1160,7 +1160,7 @@ let f () : Int;\n"
 
     #[test]
     fn keeps_attribute_attached_on_own_line_before_native() {
-        let source = "@external(abi := .musi)\nlet levelTagIntrinsic(level : Level) : Int;";
+        let source = "@external(abi := .musi)\nlet writeIntrinsic(message : String) : Unit;";
 
         let mut options = options();
         options.trailing_commas = TrailingCommas::Never;
@@ -1169,7 +1169,7 @@ let f () : Int;\n"
 
         assert_eq!(
             formatted_result.text,
-            "@external(abi := .musi)\nlet levelTagIntrinsic (level : Level) : Int;\n"
+            "@external(abi := .musi)\nlet writeIntrinsic (message : String) : Unit;\n"
         );
         let second = format_source(&formatted_result.text, &options).unwrap();
         assert_eq!(second.text, formatted_result.text);
@@ -1796,18 +1796,19 @@ let d := import "./d";
 
     #[test]
     fn preserves_multiline_test_sequence_regression() {
-        let source = r#"let testing := import "@std/testing";
+        let source = r#"let assert := import "@std/assert";
+let testing := import "@std/testing";
 let array := import "./std.ms";
 
 export let test () :=
   (
     testing.describe("array");
-    testing.it("'copy' clones sequence values", testing.toBeTrue(array.equalsInt(array.copy[Int]([1, 2, 3]), [1, 2, 3])));
-    testing.it("'concat' joins two sequences", testing.toBeTrue(array.equalsInt(array.concat[Int]([1, 2], [3, 4]), [1, 2, 3, 4])));
-    testing.it("'append' adds trailing value", testing.toBeTrue(array.equalsInt(array.append[Int]([1, 2], 3), [1, 2, 3])));
-    testing.it("'prepend' adds leading value", testing.toBeTrue(array.equalsInt(array.prepend[Int](0, [1, 2]), [0, 1, 2])));
-    testing.it("'isEmpty' detects empty arrays", testing.toBeTrue(array.isEmpty[Int]([])));
-    testing.it("'nonEmpty' detects non-empty arrays", testing.toBeTrue(array.nonEmpty[Int]([1])));
+    testing.it("'copy' clones sequence values", assert.toBeTrue(array.equalsInt(array.copy[Int]([1, 2, 3]), [1, 2, 3])));
+    testing.it("'concat' joins two sequences", assert.toBeTrue(array.equalsInt(array.concat[Int]([1, 2], [3, 4]), [1, 2, 3, 4])));
+    testing.it("'append' adds trailing value", assert.toBeTrue(array.equalsInt(array.append[Int]([1, 2], 3), [1, 2, 3])));
+    testing.it("'prepend' adds leading value", assert.toBeTrue(array.equalsInt(array.prepend[Int](0, [1, 2]), [0, 1, 2])));
+    testing.it("'isEmpty' detects empty arrays", assert.toBeTrue(array.isEmpty[Int]([])));
+    testing.it("'nonEmpty' detects non-empty arrays", assert.toBeTrue(array.nonEmpty[Int]([1])));
     testing.endDescribe()
   );
 "#;
@@ -1820,6 +1821,7 @@ export let test () :=
         assert_eq!(
             formatted_result.text,
             r#"let array := import "./std.ms";
+let assert := import "@std/assert";
 let testing := import "@std/testing";
 
 export let test () :=
@@ -1827,31 +1829,29 @@ export let test () :=
     testing.describe("array");
     testing.it(
       "'copy' clones sequence values",
-      testing.toBeTrue(array.equalsInt(array.copy[Int]([1, 2, 3]), [1, 2, 3]))
+      assert.toBeTrue(array.equalsInt(array.copy[Int]([1, 2, 3]), [1, 2, 3]))
     );
     testing.it(
       "'concat' joins two sequences",
-      testing.toBeTrue(
+      assert.toBeTrue(
         array.equalsInt(array.concat[Int]([1, 2], [3, 4]), [1, 2, 3, 4])
       )
     );
     testing.it(
       "'append' adds trailing value",
-      testing.toBeTrue(array.equalsInt(array.append[Int]([1, 2], 3), [1, 2, 3]))
+      assert.toBeTrue(array.equalsInt(array.append[Int]([1, 2], 3), [1, 2, 3]))
     );
     testing.it(
       "'prepend' adds leading value",
-      testing.toBeTrue(
-        array.equalsInt(array.prepend[Int](0, [1, 2]), [0, 1, 2])
-      )
+      assert.toBeTrue(array.equalsInt(array.prepend[Int](0, [1, 2]), [0, 1, 2]))
     );
     testing.it(
       "'isEmpty' detects empty arrays",
-      testing.toBeTrue(array.isEmpty[Int]([]))
+      assert.toBeTrue(array.isEmpty[Int]([]))
     );
     testing.it(
       "'nonEmpty' detects non-empty arrays",
-      testing.toBeTrue(array.nonEmpty[Int]([1]))
+      assert.toBeTrue(array.nonEmpty[Int]([1]))
     );
     testing.endDescribe()
   );

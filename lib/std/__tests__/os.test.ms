@@ -16,9 +16,5 @@ export let test () :=
     );
     testing.it("'matchesOs' accepts typed OS", os.matchesOs(currentOs),);
     testing.it("'matchesArch' accepts typed arch", os.matchesArch(currentArch),);
-    testing.it(
-      "'supportsJit' mirrors typed jit",
-      os.supportsJit() = os.currentJit.isSupported(),
-    );
     testing.endDescribe()
   );

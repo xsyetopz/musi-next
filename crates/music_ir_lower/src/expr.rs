@@ -1,12 +1,11 @@
 use super::{
-    ComptimeValue, HirArg, HirArrayItem, HirBinaryOp, HirExprId, HirExprKind, HirLetMods, HirLitId,
-    HirLitKind, HirParamRange, HirPatId, HirPatKind, HirPrefixOp, HirQuoteKind, HirRecordItemRange,
-    HirSpliceKind, HirTemplatePart, HirTyKind, Ident, IrBinaryOp, IrExpr, IrExprKind, IrLit,
-    IrOrigin, IrTempId, LowerCtx, LoweringResult, NameBindingId, NameSite, SemaModule, SliceRange,
-    array, assign, binary, bind_expr_constraint_answers, call, destructure, is_type_value_expr,
-    lower_answer_literal_expr, lower_comptime_value, lower_field_expr, lower_handle_expr,
-    lower_in_expr, lower_index_expr, lower_lambda_expr, lower_local_callable_let, lower_match_expr,
-    lower_partial_range_expr, lower_range_expr, lower_request_expr, lower_variant_expr,
+    HirArg, HirArrayItem, HirBinaryOp, HirExprId, HirExprKind, HirLetMods, HirLitId, HirLitKind,
+    HirParamRange, HirPatId, HirPatKind, HirPrefixOp, HirRecordItemRange, HirTemplatePart,
+    HirTyKind, Ident, IrBinaryOp, IrExpr, IrExprKind, IrLit, IrOrigin, IrTempId, LowerCtx,
+    LoweringResult, NameBindingId, NameSite, SemaModule, SliceRange, array, assign, binary,
+    bind_expr_constraint_evidence, call, destructure, is_type_value_expr, lower_comptime_value,
+    lower_field_expr, lower_in_expr, lower_index_expr, lower_lambda_expr, lower_local_callable_let,
+    lower_match_expr, lower_partial_range_expr, lower_range_expr, lower_variant_expr,
     lowering_invariant_violation, record, render_ty_name, render_type_value_expr_name,
 };
 
@@ -42,15 +41,15 @@ pub(crate) fn lower_expr(ctx: &mut LowerCtx<'_>, expr_id: HirExprId) -> IrExpr {
                 type_args,
             },
         );
-        return bind_expr_constraint_answers(ctx, expr_id, origin, lowered);
+        return bind_expr_constraint_evidence(ctx, expr_id, origin, lowered);
     }
     if let HirExprKind::Unsafe { body } = &expr.kind {
         let lowered = lower_expr_with_origin(ctx, *body, origin);
-        return bind_expr_constraint_answers(ctx, expr_id, origin, lowered);
+        return bind_expr_constraint_evidence(ctx, expr_id, origin, lowered);
     }
     if let HirExprKind::Pin { value, name, body } = &expr.kind {
         let lowered = lower_pin_expr(ctx, origin, *value, *name, *body);
-        return bind_expr_constraint_answers(ctx, expr_id, origin, lowered);
+        return bind_expr_constraint_evidence(ctx, expr_id, origin, lowered);
     }
     let kind = match &expr.kind {
         HirExprKind::Name { .. }
@@ -71,20 +70,15 @@ pub(crate) fn lower_expr(ctx: &mut LowerCtx<'_>, expr_id: HirExprId) -> IrExpr {
             lower_operation_expr(ctx, expr_id, origin, &expr.kind)
         }
         HirExprKind::Match { .. }
+        | HirExprKind::If { .. }
         | HirExprKind::Variant { .. }
-        | HirExprKind::Lambda { .. }
-        | HirExprKind::Request { .. }
-        | HirExprKind::AnswerLit { .. }
-        | HirExprKind::Handle { .. } => lower_control_expr(ctx, expr_id, origin, &expr.kind),
+        | HirExprKind::Lambda { .. } => lower_control_expr(ctx, expr_id, origin, &expr.kind),
         HirExprKind::TypeTest { .. }
         | HirExprKind::TypeCast { .. }
-        | HirExprKind::Resume { .. }
-        | HirExprKind::Import { .. }
-        | HirExprKind::Quote { .. }
-        | HirExprKind::Splice { .. } => lower_misc_expr(ctx, expr_id, &expr.kind),
+        | HirExprKind::Import { .. } => lower_misc_expr(ctx, expr_id, &expr.kind),
         other => lowering_invariant_violation(format!("missing IR lowering for {other:?}")),
     };
-    bind_expr_constraint_answers(ctx, expr_id, origin, IrExpr::new(origin, kind))
+    bind_expr_constraint_evidence(ctx, expr_id, origin, IrExpr::new(origin, kind))
 }
 
 pub(crate) fn lower_value_expr(
@@ -151,14 +145,17 @@ pub(crate) fn lower_control_expr(
 ) -> IrExprKind {
     match kind {
         HirExprKind::Match { scrutinee, arms } => lower_match_expr(ctx, *scrutinee, arms),
+        HirExprKind::If {
+            condition,
+            then_expr,
+            else_expr,
+        } => IrExprKind::If {
+            condition: lower_boxed_expr(ctx, *condition),
+            then_expr: lower_boxed_expr(ctx, *then_expr),
+            else_expr: lower_boxed_expr(ctx, *else_expr),
+        },
         HirExprKind::Variant { tag, args } => lower_variant_expr(ctx, expr_id, *tag, args.clone()),
         HirExprKind::Lambda { params, body, .. } => lower_lambda_expr(ctx, origin, params, *body),
-        HirExprKind::Request { expr } => lower_request_expr(ctx, *expr)
-            .unwrap_or_else(|description| lowering_invariant_violation(description)),
-        HirExprKind::AnswerLit { effect, clauses } => {
-            lower_answer_literal_expr(ctx, expr_id, *effect, clauses.clone())
-        }
-        HirExprKind::Handle { expr, handler } => lower_handle_expr(ctx, expr_id, *expr, *handler),
         _ => lowering_invariant_violation("control expr dispatcher mismatch"),
     }
 }
@@ -192,9 +189,6 @@ pub(crate) fn lower_misc_expr(
                 ty_name: render_ty_name(sema, target, interner),
             }
         }
-        HirExprKind::Resume { expr } => IrExprKind::Resume {
-            expr: expr.map(|expr| lower_boxed_expr(ctx, expr)),
-        },
         HirExprKind::Import { arg } => {
             if sema.expr_import_record_target(expr_id).is_some() {
                 IrExprKind::Unit
@@ -204,8 +198,6 @@ pub(crate) fn lower_misc_expr(
                 }
             }
         }
-        HirExprKind::Quote { kind } => lower_quote_expr(kind),
-        HirExprKind::Splice { kind } => lower_splice_expr(kind),
         _ => lowering_invariant_violation("misc expr dispatcher mismatch"),
     }
 }
@@ -219,9 +211,7 @@ pub(crate) fn lower_prefix_expr(
 ) -> IrExprKind {
     match op {
         HirPrefixOp::Known => lower_comptime_prefix_expr(ctx, expr_id, expr, origin),
-        HirPrefixOp::Mut | HirPrefixOp::Any | HirPrefixOp::Some => {
-            lower_expr_with_origin(ctx, expr, origin).kind
-        }
+        HirPrefixOp::Mut => lower_expr_with_origin(ctx, expr, origin).kind,
         HirPrefixOp::Not => IrExprKind::Not {
             expr: lower_boxed_expr(ctx, expr),
         },
@@ -270,14 +260,6 @@ pub(crate) fn lower_comptime_prefix_expr(
     origin: IrOrigin,
 ) -> IrExprKind {
     if let Some(value) = ctx.sema.expr_comptime_value(expr_id) {
-        if let ComptimeValue::Syntax(term) = value
-            && matches!(term.shape(), music_term::SyntaxShape::Expr)
-            && let HirExprKind::Quote {
-                kind: HirQuoteKind::Expr { expr, .. },
-            } = ctx.sema.module().store.exprs.get(expr).kind
-        {
-            return lower_expr_with_origin(ctx, expr, origin).kind;
-        }
         return lower_comptime_value(ctx, value);
     }
     lower_expr_with_origin(ctx, expr, origin).kind
@@ -295,22 +277,6 @@ pub(crate) fn lower_expr_with_origin(
 
 pub(crate) fn lower_boxed_expr(ctx: &mut LowerCtx<'_>, expr_id: HirExprId) -> Box<IrExpr> {
     Box::new(lower_expr(ctx, expr_id))
-}
-
-pub(crate) fn lower_quote_expr(kind: &HirQuoteKind) -> IrExprKind {
-    let raw = match kind {
-        HirQuoteKind::Expr { raw, .. } | HirQuoteKind::Block { raw, .. } => raw.clone(),
-    };
-    IrExprKind::SyntaxValue { raw }
-}
-
-pub(crate) fn lower_splice_expr(kind: &HirSpliceKind) -> IrExprKind {
-    let raw = match kind {
-        HirSpliceKind::Name { raw, .. }
-        | HirSpliceKind::Expr { raw, .. }
-        | HirSpliceKind::Exprs { raw, .. } => raw.clone(),
-    };
-    IrExprKind::SyntaxValue { raw }
 }
 
 pub(crate) fn lower_template_expr(

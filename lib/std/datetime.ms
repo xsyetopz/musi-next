@@ -1,4 +1,4 @@
---! Date and time helper namespace.
+--! Date and time module.
 
 let timeHost := import "musi:time";
 

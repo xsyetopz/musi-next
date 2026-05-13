@@ -1495,7 +1495,7 @@ mod success {
     }
 
     #[test]
-    fn handles_effect_value_clause_and_resume() {
+    fn calls_simple_exported_int_function() {
         let program = compile_program(
             &[(
                 "main",
@@ -1509,13 +1509,13 @@ mod success {
         vm.initialize().expect("vm init should succeed");
         let value = vm
             .call_export("result", &[])
-            .expect("handled effect should succeed");
+            .expect("exported function should succeed");
 
         assert_eq!(value, Value::Int(42));
     }
 
     #[test]
-    fn fuses_inline_effect_resume() {
+    fn simple_exported_int_function_has_no_runtime_kernel() {
         let program = compile_program(
             &[(
                 "main",

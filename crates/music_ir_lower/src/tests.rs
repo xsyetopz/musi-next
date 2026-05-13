@@ -250,10 +250,7 @@ pub(crate) fn contains_named_value_ref_children(kind: &IrExprKind, expected: &st
         | IrExprKind::Array { items, .. }
         | IrExprKind::ClosureNew {
             captures: items, ..
-        }
-        | IrExprKind::Request { args: items, .. } => {
-            contains_named_value_ref_in_exprs(items, expected)
-        }
+        } => contains_named_value_ref_in_exprs(items, expected),
         IrExprKind::ArrayCat { parts, .. } | IrExprKind::CallParts { args: parts, .. } => {
             contains_named_value_ref_in_seq_parts(parts, expected)
         }
@@ -271,6 +268,15 @@ pub(crate) fn contains_named_value_ref_children(kind: &IrExprKind, expected: &st
         | IrExprKind::BoolOr { left, right } => {
             contains_named_value_ref(left, expected) || contains_named_value_ref(right, expected)
         }
+        IrExprKind::If {
+            condition,
+            then_expr,
+            else_expr,
+        } => {
+            contains_named_value_ref(condition, expected)
+                || contains_named_value_ref(then_expr, expected)
+                || contains_named_value_ref(else_expr, expected)
+        }
         IrExprKind::Match { scrutinee, arms } => {
             contains_named_value_ref_in_case(scrutinee, arms, expected)
         }
@@ -280,21 +286,6 @@ pub(crate) fn contains_named_value_ref_children(kind: &IrExprKind, expected: &st
         IrExprKind::VariantNew { args, .. } => args
             .iter()
             .any(|expr| contains_named_value_ref(expr, expected)),
-        IrExprKind::RequestSeq { args, .. } => {
-            contains_named_value_ref_in_seq_parts(args, expected)
-        }
-        IrExprKind::AnswerLit { value, ops, .. } => {
-            contains_named_value_ref(value, expected)
-                || ops
-                    .iter()
-                    .any(|op| contains_named_value_ref(&op.closure, expected))
-        }
-        IrExprKind::Handle { answer, body, .. } => {
-            contains_named_value_ref(answer, expected) || contains_named_value_ref(body, expected)
-        }
-        IrExprKind::Resume { expr } => expr
-            .as_deref()
-            .is_some_and(|expr| contains_named_value_ref(expr, expected)),
         IrExprKind::Unit
         | IrExprKind::Temp { .. }
         | IrExprKind::Lit(_)
@@ -330,7 +321,6 @@ pub(crate) fn contains_named_value_ref_children_with_prefix(
         | IrExprKind::ClosureNew {
             captures: items, ..
         }
-        | IrExprKind::Request { args: items, .. }
         | IrExprKind::VariantNew { args: items, .. } => items
             .iter()
             .any(|expr| contains_named_value_ref_with_prefix(expr, expected)),
@@ -348,6 +338,15 @@ pub(crate) fn contains_named_value_ref_children_with_prefix(
         | IrExprKind::BoolOr { left, right } => {
             contains_named_value_ref_with_prefix(left, expected)
                 || contains_named_value_ref_with_prefix(right, expected)
+        }
+        IrExprKind::If {
+            condition,
+            then_expr,
+            else_expr,
+        } => {
+            contains_named_value_ref_with_prefix(condition, expected)
+                || contains_named_value_ref_with_prefix(then_expr, expected)
+                || contains_named_value_ref_with_prefix(else_expr, expected)
         }
         IrExprKind::Match { scrutinee, arms } => {
             contains_named_value_ref_with_prefix(scrutinee, expected)
@@ -515,9 +514,7 @@ mod success {
         assert!(ir.exported_value("id").is_some());
         assert!(!ir.callables().is_empty());
         assert_eq!(ir.foreigns().len(), 1);
-        assert!(ir.effects().is_empty());
         assert_eq!(ir.shapes().len(), 1);
-        assert!(ir.givens().is_empty());
         assert!(ir.static_imports().is_empty());
     }
 
@@ -967,7 +964,7 @@ mod success {
     }
 
     #[test]
-    fn local_constrained_helper_prebinds_hidden_constraint_answers() {
+    fn local_constrained_helper_prebinds_hidden_constraint_evidence() {
         let ir = lower(
             r"
         let Mark[T] := shape { };
@@ -984,7 +981,7 @@ mod success {
     }
 
     #[test]
-    fn given_member_helper_captures_provider_constraint_answers() {
+    fn shape_member_helper_captures_provider_constraint_evidence() {
         let ir = lower(
             r"
         let Mark[T] := shape { };

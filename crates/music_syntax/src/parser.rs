@@ -177,10 +177,10 @@ fn compute_matching(tokens: &[Token], open: TokenKind, close: TokenKind) -> Vec<
     for (index, token) in tokens.iter().enumerate() {
         if same_kind(token.kind, open) {
             stack.push(index);
-        } else if same_kind(token.kind, close) {
-            if let Some(open_index) = stack.pop() {
-                matches[open_index] = Some(index);
-            }
+        } else if same_kind(token.kind, close)
+            && let Some(open_index) = stack.pop()
+        {
+            matches[open_index] = Some(index);
         }
     }
     matches

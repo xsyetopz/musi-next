@@ -5,22 +5,22 @@ let Int := Core.Int;
 let Unit := Core.Unit;
 
 @external(abi := .musi)
-let nowUnixMsIntrinsic () : Int;
+let Musi__nowUnixMs () : Int;
 
 export let nowUnixMs () : Int := unsafe {
-  nowUnixMsIntrinsic();
+  Musi__nowUnixMs();
 };
 
 @external(abi := .musi)
-let monotonicMsIntrinsic () : Int;
+let Musi__monotonicMs () : Int;
 
 export let monotonicMs () : Int := unsafe {
-  monotonicMsIntrinsic();
+  Musi__monotonicMs();
 };
 
 @external(abi := .musi)
-let sleepMsIntrinsic (ms : Int) : Unit;
+let Musi__sleepMs (ms : Int) : Unit;
 
 export let sleepMs (ms : Int) : Unit := unsafe {
-  sleepMsIntrinsic(ms);
+  Musi__sleepMs(ms);
 };

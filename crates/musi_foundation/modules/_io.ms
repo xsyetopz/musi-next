@@ -5,36 +5,36 @@ let String := Core.String;
 let Unit := Core.Unit;
 
 @external(abi := .musi)
-let writeIntrinsic (text : String) : Unit;
+let Musi__write (text : String) : Unit;
 
 export let write (text : String) : Unit := unsafe {
-  writeIntrinsic(text);
+  Musi__write(text);
 };
 
 @external(abi := .musi)
-let writeLnIntrinsic (text : String) : Unit;
+let Musi__writeLn (text : String) : Unit;
 
 export let writeLn (text : String) : Unit := unsafe {
-  writeLnIntrinsic(text);
+  Musi__writeLn(text);
 };
 
 @external(abi := .musi)
-let writeErrIntrinsic (text : String) : Unit;
+let Musi__writeErr (text : String) : Unit;
 
 export let writeErr (text : String) : Unit := unsafe {
-  writeErrIntrinsic(text);
+  Musi__writeErr(text);
 };
 
 @external(abi := .musi)
-let writeErrLnIntrinsic (text : String) : Unit;
+let Musi__writeErrLn (text : String) : Unit;
 
 export let writeErrLn (text : String) : Unit := unsafe {
-  writeErrLnIntrinsic(text);
+  Musi__writeErrLn(text);
 };
 
 @external(abi := .musi)
-let readLineIntrinsic () : String;
+let Musi__readLine () : String;
 
 export let readLine () : String := unsafe {
-  readLineIntrinsic();
+  Musi__readLine();
 };

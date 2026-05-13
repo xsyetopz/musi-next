@@ -12,42 +12,42 @@ export let Success [T, E] (value : T) : Expect[T, E] := .Success(value);
 --- Build failed expected value.
 export let Failure [T, E] (value : E) : Expect[T, E] := .Failure(value);
 
---- Core operation for `isSuccess`.
+--- Function for `isSuccess`.
 let expectIsSuccess [T, E] (target : Expect[T, E]) : Bit :=
   match target (
   | .Success(_) => 0 = 0
   | .Failure(_) => 0 = 1
   );
 
---- Core operation for `isFailure`.
+--- Function for `isFailure`.
 let expectIsFailure [T, E] (target : Expect[T, E]) : Bit :=
   match target (
   | .Success(_) => 0 = 1
   | .Failure(_) => 0 = 0
   );
 
---- Core operation for `unwrapOr`.
+--- Function for `unwrapOr`.
 let expectUnwrapOr [T, E] (target : Expect[T, E], fallback : T) : T :=
   match target (
   | .Success(item) => item
   | .Failure(_) => fallback
   );
 
---- Core operation for `unwrapOrElse`.
+--- Function for `unwrapOrElse`.
 let expectUnwrapOrElse [T, E] (target : Expect[T, E], fallback : E -> T) : T :=
   match target (
   | .Success(item) => item
   | .Failure(error) => fallback(error)
   );
 
---- Core operation for `map`.
+--- Function for `map`.
 let expectMap [T, E, U] (target : Expect[T, E], f : T -> U) : Expect[U, E] :=
   match target (
   | .Success(item) => Success[U, E](f(item))
   | .Failure(error) => Failure[U, E](error)
   );
 
---- Core operation for `mapFail`.
+--- Function for `mapFail`.
 let expectMapFail [T, E, F] (
   target : Expect[T, E],
   f : E -> F
@@ -57,7 +57,7 @@ let expectMapFail [T, E, F] (
   | .Failure(error) => Failure[T, F](f(error))
   );
 
---- Core operation for `mapOr`.
+--- Function for `mapOr`.
 let expectMapOr [T, E, U] (
   target : Expect[T, E],
   fallback : U,
@@ -68,7 +68,7 @@ let expectMapOr [T, E, U] (
   | .Failure(_) => fallback
   );
 
---- Core operation for `mapOrElse`.
+--- Function for `mapOrElse`.
 let expectMapOrElse [T, E, U] (
   target : Expect[T, E],
   onFailure : E -> U,
@@ -79,7 +79,7 @@ let expectMapOrElse [T, E, U] (
   | .Failure(error) => onFailure(error)
   );
 
---- Core operation for `andThen`.
+--- Function for `andThen`.
 let expectAndThen [T, E, U] (
   target : Expect[T, E],
   f : T -> Expect[U, E]
@@ -89,7 +89,7 @@ let expectAndThen [T, E, U] (
   | .Failure(error) => Failure[U, E](error)
   );
 
---- Core operation for `orElse`.
+--- Function for `orElse`.
 let expectOrElse [T, E, F] (
   target : Expect[T, E],
   f : E -> Expect[T, F]
@@ -99,7 +99,7 @@ let expectOrElse [T, E, F] (
   | .Failure(error) => f(error)
   );
 
---- Core operation for `fold`.
+--- Function for `fold`.
 let expectFold [T, E, U] (
   target : Expect[T, E],
   onSuccess : T -> U,

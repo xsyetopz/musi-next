@@ -1,6 +1,6 @@
 # Musi
 
-Musi is an expression-first programming language with typed effects, a SEAM bytecode pipeline, and package tooling built around `.ms` source files.
+Musi is an expression-first programming language with a compact core, a SEAM bytecode pipeline, and package tooling built around `.ms` source files.
 
 > [!WARNING]
 > Musi is `v0.1.0-alpha.1`. Language, tooling, and stdlib shape will still change.

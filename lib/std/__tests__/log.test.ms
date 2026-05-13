@@ -1,3 +1,4 @@
+let assert := import "@std/assert";
 let log := import "@std/log";
 let testing := import "@std/testing";
 
@@ -10,7 +11,7 @@ export let test () :=
     );
     testing.it(
       "level 'value' renders numeric level",
-      testing.toBe(log.errorLevel.value(), 40),
+      assert.toBe(log.errorLevel.value(), 40),
     );
     testing.it(
       "'write' returns without failure",

@@ -83,6 +83,59 @@ fn register_runtime_module(runtime: &mut Runtime, spec: &str, text: &str) {
     runtime.register_module_text(spec, text).unwrap();
 }
 
+fn runtime_options_with_std_imports(output: RuntimeOutputMode) -> RuntimeOptions {
+    let mut import_map = ImportMap::default();
+    let _ = import_map.imports.insert("@std/".into(), "@std/".into());
+    RuntimeOptions::default()
+        .with_output(output)
+        .with_session(SessionOptions::new().with_import_map(import_map))
+}
+
+fn register_runtime_std_log(runtime: &mut Runtime) {
+    register_runtime_module(
+        runtime,
+        "@std/prelude",
+        r#"
+let Core := import "musi:core";
+export let Int := Core.Int;
+export let Bit := Core.Bit;
+export let String := Core.String;
+export let Unit := Core.Unit;
+"#,
+    );
+    register_runtime_module(
+        runtime,
+        "@std/log",
+        r#"
+let Io := import "musi:io";
+
+export hidden let Level := data {
+  | Info := 20
+  | Error := 40
+};
+
+export let infoLevel : Level := .Info;
+export let errorLevel : Level := .Error;
+
+export let (self : Level).name () : String :=
+  match self (
+  | .Info => "info"
+  | .Error => "error"
+  );
+
+export let write (level : Level, message : String) : Unit :=
+  (
+    Io.writeErr("[");
+    Io.writeErr(level.name());
+    Io.writeErr("] ");
+    Io.writeErrLn(message)
+  );
+
+export let info (message : String) : Unit := write(infoLevel, message);
+"#,
+    );
+}
+
 fn unique_test_suffix() -> String {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -474,15 +527,16 @@ export let test () :=
     fn handles_runtime_fs_and_log_services() {
         let mut runtime = Runtime::new(
             NativeHost::new(),
-            RuntimeOptions::default().with_output(RuntimeOutputMode::Capture),
+            runtime_options_with_std_imports(RuntimeOutputMode::Capture),
         );
+        register_runtime_std_log(&mut runtime);
         runtime
             .register_module_text(
                 "main",
                 r#"
             let Fs := import "musi:fs";
             let Io := import "musi:io";
-            let Log := import "musi:log";
+            let Log := import "@std/log";
             export let roundtrip (path : String, text : String) : String := (
               Fs.writeText(path, text);
               Fs.readText(path)
@@ -514,20 +568,21 @@ export let test () :=
     fn captures_runtime_output_during_tests() {
         let mut runtime = Runtime::new(
             NativeHost::new(),
-            RuntimeOptions::default().with_output(RuntimeOutputMode::Capture),
+            runtime_options_with_std_imports(RuntimeOutputMode::Capture),
         );
+        register_runtime_std_log(&mut runtime);
         runtime
             .register_module_text(
                 "main",
                 r#"
             let Io := import "musi:io";
-            let Log := import "musi:log";
+            let Log := import "@std/log";
             export let test () : Unit := (
               Io.write("out");
               Io.writeLn(" line");
               Io.writeErr("err");
               Io.writeErrLn(" line");
-              Log.write(40, "boom")
+              Log.write(Log.errorLevel, "boom")
             );
         "#,
             )
@@ -536,25 +591,26 @@ export let test () :=
         let report = runtime.run_test_export("main", "test").unwrap();
 
         assert_eq!(report.stdout.as_ref(), "out line\n");
-        assert_eq!(report.stderr.as_ref(), "err line\n[std:40] boom\n");
+        assert_eq!(report.stderr.as_ref(), "err line\n[error] boom\n");
     }
 
     #[test]
     fn suppresses_runtime_output_during_tests() {
         let mut runtime = Runtime::new(
             NativeHost::new(),
-            RuntimeOptions::default().with_output(RuntimeOutputMode::Suppress),
+            runtime_options_with_std_imports(RuntimeOutputMode::Suppress),
         );
+        register_runtime_std_log(&mut runtime);
         runtime
             .register_module_text(
                 "main",
                 r#"
             let Io := import "musi:io";
-            let Log := import "musi:log";
+            let Log := import "@std/log";
             export let test () : Unit := (
               Io.writeLn("hidden");
               Io.writeErrLn("hidden");
-              Log.write(40, "hidden")
+              Log.write(Log.errorLevel, "hidden")
             );
         "#,
             )
@@ -568,15 +624,41 @@ export let test () :=
 
     #[test]
     fn runs_root_hub_std_test_module() {
-        let mut import_map = ImportMap::default();
-        let _ = import_map.imports.insert("@std/".into(), "@std/".into());
         let mut runtime = Runtime::new(
             NativeHost::new(),
-            RuntimeOptions::default()
-                .with_session(SessionOptions::new().with_import_map(import_map)),
+            runtime_options_with_std_imports(RuntimeOutputMode::Capture),
         );
+        register_root_hub_std_modules(&mut runtime);
         register_runtime_module(
             &mut runtime,
+            "suite",
+            r#"
+let Testing := import "@std/testing";
+let Assert := import "@std/assert";
+let Bytes := import "@std/bytes";
+let Math := import "@std/math";
+let Maybe := import "@std/maybe";
+
+export let test () :=
+    (
+      Testing.describe("std root");
+      Testing.it("bytes chain", Assert.toBeTrue(Bytes.equals([1, 2], [1, 2])));
+      Testing.it("math chain", Assert.toBe(Math.clamp(9, 0, 4), 4));
+      Testing.it("maybe chain", Assert.toBe(Maybe.unwrapOr[Int](Maybe.None[Int](), 5), 5));
+      Testing.endDescribe()
+    );
+"#,
+        );
+
+        let report = runtime.run_test_module("suite").unwrap();
+
+        assert_eq!(report.cases.len(), 3);
+        assert!(report.cases.iter().all(|case| case.passed));
+    }
+
+    fn register_root_hub_std_modules(runtime: &mut Runtime) {
+        register_runtime_module(
+            runtime,
             "@std/prelude",
             r#"
 let Core := import "musi:core";
@@ -587,24 +669,51 @@ export let Unit := Core.Unit;
 "#,
         );
         register_runtime_module(
-            &mut runtime,
+            runtime,
             "@std",
             r#"
 	export let bytes := import "@std/bytes";
 	export let math := import "@std/math";
 	export let maybe := import "@std/maybe";
+	export let assert := import "@std/assert";
 	export let testing := import "@std/testing";
 "#,
         );
         register_runtime_module(
-            &mut runtime,
+            runtime,
             "@std/bytes",
             r"
 export let equals (left : []Int, right : []Int) : Bit := left = right;
 ",
         );
+        register_root_hub_math_maybe_modules(runtime);
         register_runtime_module(
-            &mut runtime,
+            runtime,
+            "@std/assert",
+            r"
+export let toBe (actual : Int, expected : Int) := actual = expected;
+export let toBeTrue (actual : Bit) := actual;
+",
+        );
+        register_runtime_module(
+            runtime,
+            "@std/testing",
+            r#"
+let Intrinsics := import "musi:test";
+
+export let describe (name : String) :=
+    Intrinsics.suiteStart(name);
+export let endDescribe () :=
+    Intrinsics.suiteEnd();
+export let it (name : String, passed : Bit) :=
+    Intrinsics.testCase(name, passed);
+"#,
+        );
+    }
+
+    fn register_root_hub_math_maybe_modules(runtime: &mut Runtime) {
+        register_runtime_module(
+            runtime,
             "@std/math",
             r"
 export let clamp (value : Int, low : Int, high : Int) : Int :=
@@ -616,7 +725,7 @@ export let clamp (value : Int, low : Int, high : Int) : Int :=
 ",
         );
         register_runtime_module(
-            &mut runtime,
+            runtime,
             "@std/maybe",
             r"
 	export hidden let Maybe[T] := data {
@@ -633,47 +742,6 @@ export let unwrapOr [T] (value : Maybe[T], fallback : T) : T :=
     );
 ",
         );
-        register_runtime_module(
-            &mut runtime,
-            "@std/testing",
-            r#"
-let Intrinsics := import "musi:test";
-
-export let toBe (actual : Int, expected : Int) := actual = expected;
-export let toBeTrue (actual : Bit) := actual;
-
-export let describe (name : String) :=
-    Intrinsics.suiteStart(name);
-export let endDescribe () :=
-    Intrinsics.suiteEnd();
-export let it (name : String, passed : Bit) :=
-    Intrinsics.testCase(name, passed);
-"#,
-        );
-        register_runtime_module(
-            &mut runtime,
-            "suite",
-            r#"
-let Testing := import "@std/testing";
-let Bytes := import "@std/bytes";
-let Math := import "@std/math";
-let Maybe := import "@std/maybe";
-
-export let test () :=
-    (
-      Testing.describe("std root");
-      Testing.it("bytes chain", Testing.toBeTrue(Bytes.equals([1, 2], [1, 2])));
-      Testing.it("math chain", Testing.toBe(Math.clamp(9, 0, 4), 4));
-      Testing.it("maybe chain", Testing.toBe(Maybe.unwrapOr[Int](Maybe.None[Int](), 5), 5));
-      Testing.endDescribe()
-    );
-"#,
-        );
-
-        let report = runtime.run_test_module("suite").unwrap();
-
-        assert_eq!(report.cases.len(), 3);
-        assert!(report.cases.iter().all(|case| case.passed));
     }
 }
 

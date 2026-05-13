@@ -199,7 +199,7 @@ fn leaf_role_for(parent: SyntaxNode<'_, '_>, token: TokenKind) -> CstLeafRole {
             CstLeafRole::ArrayTypeBracket
         }
         (
-            SyntaxNodeKind::EffectSet | SyntaxNodeKind::RecordExpr | SyntaxNodeKind::RecordPat,
+            SyntaxNodeKind::RecordExpr | SyntaxNodeKind::RecordPat,
             TokenKind::LBrace | TokenKind::RBrace,
         ) => CstLeafRole::CommaListBrace,
         (SyntaxNodeKind::Attr, _) => CstLeafRole::Attribute,
