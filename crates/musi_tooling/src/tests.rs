@@ -1441,6 +1441,23 @@ dep.add(1, 2);
     }
 
     #[test]
+    fn hover_renders_bits_width_for_std_word_exports() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../lib/std/word.ms");
+
+        let hover = hover_for_project_file_with_overlay(&path, None, 86, 13)
+            .expect("std word export hover should resolve");
+
+        assert!(
+            hover
+                .contents
+                .starts_with("```musi\n(function) logicalNot32 : Bits[32] -> Bits[32]\n```"),
+            "{}",
+            hover.contents
+        );
+        assert!(hover.contents.contains("Invert 32-bit machine word bits."));
+    }
+
+    #[test]
     fn semantic_tokens_use_member_facts_for_properties_and_dot_callables() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);

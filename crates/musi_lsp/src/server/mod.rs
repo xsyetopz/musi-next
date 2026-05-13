@@ -92,7 +92,7 @@ type DefinitionFuture = ServerFuture<Option<GotoDefinitionResponse>>;
 type TextEditListFuture = ServerFuture<Option<Vec<TextEdit>>>;
 type NotifyResult = ControlFlow<async_lsp::Result<()>>;
 const REFERENCES_COMMAND: &str = "musi.references";
-const SHOW_REFERENCES_COMMAND: &str = "editor.action.showReferences";
+const SHOW_REFERENCES_COMMAND: &str = "musi.showReferences";
 
 #[derive(Debug)]
 pub struct MusiLanguageServer {

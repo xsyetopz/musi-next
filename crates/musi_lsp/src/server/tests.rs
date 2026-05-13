@@ -1663,6 +1663,50 @@ add(value, 2);
     }
 
     #[test]
+    fn inlay_hints_defaults_match_editor_policy() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "\
+let add (left : Int, right : Int) : Int := left + right;
+let value := 1;
+let result := add(value, 2);
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let hints = server
+            .inlay_hints(&InlayHintParams {
+                text_document: TextDocumentIdentifier { uri },
+                range: full_document_range(source),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("inlay hints should run");
+        let labels = hints
+            .iter()
+            .map(|hint| match &hint.label {
+                InlayHintLabel::String(label) => label.as_str(),
+                InlayHintLabel::LabelParts(_) => "",
+            })
+            .collect::<Vec<_>>();
+
+        assert!(labels.iter().any(|label| label.starts_with(": Int")));
+        assert!(labels.contains(&"right:"));
+        assert!(!labels.contains(&"left:"));
+    }
+
+    #[test]
     fn inlay_hints_include_imported_member_parameter_names() {
         let root = temp_project();
         fs::write(

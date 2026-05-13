@@ -77,6 +77,9 @@ fn render_atomic_hir_ty(kind: &HirTyKind) -> Option<String> {
     if let HirTyKind::NatLit(value) = kind {
         return Some(value.to_string());
     }
+    if let HirTyKind::Bits { width } = kind {
+        return Some(format!("Bits[{width}]"));
+    }
     simple_hir_ty_display_name(kind).map(str::to_owned)
 }
 

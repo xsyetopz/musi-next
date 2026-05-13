@@ -56,8 +56,8 @@ impl Default for InlayHintConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            parameter_names: ParameterNameHints::None,
-            variable_types: false,
+            parameter_names: ParameterNameHints::Literals,
+            variable_types: true,
         }
     }
 }
