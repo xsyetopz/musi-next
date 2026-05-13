@@ -643,6 +643,9 @@ impl CstFormatter<'_> {
         if current == TokenKind::LParen && previous == TokenKind::KwMatch {
             return true;
         }
+        if current == TokenKind::LParen && is_operator(previous) {
+            return true;
+        }
         if current == TokenKind::LParen && previous != TokenKind::Colon {
             return false;
         }

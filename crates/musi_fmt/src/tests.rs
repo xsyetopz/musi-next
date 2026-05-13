@@ -192,6 +192,27 @@ mod success {
     }
 
     #[test]
+    fn spaces_empty_groups_after_infix_operators() {
+        let formatted_array =
+            format_source("let value := if values =[] then 1 else 0;", &options())
+                .expect("empty array format");
+        let formatted_sequence =
+            format_source("let value := if next =() then 1 else 0;", &options())
+                .expect("empty sequence format");
+
+        assert_eq!(
+            formatted_array.text,
+            "let value := if values = [] then 1 else 0;\n"
+        );
+        assert_eq!(
+            formatted_sequence.text,
+            "let value := if next = () then 1 else 0;\n"
+        );
+        assert_formatted_text_is_stable(&formatted_array.text);
+        assert_formatted_text_is_stable(&formatted_sequence.text);
+    }
+
+    #[test]
     fn keeps_empty_lambda_params_attached_to_backslash() {
         let source = r"let value := \() => 1;";
 

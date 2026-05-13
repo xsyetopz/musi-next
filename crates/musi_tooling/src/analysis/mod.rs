@@ -208,8 +208,49 @@ fn member_hover_contents(
             lines.push(String::new());
             lines.push(docs);
         }
+    } else if let Some(docs) = imported_member_doc_text(session, fact, import_record_target) {
+        lines.push(String::new());
+        lines.push(docs);
     }
     lines.join("\n")
+}
+
+fn imported_member_doc_text(
+    session: &Session,
+    fact: &ExprMemberFact,
+    import_record_target: Option<&ModuleKey>,
+) -> Option<String> {
+    if !matches!(fact.kind, ExprMemberKind::ImportRecordExport) {
+        return None;
+    }
+    let target = import_record_target?;
+    let imported = session.sema_module_cached(target).ok().flatten()?;
+    let export_name = session.resolve_symbol(fact.name);
+    let export_exists = imported
+        .surface()
+        .exported_values()
+        .iter()
+        .any(|export| export.name.as_ref() == export_name);
+    if !export_exists {
+        return None;
+    }
+    let binding = imported
+        .resolved()
+        .names
+        .bindings
+        .iter()
+        .map(|(_, binding)| binding)
+        .find(|binding| {
+            session.resolve_symbol(binding.name) == export_name
+                && matches!(
+                    binding.kind,
+                    NameBindingKind::Let | NameBindingKind::AttachedMethod
+                )
+        })?;
+    session
+        .source(binding.site.source_id)
+        .and_then(|source| leading_doc_text(source, binding.site.span))
+        .filter(|docs| !docs.is_empty())
 }
 
 fn imported_member_ty_label(

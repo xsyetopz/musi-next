@@ -1528,7 +1528,7 @@ dep.add(1, 2);
         .expect("manifest should be written");
         fs::write(
             root.join("dep.ms"),
-            "export let add (left : Int, right : Int) : Int := left + right;\n",
+            "--- Add two numbers.\nexport let add (left : Int, right : Int) : Int := left + right;\n",
         )
         .expect("dep should be written");
         let path = root.join("index.ms");
@@ -1558,6 +1558,54 @@ dep.add(1, 2);
             contents
                 .value
                 .starts_with("```musi\n(function) add : (left : Int, right : Int) -> Int\n```"),
+            "{}",
+            contents.value
+        );
+        assert!(
+            contents.value.contains("Add two numbers."),
+            "{}",
+            contents.value
+        );
+    }
+
+    #[test]
+    fn hover_shows_std_testing_describe_docs() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let path = root.join("index.ms");
+        let source = "\
+let testing := import \"@std/testing\";
+testing.describe(\"encoding\");
+";
+        fs::write(&path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let hover = server
+            .hover_at(HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 9),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .expect("hover should resolve");
+        let HoverContents::Markup(contents) = hover.contents else {
+            panic!("markup hover expected");
+        };
+
+        assert!(
+            contents.value.contains("Start a named test suite."),
             "{}",
             contents.value
         );

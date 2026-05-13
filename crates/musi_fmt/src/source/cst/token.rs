@@ -513,6 +513,7 @@ impl CstFormatter<'_> {
             CstLeafRole::TypeParamBracket | CstLeafRole::ArrayTypeBracket
         ) || self.previous == Some(TokenKind::ColonEq)
             || self.previous == Some(TokenKind::Pipe)
+            || self.previous.is_some_and(is_operator)
         {
             self.push_space();
         }

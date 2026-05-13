@@ -1414,7 +1414,7 @@ one.inc(2);
         write_file(
             test_dir.path(),
             "dep.ms",
-            "export let add (left : Int, right : Int) : Int := left + right;\n",
+            "--- Add two numbers.\nexport let add (left : Int, right : Int) : Int := left + right;\n",
         );
         let source = "\
 let dep := import \"./dep\";
@@ -1437,6 +1437,7 @@ dep.add(1, 2);
             "{}",
             hover.contents
         );
+        assert!(hover.contents.contains("Add two numbers."));
     }
 
     #[test]
