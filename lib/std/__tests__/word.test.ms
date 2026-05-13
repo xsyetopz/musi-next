@@ -16,8 +16,14 @@ export let test () :=
     );
     testing.it(
       "logicalAnd32 combines pointwise",
-      assert.toBe(word.toInt32(word.logicalAnd32(word.fromInt32(10), word.fromInt32(12))), 8),
+      assert.toBe(
+        word.toInt32(word.logicalAnd32(word.fromInt32(10), word.fromInt32(12))),
+        8,
+      ),
     );
-    testing.it("equals32 detects equal words", word.equals32(word.zero32(), word.zero32()));
+    testing.it(
+      "equals32 detects equal words",
+      word.equals32(word.zero32(), word.zero32()),
+    );
     testing.endDescribe()
   );

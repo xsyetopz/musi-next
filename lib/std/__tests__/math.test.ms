@@ -33,9 +33,18 @@ export let test () :=
       "'clamp' clamps above high",
       assert.toBe(math.clamp(11, 0, 10), 10),
     );
-    testing.it("'absFloat' flips negative floats", close(math.absFloat(- 3.0), 3.0));
-    testing.it("'maxFloat' picks larger float", close(math.maxFloat(1.0, 2.0), 2.0));
-    testing.it("'minFloat' picks smaller float", close(math.minFloat(1.0, 2.0), 1.0));
+    testing.it(
+      "'absFloat' flips negative floats",
+      close(math.absFloat(- 3.0), 3.0),
+    );
+    testing.it(
+      "'maxFloat' picks larger float",
+      close(math.maxFloat(1.0, 2.0), 2.0),
+    );
+    testing.it(
+      "'minFloat' picks smaller float",
+      close(math.minFloat(1.0, 2.0), 1.0),
+    );
     testing.it(
       "'clampFloat' clamps above high",
       close(math.clampFloat(3.0, 0.0, 2.0), 2.0),

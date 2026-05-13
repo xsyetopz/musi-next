@@ -1,5 +1,5 @@
-let assert := import "@std/assert";
 let ascii := import "@std/ascii";
+let assert := import "@std/assert";
 let maybe := import "@std/maybe";
 let testing := import "@std/testing";
 

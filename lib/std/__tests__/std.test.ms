@@ -1,5 +1,5 @@
-let assert := import "@std/assert";
 let std := import "@std";
+let assert := import "@std/assert";
 let testing := import "@std/testing";
 
 export let test () :=
@@ -25,10 +25,7 @@ export let test () :=
       "root exports 'expect' family",
       std.expect.isSuccess[Int, String](successExpect),
     );
-    testing.it(
-      "root exports 'cmp' family",
-      std.cmp.compareInt(1, 2).isLess(),
-    );
+    testing.it("root exports 'cmp' family", std.cmp.compareInt(1, 2).isLess(),);
     testing.it(
       "root exports 'list' family",
       std.collections.list.equalsInt(
@@ -77,10 +74,7 @@ export let test () :=
       "root exports 'random' family",
       std.random.nextIntInRange(1, 10) >= 1,
     );
-    testing.it(
-      "root exports 'crypto' family",
-      std.crypto.sha256Hex("") /= "",
-    );
+    testing.it("root exports 'crypto' family", std.crypto.sha256Hex("") /= "",);
     testing.it("root exports 'fs' family", std.fs.exists(rootPath));
     testing.it(
       "root exports 'path' family",
@@ -95,19 +89,13 @@ export let test () :=
       "root exports 'env' family",
       std.env.key("PATH").toString() = "PATH",
     );
-    testing.it(
-      "root exports 'process' family",
-      std.process.argsCount() >= 0,
-    );
+    testing.it("root exports 'process' family", std.process.argsCount() >= 0,);
     testing.it("root exports 'os' family", currentOs.toString() /= "",);
     testing.it(
       "root exports 'maybe' family",
       assert.toBe(std.maybe.unwrapOr[Int](noneInt, 5), 5),
     );
-    testing.it(
-      "root exports 'log' family",
-      std.log.warnLevel.name() = "warn",
-    );
+    testing.it("root exports 'log' family", std.log.warnLevel.name() = "warn",);
     testing.it("root exports 'cli' family", 0 = 0);
     testing.it(
       "root exports 'uuid' family",

@@ -8,31 +8,34 @@ export let test () :=
     let a := bits.fromInt8(10);
     let b := bits.fromInt8(12);
     testing.it(
-      "fromNat8 converts natural values",
+      "'fromNat8' converts natural values",
       assert.toBe(bits.toInt8(bits.fromNat8(10)), 10),
     );
     testing.it(
-      "fromInt8 converts integer values",
+      "'fromInt8' converts integer values",
       assert.toBe(bits.toInt8(bits.fromInt8(7)), 7),
     );
-    testing.it("zero8 builds empty bits", bits.isZero8(bits.zero8()));
-    testing.it("ones8 builds full bits", bits.all8(bits.ones8()));
-    testing.it("any8 detects set bits", bits.any8(a));
-    testing.it("equals detects equal bits", bits.equals8(a, bits.fromInt8(10)));
+    testing.it("'zero8' builds empty bits", bits.isZero8(bits.zero8()));
+    testing.it("'ones8' builds full bits", bits.all8(bits.ones8()));
+    testing.it("'any8' detects set bits", bits.any8(a));
     testing.it(
-      "logicalAnd combines pointwise",
+      "'equals' detects equal bits",
+      bits.equals8(a, bits.fromInt8(10)),
+    );
+    testing.it(
+      "'logicalAnd' combines pointwise",
       assert.toBe(bits.toInt8(bits.logicalAnd8(a, b)), 8),
     );
     testing.it(
-      "logicalOr combines pointwise",
+      "'logicalOr' combines pointwise",
       assert.toBe(bits.toInt8(bits.logicalOr8(a, b)), 14),
     );
     testing.it(
-      "logicalXor combines pointwise",
+      "'logicalXor' combines pointwise",
       assert.toBe(bits.toInt8(bits.logicalXor8(a, b)), 6),
     );
     testing.it(
-      "logicalNot inverts within width",
+      "'logicalNot' inverts within width",
       assert.toBe(bits.toInt8(bits.logicalNot8(a)), 245),
     );
     testing.endDescribe()

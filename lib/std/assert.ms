@@ -7,20 +7,16 @@ export let passValue : Bit := 0 = 0;
 export let fail (message : String) : Bit := 0 = 1;
 
 --- Assert two values are equal.
-export let equal [T] (actual : T, expected : T) : Bit :=
-  actual = expected;
+export let equal [T] (actual : T, expected : T) : Bit := actual = expected;
 
 --- Assert two values are different.
-export let notEqual [T] (actual : T, expected : T) : Bit :=
-  actual /= expected;
+export let notEqual [T] (actual : T, expected : T) : Bit := actual /= expected;
 
 --- Assert a boolean is true.
-export let isTrue (actual : Bit) : Bit :=
-  actual;
+export let isTrue (actual : Bit) : Bit := actual;
 
 --- Assert a boolean is false.
-export let isFalse (actual : Bit) : Bit :=
-  actual = (0 = 1);
+export let isFalse (actual : Bit) : Bit := actual = (0 = 1);
 
 --- Assert an integer is greater than a lower bound.
 export let greaterThan (actual : Int, lowerBound : Int) : Bit :=
@@ -40,10 +36,8 @@ export let betweenInclusive (
 --- Build integer matcher helpers for one actual value.
 export let expectInt (actual : Int) :=
   (
-    let shouldEqual (expected : Int) :=
-      actual = expected;
-    let shouldNotEqual (expected : Int) :=
-      actual /= expected;
+    let shouldEqual (expected : Int) := actual = expected;
+    let shouldNotEqual (expected : Int) := actual /= expected;
     let shouldBeGreaterThan (bound : Int) := greaterThan(actual, bound);
     let shouldBeLessThan (bound : Int) := lessThan(actual, bound);
     {
@@ -53,8 +47,7 @@ export let expectInt (actual : Int) :=
   );
 
 --- Integer equality matcher.
-export let toBe (actual : Int, expected : Int) : Bit :=
-  actual = expected;
+export let toBe (actual : Int, expected : Int) : Bit := actual = expected;
 
 --- True boolean matcher.
 export let toBeTrue (actual : Bit) : Bit := isTrue(actual);

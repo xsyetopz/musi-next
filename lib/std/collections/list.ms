@@ -22,7 +22,7 @@ export let fromArray [T] (values : []T) : List[T] :=
 --- Function for `toArray`.
 let listToArray [T] (target : List[T]) : []T :=
   match target (
-  | .ListValues(values := values) =>[...values]
+  | .ListValues(values := values) => [...values]
   );
 
 --- Return a copy of list values.

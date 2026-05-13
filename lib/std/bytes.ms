@@ -15,7 +15,7 @@ export let fromArray (values : []Int) : Bytes :=
 --- Function for `toArray`.
 let bytesToArray (target : Bytes) : []Int :=
   match target (
-  | .ByteValues(values := values) =>[...values]
+  | .ByteValues(values := values) => [...values]
   );
 
 --- Return a copy of raw byte values.

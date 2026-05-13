@@ -17,7 +17,7 @@ export let test () :=
     let nan := libm.sqrt(- 1.0);
     let infinity := libm.log(0.0 - 0.0);
     testing.it("'isNan' detects NaN", libm.isNan(nan));
-    testing.it("'isFinite' rejects NaN", libm.isFinite(nan) =(0 = 1));
+    testing.it("'isFinite' rejects NaN", libm.isFinite(nan) = (0 = 1));
     testing.it("'isInfinite' detects infinity", libm.isInfinite(infinity));
     testing.it("'isFinite' accepts finite values", libm.isFinite(1.0));
     testing.it(

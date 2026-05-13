@@ -1,8 +1,8 @@
 --! Machine word helpers.
 
+let sys := import "#sys";
 let bits := import "@std/bits";
 let core := import "musi:core";
-let sys := import "#sys";
 
 let Word8 := core.Word8;
 let Word16 := core.Word16;
