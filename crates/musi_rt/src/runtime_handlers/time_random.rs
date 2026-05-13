@@ -50,20 +50,20 @@ pub(super) fn register(host: &mut NativeHost) {
     host.register_foundation_handler(
         foundation_time::EFFECT,
         foundation_time::NOW_UNIX_MS_OP,
-        |effect, args| {
+        |foreign, args| {
             if !args.is_empty() {
-                return Err(invalid_runtime_args(effect, "no arguments", args.len()));
+                return Err(invalid_runtime_args(foreign, "no arguments", args.len()));
             }
-            Ok(Value::Int(current_unix_millis(effect)?))
+            Ok(Value::Int(current_unix_millis(foreign)?))
         },
     );
 
     host.register_foundation_handler(
         foundation_time::EFFECT,
         foundation_time::MONOTONIC_MS_OP,
-        |effect, args| {
+        |foreign, args| {
             if !args.is_empty() {
-                return Err(invalid_runtime_args(effect, "no arguments", args.len()));
+                return Err(invalid_runtime_args(foreign, "no arguments", args.len()));
             }
             let millis =
                 i64::try_from(monotonic_origin().elapsed().as_millis()).unwrap_or(i64::MAX);
@@ -74,10 +74,10 @@ pub(super) fn register(host: &mut NativeHost) {
     host.register_foundation_handler(
         foundation_time::EFFECT,
         foundation_time::SLEEP_MS_OP,
-        |effect, args| {
+        |foreign, args| {
             let [Value::Int(ms)] = args else {
                 return Err(invalid_runtime_args(
-                    effect,
+                    foreign,
                     "integer milliseconds",
                     args.len(),
                 ));
@@ -156,9 +156,9 @@ fn register_random_effect_handlers(host: &mut NativeHost, random_state: &RandomS
     host.register_foundation_handler(
         foundation_random::EFFECT,
         foundation_random::INT_OP,
-        move |effect, args| {
+        move |foreign, args| {
             if !args.is_empty() {
-                return Err(invalid_runtime_args(effect, "no arguments", args.len()));
+                return Err(invalid_runtime_args(foreign, "no arguments", args.len()));
             }
             Ok(Value::Int(next_random_int(&int_random_state)))
         },
@@ -168,10 +168,10 @@ fn register_random_effect_handlers(host: &mut NativeHost, random_state: &RandomS
     host.register_foundation_handler(
         foundation_random::EFFECT,
         foundation_random::INT_IN_RANGE_OP,
-        move |effect, args| {
+        move |foreign, args| {
             let [Value::Int(lower_bound), Value::Int(upper_bound)] = args else {
                 return Err(invalid_runtime_args(
-                    effect,
+                    foreign,
                     "lower and upper integer bounds",
                     args.len(),
                 ));
@@ -188,9 +188,9 @@ fn register_random_effect_handlers(host: &mut NativeHost, random_state: &RandomS
     host.register_foundation_handler(
         foundation_random::EFFECT,
         foundation_random::BOOL_OP,
-        move |effect, args| {
+        move |foreign, args| {
             if !args.is_empty() {
-                return Err(invalid_runtime_args(effect, "no arguments", args.len()));
+                return Err(invalid_runtime_args(foreign, "no arguments", args.len()));
             }
             Ok(Value::Int(next_random_int(&bool_random_state) & 1))
         },
@@ -200,19 +200,19 @@ fn register_random_effect_handlers(host: &mut NativeHost, random_state: &RandomS
     host.register_foundation_handler(
         foundation_random::EFFECT,
         foundation_random::FLOAT_01_OP,
-        move |effect, args| {
+        move |foreign, args| {
             if !args.is_empty() {
-                return Err(invalid_runtime_args(effect, "no arguments", args.len()));
+                return Err(invalid_runtime_args(foreign, "no arguments", args.len()));
             }
             Ok(Value::Float(random_float01(&float_random_state)))
         },
     );
 }
 
-fn current_unix_millis(effect: &ForeignCall) -> Result<i64, VmError> {
+fn current_unix_millis(foreign: &ForeignCall) -> Result<i64, VmError> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|error| runtime_foreign_failed(effect, error))?;
+        .map_err(|error| runtime_foreign_failed(foreign, error))?;
     Ok(i64::try_from(now.as_millis()).unwrap_or(i64::MAX))
 }
 

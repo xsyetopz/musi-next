@@ -29,7 +29,6 @@ impl VmHost for TestHost {
             foreign: foreign.name().into(),
         }))
     }
-
 }
 
 fn expr_syntax(runtime: &mut Runtime, text: &str) -> Value {

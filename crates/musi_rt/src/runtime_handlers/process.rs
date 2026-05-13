@@ -78,9 +78,9 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler(
         foundation_process::EFFECT,
         foundation_process::ARG_COUNT_OP,
-        |effect, args| {
+        |foreign, args| {
             if !args.is_empty() {
-                return Err(invalid_runtime_args(effect, "no arguments", args.len()));
+                return Err(invalid_runtime_args(foreign, "no arguments", args.len()));
             }
             Ok(Value::Int(saturating_usize_to_i64(args_os().count())))
         },
@@ -89,9 +89,9 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_process::EFFECT,
         foundation_process::ARG_AT_OP,
-        |ctx, effect, args| {
+        |ctx, foreign, args| {
             let [Value::Int(index)] = args else {
-                return Err(invalid_runtime_args(effect, "integer index", args.len()));
+                return Err(invalid_runtime_args(foreign, "integer index", args.len()));
             };
             let arg_value = usize::try_from(*index).map_or_else(
                 |_| String::new(),
@@ -109,11 +109,11 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_process::EFFECT,
         foundation_process::CWD_OP,
-        |ctx, effect, args| {
+        |ctx, foreign, args| {
             if !args.is_empty() {
-                return Err(invalid_runtime_args(effect, "no arguments", args.len()));
+                return Err(invalid_runtime_args(foreign, "no arguments", args.len()));
             }
-            let cwd = current_dir().map_err(|error| runtime_foreign_failed(effect, error))?;
+            let cwd = current_dir().map_err(|error| runtime_foreign_failed(foreign, error))?;
             ctx.alloc_string(cwd.to_string_lossy().into_owned())
         },
     );
@@ -121,25 +121,25 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_process::EFFECT,
         foundation_process::RUN_OP,
-        |ctx, effect, args| {
-            let command = string_arg(ctx, effect, args, "processRun")?;
-            Ok(Value::Int(run_shell_command(command, effect)?))
+        |ctx, foreign, args| {
+            let command = string_arg(ctx, foreign, args, "processRun")?;
+            Ok(Value::Int(run_shell_command(command, foreign)?))
         },
     );
 
     host.register_foundation_handler(
         foundation_process::EFFECT,
         foundation_process::EXIT_OP,
-        |effect, args| {
+        |foreign, args| {
             let [Value::Int(_code)] = args else {
-                return Err(invalid_runtime_args(effect, "integer code", args.len()));
+                return Err(invalid_runtime_args(foreign, "integer code", args.len()));
             };
-            Err(runtime_foreign_unsupported(effect))
+            Err(runtime_foreign_unsupported(foreign))
         },
     );
 }
 
-fn run_shell_command(command: &str, effect: &ForeignCall) -> Result<i64, VmError> {
+fn run_shell_command(command: &str, foreign: &ForeignCall) -> Result<i64, VmError> {
     let status = if cfg!(windows) {
         Command::new("cmd")
             .args([windows_shell_flag().as_str(), command])
@@ -147,7 +147,7 @@ fn run_shell_command(command: &str, effect: &ForeignCall) -> Result<i64, VmError
     } else {
         Command::new("sh").args(["-c", command]).status()
     }
-    .map_err(|error| runtime_foreign_failed(effect, error))?;
+    .map_err(|error| runtime_foreign_failed(foreign, error))?;
     Ok(i64::from(status.code().unwrap_or(-1)))
 }
 

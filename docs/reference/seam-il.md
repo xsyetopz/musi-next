@@ -34,10 +34,9 @@ BC/IL is not source syntax. It has no opcodes named `shape`, `option`, `result`,
 Core lowering examples:
 
 - tuples, records, variants, `?T`, and `E!T`: `new.obj` plus `ld.fld` / `st.fld`
-- first-class functions: `ld.fn`, `new.fn`, `call.ind`
-- receiver dispatch: `call.virt`, `call.iface`, `call.dyn`
+- first-class functions: `new.fn`, `call.ind`
 - FFI: `call.ffi`, `ld.ffi`
-- suspension/runtime protocols: explicit VM operations, not source keywords
+- runtime protocols: native module calls and explicit state values
 
 Full opcode positions and stack effects live in `specs/seam/bytecode.md`.
 

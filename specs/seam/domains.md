@@ -7,7 +7,6 @@ This spec defines the final public SEAM domain contract.
 Domain names are fixed:
 
 - `managed`
-- `resumable`
 - `native`
 - `link`
 - `introspect`
@@ -18,7 +17,7 @@ These are VM and module-contract concepts. They are not source-language feature 
 
 Rust 2024 is the host language for the current VM and compiler. SEAM domains may map to Rust modules, types, traits, or unsafe boundaries internally.
 
-That host structure is not the SEAM contract. Public SEAM names stay domain names such as `managed`, `resumable`, `native`, `link`, and `introspect`. Do not expose Rust trait/module names as SEAM feature ids.
+That host structure is the implementation substrate. Public SEAM names stay domain names such as `managed`, `native`, `link`, and `introspect`. Do not expose Rust trait/module names as SEAM feature ids.
 
 ## `managed`
 
@@ -39,7 +38,6 @@ Standardized heap and value kinds:
 - `array`
 - `object`
 - `closure`
-- `continuation`
 - `weakref`
 - ephemeral `ref`
 - ephemeral `mutref`
@@ -59,28 +57,6 @@ Relation to Musi specs:
 
 - `Array[T]`, `Ref[T]`, `MutRef[T]`, and `Slice[T]` lower against this domain
 - movable managed heap must remain consistent with `specs/runtime/memory-model.md`
-
-## `resumable`
-
-`resumable` defines driver-owned resumable control.
-
-Public features:
-
-- `resumable.handlers`
-- `resumable.cont.oneshot`
-- `resumable.unwind`
-
-Rules:
-
-- control frames are first-class runtime state
-- portable bytecode names the runtime frame a control frame
-- continuation capture is one-shot
-- resumed continuation may not resume again
-- stack restoration and control-frame restoration are standardized runtime behavior
-- multi-shot continuations are not part of this domain
-- generators, coroutine schedulers, and async task systems are not part of this domain
-
-This domain is named for runtime behavior, not source syntax. Host behavior enters SEAM through native calls and module loading.
 
 ## `native`
 
@@ -164,7 +140,6 @@ The SEAM verifier enforces:
 - stack and local discipline
 - method and block stack-signature discipline
 - non-escaping view restrictions for `managed.views`
-- one-shot continuation discipline for `resumable.cont.oneshot`
 - pin requirements for `native.pin`
 - declared capability and import correctness for `link`
 - public/export-only visibility boundaries for `introspect`

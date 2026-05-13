@@ -949,9 +949,9 @@ mod success {
     }
 
     #[test]
-    fn block_effect_member_parameter_layout_breaks_fitting_members() {
+    fn block_member_parameter_layout_breaks_fitting_members() {
         let mut options = options();
-        options.effect_member_parameter_layout = GroupLayout::Block;
+        options.member_parameter_layout = GroupLayout::Block;
         let source = "export hidden let Runtime := shape { let envSet (name : String, value : String) : Int; };";
 
         let formatted_result = format_source(source, &options).unwrap();

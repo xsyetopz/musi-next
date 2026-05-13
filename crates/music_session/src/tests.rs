@@ -96,7 +96,6 @@ impl VmHost for CtfeTestHost {
             foreign: foreign.name().into(),
         }))
     }
-
 }
 
 fn assert_output_contains(output: &CompiledOutput, needles: &[&str]) {
@@ -737,7 +736,7 @@ mod success {
     }
 
     #[test]
-    fn compiles_effects_with_perform_handle_resume() {
+    fn compiles_record_method_call() {
         let _ = assert_main_entry_compiles_with!(
             r#"
             let Console := { readLine := \() : String => "ok" };

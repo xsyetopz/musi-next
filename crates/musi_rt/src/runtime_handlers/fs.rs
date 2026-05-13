@@ -73,10 +73,10 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_fs::EFFECT,
         foundation_fs::READ_TEXT_OP,
-        |ctx, effect, args| {
-            let path = string_arg(ctx, effect, args, "fsReadText")?.to_owned();
+        |ctx, foreign, args| {
+            let path = string_arg(ctx, foreign, args, "fsReadText")?.to_owned();
             let text =
-                fs::read_to_string(path).map_err(|error| runtime_foreign_failed(effect, error))?;
+                fs::read_to_string(path).map_err(|error| runtime_foreign_failed(foreign, error))?;
             ctx.alloc_string(text)
         },
     );
@@ -84,22 +84,22 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_fs::EFFECT,
         foundation_fs::WRITE_TEXT_OP,
-        |ctx, effect, args| {
+        |ctx, foreign, args| {
             let [path, text] = args else {
                 return Err(invalid_runtime_args(
-                    effect,
+                    foreign,
                     "path and text strings",
                     args.len(),
                 ));
             };
             let path = ctx
                 .string(path)
-                .ok_or_else(|| invalid_runtime_args(effect, "path string", path.kind()))?;
+                .ok_or_else(|| invalid_runtime_args(foreign, "path string", path.kind()))?;
             let text = ctx
                 .string(text)
-                .ok_or_else(|| invalid_runtime_args(effect, "text string", text.kind()))?;
+                .ok_or_else(|| invalid_runtime_args(foreign, "text string", text.kind()))?;
             fs::write(path.as_str(), text.as_str())
-                .map_err(|error| runtime_foreign_failed(effect, error))?;
+                .map_err(|error| runtime_foreign_failed(foreign, error))?;
             Ok(Value::Unit)
         },
     );
@@ -107,8 +107,8 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_fs::EFFECT,
         foundation_fs::EXISTS_OP,
-        |ctx, effect, args| {
-            let path = string_arg(ctx, effect, args, "fsExists")?;
+        |ctx, foreign, args| {
+            let path = string_arg(ctx, foreign, args, "fsExists")?;
             Ok(Value::Int(i64::from(Path::new(path).exists())))
         },
     );
@@ -116,20 +116,20 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_fs::EFFECT,
         foundation_fs::APPEND_TEXT_OP,
-        |ctx, effect, args| {
+        |ctx, foreign, args| {
             let [path, text] = args else {
                 return Err(invalid_runtime_args(
-                    effect,
+                    foreign,
                     "path and text strings",
                     args.len(),
                 ));
             };
             let path = ctx
                 .string(path)
-                .ok_or_else(|| invalid_runtime_args(effect, "path string", path.kind()))?;
+                .ok_or_else(|| invalid_runtime_args(foreign, "path string", path.kind()))?;
             let text = ctx
                 .string(text)
-                .ok_or_else(|| invalid_runtime_args(effect, "text string", text.kind()))?;
+                .ok_or_else(|| invalid_runtime_args(foreign, "text string", text.kind()))?;
             let append_result = fs::OpenOptions::new()
                 .create(true)
                 .append(true)
@@ -142,8 +142,8 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_fs::EFFECT,
         foundation_fs::REMOVE_OP,
-        |ctx, effect, args| {
-            let path = string_arg(ctx, effect, args, "fsRemove")?;
+        |ctx, foreign, args| {
+            let path = string_arg(ctx, foreign, args, "fsRemove")?;
             let path = Path::new(path);
             let removed = if path.is_dir() {
                 fs::remove_dir_all(path)
@@ -158,8 +158,8 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_fs::EFFECT,
         foundation_fs::CREATE_DIR_ALL_OP,
-        |ctx, effect, args| {
-            let path = string_arg(ctx, effect, args, "fsCreateDirAll")?;
+        |ctx, foreign, args| {
+            let path = string_arg(ctx, foreign, args, "fsCreateDirAll")?;
             Ok(Value::Int(i64::from(fs::create_dir_all(path).is_ok())))
         },
     );

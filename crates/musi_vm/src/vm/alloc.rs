@@ -156,5 +156,4 @@ impl Vm {
         self.after_heap_allocation(&value)?;
         Ok(value)
     }
-
 }

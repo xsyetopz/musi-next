@@ -75,10 +75,12 @@ impl RegisteredHost {
         let handler = self.foreign_handlers.get_mut(foreign.name())?;
         Some(handler(ctx, foreign, args))
     }
-
 }
 
 fn foundation_foreign_name(module: impl AsRef<str>, op: impl AsRef<str>) -> Box<str> {
-    let module = module.as_ref().split_once("::").map_or(module.as_ref(), |(head, _)| head);
+    let module = module
+        .as_ref()
+        .split_once("::")
+        .map_or_else(|| module.as_ref(), |(head, _)| head);
     format!("{module}::Musi__{}", op.as_ref()).into_boxed_str()
 }

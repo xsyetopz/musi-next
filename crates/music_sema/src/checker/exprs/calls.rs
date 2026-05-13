@@ -173,8 +173,13 @@ impl CallArgChecker<'_, '_, '_, '_, '_> {
             let _ = self.ctx.pop_expected_ty();
             let arg_origin = self.ctx.expr(arg.expr).origin;
             self.ctx.type_mismatch(arg_origin, expected, facts.ty);
-            if is_comptime && let Some(value) = try_comptime_value(self.ctx, arg.expr) {
-                self.ctx.set_expr_comptime_value(arg.expr, value);
+            if is_comptime {
+                if let Some(value) = try_comptime_value(self.ctx, arg.expr) {
+                    self.ctx.set_expr_comptime_value(arg.expr, value);
+                } else {
+                    self.ctx
+                        .diag(arg_origin.span, DiagKind::RuntimeValueInComptimeContext, "");
+                }
             }
             if let Some(slot) = self.filled.get_mut(self.param_index) {
                 *slot = true;
@@ -550,8 +555,12 @@ impl CheckPass<'_, '_, '_> {
             expected,
             facts.ty,
         );
-        if is_comptime && let Some(value) = try_comptime_value(self, expr) {
-            self.set_expr_comptime_value(expr, value);
+        if is_comptime {
+            if let Some(value) = try_comptime_value(self, expr) {
+                self.set_expr_comptime_value(expr, value);
+            } else {
+                self.diag(origin.span, DiagKind::RuntimeValueInComptimeContext, "");
+            }
         }
     }
 

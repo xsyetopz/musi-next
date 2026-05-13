@@ -54,7 +54,6 @@ impl VmHost for TestHost {
             foreign: foreign.name().into(),
         }))
     }
-
 }
 
 #[derive(Default)]
@@ -93,7 +92,6 @@ impl VmHost for SignatureHost {
         drop(log);
         Ok(Value::Int(7))
     }
-
 }
 
 fn session() -> Session {
@@ -1659,12 +1657,12 @@ mod success {
         let foreign_value = vm
             .call_export("call_puts", &[])
             .expect("foreign call should succeed");
-        let effect_value = vm
+        let runtime_value = vm
             .call_export("call_readLine", &[])
-            .expect("effect call should succeed");
+            .expect("runtime call should succeed");
 
         assert_eq!(foreign_value, Value::Int(7));
-        assert_eq!(effect_value, Value::Int(7));
+        assert_eq!(runtime_value, Value::Int(7));
         let log = log.lock().expect("signature log should lock");
         assert_eq!(log.foreign_calls.len(), 2);
         assert_eq!(log.foreign_calls[0].0.as_ref(), "main::puts");

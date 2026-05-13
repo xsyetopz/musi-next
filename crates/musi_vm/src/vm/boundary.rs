@@ -34,7 +34,6 @@ impl HostState {
             Self::Custom(host) => host.call_foreign(ctx, foreign, args),
         }
     }
-
 }
 
 impl Vm {
@@ -49,5 +48,4 @@ impl Vm {
         self.after_host_call_result(&result)?;
         Ok(result)
     }
-
 }

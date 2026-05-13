@@ -61,16 +61,16 @@ pub(super) fn register(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_encoding::EFFECT,
         foundation_encoding::BASE64_ENCODE_OP,
-        |ctx, effect, args| {
-            let source = string_arg(ctx, effect, args, "base64Encode")?.to_owned();
+        |ctx, foreign, args| {
+            let source = string_arg(ctx, foreign, args, "base64Encode")?.to_owned();
             ctx.alloc_string(BASE64_STANDARD.encode(source.as_bytes()))
         },
     );
     host.register_foundation_handler_with_context(
         foundation_encoding::EFFECT,
         foundation_encoding::BASE64_DECODE_OP,
-        |ctx, effect, args| {
-            decode_utf8_encoded(ctx, effect, args, "base64Decode", |source| {
+        |ctx, foreign, args| {
+            decode_utf8_encoded(ctx, foreign, args, "base64Decode", |source| {
                 BASE64_STANDARD
                     .decode(source)
                     .map_err(|error| format!("base64Decode failed (`{error}`)").into())
@@ -80,8 +80,8 @@ pub(super) fn register(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_encoding::EFFECT,
         foundation_encoding::BASE64_IS_VALID_OP,
-        |ctx, effect, args| {
-            let source = string_arg(ctx, effect, args, "base64IsValid")?;
+        |ctx, foreign, args| {
+            let source = string_arg(ctx, foreign, args, "base64IsValid")?;
             Ok(Value::Int(i64::from(
                 BASE64_STANDARD.decode(source).is_ok(),
             )))
@@ -90,18 +90,18 @@ pub(super) fn register(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_encoding::EFFECT,
         foundation_encoding::UTF8_ENCODE_OP,
-        |ctx, effect, args| transform_string_arg(ctx, effect, args, "utf8Encode", str::to_owned),
+        |ctx, foreign, args| transform_string_arg(ctx, foreign, args, "utf8Encode", str::to_owned),
     );
     host.register_foundation_handler_with_context(
         foundation_encoding::EFFECT,
         foundation_encoding::UTF8_DECODE_OP,
-        |ctx, effect, args| transform_string_arg(ctx, effect, args, "utf8Decode", str::to_owned),
+        |ctx, foreign, args| transform_string_arg(ctx, foreign, args, "utf8Decode", str::to_owned),
     );
     host.register_foundation_handler_with_context(
         foundation_encoding::EFFECT,
         foundation_encoding::UTF8_IS_VALID_OP,
-        |ctx, effect, args| {
-            let bytes = string_arg(ctx, effect, args, "utf8IsValid")?;
+        |ctx, foreign, args| {
+            let bytes = string_arg(ctx, foreign, args, "utf8IsValid")?;
             Ok(Value::Int(i64::from(from_utf8(bytes.as_bytes()).is_ok())))
         },
     );

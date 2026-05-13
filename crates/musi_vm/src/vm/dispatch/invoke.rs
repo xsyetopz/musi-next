@@ -85,5 +85,4 @@ impl Vm {
         self.return_depth = saved_return_depth;
         result
     }
-
 }

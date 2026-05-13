@@ -352,7 +352,7 @@ impl TextBuilder {
     pub(crate) fn parse_export(&mut self, parts: &[String]) -> AssemblyResult {
         if parts.len() < 3 {
             return Err(text_expected_form(
-                ".export $Name <procedure|global|native|type|effect|capability> [opaque]",
+                ".export $Name <procedure|global|native|type|capability> [opaque]",
             ));
         }
         let name = parse_symbol(must_get(parts.get(1), "export name")?)?;
@@ -388,7 +388,7 @@ impl TextBuilder {
             }
             _ => {
                 return Err(text_expected_form(
-                    ".export $Name <procedure|global|native|type|effect|capability> [opaque]",
+                    ".export $Name <procedure|global|native|type|capability> [opaque]",
                 ));
             }
         };

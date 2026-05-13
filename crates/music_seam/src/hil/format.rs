@@ -83,18 +83,6 @@ fn format_instruction(out: &mut String, instruction: &HilInstruction) {
             format_value_list(out, fields);
             out.push_str(")\n");
         }
-        HilInstruction::EffectCall {
-            out: id,
-            result_ty,
-            effect,
-            op,
-            args,
-        } => {
-            write!(out, "      {id}: {result_ty} = effect.call {effect}.{op}(")
-                .expect("write to string");
-            format_value_list(out, args);
-            out.push_str(")\n");
-        }
         HilInstruction::ForeignCall {
             out: Some(id),
             result_ty: Some(ty),

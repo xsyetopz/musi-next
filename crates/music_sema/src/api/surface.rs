@@ -7,9 +7,8 @@ mod types;
 mod values;
 
 pub use comptime::{
-    ComptimeClosureValue, ComptimeContinuationValue, ComptimeDataValue, ComptimeEffectValue,
-    ComptimeForeignValue, ComptimeImportRecordValue, ComptimeSeqValue, ComptimeShapeValue,
-    ComptimeTypeValue, ComptimeValue, ComptimeValueList,
+    ComptimeClosureValue, ComptimeDataValue, ComptimeForeignValue, ComptimeImportRecordValue,
+    ComptimeSeqValue, ComptimeShapeValue, ComptimeTypeValue, ComptimeValue, ComptimeValueList,
 };
 pub use constraints::ConstraintSurface;
 pub use data::{DataSurface, DataVariantSurface};

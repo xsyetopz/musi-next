@@ -3,7 +3,9 @@ use std::sync::{Arc, Mutex};
 
 use musi_foundation::syntax;
 use musi_native::{NativeHost, WeakNativeHost};
-use musi_vm::{ForeignCall, Value, ValueView, Vm, VmError, VmErrorKind, VmOptions, VmResult, VmValueKind};
+use musi_vm::{
+    ForeignCall, Value, ValueView, Vm, VmError, VmErrorKind, VmOptions, VmResult, VmValueKind,
+};
 use music_term::SyntaxTerm;
 
 use super::compile::{SessionLoader, compile_synthetic_program_from_store};
@@ -76,18 +78,18 @@ pub(super) fn register_syntax_handlers(
     host.register_foundation_handler_with_context(
         syntax::EFFECT,
         syntax::EVAL_OP,
-        move |ctx, effect, args| {
+        move |ctx, foreign, args| {
             let [body, Value::Type(result_ty)] = args else {
                 return Err(invalid_syntax_foreign_args(
-                    effect,
+                    foreign,
                     "syntax body and result type",
                     args.len(),
                 ));
             };
             let body = ctx
                 .syntax(body)
-                .ok_or_else(|| invalid_syntax_foreign_args(effect, "syntax body", body.kind()))?;
-            let result_ty_name = effect.type_term(*result_ty).to_string();
+                .ok_or_else(|| invalid_syntax_foreign_args(foreign, "syntax body", body.kind()))?;
+            let result_ty_name = foreign.type_term(*result_ty).to_string();
             eval_syntax_value(
                 &eval_store,
                 &eval_host,
@@ -101,23 +103,23 @@ pub(super) fn register_syntax_handlers(
     host.register_foundation_handler_with_context(
         syntax::EFFECT,
         syntax::REGISTER_MODULE_OP,
-        move |ctx, effect, args| {
+        move |ctx, foreign, args| {
             let [spec, body] = args else {
                 return Err(invalid_syntax_foreign_args(
-                    effect,
+                    foreign,
                     "module spec and syntax body",
                     args.len(),
                 ));
             };
-            let spec = ctx
-                .string(spec)
-                .ok_or_else(|| invalid_syntax_foreign_args(effect, "module spec string", spec.kind()))?;
+            let spec = ctx.string(spec).ok_or_else(|| {
+                invalid_syntax_foreign_args(foreign, "module spec string", spec.kind())
+            })?;
             let body = ctx
                 .syntax(body)
-                .ok_or_else(|| invalid_syntax_foreign_args(effect, "syntax body", body.kind()))?;
+                .ok_or_else(|| invalid_syntax_foreign_args(foreign, "syntax body", body.kind()))?;
             let mut store = store
                 .lock()
-                .map_err(|_| runtime_host_unavailable(effect, "runtime store lock"))?;
+                .map_err(|_| runtime_host_unavailable(foreign, "runtime store lock"))?;
             let _ = store
                 .module_texts
                 .insert(spec.as_str().into(), body.term().text().into());
@@ -147,18 +149,22 @@ fn eval_syntax_value(
     vm.call_export("result", &[])
 }
 
-fn syntax_foreign_rejected_reason(effect: &ForeignCall, reason: impl AsRef<str>) -> VmError {
+fn syntax_foreign_rejected_reason(foreign: &ForeignCall, reason: impl AsRef<str>) -> VmError {
     VmError::new(VmErrorKind::ForeignCallRejected {
-        foreign: format!("{} ({})", effect.name(), reason.as_ref()).into_boxed_str(),
+        foreign: format!("{} ({})", foreign.name(), reason.as_ref()).into_boxed_str(),
     })
 }
 
-fn invalid_syntax_foreign_args(effect: &ForeignCall, expected: &str, found: impl Display) -> VmError {
-    syntax_foreign_rejected_reason(effect, format!("expected {expected}, found {found}"))
+fn invalid_syntax_foreign_args(
+    foreign: &ForeignCall,
+    expected: &str,
+    found: impl Display,
+) -> VmError {
+    syntax_foreign_rejected_reason(foreign, format!("expected {expected}, found {found}"))
 }
 
-fn runtime_host_unavailable(effect: &ForeignCall, subject: &str) -> VmError {
-    syntax_foreign_rejected_reason(effect, format!("host unavailable: {subject}"))
+fn runtime_host_unavailable(foreign: &ForeignCall, subject: &str) -> VmError {
+    syntax_foreign_rejected_reason(foreign, format!("host unavailable: {subject}"))
 }
 
 fn runtime_host_unavailable_name(subject: &str) -> VmError {

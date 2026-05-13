@@ -552,7 +552,7 @@ impl CheckPass<'_, '_, '_> {
                 return ExprFacts::new(ty);
             }
             let inner_facts = check_expr(ctx, inner);
-            let _ = origin;
+            ctx.diag(origin.span, DiagKind::RuntimeValueInComptimeContext, "");
             return ExprFacts::new(inner_facts.ty);
         }
         let inner_facts = check_expr(ctx, inner);
@@ -641,11 +641,9 @@ const fn comptime_value_ty(builtins: Builtins, value: &ComptimeValue) -> HirTyId
         ComptimeValue::Seq(_)
         | ComptimeValue::Data(_)
         | ComptimeValue::Closure(_)
-        | ComptimeValue::Continuation(_)
         | ComptimeValue::Type(_)
         | ComptimeValue::ImportRecord(_)
         | ComptimeValue::Foreign(_)
-        | ComptimeValue::Effect(_)
         | ComptimeValue::Shape(_) => builtins.any,
     }
 }

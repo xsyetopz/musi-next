@@ -23,11 +23,10 @@ pub use lists::{
 };
 pub use module::SemaModule;
 pub use surface::{
-    ComptimeClosureValue, ComptimeContinuationValue, ComptimeDataValue, ComptimeEffectValue,
-    ComptimeForeignValue, ComptimeImportRecordValue, ComptimeSeqValue, ComptimeShapeValue,
-    ComptimeTypeValue, ComptimeValue, ComptimeValueList, ConstraintSurface, DataSurface,
-    DataVariantSurface, ExportedValue, LawParamSurface, LawSurface, ModuleSurface,
-    ShapeMemberSurface, ShapeSurface, SurfaceDim, SurfaceTy, SurfaceTyField, SurfaceTyId,
-    SurfaceTyKind,
+    ComptimeClosureValue, ComptimeDataValue, ComptimeForeignValue, ComptimeImportRecordValue,
+    ComptimeSeqValue, ComptimeShapeValue, ComptimeTypeValue, ComptimeValue, ComptimeValueList,
+    ConstraintSurface, DataSurface, DataVariantSurface, ExportedValue, LawParamSurface, LawSurface,
+    ModuleSurface, ShapeMemberSurface, ShapeSurface, SurfaceDim, SurfaceTy, SurfaceTyField,
+    SurfaceTyId, SurfaceTyKind,
 };
 pub use target::{ForeignLinkInfo, TargetInfo, normalize_arch_text, normalize_target_text};

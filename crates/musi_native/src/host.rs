@@ -1,8 +1,6 @@
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
 
-use musi_vm::{
-    ForeignCall, Value, VmError, VmErrorKind, VmHost, VmHostCallContext, VmResult,
-};
+use musi_vm::{ForeignCall, Value, VmError, VmErrorKind, VmHost, VmHostCallContext, VmResult};
 
 use crate::platform::PlatformHost;
 use crate::registered::RegisteredHost;
@@ -197,5 +195,4 @@ impl VmHost for NativeHost {
         }
         self.call_fallback(|host| host.call_foreign(ctx, foreign, args))
     }
-
 }

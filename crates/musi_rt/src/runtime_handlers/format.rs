@@ -20,9 +20,9 @@ pub(super) fn register(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_fmt::EFFECT,
         foundation_fmt::INT_OP,
-        |ctx, effect, args| {
+        |ctx, foreign, args| {
             let [Value::Int(value)] = args else {
-                return Err(invalid_runtime_args(effect, "integer value", args.len()));
+                return Err(invalid_runtime_args(foreign, "integer value", args.len()));
             };
             ctx.alloc_string(value.to_string())
         },
@@ -30,9 +30,9 @@ pub(super) fn register(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_fmt::EFFECT,
         foundation_fmt::FLOAT_OP,
-        |ctx, effect, args| {
+        |ctx, foreign, args| {
             let [Value::Float(value)] = args else {
-                return Err(invalid_runtime_args(effect, "float value", args.len()));
+                return Err(invalid_runtime_args(foreign, "float value", args.len()));
             };
             ctx.alloc_string(value.to_string())
         },

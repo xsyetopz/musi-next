@@ -62,8 +62,8 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_text::EFFECT,
         foundation_text::LENGTH_OP,
-        |ctx, effect, args| {
-            let text_arg = string_arg(ctx, effect, args, "textLength")?;
+        |ctx, foreign, args| {
+            let text_arg = string_arg(ctx, foreign, args, "textLength")?;
             Ok(Value::Int(saturating_usize_to_i64(
                 text_arg.chars().count(),
             )))
@@ -72,20 +72,20 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_text::EFFECT,
         foundation_text::CONCAT_OP,
-        |ctx, effect, args| {
+        |ctx, foreign, args| {
             let [left, right] = args else {
                 return Err(invalid_runtime_args(
-                    effect,
+                    foreign,
                     "left and right strings",
                     args.len(),
                 ));
             };
             let left = ctx
                 .string(left)
-                .ok_or_else(|| invalid_runtime_args(effect, "left string", left.kind()))?;
+                .ok_or_else(|| invalid_runtime_args(foreign, "left string", left.kind()))?;
             let right = ctx
                 .string(right)
-                .ok_or_else(|| invalid_runtime_args(effect, "right string", right.kind()))?;
+                .ok_or_else(|| invalid_runtime_args(foreign, "right string", right.kind()))?;
             let mut text =
                 String::with_capacity(left.as_str().len().saturating_add(right.as_str().len()));
             text.push_str(left.as_str());
@@ -96,34 +96,34 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_text::EFFECT,
         foundation_text::SLICE_OP,
-        |ctx, effect, args| {
+        |ctx, foreign, args| {
             let [text_value, Value::Int(start), Value::Int(end)] = args else {
                 return Err(invalid_runtime_args(
-                    effect,
+                    foreign,
                     "value string and integer bounds",
                     args.len(),
                 ));
             };
             let text_value = ctx
                 .string(text_value)
-                .ok_or_else(|| invalid_runtime_args(effect, "value string", text_value.kind()))?;
+                .ok_or_else(|| invalid_runtime_args(foreign, "value string", text_value.kind()))?;
             ctx.alloc_string(text_slice(text_value.as_str(), *start, *end))
         },
     );
     host.register_foundation_handler_with_context(
         foundation_text::EFFECT,
         foundation_text::BYTE_AT_OP,
-        |ctx, effect, args| {
+        |ctx, foreign, args| {
             let [text_value, Value::Int(index)] = args else {
                 return Err(invalid_runtime_args(
-                    effect,
+                    foreign,
                     "value string and integer index",
                     args.len(),
                 ));
             };
             let text_value = ctx
                 .string(text_value)
-                .ok_or_else(|| invalid_runtime_args(effect, "value string", text_value.kind()))?;
+                .ok_or_else(|| invalid_runtime_args(foreign, "value string", text_value.kind()))?;
             let byte = usize::try_from(*index)
                 .ok()
                 .and_then(|index| text_value.as_str().as_bytes().get(index).copied())
@@ -134,9 +134,9 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_text::EFFECT,
         foundation_text::FROM_BYTE_OP,
-        |ctx, effect, args| {
+        |ctx, foreign, args| {
             let [Value::Int(byte_code)] = args else {
-                return Err(invalid_runtime_args(effect, "integer byte", args.len()));
+                return Err(invalid_runtime_args(foreign, "integer byte", args.len()));
             };
             let byte = u8::try_from((*byte_code).clamp(0, 127)).unwrap_or(0);
             ctx.alloc_string(char::from(byte).to_string())

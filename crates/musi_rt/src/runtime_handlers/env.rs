@@ -57,8 +57,8 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_env::EFFECT,
         foundation_env::GET_OP,
-        |ctx, effect, args| {
-            let name = string_arg(ctx, effect, args, "envGet")?;
+        |ctx, foreign, args| {
+            let name = string_arg(ctx, foreign, args, "envGet")?;
             ctx.alloc_string(var(name).unwrap_or_default())
         },
     );
@@ -66,8 +66,8 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_env::EFFECT,
         foundation_env::HAS_OP,
-        |ctx, effect, args| {
-            let name = string_arg(ctx, effect, args, "envHas")?;
+        |ctx, foreign, args| {
+            let name = string_arg(ctx, foreign, args, "envHas")?;
             Ok(Value::Int(i64::from(var_os(name).is_some())))
         },
     );
@@ -75,20 +75,20 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_env::EFFECT,
         foundation_env::SET_OP,
-        |ctx, effect, args| {
+        |ctx, foreign, args| {
             let [name, env_value] = args else {
                 return Err(invalid_runtime_args(
-                    effect,
+                    foreign,
                     "name and value strings",
                     args.len(),
                 ));
             };
             let name = ctx
                 .string(name)
-                .ok_or_else(|| invalid_runtime_args(effect, "name string", name.kind()))?;
+                .ok_or_else(|| invalid_runtime_args(foreign, "name string", name.kind()))?;
             let env_value = ctx
                 .string(env_value)
-                .ok_or_else(|| invalid_runtime_args(effect, "value string", env_value.kind()))?;
+                .ok_or_else(|| invalid_runtime_args(foreign, "value string", env_value.kind()))?;
             let name = name.as_str();
             let env_value = env_value.as_str();
             if !valid_env_key(name) || env_value.contains('\0') {
@@ -106,8 +106,8 @@ fn register_effect_handlers(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_env::EFFECT,
         foundation_env::REMOVE_OP,
-        |ctx, effect, args| {
-            let name = string_arg(ctx, effect, args, "envRemove")?;
+        |ctx, foreign, args| {
+            let name = string_arg(ctx, foreign, args, "envRemove")?;
             if !valid_env_key(name) {
                 return Ok(Value::Int(0));
             }

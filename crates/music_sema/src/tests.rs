@@ -1990,18 +1990,22 @@ mod success {
     }
 
     #[test]
-    fn known_prefix_accepts_runtime_expressions_for_ctfe() {
+    fn known_prefix_rejects_runtime_expressions() {
         let sema = check(
             r"
         let runtime () : Int := 1;
         let x : Int := known runtime();
     ",
         );
-        assert!(sema.diags().is_empty(), "{:?}", sema.diags());
+        assert!(
+            has_diag(&sema, SemaDiagKind::RuntimeValueInComptimeContext),
+            "{:?}",
+            sema.diags()
+        );
     }
 
     #[test]
-    fn imported_known_param_metadata_accepts_runtime_arguments_for_ctfe() {
+    fn imported_known_param_metadata_rejects_runtime_arguments() {
         let (_module_a, module_b) = check_with_imported_surface(
             210,
             r"
@@ -2014,11 +2018,15 @@ mod success {
         let y : Int := scale(runtime(), 2);
     "#,
         );
-        assert!(module_b.diags().is_empty(), "{:?}", module_b.diags());
+        assert!(
+            has_diag(&module_b, SemaDiagKind::RuntimeValueInComptimeContext),
+            "{:?}",
+            module_b.diags()
+        );
     }
 
     #[test]
-    fn known_params_accept_runtime_arguments_for_ctfe() {
+    fn known_params_reject_runtime_arguments() {
         let sema = check(
             r"
         let scale (known n : Int, x : Int) : Int := x * n;
@@ -2026,7 +2034,27 @@ mod success {
         let y : Int := scale(runtime(), 2);
     ",
         );
-        assert!(sema.diags().is_empty(), "{:?}", sema.diags());
+        assert!(
+            has_diag(&sema, SemaDiagKind::RuntimeValueInComptimeContext),
+            "{:?}",
+            sema.diags()
+        );
+    }
+
+    #[test]
+    fn known_type_annotation_marks_param_compiler_known() {
+        let sema = check(
+            r"
+        let scale (n : known Int, x : Int) : Int := x * n;
+        let runtime () : Int := 3;
+        let y : Int := scale(runtime(), 2);
+    ",
+        );
+        assert!(
+            has_diag(&sema, SemaDiagKind::RuntimeValueInComptimeContext),
+            "{:?}",
+            sema.diags()
+        );
     }
 }
 

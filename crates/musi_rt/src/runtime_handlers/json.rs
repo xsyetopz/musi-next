@@ -26,8 +26,8 @@ pub(super) fn register(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_json::EFFECT,
         foundation_json::IS_VALID_OP,
-        |ctx, effect, args| {
-            let source = string_arg(ctx, effect, args, "jsonIsValid")?;
+        |ctx, foreign, args| {
+            let source = string_arg(ctx, foreign, args, "jsonIsValid")?;
             Ok(Value::Int(i64::from(
                 serde_json::from_str::<serde_json::Value>(source).is_ok(),
             )))
@@ -37,9 +37,9 @@ pub(super) fn register(host: &mut NativeHost) {
     host.register_foundation_handler_with_context(
         foundation_json::EFFECT,
         foundation_json::NORMALIZE_OP,
-        |ctx, effect, args| {
-            let source = string_arg(ctx, effect, args, "jsonNormalize")?.to_owned();
-            ctx.alloc_string(normalize_json(&source, effect)?)
+        |ctx, foreign, args| {
+            let source = string_arg(ctx, foreign, args, "jsonNormalize")?.to_owned();
+            ctx.alloc_string(normalize_json(&source, foreign)?)
         },
     );
 }

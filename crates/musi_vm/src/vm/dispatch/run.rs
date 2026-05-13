@@ -121,7 +121,6 @@ impl Vm {
             Opcode::CallFfi | Opcode::LdFfi | Opcode::MdlLoad | Opcode::MdlGet => {
                 self.exec_host_edge(instruction)
             }
-            _ => Err(Self::invalid_dispatch(instruction, "general")),
         }
     }
 

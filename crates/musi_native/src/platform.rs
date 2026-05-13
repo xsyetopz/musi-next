@@ -1,4 +1,3 @@
-
 use musi_native_ffi::{call_foreign, call_musi_pointer_intrinsic};
 use musi_vm::{ForeignCall, ProgramTypeAbiKind, Value, VmHostCallContext, VmResult};
 use music_seam::TypeId;
@@ -120,7 +119,6 @@ impl PlatformHost {
             | NativeAbiCallSupport::UnsupportedType { .. } => None,
         }
     }
-
 }
 
 fn native_abi_kind_for_type(foreign: &ForeignCall, ty: TypeId) -> ProgramTypeAbiKind {

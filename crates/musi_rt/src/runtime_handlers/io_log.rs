@@ -86,18 +86,25 @@ fn register_io_effect_handlers(host: &mut NativeHost, output: &RuntimeOutputSink
     host.register_foundation_handler_with_context(
         foundation_io::EFFECT,
         foundation_io::WRITE_OP,
-        move |ctx, effect, args| {
-            write_stream(ctx, effect, args, StreamKind::Stdout, false, &stdout_output)
+        move |ctx, foreign, args| {
+            write_stream(
+                ctx,
+                foreign,
+                args,
+                StreamKind::Stdout,
+                false,
+                &stdout_output,
+            )
         },
     );
     let stdout_line_output = Arc::clone(output);
     host.register_foundation_handler_with_context(
         foundation_io::EFFECT,
         foundation_io::WRITE_LN_OP,
-        move |ctx, effect, args| {
+        move |ctx, foreign, args| {
             write_stream(
                 ctx,
-                effect,
+                foreign,
                 args,
                 StreamKind::Stdout,
                 true,
@@ -109,18 +116,25 @@ fn register_io_effect_handlers(host: &mut NativeHost, output: &RuntimeOutputSink
     host.register_foundation_handler_with_context(
         foundation_io::EFFECT,
         foundation_io::WRITE_ERR_OP,
-        move |ctx, effect, args| {
-            write_stream(ctx, effect, args, StreamKind::Stderr, false, &stderr_output)
+        move |ctx, foreign, args| {
+            write_stream(
+                ctx,
+                foreign,
+                args,
+                StreamKind::Stderr,
+                false,
+                &stderr_output,
+            )
         },
     );
     let stderr_line_output = Arc::clone(output);
     host.register_foundation_handler_with_context(
         foundation_io::EFFECT,
         foundation_io::WRITE_ERR_LN_OP,
-        move |ctx, effect, args| {
+        move |ctx, foreign, args| {
             write_stream(
                 ctx,
-                effect,
+                foreign,
                 args,
                 StreamKind::Stderr,
                 true,
@@ -131,11 +145,11 @@ fn register_io_effect_handlers(host: &mut NativeHost, output: &RuntimeOutputSink
     host.register_foundation_handler_with_context(
         foundation_io::EFFECT,
         foundation_io::READ_LINE_OP,
-        |ctx, effect, args| {
+        |ctx, foreign, args| {
             if !args.is_empty() {
-                return Err(invalid_runtime_args(effect, "no arguments", args.len()));
+                return Err(invalid_runtime_args(foreign, "no arguments", args.len()));
             }
-            ctx.alloc_string(read_line(effect)?)
+            ctx.alloc_string(read_line(foreign)?)
         },
     );
 }
@@ -148,37 +162,41 @@ enum StreamKind {
 
 fn write_stream(
     ctx: &VmHostContext<'_>,
-    effect: &ForeignCall,
+    foreign: &ForeignCall,
     args: &[Value],
     stream: StreamKind,
     line: bool,
     output: &RuntimeOutputSinkCell,
 ) -> Result<Value, VmError> {
     let [text] = args else {
-        return Err(invalid_runtime_args(effect, "one string", args.len()));
+        return Err(invalid_runtime_args(foreign, "one string", args.len()));
     };
     let Some(text) = ctx.string(text) else {
-        return Err(invalid_runtime_args(effect, "string argument", text.kind()));
+        return Err(invalid_runtime_args(
+            foreign,
+            "string argument",
+            text.kind(),
+        ));
     };
     let write_result = match stream {
         StreamKind::Stdout => output
             .lock()
-            .map_err(|_| runtime_host_unavailable(effect, "runtime output lock"))?
+            .map_err(|_| runtime_host_unavailable(foreign, "runtime output lock"))?
             .write_stdout(text.as_str(), line),
         StreamKind::Stderr => output
             .lock()
-            .map_err(|_| runtime_host_unavailable(effect, "runtime output lock"))?
+            .map_err(|_| runtime_host_unavailable(foreign, "runtime output lock"))?
             .write_stderr(text.as_str(), line),
     };
-    write_result.map_err(|error| runtime_foreign_failed(effect, error))?;
+    write_result.map_err(|error| runtime_foreign_failed(foreign, error))?;
     Ok(Value::Unit)
 }
 
-fn read_line(effect: &ForeignCall) -> Result<String, VmError> {
+fn read_line(foreign: &ForeignCall) -> Result<String, VmError> {
     let mut line = String::new();
     let _bytes = io::stdin()
         .read_line(&mut line)
-        .map_err(|error| runtime_foreign_failed(effect, error))?;
+        .map_err(|error| runtime_foreign_failed(foreign, error))?;
     if line.ends_with('\n') {
         let _ = line.pop();
         if line.ends_with('\r') {

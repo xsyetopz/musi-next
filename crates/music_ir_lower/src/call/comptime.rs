@@ -179,7 +179,6 @@ fn encode_comptime_value(value: &ComptimeValue) -> String {
             encode_text(&value.name),
             encode_comptime_values(&value.captures)
         ),
-        ComptimeValue::Continuation(value) => format!("k{}", encode_comptime_values(&value.frames)),
         ComptimeValue::Type(value) => format!("t{}", encode_text(&value.term.to_string())),
         ComptimeValue::ImportRecord(value) => format!("m{}", encode_text(value.key.as_str())),
         ComptimeValue::Foreign(value) => format!(
@@ -194,13 +193,6 @@ fn encode_comptime_value(value: &ComptimeValue) -> String {
                 .collect::<Vec<_>>()
                 .join("_")
         ),
-        ComptimeValue::Effect(value) => {
-            format!(
-                "e{}_{}",
-                encode_text(value.module.as_str()),
-                encode_text(&value.name)
-            )
-        }
         ComptimeValue::Shape(value) => {
             format!(
                 "h{}_{}",

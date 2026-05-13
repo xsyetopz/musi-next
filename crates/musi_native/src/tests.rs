@@ -36,7 +36,6 @@ impl VmHost for FallbackHost {
             foreign: foreign.name().into(),
         }))
     }
-
 }
 
 fn compile_program(modules: &[(&str, &str)], entry: &str) -> Program {

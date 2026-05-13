@@ -33,8 +33,7 @@ mod state;
 mod value_support;
 
 use self::state::{
-    CallFrame, CallFrameList, LoadedModuleList, ModuleSlotMap, Seq8ExportCache,
-    Seq8ExportCacheList,
+    CallFrame, CallFrameList, LoadedModuleList, ModuleSlotMap, Seq8ExportCache, Seq8ExportCacheList,
 };
 
 mod boundary;

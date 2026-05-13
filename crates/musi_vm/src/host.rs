@@ -128,7 +128,6 @@ pub trait VmHost: Send {
         foreign: &ForeignCall,
         args: &[Value],
     ) -> VmResult<Value>;
-
 }
 
 /// Borrowed VM context passed to host callbacks.
@@ -220,5 +219,4 @@ impl VmHost for RejectingHost {
             foreign: foreign.name().into(),
         }))
     }
-
 }

@@ -12,7 +12,7 @@ let Reader := shape {
 
 A concrete value can satisfy a shape statically. An `erased Shape` value may carry runtime evidence, witnesses, or dynamic dispatch. This keeps type-erasure cost visible.
 
-Capability values are ordinary values passed through normal bindings, imports, and parameters. They carry authority explicitly; there is no hidden global instance registry or ambient effect context.
+Capability values are ordinary values passed through normal bindings, imports, and parameters. They carry authority explicitly; there is no hidden global instance registry or ambient authority context.
 
 ```musi
 let useReader(reader : erased Reader, buffer : mut Buffer) : IOError!Nat := (

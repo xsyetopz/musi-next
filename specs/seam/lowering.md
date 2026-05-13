@@ -18,7 +18,7 @@ SEAM is not where source-language constructs stay pretty.
 
 Rust 2024 is implementation substrate after or beside SEAM lowering. Rust MIR/LLVM/Cranelift concepts may inform backend implementation, but SEAM is not Rust IR and must not inherit Rust syntax or trait terminology.
 
-Frontend lowering may use Rust-style implementation strategies internally: explicit environment structs, vtables, match lowering, or unsafe wrappers. The emitted SEAM contract remains Musi/SEAM terms: contextual arguments, control frames, continuations, native pointers, and verified domains.
+Frontend lowering may use Rust-style implementation strategies internally: explicit environment structs, vtables, match lowering, or unsafe wrappers. The emitted SEAM contract remains Musi/SEAM terms: contextual arguments, native runtime calls, native pointers, and verified domains.
 
 ## What Must Lower Away
 
@@ -44,10 +44,8 @@ SEAM receives explicit machinery such as:
 - jump tables
 - layout-guided field loads and stores
 - explicit closure environment values
-- explicit continuation payloads
-- explicit driver-frame setup and unwind paths
 - explicit contextual value arguments and dispatch calls
-- explicit native pointer and pin-region operations
+- explicit native runtime module calls
 
 ## Lowering Responsibilities By Concept
 
@@ -71,7 +69,7 @@ Closures lower to:
 - explicit callee and environment pairing
 - explicit indirect call path
 
-Function values use `ld.fn`, `new.fn`, and `call.ind`. Virtual, interface/shape, dynamic message, and foreign ABI calls use `call.virt`, `call.iface`, `call.dyn`, and `call.ffi`.
+Function values use `new.fn` and `call.ind`. Foreign ABI calls use `call.ffi`.
 
 ### Contextual Values
 
@@ -83,7 +81,7 @@ Context values lower to:
 
 SEAM does not treat context markers as VM objects.
 
-Dictionary dispatch uses ordinary object and stack-call operations such as `ld.fld` and `call.ind`. VM-assisted shape/protocol dispatch uses `call.iface` when the descriptor declares an interface/shape member.
+Dictionary dispatch uses ordinary object and stack-call operations such as `ld.fld` and `call.ind`.
 
 ### Ranges
 
@@ -95,33 +93,29 @@ Ranges lower to:
 
 SEAM does not require range-specific VM primitives.
 
-Tuples, records, variants, options, and results lower to `new.obj`, `ld.fld`, `st.fld`, and `ld.fld.a` over layout descriptors. There are no tuple, sum, option, result, or range opcodes.
+Tuples, records, variants, options, and results lower to `new.obj`, `ld.fld`, and `st.fld` over layout descriptors. There are no tuple, sum, option, result, or range opcodes.
 
 ### Views And Pinning
 
-Borrow-like views lower to `managed.views` machinery, and stable-address regions lower to `native.pin` machinery.
+Borrow-like views and stable-address regions lower through native runtime modules.
 
-Address-like stack operations are `ld.fld.a`, `ld.elem.a`, `ld.ind`, `st.ind`, `pin`, `unpin`, and `ld.addr`. There is no arbitrary pointer arithmetic opcode.
+SEAM has no address-like stack opcodes and no arbitrary pointer arithmetic opcode.
 
 ### Suspension And Drivers
 
-Suspending operations lower to `resumable` machinery:
+Suspending operations lower to native runtime machinery:
 
 - host behavior through native calls and module loading
-- operation invocation through `raise`
-- one-shot continuation transfer through `resume`
-- unwind restoration
-
-`raise` captures the continuation according to the operation descriptor. Driver clauses receive the continuation as an ordinary parameter when their descriptor needs resumption.
+- operation invocation through `call.ffi` or module export calls
+- explicit state values when a runtime protocol needs resumption
 
 ### Arithmetic
 
 Source languages choose numeric opcodes that match their safety contract.
 
-- `add`, `sub`, and `mul` are wrapping/modulo for fixed-width integers and IEEE for floats.
-- `add.ovf`, `sub.ovf`, and `mul.ovf` trap on integer overflow.
-- signed/unsigned operations use `.s` and `.u`.
-- Musi source-level checked arithmetic lowers to `.ovf` opcodes.
+- `add`, `sub`, and `mul` are core arithmetic operations.
+- `div.s` and `rem.s` are signed integer operations.
+- Musi source-level checked arithmetic lowers through helper calls.
 
 ## Public Targeting Rule
 

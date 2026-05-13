@@ -362,7 +362,7 @@ Implementation checkpoints:
 
 1. Recursion: keep `recur` fast because Musi has no `for`, `while`, or `continue` constructs; expand tail-recursive and structurally-recursive kernels only when semantics prove the shape.
 2. General export calls: reduce lookup, retain, and dynamic call overhead so default `call_export` can approach bound handles without requiring embedder-only APIs.
-3. Suspension protocols: optimize continuation allocation and returned value flow without hiding source-level `yield`.
+3. Suspension protocols: optimize explicit runtime state and returned value flow without hiding source-level `yield`.
 4. Sequence return and GC diagnostics: cut explicit collection, stress collection, and returned-sequence root handling while preserving precise roots.
 5. Bound exports: expand reusable handles beyond const sequence returns so embedders avoid name lookup on hot calls.
 6. Sequence mutation: keep pushing plain nested `[2][2]Int` fast path while allowing typed/described heap payloads and rejecting untyped packed blobs.

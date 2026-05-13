@@ -401,7 +401,7 @@ impl CstFormatter<'_> {
                 self.options.declaration_parameter_layout == GroupLayout::Block
             }
             CstLeafRole::MemberParamParen => {
-                self.options.effect_member_parameter_layout == GroupLayout::Block
+                self.options.member_parameter_layout == GroupLayout::Block
             }
             _ => false,
         }

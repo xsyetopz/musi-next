@@ -11,6 +11,7 @@ use music_sema::{
     ComptimeSeqValue, ComptimeShapeValue, ComptimeTypeValue, ComptimeValue, SemaModule,
 };
 use music_term::TypeTerm;
+use std::sync::{Arc, Mutex};
 
 use crate::api::SessionError;
 
@@ -190,7 +191,7 @@ impl Session {
 struct SafeCtfeHost;
 
 impl SafeCtfeHost {
-    fn new(_host: Option<std::sync::Arc<std::sync::Mutex<Box<dyn VmHost>>>>) -> Self {
+    fn new(_host: Option<Arc<Mutex<Box<dyn VmHost>>>>) -> Self {
         Self
     }
 }
@@ -206,7 +207,6 @@ impl VmHost for SafeCtfeHost {
             foreign: foreign.name().into(),
         }))
     }
-
 }
 
 fn value_to_comptime(

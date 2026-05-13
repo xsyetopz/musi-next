@@ -1,6 +1,7 @@
 use crate::descriptor::{
-    ConstantDescriptor, ConstantValue, DataDescriptor, DataVariantDescriptor, ExportDescriptor, ExportTarget, ForeignDescriptor, GlobalDescriptor,
-    MetaDescriptor, ProcedureDescriptor, ShapeDescriptor, TypeDescriptor,
+    ConstantDescriptor, ConstantValue, DataDescriptor, DataVariantDescriptor, ExportDescriptor,
+    ExportTarget, ForeignDescriptor, GlobalDescriptor, MetaDescriptor, ProcedureDescriptor,
+    ShapeDescriptor, TypeDescriptor,
 };
 use crate::{
     Artifact, BINARY_MAJOR_VERSION, BINARY_MINOR_VERSION, CodeEntry, Instruction, Label, Opcode,

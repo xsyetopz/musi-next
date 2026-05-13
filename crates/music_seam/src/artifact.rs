@@ -248,7 +248,7 @@ impl Artifact {
     /// # Errors
     ///
     /// Returns [`ArtifactError`] when the artifact contains an invalid table reference, label,
-    /// effect op, or opcode/operand pairing.
+    /// foreign call, or opcode/operand pairing.
     pub fn validate(&self) -> Result<(), ArtifactError> {
         self.validate_types()?;
         self.validate_constants()?;
