@@ -4,12 +4,20 @@ let Core := import "musi:core";
 let Int := Core.Int;
 let String := Core.String;
 
-export opaque let JsonHost := effect {
-  let isValid (source : String) : Int;
-  let normalize (source : String) : String;
+@external(
+  abi := .musi
+)
+let isValidIntrinsic(source : String) : Int;
+
+export let isValid(source : String) : Int := unsafe {
+  isValidIntrinsic(source);
 };
 
-export let isValid (source : String) : Int := ask JsonHost.isValid(source);
+@external(
+  abi := .musi
+)
+let normalizeIntrinsic(source : String) : String;
 
-export let normalize (source : String) : String :=
-  ask JsonHost.normalize(source);
+export let normalize(source : String) : String := unsafe {
+  normalizeIntrinsic(source);
+};

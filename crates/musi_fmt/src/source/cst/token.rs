@@ -653,7 +653,7 @@ impl CstFormatter<'_> {
             TokenKind::Ident if self.declaration_state == DeclarationState::WaitingName => {
                 self.declaration_state = DeclarationState::NameBeforeParams;
             }
-            TokenKind::KwExport | TokenKind::KwRec | TokenKind::KwPartial => {}
+            TokenKind::KwExport => {}
             _ if kind != TokenKind::LParen
                 && !matches!(kind, TokenKind::LBracket | TokenKind::RBracket) =>
             {

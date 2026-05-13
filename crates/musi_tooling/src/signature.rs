@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use music_base::{Source, Span};
+use music_base::{Source, SourceId, Span};
 use music_hir::{HirExprId, HirExprKind, HirTyId, HirTyKind};
 use music_module::ModuleKey;
 use music_sema::{ExprMemberKind, SemaModule};
@@ -78,7 +78,7 @@ fn signature_help_for_call(
 
 fn innermost_call_at_offset(
     sema: &SemaModule,
-    source_id: music_base::SourceId,
+    source_id: SourceId,
     offset: u32,
 ) -> Option<HirExprId> {
     sema.module()

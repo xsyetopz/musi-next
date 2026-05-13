@@ -5,12 +5,20 @@ let Int := Core.Int;
 let String := Core.String;
 let Unit := Core.Unit;
 
-export opaque let Log := effect {
-  let info (message : String) : Unit;
-  let write (level : Int, message : String) : Unit;
+@external(
+  abi := .musi
+)
+let infoIntrinsic(message : String) : Unit;
+
+export let info(message : String) : Unit := unsafe {
+  infoIntrinsic(message);
 };
 
-export let info (message : String) : Unit := ask Log.info(message);
+@external(
+  abi := .musi
+)
+let writeIntrinsic(level : Int, message : String) : Unit;
 
-export let write (level : Int, message : String) : Unit :=
-  ask Log.write(level, message);
+export let write(level : Int, message : String) : Unit := unsafe {
+  writeIntrinsic(level, message);
+};

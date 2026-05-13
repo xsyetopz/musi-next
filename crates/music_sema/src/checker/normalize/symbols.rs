@@ -52,7 +52,7 @@ impl PassBase<'_, '_, '_> {
             ("Nat16", builtins.nat16),
             ("Nat32", builtins.nat32),
             ("Nat64", builtins.nat64),
-            ("Bool", builtins.bool_),
+            ("Bit", builtins.bool_),
             ("CChar", builtins.int8),
             ("CSChar", builtins.int8),
             ("CUChar", builtins.nat8),

@@ -61,7 +61,7 @@ fn assert_file_format_is_stable(path: &Path, source: &str) {
     );
     let formatted_result = format_source(source, &options())
         .unwrap_or_else(|err| panic!("{}: {err:?}", path.display()));
-    assert_formatted_text_is_stable(&formatted_result.text);
+    assert_formatted_text_is_stable_for_path(path, &formatted_result.text);
 }
 
 fn assert_format_respects_width(source: &str, path: &Path) {
@@ -80,12 +80,26 @@ fn assert_format_respects_width(source: &str, path: &Path) {
 }
 
 fn assert_formatted_text_is_stable(text: &str) {
+    assert_formatted_text_is_stable_for_path(Path::new("<inline>"), text);
+}
+
+fn assert_formatted_text_is_stable_for_path(path: &Path, text: &str) {
     let formatted = Lexer::new(text).lex();
-    assert!(formatted.errors().is_empty(), "{:?}", formatted.errors());
+    assert!(
+        formatted.errors().is_empty(),
+        "{}: {:?}",
+        path.display(),
+        formatted.errors()
+    );
     let parsed = parse(formatted);
-    assert!(parsed.errors().is_empty(), "{:?}", parsed.errors());
+    assert!(
+        parsed.errors().is_empty(),
+        "{}: {:?}",
+        path.display(),
+        parsed.errors()
+    );
     let second = format_source(text, &options()).unwrap();
-    assert_eq!(second.text, text);
+    assert_eq!(second.text, text, "{}", path.display());
 }
 
 fn line_has_unbreakable_atom(line: &str) -> bool {
@@ -455,19 +469,19 @@ mod success {
     #[test]
     fn keeps_short_declaration_parameters_inline_when_body_wraps() {
         let source =
-            "export let exists (target : Path) : Bool := fsHost.exists(target.toString()) > 0;";
+            "export let exists (target : Path) : Bit := fsHost.exists(target.toString()) > 0;";
 
         let formatted_result = format_source(source, &options()).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            "export let exists (target : Path) : Bool :=\n  fsHost.exists(target.toString()) > 0;\n"
+            "export let exists (target : Path) : Bit := fsHost.exists(target.toString()) > 0;\n"
         );
     }
 
     #[test]
     fn keeps_fitting_effect_members_inline_and_aligned() {
-        let source = r"export opaque let Runtime := effect {
+        let source = r"export hidden let Runtime := shape {
   let envGet (name : String) : String;
   let envSet (name : String, value : String) : Int;
   let randomIntInRange (lowerBound : Int, upperBound : Int) : Int;
@@ -477,7 +491,7 @@ mod success {
 
         assert_eq!(
             formatted_result.text,
-            r"export opaque let Runtime := effect {
+            r"export hidden let Runtime := shape {
   let envGet (name : String) : String;
   let envSet (name : String, value : String) : Int;
   let randomIntInRange (lowerBound : Int, upperBound : Int) : Int;
@@ -498,13 +512,13 @@ mod success {
     fn wraps_only_long_effect_member_parameters() {
         let mut options = options();
         options.line_width = 48;
-        let source = "export opaque let Runtime := effect { let randomIntInRange (lowerBound : Int, upperBound : Int) : Int; };";
+        let source = "export hidden let Runtime := shape { let randomIntInRange (lowerBound : Int, upperBound : Int) : Int; };";
 
         let formatted_result = format_source(source, &options).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            r"export opaque let Runtime := effect {
+            r"export hidden let Runtime := shape {
   let randomIntInRange (
     lowerBound : Int,
     upperBound : Int
@@ -524,13 +538,13 @@ mod success {
 
     #[test]
     fn keeps_fitting_instance_members_inline_and_spaced() {
-        let source = "export let intRangeable := given Rangeable[Int] { let next (value : Int) : Maybe[Int] := Some[Int](value + 1); };";
+        let source = "export let intRangeable := shape { let next (value : Int) : Maybe[Int] := Some[Int](value + 1); };";
 
         let formatted_result = format_source(source, &options()).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            "export let intRangeable :=\n  given Rangeable[Int] {\n  let next (value : Int) : Maybe[Int] := Some[Int](value + 1);\n};\n"
+            "export let intRangeable := shape {\n  let next (value : Int) : Maybe[Int] := Some[Int](value + 1);\n};\n"
         );
     }
 
@@ -593,13 +607,13 @@ mod success {
 
     #[test]
     fn declaration_wrap_drops_empty_trailing_parameter_item() {
-        let source = "export let betweenInclusive (actual : Int, lowerBound : Int, upperBound : Int,) : Bool := assert.betweenInclusive(actual, lowerBound, upperBound);";
+        let source = "export let betweenInclusive (actual : Int, lowerBound : Int, upperBound : Int,) : Bit := assert.betweenInclusive(actual, lowerBound, upperBound);";
 
         let formatted_result = format_source(source, &options()).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            "export let betweenInclusive (\n  actual : Int,\n  lowerBound : Int,\n  upperBound : Int\n) : Bool := assert.betweenInclusive(actual, lowerBound, upperBound);\n"
+            "export let betweenInclusive (\n  actual : Int,\n  lowerBound : Int,\n  upperBound : Int\n) : Bit := assert.betweenInclusive(actual, lowerBound, upperBound);\n"
         );
         let second = format_source(&formatted_result.text, &options()).unwrap();
         assert_eq!(second.text, formatted_result.text);
@@ -652,7 +666,7 @@ mod success {
     fn formats_match_arms_pipe_aligned_by_default() {
         let source = r"export let readNonEmptyLine () : Maybe[String] :=
   match readTrimmedLine() (
-    | value if value.isEmpty() => maybe.None[String]()
+    | value where value.isEmpty() => maybe.None[String]()
     | value => maybe.Some[String](value)
   );
 ";
@@ -663,7 +677,7 @@ mod success {
             formatted_result.text,
             r"export let readNonEmptyLine () : Maybe[String] :=
   match readTrimmedLine() (
-  | value if value.isEmpty() => maybe.None[String]()
+  | value where value.isEmpty() => maybe.None[String]()
   | value => maybe.Some[String](value)
   );
 "
@@ -672,7 +686,7 @@ mod success {
 
     #[test]
     fn formats_dirty_multiline_match_rhs_canonically() {
-        let source = r"export let isLess (target : Ordering) : Bool := match target(
+        let source = r"export let isLess (target : Ordering) : Bit := match target(
     | .Less => 0 = 0
     | _ => 0 = 1);
 ";
@@ -681,7 +695,7 @@ mod success {
 
         assert_eq!(
             formatted_result.text,
-            r"export let isLess (target : Ordering) : Bool :=
+            r"export let isLess (target : Ordering) : Bit :=
   match target (
   | .Less => 0 = 0
   | _ => 0 = 1
@@ -696,7 +710,7 @@ mod success {
     fn formats_dirty_multiline_match_rhs_with_block_arms_when_configured() {
         let mut options = options();
         options.match_arm_indent = MatchArmIndent::Block;
-        let source = r"export let isLess (target : Ordering) : Bool := match target(
+        let source = r"export let isLess (target : Ordering) : Bit := match target(
 | .Less => 0 = 0
 | _ => 0 = 1);
 ";
@@ -705,7 +719,7 @@ mod success {
 
         assert_eq!(
             formatted_result.text,
-            r"export let isLess (target : Ordering) : Bool :=
+            r"export let isLess (target : Ordering) : Bit :=
   match target (
     | .Less => 0 = 0
     | _ => 0 = 1
@@ -798,13 +812,13 @@ mod success {
     fn block_effect_member_parameter_layout_breaks_fitting_members() {
         let mut options = options();
         options.effect_member_parameter_layout = GroupLayout::Block;
-        let source = "export opaque let Runtime := effect { let envSet (name : String, value : String) : Int; };";
+        let source = "export hidden let Runtime := shape { let envSet (name : String, value : String) : Int; };";
 
         let formatted_result = format_source(source, &options).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            r"export opaque let Runtime := effect {
+            r"export hidden let Runtime := shape {
   let envSet (
     name : String,
     value : String
@@ -832,13 +846,13 @@ mod success {
     fn auto_record_field_layout_keeps_simple_data_fields_one_line_when_fitting() {
         let mut options = options();
         options.record_field_layout = GroupLayout::Auto;
-        let source = "let p := data { x : Int; y : Int };";
+        let source = "let p := data { let x : Int; let y : Int };";
 
         let formatted_result = format_source(source, &options).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            "let p := data { x : Int; y : Int };\n"
+            "let p := data {\n  let x : Int;\n  let y : Int\n};\n"
         );
     }
 
@@ -847,13 +861,13 @@ mod success {
         let mut options = options();
         options.line_width = 0;
         options.record_field_layout = GroupLayout::Auto;
-        let source = "let p := data { x : Int; y : Int };";
+        let source = "let p := data { let x : Int; let y : Int };";
 
         let formatted_result = format_source(source, &options).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            "let p := data { x : Int; y : Int };\n"
+            "let p := data {\n  let x : Int;\n  let y : Int\n};\n"
         );
     }
 
@@ -863,8 +877,8 @@ mod success {
         options.record_field_layout = GroupLayout::Auto;
         let source = r"let p := data {
   --- x coordinate
-  x : Int;
-  y : Int
+  let x : Int;
+  let y : Int
 };
 ";
 
@@ -874,8 +888,8 @@ mod success {
             formatted_result.text,
             r"let p := data {
   --- x coordinate
-  x : Int;
-  y : Int
+  let x : Int;
+  let y : Int
 };
 "
         );
@@ -885,13 +899,13 @@ mod success {
     fn block_record_field_layout_expands_simple_data_fields() {
         let mut options = options();
         options.record_field_layout = GroupLayout::Block;
-        let source = "let p := data { x : Int; y : Int };";
+        let source = "let p := data { let x : Int; let y : Int };";
 
         let formatted_result = format_source(source, &options).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            "let p := data {\n  x : Int;\n  y : Int\n};\n"
+            "let p := data {\n  let x : Int;\n  let y : Int\n};\n"
         );
     }
 
@@ -900,13 +914,13 @@ mod success {
         let mut options = options();
         options.line_width = 32;
         options.record_field_layout = GroupLayout::Auto;
-        let source = "let p := data { longLeftName : Int; longRightName : Int };";
+        let source = "let p := data { let longLeftName : Int; let longRightName : Int };";
 
         let formatted_result = format_source(source, &options).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            "let p := data {\n  longLeftName : Int;\n  longRightName : Int\n};\n"
+            "let p := data {\n  let longLeftName : Int;\n  let longRightName : Int\n};\n"
         );
     }
 
@@ -931,7 +945,7 @@ mod success {
         options.match_arm_indent = MatchArmIndent::Block;
         let source = r"export let readNonEmptyLine () : Maybe[String] :=
   match readTrimmedLine() (
-  | value if value.isEmpty() => maybe.None[String]()
+  | value where value.isEmpty() => maybe.None[String]()
   | value => maybe.Some[String](value)
   );
 ";
@@ -942,7 +956,7 @@ mod success {
             formatted_result.text,
             r"export let readNonEmptyLine () : Maybe[String] :=
   match readTrimmedLine() (
-    | value if value.isEmpty() => maybe.None[String]()
+    | value where value.isEmpty() => maybe.None[String]()
     | value => maybe.Some[String](value)
   );
 "
@@ -966,16 +980,18 @@ mod success {
     }
 
     #[test]
-    fn trailing_commas_apply_to_effect_sets() {
+    fn formats_stack_effect_attribute() {
         let mut options = options();
         options.trailing_commas = TrailingCommas::MultiLine;
-        let source = "let f () : Int require { Console, Runtime } := 1;";
+        let source = "@external(stack := [Word, Word ; Word]) let f() : Int;";
 
         let formatted_result = format_source(source, &options).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            "let f () : Int require {\n  Console,\n  Runtime,\n} := 1;\n"
+            "@external(stack := [Word, Word;
+    Word])
+let f () : Int;\n"
         );
         let second = format_source(&formatted_result.text, &options).unwrap();
         assert_eq!(second.text, formatted_result.text);
@@ -1004,7 +1020,7 @@ mod success {
 
     #[test]
     fn keeps_attribute_attached_on_own_line_before_native() {
-        let source = "@link(symbol := \"data.tag\")\nnative \"musi\" let levelTagIntrinsic (level : Level) : Int;";
+        let source = "@external(abi := .musi)\nlet levelTagIntrinsic(level : Level) : Int;";
 
         let mut options = options();
         options.trailing_commas = TrailingCommas::Never;
@@ -1013,7 +1029,7 @@ mod success {
 
         assert_eq!(
             formatted_result.text,
-            "@link(symbol := \"data.tag\")\nnative \"musi\" let levelTagIntrinsic (level : Level) : Int;\n"
+            "@external(abi := .musi)\nlet levelTagIntrinsic (level : Level) : Int;\n"
         );
         let second = format_source(&formatted_result.text, &options).unwrap();
         assert_eq!(second.text, formatted_result.text);
@@ -1021,7 +1037,7 @@ mod success {
 
     #[test]
     fn formats_multiple_attributes_as_attached_lines() {
-        let source = "@target(os := \"linux\") @link(name := \"c\") native \"c\" let puts (msg : CString) : Int;";
+        let source = "@target(os := \"linux\") @external(abi := .c) let puts(msg : CString) : Int;";
 
         let mut options = options();
         options.trailing_commas = TrailingCommas::Never;
@@ -1030,7 +1046,7 @@ mod success {
 
         assert_eq!(
             formatted_result.text,
-            "@target(os := \"linux\")\n@link(name := \"c\")\nnative \"c\" let puts (msg : CString) : Int;\n"
+            "@target(os := \"linux\")\n@external(abi := .c)\nlet puts (msg : CString) : Int;\n"
         );
     }
 
@@ -1140,25 +1156,25 @@ import "@std/testing";
 
     #[test]
     fn sorts_import_destructure_fields() {
-        let source = r#"let { writeLine, readText, append } := import "@std/io";"#;
+        let source = r#"let { writeLn, readText, append } := import "@std/io";"#;
 
         let formatted_result = format_source(source, &options()).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            "let {\n  append,\n  readText,\n  writeLine,\n} := import \"@std/io\";\n"
+            "let {\n  append,\n  readText,\n  writeLn,\n} := import \"@std/io\";\n"
         );
     }
 
     #[test]
     fn sorts_aliased_import_destructure_fields_by_imported_name() {
-        let source = r#"let { writeLine: line, append, readText: read } := import "@std/io";"#;
+        let source = r#"let { writeLn: line, append, readText: read } := import "@std/io";"#;
 
         let formatted_result = format_source(source, &options()).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            "let {\n  append,\n  readText : read,\n  writeLine : line,\n} := import \"@std/io\";\n"
+            "let {\n  append,\n  readText : read,\n  writeLn : line,\n} := import \"@std/io\";\n"
         );
     }
 
@@ -1166,7 +1182,7 @@ import "@std/testing";
     fn import_destructure_field_comments_do_not_break_formatting() {
         let source = r#"let {
   -- writes one line
-  writeLine,
+  writeLn,
   readText,
 } := import "@std/io";"#;
 
@@ -1176,7 +1192,7 @@ import "@std/testing";
             formatted_result.text,
             r#"let {
   -- writes one line
-  writeLine,
+  writeLn,
   readText,
 } := import "@std/io";
 "#
@@ -1188,7 +1204,7 @@ import "@std/testing";
         let source = r#"let {
   /- reads text -/
   readText,
-  writeLine,
+  writeLn,
 } := import "@std/io";"#;
 
         let formatted_result = format_source(source, &options()).unwrap();
@@ -1198,7 +1214,7 @@ import "@std/testing";
             r#"let {
   /- reads text -/
   readText,
-  writeLine,
+  writeLn,
 } := import "@std/io";
 "#
         );
@@ -1272,7 +1288,9 @@ let testing := import "@std/testing";
 
     #[test]
     fn attached_import_block_comments_move_with_sorted_imports() {
-        let source = r#"/--
+        let source = concat!(
+            "/",
+            r#"--
 testing helpers
 -/
 let testing := import "@std/testing";
@@ -1280,13 +1298,16 @@ let testing := import "@std/testing";
 io helpers
 -/
 let io := import "@std/io";
-"#;
+"#,
+        );
 
         let formatted_result = format_source(source, &options()).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            r#"/-
+            concat!(
+                "/",
+                r#"-
 io helpers
 -/
 let io := import "@std/io";
@@ -1294,26 +1315,33 @@ let io := import "@std/io";
 testing helpers
 -/
 let testing := import "@std/testing";
-"#
+"#,
+            )
         );
     }
 
     #[test]
     fn keeps_leading_regular_block_comment_on_own_line() {
-        let source = r"/-
+        let source = concat!(
+            "/",
+            r"-
 explains value
 -/
-let value:=1;";
+let value:=1;",
+        );
 
         let formatted_result = format_source(source, &options()).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            r"/-
+            concat!(
+                "/",
+                r"-
 explains value
 -/
 let value := 1;
-"
+",
+            )
         );
     }
 
@@ -1383,13 +1411,13 @@ let io := import "@std/io";
     #[test]
     fn preserves_single_top_level_blank_line_between_statements() {
         let source =
-            "let io := import \"@std/io\";\n\nlet message := \"Hello\";\nio.writeLine(message);\n";
+            "let io := import \"@std/io\";\n\nlet message := \"Hello\";\nio.writeLn(message);\n";
 
         let formatted_result = format_source(source, &options()).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            "let io := import \"@std/io\";\n\nlet message := \"Hello\";\nio.writeLine(message);\n"
+            "let io := import \"@std/io\";\n\nlet message := \"Hello\";\nio.writeLn(message);\n"
         );
     }
 
@@ -1701,11 +1729,11 @@ export let test () :=
     fn formats_constructs_without_changing_tokens() {
         const SOURCES: &[&str] = &[
             "export let toString  (self : Command) : String := match self (\n| .Command(value := value) => value\n);",
-            "export let chance (percent : Int) : Bool := match () (\n| _ if percent <= 0 => 0 = 1\n| _ if percent >= 100 => 0 = 0\n| _ => nextIntInRange(0, 100) < percent\n);",
+            "export let chance (percent : Int) : Bit := match () (\n| _ where percent <= 0 => 0 = 1\n| _ where percent >= 100 => 0 = 0\n| _ => nextIntInRange(0, 100) < percent\n);",
             "export let command (value : String) : Command := .Command(value := value);",
             "export let values : []Int := [1, 2, 3];",
-            "export let cast [T] (raw : CPtr) : Ptr[T] := .Ptr(raw := raw);",
-            "export native \"musi\" (\nlet offset[T] (pointer : Ptr[T], count : Int) : Ptr[T];\nlet read[T] (pointer : Ptr[T]) : T;\n);",
+            "export let cast[T](raw : CPtr) : Ptr[T] := .Ptr(raw := raw);",
+            "@external(abi := .musi)\nexport (\nlet offset[T](pointer : Ptr[T], count : Int) : Ptr[T];\nlet read[T](pointer : Ptr[T]) : T;\n);",
             "--- Documented value.\nexport let x : Int := 1;",
             "let x := 1; -- trailing\nlet y := /- inline -/ 2;",
         ];

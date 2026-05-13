@@ -30,6 +30,7 @@
     "./libm": "./libm.ms",
     "./libc": "./libc.ms",
     "./bits": "./bits.ms",
+    "./bool": "./bool.ms",
     "./fmt": "./fmt.ms",
     "./errors": "./errors.ms",
     "./datetime": "./datetime.ms",

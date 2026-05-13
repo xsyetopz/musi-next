@@ -2,6 +2,8 @@
 
 use std::fs::read_to_string;
 
+use musi_tooling::{ToolLocation, ToolPosition, ToolWorkspaceEdit};
+
 use super::*;
 
 impl MusiLanguageServer {
@@ -639,7 +641,7 @@ impl MusiLanguageServer {
             .positions
             .into_iter()
             .map(|position| {
-                Some(musi_tooling::ToolPosition::new(
+                Some(ToolPosition::new(
                     usize::try_from(position.line).ok()?.saturating_add(1),
                     usize::try_from(position.character).ok()?.saturating_add(1),
                 ))
@@ -766,10 +768,7 @@ impl MusiLanguageServer {
         sort_dedup_paths(paths)
     }
 
-    fn lsp_location_for_tool_location(
-        &self,
-        location: &musi_tooling::ToolLocation,
-    ) -> Option<Location> {
+    fn lsp_location_for_tool_location(&self, location: &ToolLocation) -> Option<Location> {
         let uri = Url::from_file_path(&location.path).ok()?;
         let file_text;
         let text = if let Some((_, text)) = self.open_document_for_path(&location.path) {
@@ -784,10 +783,7 @@ impl MusiLanguageServer {
         })
     }
 
-    fn lsp_workspace_edit_for_tool_edit(
-        &self,
-        edit: musi_tooling::ToolWorkspaceEdit,
-    ) -> Option<WorkspaceEdit> {
+    fn lsp_workspace_edit_for_tool_edit(&self, edit: ToolWorkspaceEdit) -> Option<WorkspaceEdit> {
         let mut changes = HashMap::new();
         for (path, edits) in edit.changes {
             let uri = Url::from_file_path(&path).ok()?;

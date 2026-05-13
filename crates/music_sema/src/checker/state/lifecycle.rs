@@ -74,9 +74,9 @@ fn seed_builtin_data_defs(decls: &mut DeclState, module: &ModuleKey) {
         ),
     ]);
     let _ = decls.data_defs.insert(
-        "Bool".into(),
+        "Bit".into(),
         SemaDataDef::new(
-            DefinitionKey::new(module.clone(), "Bool"),
+            DefinitionKey::new(module.clone(), "Bit"),
             bool_variants,
             None,
             None,

@@ -185,6 +185,11 @@ impl VmHost for NativeHost {
             return result;
         }
 
+        let test_result = self.state()?.testing.handle_foreign(ctx, foreign, args);
+        if let Some(result) = test_result {
+            return result;
+        }
+
         if self.state()?.fallback.is_none() {
             return Err(VmError::new(VmErrorKind::ForeignCallRejected {
                 foreign: foreign.name().into(),

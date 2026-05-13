@@ -22,10 +22,10 @@ pub mod process {
 
 pub mod io {
     pub const EFFECT: &str = "musi:io::Io";
-    pub const PRINT_OP: &str = "print";
-    pub const PRINT_LINE_OP: &str = "printLine";
-    pub const PRINT_ERROR_OP: &str = "printError";
-    pub const PRINT_ERROR_LINE_OP: &str = "printErrorLine";
+    pub const WRITE_OP: &str = "write";
+    pub const WRITE_LN_OP: &str = "writeLn";
+    pub const WRITE_ERR_OP: &str = "writeErr";
+    pub const WRITE_ERR_LN_OP: &str = "writeErrLn";
     pub const READ_LINE_OP: &str = "readLine";
 }
 

@@ -12,7 +12,7 @@ Comparison rules:
 
 - cite Rust for memory safety, aliasing, unsafe, ABI, runtime implementation tradeoffs, and delimiter comparisons where Musi intentionally diverges or matches surface shape
 - do not import Rust source terms such as traits, impl blocks, lifetimes, borrow sigils, `?`, or `Result<T, E>` syntax into Musi surface design
-- expose user-visible consequences in Musi terms: `given`, `answer`, `handle`, `?T`, `E!T`, `:=`, `=`, `/=`, `{}` structure, `()` computing
+- expose user-visible consequences in Musi terms: `?T`, `E!T`, `:=`, `=`, `/=`, `mut`, `known`, `defer`, `yield`, `pin`, `{}` structure, and `()` computing
 
 ## Canonical Map
 

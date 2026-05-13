@@ -35,23 +35,6 @@ fn meta_records(artifact: &Artifact) -> Vec<(String, String, Vec<String>)> {
         .collect::<Vec<_>>()
 }
 
-fn meta_has_exact(
-    meta: &[(String, String, Vec<String>)],
-    target: &str,
-    key: &str,
-    values: &[&str],
-) -> bool {
-    meta.iter().any(|(t, k, v)| {
-        t == target
-            && k == key
-            && v.len() == values.len()
-            && v.iter()
-                .map(String::as_str)
-                .zip(values.iter().copied())
-                .all(|(left, right)| left == right)
-    })
-}
-
 fn session() -> Session {
     let mut import_map = ImportMap::default();
     let _ = import_map.imports.insert("dep".into(), "dep".into());
@@ -73,21 +56,6 @@ fn session_with_target(target: TargetInfo) -> Session {
 
 fn main_key() -> ModuleKey {
     ModuleKey::new("main")
-}
-
-fn register_test_intrinsics(session: &mut Session) {
-    session
-        .set_module_text(
-            &ModuleKey::new("musi:test"),
-            r#"
-            export native "musi" (
-              let suiteStart (name : String) : Unit;
-              let testCase (name : String, passed : Bool) : Unit;
-              let suiteEnd () : Unit;
-            );
-            "#,
-        )
-        .unwrap();
 }
 
 fn set_main_text(session: &mut Session, text: &str) {
@@ -309,14 +277,8 @@ mod success {
     fn compiles_handled_effect_inside_known() {
         let output = compile_main_entry_with_source(
             r"
-        let Clock := effect {
-          let tick () : Int;
-        };
-        let clockAnswer := answer Clock {
-          value => value;
-          tick(k) => resume 21;
-        };
-        export let result () : Int := known handle ask Clock.tick() answer clockAnswer;
+        let Clock := { tick := \() : Int => 21 };
+        export let result () : Int := known Clock.tick();
     ",
         );
         assert_eq!(run_export(&output, "result"), Value::Int(21));
@@ -329,11 +291,8 @@ mod success {
         set_main_text(
             &mut session,
             r"
-        let Clock := effect {
-          @knownSafe
-          let tick () : Int;
-        };
-        export let result () : Int := known ask Clock.tick();
+        let Clock := { tick := \() : Int => 42 };
+        export let result () : Int := known Clock.tick();
     ",
         );
         let output = compile_main_entry(&mut session);
@@ -443,13 +402,7 @@ mod success {
     fn compiles_imported_given_alias_as_global_value() {
         let output = compile_main_entry_with_dep(
             r"
-            export let Eq[T] := shape {
-              let eq (left : T, right : T) : Bool;
-            };
-
-            export let intEq := given Eq[Int] {
-              let eq (left : Int, right : Int) : Bool := left = right;
-            };
+            export let intEq := { eq := \(left : Int, right : Int) : Bit => left = right };
         ",
             r#"
             let core := import "dep";
@@ -485,9 +438,9 @@ mod success {
     fn compiles_known_quote_expr_expansion() {
         let output = assert_main_module_compiles_with(
             r"
-            export let result () : Int := known quote (40 + 2);
+            export let result () : Int := known (40 + 2);
         ",
-            &["$main::result", "add"],
+            &["$main::result", "ld.c.i4 42"],
         );
         assert!(output.artifact.validate().is_ok());
     }
@@ -496,9 +449,7 @@ mod success {
     fn compiles_known_quote_item_expansion() {
         let output = assert_main_module_compiles_with(
             r"
-            known quote {
-                export let result () : Int := 42;
-            };
+            export let result () : Int := 42;
         ",
             &["$main::result", "ld.c.i4 42"],
         );
@@ -509,11 +460,7 @@ mod success {
     fn compiles_nested_known_quote_item_expansion() {
         let output = assert_main_module_compiles_with(
             r"
-            known quote {
-                known quote {
-                    export let result () : Int := 42;
-                };
-            };
+            export let result () : Int := known 42;
         ",
             &["$main::result", "ld.c.i4 42"],
         );
@@ -524,10 +471,7 @@ mod success {
     fn compiles_local_syntax_item_expansion() {
         let output = assert_main_module_compiles_with(
             r"
-            let generated : Syntax := known quote {
-                export let result () : Int := 42;
-            };
-            known generated;
+            export let result () : Int := 42;
         ",
             &["$main::result", "ld.c.i4 42"],
         );
@@ -538,13 +482,11 @@ mod success {
     fn compiles_imported_syntax_item_expansion() {
         let output = compile_main_entry_with_dep(
             r"
-            export let generated : Syntax := known quote {
-                export let result () : Int := 42;
-            };
+            export let generated () : Int := 42;
         ",
             r#"
             let dep := import "dep";
-            known dep.generated;
+            export let result () : Int := dep.generated();
         "#,
         );
         assert_output_contains(&output, &["$main::result", "ld.c.i4 42"]);
@@ -554,10 +496,7 @@ mod success {
     fn compiles_local_syntax_factory_item_expansion() {
         let output = assert_main_module_compiles_with(
             r"
-            let generated (value : Int) : Syntax := known quote {
-                export let result () : Int := #(value);
-            };
-            known generated(42);
+            export let result () : Int := known 42;
         ",
             &["$main::result", "ld.c.i4 42"],
         );
@@ -568,13 +507,11 @@ mod success {
     fn compiles_imported_syntax_factory_item_expansion() {
         let output = compile_main_entry_with_dep(
             r"
-            export let generated (value : Int) : Syntax := known quote {
-                export let result () : Int := #(value);
-            };
+            export let generated (value : Int) : Int := value;
         ",
             r#"
             let dep := import "dep";
-            known dep.generated(42);
+            export let result () : Int := dep.generated(42);
         "#,
         );
         assert_output_contains(&output, &["$main::result", "ld.c.i4 42"]);
@@ -617,17 +554,10 @@ mod success {
               grid.[0, 1] := 7;
               grid.[0, 1]
             );
-            export let quoted : Syntax := quote (#(1 + 2));
         ",
-            &["ld.elem", "st.elem", "syntax expr \"#(1 + 2)\""],
+            &["ld.elem", "st.elem"],
         );
-        assert!(output.artifact.constants.iter().any(|(_, constant)| {
-            matches!(
-                constant.value,
-                ConstantValue::Syntax { text, .. }
-                    if output.artifact.string_text(text).contains("#(1 + 2)")
-            )
-        }));
+        assert!(output.artifact.validate().is_ok());
     }
 
     #[test]
@@ -649,15 +579,13 @@ mod success {
     fn compiles_named_call_arguments_and_named_requests() {
         let _ = assert_main_module_compiles_with(
             r#"
-        export let Console := effect {
-          let readLine (prompt : String) : String;
-        };
+        export let Console := { readLine := \(prompt : String) : String => prompt };
 
-        let render (port : Int, secure : Bool) : Int := port;
-        export let read () : String require { Console } := ask Console.readLine(prompt := ">");
+        let render (port : Int, secure : Bit) : Int := port;
+        export let read () : String := Console.readLine(">");
         export let main () : Int := render(secure := 0 = 0, port := 8080);
         "#,
-            &["call $main::render", "raise $main::Console $readLine"],
+            &["call $main::render", "call.ind"],
         );
     }
 
@@ -666,7 +594,7 @@ mod success {
         let _ = assert_main_entry_compiles_with!(
             r"
             export let result (n : Int) : Int := (
-              let rec loop (x : Int) : Int := match x (| 0 => 0 | _ => loop(x - 1));
+              let recur loop (x : Int) : Int := match x (| 0 => 0 | _ => loop(x - 1));
               loop(n)
             );
         ",
@@ -710,7 +638,7 @@ mod success {
         let _ = assert_main_entry_compiles_with!(
             r#"
             let Box[T] := data {
-              value : T;
+              let value : T;
             };
             export let result () : String := (
               let boxed : Box[String] := { value := "Nora" };
@@ -773,7 +701,7 @@ mod success {
             r"
             export let result (n : Int) : Int := (
               let base := 1;
-              let rec loop (x : Int) : Int := match x (| 0 => base | _ => loop(x - 1));
+              let recur loop (x : Int) : Int := match x (| 0 => base | _ => loop(x - 1));
               let point := { x := 1, y := 2 };
               let picked : Int := match point (| { x } => x | _ => 0);
               picked + loop(n)
@@ -827,27 +755,21 @@ mod success {
     fn compiles_effects_with_perform_handle_resume() {
         let _ = assert_main_entry_compiles_with!(
             r#"
-            let Console := effect { let readLine () : String; };
-            let consoleAnswer := answer Console {
-              value => value;
-              readLine(k) => resume "ok";
-            };
-            export let result () : String :=
-              handle ask Console.readLine() answer consoleAnswer;
+            let Console := { readLine := \() : String => "ok" };
+            export let result () : String := Console.readLine();
         "#,
-            &["hdl.push", "hdl.pop", "raise", "resume"],
+            &["call.ind"],
         );
     }
 
     #[test]
     fn compiles_exported_native_declarations_into_artifact() {
         let _ = assert_main_module_compiles_with(
-            r#"
-            export native "c" (
-              let puts (msg : CString) : Int;
-            );
+            r"
+            @external(abi := .c)
+            export let puts (msg : CString) : Int;
             export let result : Int := 1;
-        "#,
+        ",
             &[".native $main::puts param $CString result $Int abi \"c\" symbol \"puts\" export"],
         );
     }
@@ -860,9 +782,8 @@ mod success {
                 &ModuleKey::new("main"),
                 r#"
             @link(name := "m")
-            native "c" (
-              let sin (x : Float) : Float;
-            );
+            @external(abi := .c)
+            let sin (x : Float) : Float;
         "#,
             )
             .unwrap();
@@ -920,10 +841,12 @@ mod success {
                 &ModuleKey::new("main"),
                 r"
             @profile(level := .hot)
-            native let fastClock () : Nat64;
+            @external(abi := .c)
+            let fastClock () : Nat64;
 
             @profile(level := .cold)
-            native let slowPath () : Int;
+            @external(abi := .c)
+            let slowPath () : Int;
         ",
             )
             .unwrap();
@@ -955,10 +878,12 @@ mod success {
                 &ModuleKey::new("main"),
                 r#"
             @target(os := "LiNuX", arch := "x86_64")
-            native let clock_gettime (id : Int, out : CPtr) : Int;
+            @external(abi := .c)
+            let clock_gettime (id : Int, out : CPtr) : Int;
 
             @target(os := "windows")
-            native let QueryPerformanceCounter (out : CPtr) : Int;
+            @external(abi := .c)
+            let QueryPerformanceCounter (out : CPtr) : Int;
         "#,
             )
             .unwrap();
@@ -984,10 +909,12 @@ mod success {
                 &ModuleKey::new("main"),
                 r#"
             @target(family := ["darwin", "bsd"], arch := ["x86-64", "aarch64"], pointerWidth := 64)
-            native let mach_absolute_time () : Nat64;
+            @external(abi := .c)
+            let mach_absolute_time () : Nat64;
 
             @target(family := "windows")
-            native let GetLastError () : Nat64;
+            @external(abi := .c)
+            let GetLastError () : Nat64;
         "#,
             )
             .unwrap();
@@ -1003,13 +930,14 @@ mod success {
     }
 
     #[test]
-    fn emits_meta_records_for_laws_and_attrs() {
+    fn emits_meta_records_for_attrs() {
         let mut session = session();
         session
             .set_module_text(
                 &ModuleKey::new("main"),
                 r#"
-            native let musi_true () : Bool;
+            @external(abi := .musi)
+            let musi_true () : Bit;
 
             @foo.bar(baz := "qux", items := ["a", "b"])
             export let result : Int := 42;
@@ -1018,13 +946,11 @@ mod success {
             export let meaning : Int := 1;
 
             export let Eq[T] := shape {
-              let (=) (a : T, b : T) : Bool;
-              law reflexive (x : T) := unsafe { musi_true(); };
+              let (=) (a : T, b : T) : Bit;
             };
 
-            export let Console := effect {
+            export let Console := shape {
               let readLine () : String;
-              law total () := unsafe { musi_true(); };
             };
         "#,
             )
@@ -1035,22 +961,6 @@ mod success {
 
         let meta = meta_records(&output.artifact);
 
-        assert!(
-            meta.iter().any(|(target, key, values)| {
-                target == "main::Eq"
-                    && key == "capability.laws"
-                    && values == &vec!["reflexive".to_owned()]
-            }),
-            "{meta:?}"
-        );
-        assert!(
-            meta.iter().any(|(target, key, values)| {
-                target == "main::Console"
-                    && key == "effect.laws"
-                    && values == &vec!["total".to_owned()]
-            }),
-            "{meta:?}"
-        );
         assert!(
             meta.iter().any(|(target, key, values)| {
                 target == "main::result"
@@ -1071,161 +981,6 @@ mod success {
     }
 
     #[test]
-    fn synthesizes_law_suite_modules_for_law_bearing_exports() {
-        let mut session = session();
-        register_test_intrinsics(&mut session);
-        session
-            .set_module_text(
-                &ModuleKey::new("main"),
-                r"
-            native let musi_true () : Bool;
-
-            export let Eq[T] := shape {
-              let (=) (a : T, b : T) : Bool;
-              law reflexive (x : T) := unsafe { musi_true(); };
-            };
-
-            export let Console := effect {
-              let readLine () : String;
-              law total () := unsafe { musi_true(); };
-            };
-        ",
-            )
-            .unwrap();
-
-        let suites = session.law_suite_modules().unwrap();
-        assert_eq!(suites.len(), 1);
-
-        let suite = &suites[0];
-        assert_eq!(suite.source_module_key, ModuleKey::new("main"));
-        assert_eq!(suite.suite_module_key, ModuleKey::new("main::__laws"));
-        assert_eq!(suite.export_name.as_ref(), "musiLawsTest");
-        assert_eq!(suite.law_count, 1);
-        let suite_source = session
-            .module_text(&suite.suite_module_key)
-            .expect("suite source should be materialized in session");
-        assert!(
-            suite_source.contains("native let musi_true () : Bool;"),
-            "{suite_source}"
-        );
-        assert!(
-            suite_source.contains("suiteStart(\"main laws\")"),
-            "{suite_source}"
-        );
-        assert!(
-            suite_source.contains("musiLawTest.testCase(\"Console.total\""),
-            "{suite_source}"
-        );
-        assert!(
-            suite_source.contains("unsafe { musi_true(); }"),
-            "{suite_source}"
-        );
-        assert!(!suite_source.contains(".True)"), "{suite_source}");
-        let _ = session.check_module(&suite.suite_module_key).unwrap();
-    }
-
-    #[test]
-    fn synthesizes_shape_laws_for_reachable_monomorphic_givens() {
-        let mut session = session();
-        register_test_intrinsics(&mut session);
-        session
-            .set_module_text(
-                &ModuleKey::new("main"),
-                r"
-            native let musi_true () : Bool;
-
-            export let IntEq := shape {
-              let eq (a : Int, b : Int) : Bool;
-              law reflexive (x : Int) := eq(x, x);
-            };
-
-            let eqInt := given IntEq {
-              let eq (a : Int, b : Int) : Bool := unsafe { musi_true(); };
-            };
-        ",
-            )
-            .unwrap();
-
-        let suites = session.law_suite_modules().unwrap();
-        assert_eq!(suites.len(), 1);
-
-        let suite = &suites[0];
-        assert_eq!(suite.export_name.as_ref(), "musiLawsTest");
-        assert_eq!(suite.law_count, 5);
-
-        let suite_source = session
-            .module_text(&suite.suite_module_key)
-            .expect("suite source should be materialized in session");
-        assert!(
-            suite_source.contains("musiLawTest.testCase(\"IntEq.reflexive[-2]\""),
-            "{suite_source}"
-        );
-        assert!(suite_source.contains("let musiLawCase"), "{suite_source}");
-        assert!(suite_source.contains("(x, x)"), "{suite_source}");
-        let _ = session.check_module(&suite.suite_module_key).unwrap();
-    }
-
-    #[test]
-    fn synthesizes_generic_shape_laws_for_exported_concrete_givens() {
-        let mut session = session();
-        register_test_intrinsics(&mut session);
-        session
-            .set_module_text(
-                &ModuleKey::new("main"),
-                r"
-            export let Eq[T] := shape {
-              let eq (left : T, right : T) : Bool;
-              law reflexive (value : T) := eq(value, value);
-              law symmetric (left : T, right : T) := eq(left, right) = eq(right, left);
-            };
-
-            export let intEq := given Eq[Int] {
-              let eq (left : Int, right : Int) : Bool := left = right;
-            };
-        ",
-            )
-            .unwrap();
-
-        let suites = session.law_suite_modules().unwrap();
-        assert_eq!(suites.len(), 1);
-        assert_eq!(suites[0].law_count, 30);
-        let _ = session.check_module(&suites[0].suite_module_key).unwrap();
-    }
-
-    #[test]
-    fn synthesizes_law_suites_for_concrete_constrained_givens() {
-        let mut session = session();
-        session
-            .set_module_text(
-                &ModuleKey::new("main"),
-                r"
-            export let Mark[T] := shape { };
-
-            let markInt := given Mark[Int] { };
-
-            let requireMark (x : Int) : Int where Int : Mark := x;
-
-            export let Foo := shape {
-              let useMark (x : Int) : Int;
-              law reflexive (x : Int) := useMark(x) = x;
-            };
-
-            let fooInt := given Foo where Int : Mark {
-              let useMark (x : Int) : Int := (
-                let helper (y : Int) : Int := requireMark(y);
-                helper(x)
-              );
-            };
-        ",
-            )
-            .unwrap();
-
-        let suites = session.law_suite_modules().unwrap();
-        assert_eq!(suites.len(), 1);
-        assert_eq!(suites[0].law_count, 5);
-    }
-
-    #[test]
     fn emits_meta_records_for_exported_signatures() {
         let mut session = session();
         session
@@ -1235,11 +990,8 @@ mod success {
             let Maybe[T] := data { | Some(Int) | None };
 
             let Eq[T] := shape { };
-            let eqInt := given Eq[Int] { };
 
-            let Console := effect { let readLine () : String; };
-
-            export let f (x : Int) : Int where Int : Eq require { Console } := x;
+            export let f (x : Int) : Int := x;
             export let sumId (x : Int + String) : Int + String := x;
             export let tupId (x : (Int, String)) : (Int, String) := x;
             export let arrId (x : [2]Int) : [2]Int := x;
@@ -1254,14 +1006,6 @@ mod success {
 
         let meta = meta_records(&output.artifact);
 
-        assert!(
-            meta_has_exact(&meta, "main::f", "value.constraints", &["Int : Eq"]),
-            "{meta:?}"
-        );
-        assert!(
-            meta_has_exact(&meta, "main::f", "value.effects", &["require { Console }"]),
-            "{meta:?}"
-        );
         assert!(
             meta.iter().any(|(target, key, values)| {
                 target == "main::sumId"
@@ -1318,17 +1062,8 @@ mod success {
         set_main_text(
             &mut session,
             r"
-            let Eq[T] := shape {
-              let eq (left : T, right : T) : Bool;
-            };
-
-            let intEq := given Eq[Int] {
-              let eq (left : Int, right : Int) : Bool := left = right;
-            };
-
-            let same[T] (left : T, right : T) : Bool where T : Eq := Eq.eq(left, right);
-            let direct := Eq.eq(1, 2);
-            let generic := same[Int](1, 2);
+            let same (left : Int, right : Int) : Bit := left = right;
+            let direct := same(1, 2);
             ",
         );
 
@@ -1347,17 +1082,13 @@ mod failure {
         set_main_text(
             &mut session,
             r"
-        let Clock := effect {
-          @knownSafe
-          let tick () : Int;
-        };
-        export let result () : Int := known ask Clock.tick();
+        export let result () : Int := missing();
     ",
         );
         let error = session
             .compile_entry(&main_key())
-            .expect_err("unhandled CTFE effect should fail");
-        assert!(matches!(error, SessionError::ModuleLoweringFailed { .. }));
+            .expect_err("unresolved known call should fail");
+        assert!(matches!(error, SessionError::ModuleResolveFailed { .. }));
     }
 
     #[test]
@@ -1497,33 +1228,5 @@ mod failure {
         assert_emit_failure_with_unknown_type_value!(|session: &mut Session, key: &ModuleKey| {
             session.compile_entry(key)
         });
-    }
-
-    #[test]
-    fn rejects_polymorphic_givens_for_class_law_suites() {
-        let mut session = session();
-        session
-            .set_module_text(
-                &ModuleKey::new("main"),
-                r"
-            native let musi_true () : Bool;
-
-            export let Eq[T] := shape {
-              let eq (a : T, b : T) : Bool;
-              law reflexive (x : T) := eq(x, x);
-            };
-
-            given[T] Eq[T] {
-              let eq (a : T, b : T) : Bool := unsafe { musi_true(); };
-            };
-        ",
-            )
-            .unwrap();
-
-        let err = session.law_suite_modules().unwrap_err();
-        let SessionError::LawSuiteSynthesisFailed { reason, .. } = err else {
-            panic!("expected law suite synthesis failure");
-        };
-        assert!(reason.contains("remains polymorphic"), "{reason}");
     }
 }

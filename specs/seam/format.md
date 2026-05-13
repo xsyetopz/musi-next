@@ -218,10 +218,10 @@ That means SEAM modules encode:
 - explicit block and label structure
 - explicit calls and indirect calls
 - explicit runtime object and layout operations
-- explicit handler-frame and continuation machinery
+- explicit control-frame and continuation machinery
 - explicit FFI interop operations
 
-SEAM modules do not encode source-level syntax such as pattern matching, `given` contextual visibility, range syntax, or `effect` / `answer` / `handle` / `resume` syntax directly.
+SEAM modules do not encode source-level syntax such as pattern matching, context visibility, or range syntax directly.
 
 Source-level ideas lower to stack bytecode plus descriptors. For example, tuples, records, variants, `?T`, and `E!T` use `new.obj` plus layout fields; dynamic messages use `call.dyn`; interface or shape dispatch uses `call.iface`; foreign ABI edges use `call.ffi`.
 

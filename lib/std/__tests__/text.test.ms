@@ -1,7 +1,7 @@
 let testing := import "@std/testing";
 let text := import "@std/text";
 
-export let test () :=
+export let test() :=
   (
     testing.describe("text/index");
     testing.it(

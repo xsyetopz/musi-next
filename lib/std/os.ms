@@ -3,34 +3,34 @@
 let sys := import "#sys";
 
 --- Operating system name.
-export opaque let Os := data {
+export hidden let Os := data {
   | OsName(value : String)
 };
 
 --- CPU architecture name.
-export opaque let Arch := data {
+export hidden let Arch := data {
   | ArchName(value : String)
 };
 
 --- Platform family name.
-export opaque let Family := data {
+export hidden let Family := data {
   | FamilyName(value : String)
 };
 
 --- Byte order.
-export opaque let Endian := data {
+export hidden let Endian := data {
   | Little
   | Big
 };
 
 --- JIT backend availability.
-export opaque let Jit := data {
+export hidden let Jit := data {
   | Supported(backend : String, isa : String)
   | Unsupported
 };
 
 --- Current compilation/runtime target facts.
-export opaque let Target := data {
+export hidden let Target := data {
   | TargetInfo(
     os : String,
     arch : String,
@@ -44,58 +44,58 @@ export opaque let Target := data {
 };
 
 --- Core operation for `os`.
-let makeOs (value : String) : Os := .OsName(value := value);
+let makeOs(value : String) : Os := .OsName(value := value);
 
 --- Core operation for `arch`.
-let makeArch (value : String) : Arch := .ArchName(value := value);
+let makeArch(value : String) : Arch := .ArchName(value := value);
 
 --- Core operation for `arch`.
-export let arch (value : String) : Arch := makeArch(value);
+export let arch(value : String) : Arch := makeArch(value);
 --- Core operation for `family`.
-let makeFamily (value : String) : Family := .FamilyName(value := value);
+let makeFamily(value : String) : Family := .FamilyName(value := value);
 
 --- Core operation for `family`.
-export let family (value : String) : Family := makeFamily(value);
+export let family(value : String) : Family := makeFamily(value);
 
 --- Core operation for `osText`.
-export let osText (target : Os) : String :=
+export let osText(target : Os) : String :=
   match target (
   | .OsName(value := value) => value
   );
 
 --- Core operation for `archText`.
-export let archText (target : Arch) : String :=
+export let archText(target : Arch) : String :=
   match target (
   | .ArchName(value := value) => value
   );
 
 --- Core operation for `familyText`.
-export let familyText (target : Family) : String :=
+export let familyText(target : Family) : String :=
   match target (
   | .FamilyName(value := value) => value
   );
 
 --- Core operation for `endianFromString`.
-export let endianFromString (value : String) : Endian :=
+export let endianFromString(value : String) : Endian :=
   match value (
   | "big" =>.Big
   | _ =>.Little
   );
 
 --- Core operation for `isSupported`.
-let jitIsSupported (target : Jit) : Bool :=
+let jitIsSupported(target : Jit) : Bit :=
   match target (
   | .Supported(backend := _, isa := _) => 0 = 0
   | .Unsupported => 0 = 1
   );
 
 --- Core operation for `isSupported`.
-export let isSupported (target : Jit) : Bool := jitIsSupported(target);
+export let isSupported(target : Jit) : Bit := jitIsSupported(target);
 
 --- Core operation for `currentJit`.
 export let currentJit : Jit :=
   match sys.jit.supported (
-  | supported if supported =>.Supported(
+  | supported where supported =>.Supported(
     backend := sys.jit.backend,
     isa := sys.jit.isa,
   )
@@ -104,14 +104,14 @@ export let currentJit : Jit :=
 
 let jitSupportedFlag : Int :=
   match sys.jit.supported (
-  | supported if supported => 1
+  | supported where supported => 1
   | _ => 0
   );
 
 --- Core operation for `current`.
 let jitSupportedFlag : Int :=
   match sys.jit.supported (
-  | supported if supported => 1
+  | supported where supported => 1
   | _ => 0
   );
 
@@ -129,7 +129,7 @@ export let current : Target :=
   );
 
 --- Core operation for `targetOs`.
-export let targetOs (target : Target) : Os :=
+export let targetOs(target : Target) : Os :=
   match target (
   | .TargetInfo(
     os := value,
@@ -144,7 +144,7 @@ export let targetOs (target : Target) : Os :=
   );
 
 --- Core operation for `targetArch`.
-export let targetArch (target : Target) : Arch :=
+export let targetArch(target : Target) : Arch :=
   match target (
   | .TargetInfo(
     os := _,
@@ -159,7 +159,7 @@ export let targetArch (target : Target) : Arch :=
   );
 
 --- Core operation for `targetFamily`.
-export let targetFamily (target : Target) : Family :=
+export let targetFamily(target : Target) : Family :=
   match target (
   | .TargetInfo(
     os := _,
@@ -174,7 +174,7 @@ export let targetFamily (target : Target) : Family :=
   );
 
 --- Core operation for `targetPointerWidth`.
-export let targetPointerWidth (target : Target) : Int :=
+export let targetPointerWidth(target : Target) : Int :=
   match target (
   | .TargetInfo(
     os := _,
@@ -189,7 +189,7 @@ export let targetPointerWidth (target : Target) : Int :=
   );
 
 --- Core operation for `targetEndian`.
-export let targetEndian (target : Target) : Endian :=
+export let targetEndian(target : Target) : Endian :=
   match target (
   | .TargetInfo(
     os := _,
@@ -204,7 +204,7 @@ export let targetEndian (target : Target) : Endian :=
   );
 
 --- Core operation for `targetJit`.
-export let targetJit (target : Target) : Jit :=
+export let targetJit(target : Target) : Jit :=
   match target (
   | .TargetInfo(
     os := _,
@@ -216,29 +216,29 @@ export let targetJit (target : Target) : Jit :=
     jitBackend := backend,
     jitIsa := isa,
   ) => match supported (
-  | success if success > 0 =>.Supported(backend := backend, isa := isa)
+  | success where success > 0 =>.Supported(backend := backend, isa := isa)
   | _ =>.Unsupported
   )
   );
 
 --- Core operation for `matchesOs`.
-export let matchesOs (value : Os) : Bool := sys.matchesOs(osText(value));
+export let matchesOs(value : Os) : Bit := sys.matchesOs(osText(value));
 --- Core operation for `matchesArch`.
-export let matchesArch (value : Arch) : Bool :=
+export let matchesArch(value : Arch) : Bit :=
   sys.matchesArch(archText(value));
 --- Core operation for `matchesFamily`.
-export let matchesFamily (value : Family) : Bool :=
+export let matchesFamily(value : Family) : Bit :=
   sys.matchesFamily(familyText(value));
 --- Core operation for `isUnix`.
-export let isUnix () : Bool := matchesFamily(makeFamily("unix"));
+export let isUnix() : Bit := matchesFamily(makeFamily("unix"));
 --- Core operation for `isDarwin`.
-export let isDarwin () : Bool := matchesFamily(makeFamily("darwin"));
+export let isDarwin() : Bit := matchesFamily(makeFamily("darwin"));
 --- Core operation for `isWindows`.
-export let isWindows () : Bool := matchesFamily(makeFamily("windows"));
+export let isWindows() : Bit := matchesFamily(makeFamily("windows"));
 --- Core operation for `isWebAssembly`.
-export let isWebAssembly () : Bool := matchesFamily(makeFamily("webassembly"));
+export let isWebAssembly() : Bit := matchesFamily(makeFamily("webassembly"));
 --- Core operation for `supportsJit`.
-export let supportsJit () : Bool := jitIsSupported(currentJit);
+export let supportsJit() : Bit := jitIsSupported(currentJit);
 
 --- Convert value to string.
 export let (self : Os).toString () : String := osText(self);
@@ -250,7 +250,7 @@ export let (self : Arch).toString () : String := archText(self);
 export let (self : Family).toString () : String := familyText(self);
 
 --- Returns true when JIT support exists.
-export let (self : Jit).isSupported () : Bool := jitIsSupported(self);
+export let (self : Jit).isSupported () : Bit := jitIsSupported(self);
 
 --- Target architecture.
 export let (self : Target).arch () : Arch := targetArch(self);

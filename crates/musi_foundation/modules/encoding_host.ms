@@ -4,29 +4,56 @@ let Core := import "musi:core";
 let Int := Core.Int;
 let String := Core.String;
 
-export opaque let EncodingHost := effect {
-  let base64Encode (source : String) : String;
-  let base64Decode (source : String) : String;
-  let base64IsValid (source : String) : Int;
-  let utf8Encode (source : String) : String;
-  let utf8Decode (source : String) : String;
-  let utf8IsValid (source : String) : Int;
+@external(
+  abi := .musi
+)
+let base64EncodeIntrinsic(source : String) : String;
+
+export let base64Encode(source : String) : String := unsafe {
+  base64EncodeIntrinsic(source);
 };
 
-export let base64Encode (source : String) : String :=
-  ask EncodingHost.base64Encode(source);
+@external(
+  abi := .musi
+)
+let base64DecodeIntrinsic(source : String) : String;
 
-export let base64Decode (source : String) : String :=
-  ask EncodingHost.base64Decode(source);
+export let base64Decode(source : String) : String := unsafe {
+  base64DecodeIntrinsic(source);
+};
 
-export let base64IsValid (source : String) : Int :=
-  ask EncodingHost.base64IsValid(source);
+@external(
+  abi := .musi
+)
+let base64IsValidIntrinsic(source : String) : Int;
 
-export let utf8Encode (source : String) : String :=
-  ask EncodingHost.utf8Encode(source);
+export let base64IsValid(source : String) : Int := unsafe {
+  base64IsValidIntrinsic(source);
+};
 
-export let utf8Decode (source : String) : String :=
-  ask EncodingHost.utf8Decode(source);
+@external(
+  abi := .musi
+)
+let utf8EncodeIntrinsic(source : String) : String;
 
-export let utf8IsValid (source : String) : Int :=
-  ask EncodingHost.utf8IsValid(source);
+export let utf8Encode(source : String) : String := unsafe {
+  utf8EncodeIntrinsic(source);
+};
+
+@external(
+  abi := .musi
+)
+let utf8DecodeIntrinsic(source : String) : String;
+
+export let utf8Decode(source : String) : String := unsafe {
+  utf8DecodeIntrinsic(source);
+};
+
+@external(
+  abi := .musi
+)
+let utf8IsValidIntrinsic(source : String) : Int;
+
+export let utf8IsValid(source : String) : Int := unsafe {
+  utf8IsValidIntrinsic(source);
+};

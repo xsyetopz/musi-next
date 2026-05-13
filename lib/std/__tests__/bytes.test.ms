@@ -1,7 +1,7 @@
 let bytes := import "@std/bytes";
 let testing := import "@std/testing";
 
-export let test () :=
+export let test() :=
   (
     testing.describe("bytes");
     let left := bytes.fromArray([1, 2]);

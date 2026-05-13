@@ -1,173 +1,165 @@
 --! Ordering and comparison helpers.
 
 --- Ordering expect for comparisons.
-export opaque let Ordering := data {
+export hidden let Ordering := data {
   | Less
   | Equal
   | Greater
 };
 
 --- Equality contract.
-export let Eq [T] := shape {
-  let eq (left : T, right : T) : Bool;
-  law reflexive (value : T) := eq(value, value);
-  law symmetric (left : T, right : T) := eq(left, right) = eq(right, left);
+export let Eq[T] := shape {
+  let eq(left : T, right : T) : Bit;
 };
 
 --- Less-than ordering value.
-export let less () : Ordering := .Less;
+export let less() : Ordering := .Less;
 
 --- Equal ordering value.
-export let equal () : Ordering := .Equal;
+export let equal() : Ordering := .Equal;
 
 --- Greater-than ordering value.
-export let greater () : Ordering := .Greater;
+export let greater() : Ordering := .Greater;
 
 --- Core operation for `isLess`.
-let orderingIsLess (target : Ordering) : Bool :=
+let orderingIsLess(target : Ordering) : Bit :=
   match target (
   | .Less => 0 = 0
   | _ => 0 = 1
   );
 
 --- Core operation for `isEqual`.
-let orderingIsEqual (target : Ordering) : Bool :=
+let orderingIsEqual(target : Ordering) : Bit :=
   match target (
   | .Equal => 0 = 0
   | _ => 0 = 1
   );
 
 --- Core operation for `isGreater`.
-let orderingIsGreater (target : Ordering) : Bool :=
+let orderingIsGreater(target : Ordering) : Bit :=
   match target (
   | .Greater => 0 = 0
   | _ => 0 = 1
   );
 
 --- Ordering contract.
-export let Ord [T] := shape {
-  let compare (left : T, right : T) : Ordering;
-  law reflexive (value : T) := orderingIsEqual(compare(value, value));
-  law lessGreaterDual (left : T, right : T) :=
-    orderingIsLess(compare(left, right)) = orderingIsGreater(
-      compare(right, left)
-    );
-  law equalSymmetric (left : T, right : T) :=
-    orderingIsEqual(compare(left, right)) = orderingIsEqual(
-      compare(right, left)
-    );
+export let Ord[T] := shape {
+  let compare(left : T, right : T) : Ordering;
 };
 
 --- Generic equality with built-in equality semantics.
-export let eq [T] (left : T, right : T) : Bool := left = right;
+export let eq[T] (left : T, right : T) : Bit := left = right;
 
 --- Generic inequality with built-in equality semantics.
-export let notEq [T] (left : T, right : T) : Bool := left /= right;
+export let notEq[T] (left : T, right : T) : Bit := left /= right;
 
 --- Core operation for `compareInt`.
-export let compareInt (left : Int, right : Int) : Ordering :=
+export let compareInt(left : Int, right : Int) : Ordering :=
   match () (
-  | _ if left < right => less()
-  | _ if left > right => greater()
+  | _ where left < right => less()
+  | _ where left > right => greater()
   | _ => equal()
   );
 
-native "musi" let compareFloatTotalIntrinsic (left : Float, right : Float) : Int;
+@external(
+  abi := .musi
+)
+let compareFloatTotalIntrinsic(left : Float, right : Float) : Int;
 
 --- Core operation for `compareFloat`.
-export let compareFloat (left : Float, right : Float) : Ordering :=
+export let compareFloat(left : Float, right : Float) : Ordering :=
   match unsafe {
   compareFloatTotalIntrinsic(left, right);
 } (
-| value if value < 0 => less()
-| value if value > 0 => greater()
+| value where value < 0 => less()
+| value where value > 0 => greater()
 | _ => equal()
 );
 
 --- Core operation for `compareString`.
-export let compareString (left : String, right : String) : Ordering :=
+export let compareString(left : String, right : String) : Ordering :=
   match () (
-  | _ if left < right => less()
-  | _ if left > right => greater()
+  | _ where left < right => less()
+  | _ where left > right => greater()
   | _ => equal()
   );
 
 --- Core operation for `minInt`.
-export let minInt (left : Int, right : Int) : Int :=
+export let minInt(left : Int, right : Int) : Int :=
   match compareInt(left, right) (
   | .Greater => right
   | _ => left
   );
 
 --- Core operation for `maxInt`.
-export let maxInt (left : Int, right : Int) : Int :=
+export let maxInt(left : Int, right : Int) : Int :=
   match compareInt(left, right) (
   | .Less => right
   | _ => left
   );
 
 --- Core operation for `clampInt`.
-export let clampInt (value : Int, lowerBound : Int, upperBound : Int,) : Int :=
+export let clampInt(value : Int, lowerBound : Int, upperBound : Int,) : Int :=
   maxInt(lowerBound, minInt(value, upperBound));
 
---- Integer equality given.
+--- Integer equality instance.
 export let intEq :=
-  given Eq[Int] {
-  let eq (left : Int, right : Int) : Bool := left = right;
+  shape {
+  let eq(left : Int, right : Int) : Bit := left = right;
 };
 
---- Float equality given.
+--- Float equality instance.
 export let floatEq :=
-  given Eq[Float] {
-  let eq (left : Float, right : Float) : Bool := left = right;
+  shape {
+  let eq(left : Float, right : Float) : Bit := left = right;
 };
 
---- String equality given.
+--- String equality instance.
 export let stringEq :=
-  given Eq[String] {
-  let eq (left : String, right : String) : Bool := left = right;
+  shape {
+  let eq(left : String, right : String) : Bit := left = right;
 };
 
---- Boolean equality given.
+--- Bit equality instance.
 export let boolEq :=
-  given Eq[Bool] {
-  let eq (left : Bool, right : Bool) : Bool := left = right;
+  shape {
+  let eq(left : Bit, right : Bit) : Bit := left = right;
 };
 
---- Integer ordering given.
+--- Integer ordering instance.
 export let intOrd :=
-  given Ord[Int] {
-  let compare (left : Int, right : Int) : Ordering := compareInt(left, right);
+  shape {
+  let compare(left : Int, right : Int) : Ordering := compareInt(left, right);
 };
 
---- Float ordering given.
+--- Float ordering instance.
 export let floatOrd :=
-  given Ord[Float] {
-  let compare (left : Float, right : Float) : Ordering :=
+  shape {
+  let compare(left : Float, right : Float) : Ordering :=
     compareFloat(left, right);
 };
 
---- String ordering given.
+--- String ordering instance.
 export let stringOrd :=
-  given Ord[String] {
-  let compare (left : String, right : String) : Ordering :=
+  shape {
+  let compare(left : String, right : String) : Ordering :=
     compareString(left, right);
 };
 
 --- Returns true when ordering is less.
-export let isLess (target : Ordering) : Bool := orderingIsLess(target);
+export let isLess(target : Ordering) : Bit := orderingIsLess(target);
 
 --- Returns true when ordering is less.
-export let (self : Ordering).isLess () : Bool := orderingIsLess(self);
+export let (self : Ordering).isLess() : Bit := orderingIsLess(self);
 
 --- Returns true when ordering is equal.
-export let isEqual (target : Ordering) : Bool := orderingIsEqual(target);
+export let isEqual(target : Ordering) : Bit := orderingIsEqual(target);
 
 --- Returns true when ordering is equal.
-export let (self : Ordering).isEqual () : Bool := orderingIsEqual(self);
+export let (self : Ordering).isEqual() : Bit := orderingIsEqual(self);
 
 --- Returns true when ordering is greater.
-export let isGreater (target : Ordering) : Bool := orderingIsGreater(target);
+export let isGreater(target : Ordering) : Bit := orderingIsGreater(target);
 
 --- Returns true when ordering is greater.
-export let (self : Ordering).isGreater () : Bool := orderingIsGreater(self);
+export let (self : Ordering).isGreater() : Bit := orderingIsGreater(self);

@@ -1,7 +1,7 @@
 let errors := import "@std/errors";
 let testing := import "@std/testing";
 
-export let test () :=
+export let test() :=
   (
     testing.describe("errors"),
     let value := errors.error("failed"),

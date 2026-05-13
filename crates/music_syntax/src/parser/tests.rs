@@ -63,10 +63,10 @@ mod success {
     }
 
     #[test]
-    fn parses_existential_and_opaque_capability_types() {
+    fn parses_erased_and_hidden_capability_types() {
         let parsed = parse(
             Lexer::new(
-                "let writeAny (writer : any Writer) : Int := 0; let writeSome (writer : some Writer) : Int := 0;",
+                "let writeErased(writer : erased Writer) : Int := 0; let writeHidden(writer : hidden Writer) : Int := 0;",
             )
             .lex(),
         );
@@ -110,20 +110,8 @@ mod success {
     }
 
     #[test]
-    fn old_surface_words_parse_as_identifiers() {
-        for word in ["class", "instance", "via", "using", "with", "provide"] {
-            let parsed = parse(Lexer::new(&format!("let {word} := 1;")).lex());
-            assert!(
-                parsed.errors().is_empty(),
-                "{word} produced parse errors: {:?}",
-                parsed.errors()
-            );
-        }
-    }
-
-    #[test]
-    fn parses_compound_optional_tokens() {
-        let parsed = parse(Lexer::new("a?.b; a!.b; a ?? b;").lex());
+    fn parses_maybe_expect_sugar_tokens() {
+        let parsed = parse(Lexer::new("let x : ?T := a ?? b; let y : E!T := value;").lex());
         assert!(
             parsed.errors().is_empty(),
             "unexpected errors: {:?}",
@@ -132,18 +120,23 @@ mod success {
     }
 
     #[test]
-    fn parses_mathematical_range_forms() {
+    fn parses_half_open_and_inclusive_ranges_without_touching_spread() {
+        let parsed = parse(Lexer::new("let a := 0 ..< n; let b := 0 .. n; f(...xs);").lex());
+        assert!(
+            parsed.errors().is_empty(),
+            "unexpected errors: {:?}",
+            parsed.errors()
+        );
+    }
+
+    #[test]
+    fn parses_stack_effect_forms() {
         let parsed = parse(
             Lexer::new(
                 r"
-                a .. b;
-                a ..< b;
-                a <.. b;
-                a <..< b;
-                a ..;
-                a <..;
-                .. a;
-                ..< a;
+                let empty : [;] := x;
+                let unary : [Word ; Bit] := y;
+                let binary : [Word, Word ; Word] := z;
                 ",
             )
             .lex(),
@@ -161,23 +154,14 @@ mod success {
             r#"
 	let x := 1;
 	import "std/io";
-	resume x;
-	ask x;
-	handle x answer h;
+	yield x;
+	defer close(file) where ok;
+	if ok then 1 else 0;
 	match x (| _ => 0);
-	native "c" let puts (msg : CString) : Int;
-	export let y := 2;
-	let Maybe[T] := data { | Some(T) | None };
-	let Console := effect { let write (text : String) : Unit; };
-	let Write := shape { let write (text : String) : Unit; };
-	given Write { let write (text : String) : Unit := (); };
-	answer Console { value => value; };
-	answer x;
-	given x;
-	a catch b;
-	quote (x + 1);
-	quote { x; };
-	@link(name := "c") native "c" let puts (msg : CString) : Int;
+	export hidden let y := 2;
+	let Maybe[T] := data { | Some(value : T) | None };
+	let Buffer := data { let ptr : Ptr[mut Byte]; let len : Nat; };
+	let Write := shape { let write(text : String) : Unit; };
 	`hello ${x}`;
 	{ x := 1 };
 	.Some(1);
@@ -251,7 +235,7 @@ mod success {
             match value (
               | .Some(x) as whole => whole
             );
-            value :? T as refined;
+            let refined : T := value;
         ",
             )
             .lex(),
@@ -284,10 +268,10 @@ mod success {
     }
 
     #[test]
-    fn parses_some_and_any_as_type_modifiers_only() {
+    fn parses_erased_and_hidden_as_type_modifiers() {
         let parsed = parse(
             Lexer::new(
-                "let writeAny (writer : any Writer) : Int := 0; let writeSome (writer : some Writer) : Int := 0;",
+                "let writeErased(writer : erased Writer) : Int := 0; let writeHidden(writer : hidden Writer) : Int := 0;",
             )
             .lex(),
         );
@@ -304,7 +288,7 @@ mod success {
             Lexer::new(
                 r"
             let Port := data {
-              | Configured(port : Int, secure : Bool)
+              | Configured(port : Int, secure : Bit)
               | Default
             };
             let port : Port := .Configured(secure := 0 = 0, port := 8080);
@@ -328,7 +312,7 @@ mod success {
         let parsed = parse(
             Lexer::new(
                 r"
-            let render (port : Int, secure : Bool) : Int := port;
+            let render (port : Int, secure : Bit) : Int := port;
             render(port := 8080, secure := 0 = 0);
         ",
             )
@@ -352,8 +336,8 @@ mod success {
     }
 
     #[test]
-    fn parses_case_and_handle_with_trailing_pipe() {
-        let parsed = parse(Lexer::new("match x (| _ => 0 |); handle x answer h;").lex());
+    fn parses_match_with_trailing_pipe() {
+        let parsed = parse(Lexer::new("match x (| _ => 0 |);").lex());
         assert!(
             parsed.errors().is_empty(),
             "unexpected errors: {:?}",
@@ -387,13 +371,14 @@ mod success {
     }
 
     #[test]
-    fn parses_handler_type_annotation() {
+    fn parses_if_defer_yield_and_let_else() {
         let parsed = parse(
             Lexer::new(
                 r"
-            let Console := effect { let readLine () : Int; };
-            let h : answer Console (Int -> Int) := answer Console;
-            handle x answer h;
+            let reply := yield request;
+            defer close(file) where not keep;
+            let .Some(x) := maybe else .None;
+            if x = 1 then 1 else 0;
         ",
             )
             .lex(),
@@ -430,10 +415,10 @@ mod success {
     fn parses_unsafe_block_expr() {
         let parsed = parse(
             Lexer::new(
-                r#"
-            native "c" let clock () : Int;
+                r"
+            let clock() : Int := 1;
             let value := unsafe { clock(); };
-        "#,
+        ",
             )
             .lex(),
         );
@@ -465,22 +450,22 @@ mod success {
     }
 
     #[test]
-    fn parses_partial_modifier_on_let() {
-        let parsed = parse(Lexer::new("partial let parseInt(text : String) : Int := 0;").lex());
+    fn parses_hidden_export_modifier_on_let() {
+        let parsed = parse(Lexer::new("export hidden let File := data { let fd : Word; };").lex());
         assert!(
             parsed.errors().is_empty(),
             "unexpected errors: {:?}",
             parsed.errors()
         );
         assert_eq!(
-            parse_kinds("partial let x := 1;"),
+            parse_kinds("export hidden let x := 1;"),
             vec![SyntaxNodeKind::AttributedExpr]
         );
     }
 
     #[test]
-    fn parses_type_equality_operator() {
-        let parsed = parse(Lexer::new("let ok : Bool := T ~= U;").lex());
+    fn parses_expect_type_sugar() {
+        let parsed = parse(Lexer::new("let result : IOError!Bytes := value;").lex());
         assert!(
             parsed.errors().is_empty(),
             "unexpected errors: {:?}",
@@ -499,9 +484,8 @@ mod success {
     }
 
     #[test]
-    fn parses_type_equality_constraint() {
-        let parsed =
-            parse(Lexer::new("let same[A, B] (value : A) : A where A ~= B := value;").lex());
+    fn parses_colon_constraint() {
+        let parsed = parse(Lexer::new("let same[A](value : A) : A where A : Eq := value;").lex());
         assert!(
             parsed.errors().is_empty(),
             "unexpected errors: {:?}",
@@ -510,8 +494,9 @@ mod success {
     }
 
     #[test]
-    fn parses_given_and_answer_prefix_forms() {
-        let parsed = parse(Lexer::new("given x; answer x;").lex());
+    fn parses_type_equality_constraint() {
+        let parsed =
+            parse(Lexer::new("let same[A, B](value : A) : A where A ~= B := value;").lex());
         assert!(
             parsed.errors().is_empty(),
             "unexpected errors: {:?}",
@@ -532,29 +517,8 @@ mod failure {
 
     #[test]
     fn rejects_reserved_keyword_binding_names() {
-        assert_has_parse_error("let some [T] (value : T) : T := value;", |kind| {
-            matches!(
-                kind,
-                ParseErrorKind::ReservedKeywordIdentifier {
-                    keyword: crate::TokenKind::KwSome
-                }
-            )
-        });
-        assert_has_parse_error("let any := 1;", |kind| {
-            matches!(
-                kind,
-                ParseErrorKind::ReservedKeywordIdentifier {
-                    keyword: crate::TokenKind::KwAny
-                }
-            )
-        });
-        assert_has_parse_error("let value := { some := 1 };", |kind| {
-            matches!(
-                kind,
-                ParseErrorKind::ReservedKeywordIdentifier {
-                    keyword: crate::TokenKind::KwSome
-                }
-            )
+        assert_has_parse_error("let if := 1;", |kind| {
+            matches!(kind, ParseErrorKind::ReservedKeywordIdentifier { .. })
         });
     }
 
@@ -597,7 +561,7 @@ mod failure {
 
     #[test]
     fn error_expected_member() {
-        assert_has_parse_error("effect { 1 };", |k| {
+        assert_has_parse_error("shape { 1 };", |k| {
             matches!(k, ParseErrorKind::ExpectedMember { .. })
         });
     }
@@ -610,15 +574,8 @@ mod failure {
     }
 
     #[test]
-    fn error_expected_splice_target() {
-        assert_has_parse_error("quote (#);", |k| {
-            matches!(k, ParseErrorKind::ExpectedSpliceTarget { .. })
-        });
-    }
-
-    #[test]
     fn error_expected_operator_member_name() {
-        assert_has_parse_error("effect { let 1; };", |k| {
+        assert_has_parse_error("shape { let 1; };", |k| {
             matches!(k, ParseErrorKind::ExpectedOperatorMemberName { .. })
         });
     }
@@ -642,11 +599,6 @@ mod failure {
         assert_has_parse_error("@a(; ) 1;", |k| {
             matches!(k, ParseErrorKind::ExpectedAttrValue { .. })
         });
-    }
-
-    #[test]
-    fn error_splice_outside_quote_is_reported() {
-        assert_has_parse_error("#x;", |k| matches!(k, ParseErrorKind::SpliceOutsideQuote));
     }
 
     #[test]
@@ -676,12 +628,12 @@ mod failure {
     }
 
     #[test]
-    fn error_partial_modifier_requires_let() {
-        assert_has_parse_error("partial x;", |k| {
+    fn error_if_requires_else() {
+        assert_has_parse_error("if x then y;", |k| {
             matches!(
                 k,
                 ParseErrorKind::ExpectedToken {
-                    expected: crate::TokenKind::KwLet,
+                    expected: crate::TokenKind::KwElse,
                     ..
                 }
             )

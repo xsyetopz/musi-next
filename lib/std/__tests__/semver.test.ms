@@ -1,7 +1,7 @@
 let semver := import "@std/semver";
 let testing := import "@std/testing";
 
-export let test () :=
+export let test() :=
   (
     testing.describe("semver"),
     let one := semver.parse("1.0.0"),

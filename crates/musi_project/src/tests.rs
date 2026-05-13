@@ -704,8 +704,8 @@ export let version := "0.1.0";
             "lib/std/testing.ms",
             r#"
 export let pass := { passed := .True, message := "" };
-export let describe (_name, _body) : Unit ~> Unit := _body();
-export let it (_name, _body) : Unit ~> Unit := _body();
+export let describe (_name, _body) : Unit -> Unit := _body();
+export let it (_name, _body) : Unit -> Unit := _body();
 "#,
         );
         write_file(
@@ -726,67 +726,6 @@ export let test () : Unit := 0;
                 .as_str()
                 .contains("@@std@0.1.0/__tests__/math.test.ms")
         }));
-    }
-
-    #[test]
-    fn merges_synthetic_law_suites_into_project_test_targets() {
-        let test_dir = TempDir::new();
-        write_file(
-            test_dir.path(),
-            "musi.json",
-            r#"{
-  "name": "app",
-  "version": "1.0.0"
-}"#,
-        );
-        write_file(
-            test_dir.path(),
-            "index.ms",
-            r"
-native let musi_true () : Bool;
-
-export let Console := effect {
-  let readLine () : String;
-  law total () := unsafe { musi_true(); };
-};
-",
-        );
-        write_file(
-            test_dir.path(),
-            "laws.test.ms",
-            r"
-export let test () := 0;
-",
-        );
-
-        let project =
-            Project::load(test_dir.path(), ProjectOptions::default()).expect("project loads");
-        let targets = project
-            .test_targets()
-            .expect("test targets should synthesize");
-        let app_targets = targets
-            .iter()
-            .filter(|target| target.package.name == "app")
-            .collect::<Vec<_>>();
-
-        assert_eq!(app_targets.len(), 2);
-        assert_eq!(app_targets[0].kind, ProjectTestTargetKind::Module);
-        assert_eq!(
-            app_targets[1].kind,
-            ProjectTestTargetKind::SyntheticLawSuite
-        );
-        assert_eq!(
-            app_targets[1].module_key,
-            ModuleKey::new("@app@1.0.0/index.ms::__laws")
-        );
-        assert_eq!(
-            app_targets[1].source_module_key,
-            ModuleKey::new("@app@1.0.0/index.ms")
-        );
-        assert_eq!(app_targets[1].export_name.as_ref(), "musiLawsTest");
-        let ProjectTestTargetSource::SyntheticModule = &app_targets[1].source else {
-            panic!("synthetic suite source expected");
-        };
     }
 
     #[test]
@@ -916,7 +855,7 @@ export let expect : Int := 1;
             "index.ms",
             r#"
 let Hub := import "hub";
-export let expect () : Bool := Hub.Dep.equals([1, 2], [1, 2]);
+export let expect () : Bit := Hub.Dep.equals([1, 2], [1, 2]);
 "#,
         );
         write_file(
@@ -954,7 +893,7 @@ export let Dep := import "dep";
             test_dir.path(),
             "packages/dep/index.ms",
             r"
-export let equals (left : []Int, right : []Int) : Bool := left = right;
+export let equals (left : []Int, right : []Int) : Bit := left = right;
 ",
         );
 
@@ -1081,7 +1020,7 @@ export let bytes := import "@std/bytes";
             test_dir.path(),
             "lib/std/bytes.ms",
             r"
-export let equals (left : []Int, right : []Int) : Bool := left = right;
+export let equals (left : []Int, right : []Int) : Bit := left = right;
 ",
         );
 
@@ -1145,7 +1084,7 @@ export let Maybe := import "@std/maybe";
             r#"
 let MaybePkg := import "@std/maybe";
 export let Int := Int;
-export opaque let Maybe := MaybePkg.Maybe;
+export hidden let Maybe := MaybePkg.Maybe;
 export let Some := MaybePkg.Some;
 export let none := MaybePkg.none;
 "#,
@@ -1154,7 +1093,7 @@ export let none := MaybePkg.none;
             test_dir.path(),
             "lib/std/maybe.ms",
             r"
-export opaque let Maybe[T] := data {
+export hidden let Maybe[T] := data {
   | Some(T)
   | None
 };

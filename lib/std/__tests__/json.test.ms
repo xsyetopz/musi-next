@@ -1,7 +1,7 @@
 let json := import "@std/json";
 let testing := import "@std/testing";
 
-export let test () :=
+export let test() :=
   (
     testing.describe("json");
     testing.it(

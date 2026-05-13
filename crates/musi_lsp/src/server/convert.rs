@@ -10,12 +10,13 @@ use async_lsp::lsp_types::{
     SemanticTokenType, SemanticTokensLegend, SignatureHelp, SignatureInformation, SymbolKind,
     TextEdit, Url, WorkspaceLocation, WorkspaceSymbol,
 };
+use musi_tooling::ToolDocumentHighlightKind::{Read, Text, Write};
 use musi_tooling::{
     CliDiagnostic, CliDiagnosticLabel, CliDiagnosticRange, ToolCompletion, ToolCompletionKind,
-    ToolDocumentLink, ToolDocumentSymbol, ToolFoldingRange, ToolFoldingRangeKind, ToolInlayHint,
-    ToolInlayHintKind, ToolLocation, ToolPosition, ToolRange, ToolSelectionRange,
-    ToolSemanticModifier, ToolSemanticToken, ToolSemanticTokenKind, ToolSignatureHelp,
-    ToolSignatureInformation, ToolSymbolKind, ToolWorkspaceSymbol,
+    ToolDocumentHighlightKind, ToolDocumentLink, ToolDocumentSymbol, ToolFoldingRange,
+    ToolFoldingRangeKind, ToolInlayHint, ToolInlayHintKind, ToolLocation, ToolPosition, ToolRange,
+    ToolSelectionRange, ToolSemanticModifier, ToolSemanticToken, ToolSemanticTokenKind,
+    ToolSignatureHelp, ToolSignatureInformation, ToolSymbolKind, ToolWorkspaceSymbol,
 };
 use serde_json::{Value, json};
 
@@ -129,12 +130,12 @@ pub(super) fn resolve_lsp_completion(mut completion: CompletionItem) -> Completi
 }
 
 pub(super) const fn to_lsp_document_highlight_kind(
-    kind: musi_tooling::ToolDocumentHighlightKind,
+    kind: ToolDocumentHighlightKind,
 ) -> DocumentHighlightKind {
     match kind {
-        musi_tooling::ToolDocumentHighlightKind::Read => DocumentHighlightKind::READ,
-        musi_tooling::ToolDocumentHighlightKind::Text => DocumentHighlightKind::TEXT,
-        musi_tooling::ToolDocumentHighlightKind::Write => DocumentHighlightKind::WRITE,
+        Read => DocumentHighlightKind::READ,
+        Text => DocumentHighlightKind::TEXT,
+        Write => DocumentHighlightKind::WRITE,
     }
 }
 

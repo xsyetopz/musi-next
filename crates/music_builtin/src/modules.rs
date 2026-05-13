@@ -33,6 +33,7 @@ pub const STD_PACKAGE_FILES: &[BuiltinPackageFile] = &[
     BuiltinPackageFile::new("ascii.ms"),
     BuiltinPackageFile::new("assert.ms"),
     BuiltinPackageFile::new("bits.ms"),
+    BuiltinPackageFile::new("bool.ms"),
     BuiltinPackageFile::new("bytes.ms"),
     BuiltinPackageFile::new("cli.ms"),
     BuiltinPackageFile::new("cli/prompt.ms"),

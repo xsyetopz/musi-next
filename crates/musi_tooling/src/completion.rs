@@ -383,14 +383,19 @@ fn push_import_record_export_completions(
     };
     let surface = imported.surface();
     for (index, export) in surface.exported_values().iter().enumerate() {
-        let label = export.name.to_string();
+        let label = export.name.as_ref();
         let kind = completion_kind_for_export(surface, export);
         let detail = completion_detail_for_export(kind);
         push_completion(
             completions,
             seen,
-            ToolCompletion::new(label.clone(), kind, Some(detail.to_owned()), *replace_range)
-                .with_sort_text(format!("1_{index:03}_{label}")),
+            ToolCompletion::new(
+                label.to_owned(),
+                kind,
+                Some(detail.to_owned()),
+                *replace_range,
+            )
+            .with_sort_text(format!("1_{index:03}_{label}")),
         );
     }
 }

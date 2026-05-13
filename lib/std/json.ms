@@ -3,12 +3,12 @@
 let jsonHost := import "musi:json";
 
 --- Normalized JSON text.
-export opaque let Json := data {
+export hidden let Json := data {
   | JsonSource(source : String)
 };
 
 --- Parse and normalize JSON text.
-export let parse (source : String) : Json :=
+export let parse(source : String) : Json :=
   .JsonSource(source := jsonHost.normalize(source));
 
 --- Render JSON text.
@@ -18,4 +18,4 @@ export let (self : Json).stringify () : String :=
   );
 
 --- Returns true when source is valid JSON.
-export let isValid (source : String) : Bool := jsonHost.isValid(source) > 0;
+export let isValid(source : String) : Bit := jsonHost.isValid(source) > 0;

@@ -181,7 +181,7 @@ mod success {
                 r"
             export let prependMatches () : Int :=
               match () (
-              | _ if [0, ...[1, 2]] = [0, 1, 2] => 1
+              | _ where [0, ...[1, 2]] = [0, 1, 2] => 1
               | _ => 0
               );
         ",
@@ -235,9 +235,12 @@ mod success {
             .register_module_text(
                 "main",
                 r#"
-            native "c" (
-              let puts (value : Int) : Int;
-            );
+            let Core := import "musi:core";
+            let String := Core.String;
+            @external(
+              abi := .musi
+            )
+            let puts(value : Int) : Int;
             export let result () : Int := unsafe { puts(42); };
         "#,
             )
@@ -249,28 +252,26 @@ mod success {
     }
 
     #[test]
-    fn routes_effect_calls_through_registered_handlers() {
+    fn routes_foreign_calls_through_registered_handlers_with_context() {
         let mut host = NativeHost::new();
-        host.register_effect_handler_with_context(
-            "main::Console",
-            "readLine",
-            |ctx, _effect, args| {
-                let [prompt] = args else {
-                    panic!("prompt expected");
-                };
-                let prompt = ctx.string(prompt).expect("prompt should be string");
-                assert_eq!(prompt.as_str(), ">");
-                Ok(Value::Int(42))
-            },
-        );
+        host.register_foreign_handler_with_context("main::readInt", |_ctx, _foreign, args| {
+            let [Value::Int(value)] = args else {
+                panic!("integer expected");
+            };
+            assert_eq!(*value, 7);
+            Ok(Value::Int(42))
+        });
         let mut runtime = Runtime::new(host, RuntimeOptions::default());
         runtime
             .register_module_text(
                 "main",
-                r#"
-            let Console := effect { let readLine (prompt : String) : Int; };
-            export let result () : Int := ask Console.readLine(">");
-        "#,
+                r"
+            @external(
+              abi := .musi
+            )
+            let readInt(value : Int) : Int;
+            export let result () : Int := unsafe { readInt(7); };
+        ",
             )
             .unwrap();
         runtime.load_root("main").unwrap();
@@ -288,12 +289,13 @@ mod success {
         runtime
             .register_module_text(
                 "main",
-                r#"
-            native "c" (
-              let puts (value : Int) : Int;
-            );
+                r"
+            @external(
+              abi := .c
+            )
+            let puts(value : Int) : Int;
             export let result () : Int := unsafe { puts(1); };
-        "#,
+        ",
             )
             .unwrap();
         runtime.load_root("main").unwrap();
@@ -320,7 +322,7 @@ mod success {
             r#"
 let Core := import "musi:core";
 export let Int := Core.Int;
-export let Bool := Core.Bool;
+export let Bit := Core.Bit;
 export let String := Core.String;
 export let Unit := Core.Unit;
 "#,
@@ -487,7 +489,7 @@ export let test () :=
             );
             export let logAndPrint () : Unit := (
               Log.info("runtime-log");
-              Io.print("runtime-print")
+              Io.write("runtime-print")
             );
         "#,
             )
@@ -521,10 +523,10 @@ export let test () :=
             let Io := import "musi:io";
             let Log := import "musi:log";
             export let test () : Unit := (
-              Io.print("out");
-              Io.printLine(" line");
-              Io.printError("err");
-              Io.printErrorLine(" line");
+              Io.write("out");
+              Io.writeLn(" line");
+              Io.writeErr("err");
+              Io.writeErrLn(" line");
               Log.write(40, "boom")
             );
         "#,
@@ -550,8 +552,8 @@ export let test () :=
             let Io := import "musi:io";
             let Log := import "musi:log";
             export let test () : Unit := (
-              Io.printLine("hidden");
-              Io.printErrorLine("hidden");
+              Io.writeLn("hidden");
+              Io.writeErrLn("hidden");
               Log.write(40, "hidden")
             );
         "#,
@@ -579,7 +581,7 @@ export let test () :=
             r#"
 let Core := import "musi:core";
 export let Int := Core.Int;
-export let Bool := Core.Bool;
+export let Bit := Core.Bit;
 export let String := Core.String;
 export let Unit := Core.Unit;
 "#,
@@ -598,7 +600,7 @@ export let Unit := Core.Unit;
             &mut runtime,
             "@std/bytes",
             r"
-export let equals (left : []Int, right : []Int) : Bool := left = right;
+export let equals (left : []Int, right : []Int) : Bit := left = right;
 ",
         );
         register_runtime_module(
@@ -607,8 +609,8 @@ export let equals (left : []Int, right : []Int) : Bool := left = right;
             r"
 export let clamp (value : Int, low : Int, high : Int) : Int :=
     match () (
-        | _ if value < low => low
-        | _ if value > high => high
+	    | _ where value < low => low
+	    | _ where value > high => high
         | _ => value
     );
 ",
@@ -617,7 +619,7 @@ export let clamp (value : Int, low : Int, high : Int) : Int :=
             &mut runtime,
             "@std/maybe",
             r"
-export opaque let Maybe[T] := data {
+	export hidden let Maybe[T] := data {
     | Some(T)
     | None
 };
@@ -638,13 +640,13 @@ export let unwrapOr [T] (value : Maybe[T], fallback : T) : T :=
 let Intrinsics := import "musi:test";
 
 export let toBe (actual : Int, expected : Int) := actual = expected;
-export let toBeTrue (actual : Bool) := actual;
+export let toBeTrue (actual : Bit) := actual;
 
 export let describe (name : String) :=
     Intrinsics.suiteStart(name);
 export let endDescribe () :=
     Intrinsics.suiteEnd();
-export let it (name : String, passed : Bool) :=
+export let it (name : String, passed : Bit) :=
     Intrinsics.testCase(name, passed);
 "#,
         );
@@ -684,21 +686,20 @@ mod failure {
         runtime
         .register_module_text(
             "main",
-            "export opaque let Secret := data { | Secret(Int) }; export let root () : Int := 0;",
+            "export hidden let Secret := data { | Secret(Int) }; export let root () : Int := 0;",
         )
         .unwrap();
         runtime
         .register_module_text(
             "dep",
-            "export opaque let Hidden := data { | Hidden(Int) }; export let result () : Int := 42;",
+            "export hidden let Hidden := data { | Hidden(Int) }; export let result () : Int := 42;",
         )
         .unwrap();
         runtime.load_root("main").unwrap();
 
-        let err = runtime.lookup_export("Secret").unwrap_err();
         assert!(matches!(
-            err.kind(),
-            RuntimeErrorKind::VmExecutionFailed(VmError { .. })
+            runtime.lookup_export("Secret").unwrap(),
+            Value::Type(_)
         ));
 
         let module = runtime.load_module("dep").unwrap();

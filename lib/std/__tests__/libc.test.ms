@@ -1,7 +1,7 @@
 let libc := import "@std/libc";
 let testing := import "@std/testing";
 
-export let test () :=
+export let test() :=
   (
     testing.describe("libc");
     testing.it("'strlen' counts C string bytes", libc.strlen("musi") > 0);

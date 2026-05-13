@@ -21,8 +21,8 @@ export let Empty := Empty;
 @musi.builtin(name := "Unit")
 export let Unit := Unit;
 
-@musi.builtin(name := "Bool")
-export let Bool := Bool;
+@musi.builtin(name := "Bit")
+export let Bit := Bit;
 
 @musi.builtin(name := "Nat")
 export let Nat := Nat;
@@ -84,57 +84,52 @@ export let CString := CString;
 @musi.builtin(name := "CPtr")
 export let CPtr := CPtr;
 
-export opaque let Maybe [T] := data {
+export hidden let Maybe[T] := data {
   | Some(T)
   | None
 };
 
-export let Some [T] (value : T) : Maybe[T] := .Some(value);
+export let Some[T] (value : T) : Maybe[T] := .Some(value);
 
-export let None [T] () : Maybe[T] := .None;
+export let None[T] () : Maybe[T] := .None;
 
-export let isSome [T] (value : Maybe[T]) : Bool :=
+export let isSome[T] (value : Maybe[T]) : Bit :=
   match value (
   | .Some(item) => 0 = 0
   | .None => 0 = 1
   );
 
-export let isNone [T] (value : Maybe[T]) : Bool :=
+export let isNone[T] (value : Maybe[T]) : Bit :=
   match value (
   | .Some(item) => 0 = 1
   | .None => 0 = 0
   );
 
-export let unwrapOr [T] (value : Maybe[T], fallback : T) : T :=
+export let unwrapOr[T] (value : Maybe[T], fallback : T) : T :=
   match value (
   | .Some(item) => item
   | .None => fallback
   );
 
-export opaque let Abort := effect {
-  let abort () : Empty;
+export hidden let Abort := shape {
 };
 
-export let abort () : Empty := ask Abort.abort();
+@external(
+  abi := .musi
+)
+let abortIntrinsic() : Empty;
 
-export opaque let Rangeable [T] := shape {
-  let compare (left : T, right : T) : Int;
-  let next (value : T) : Maybe[T];
-  let prev (value : T) : Maybe[T];
+export let abort() : Empty := unsafe {
+  abortIntrinsic();
 };
 
-export opaque let RangeBounds [T] := shape {
-  let defaultLowerBound () : T;
-  let defaultUpperBound () : T;
+export hidden let Rangeable[T] := shape {
+  let compare(left : T, right : T) : Int;
+  let next(value : T) : Maybe[T];
+  let prev(value : T) : Maybe[T];
 };
 
-export given Rangeable[Int] {
-  let compare (left : Int, right : Int) : Int := left - right;
-  let next (value : Int) : Maybe[Int] := Some[Int](value + 1);
-  let prev (value : Int) : Maybe[Int] := Some[Int](value - 1);
-};
-
-export given RangeBounds[Int] {
-  let defaultLowerBound () : Int := - 1000000;
-  let defaultUpperBound () : Int := 1000000;
+export hidden let RangeBounds[T] := shape {
+  let defaultLowerBound() : T;
+  let defaultUpperBound() : T;
 };

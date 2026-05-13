@@ -4,10 +4,10 @@ SEAM is Musi's virtual machine. SEAM IL is the umbrella term for code after Musi
 
 ## Layers
 
-- **SEAM HIL** is high-level, typed SEAM IL. It keeps functions, blocks, values, data construction, calls, `given`, `answer`, `handle`, `resume`, native calls, contextual requirements, and proof-trust roots explicit.
+- **SEAM HIL** is high-level, typed SEAM IL. It keeps functions, blocks, values, data construction, calls, external calls, capability parameters, and runtime-boundary facts explicit.
 - **SEAM BC/IL** is lowered canonical transport IL. It is stack-based assembly form that maps one-to-one to bytecode and VM execution.
 
-`music disasm` prints SEAM HIL projection by default. Use `music disasm --level seam` to print lowered `.seam` IL.
+`music disasm` writes SEAM HIL projection by default. Use `music disasm --level seam` to write lowered `.seam` IL.
 
 HIL and BC/IL use different textual syntaxes by design:
 
@@ -29,7 +29,7 @@ BC/IL is stack based:
 - branches transfer the whole current stack after condition/index pop
 - target stack must exactly match target block `stack [...]`
 
-BC/IL is not source syntax. It has no opcodes named `given`, `shape`, `law`, `proof`, `answer`, `ask`, `option`, `result`, `tuple`, or `sum`.
+BC/IL is not source syntax. It has no opcodes named `shape`, `option`, `result`, `tuple`, or `sum`.
 
 Core lowering examples:
 
@@ -37,7 +37,7 @@ Core lowering examples:
 - first-class functions: `ld.fn`, `new.fn`, `call.ind`
 - receiver dispatch: `call.virt`, `call.iface`, `call.dyn`
 - FFI: `call.ffi`, `ld.ffi`
-- resumable control: `hdl.push`, `raise`, `resume`, `hdl.pop`
+- suspension/runtime protocols: explicit VM operations, not source keywords
 
 Full opcode positions and stack effects live in `specs/seam/bytecode.md`.
 
@@ -51,6 +51,6 @@ Full opcode positions and stack effects live in `specs/seam/bytecode.md`.
 - mismatched binary operand types
 - return values that do not match function result type
 - missing branch targets
-- effect or native calls without declared capabilities
+- external calls without declared capabilities
 
 HIL is for compiler and tooling views. `.seam` IL remains the runtime transport.

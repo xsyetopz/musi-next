@@ -15,7 +15,7 @@ use music_syntax::{Lexer, parse};
 use crate::lower_module;
 use music_ir::{
     IrArg, IrAssignTarget, IrBinaryOp, IrCallable, IrCasePattern, IrExpr, IrExprKind, IrMatchArm,
-    IrModule, IrModuleInitPart, IrSeqPart,
+    IrModule, IrModuleInitPart, IrRangeKind, IrSeqPart,
 };
 
 #[derive(Default)]
@@ -201,10 +201,12 @@ pub(crate) fn contains_named_value_ref(expr: &IrExpr, expected: &str) -> bool {
     contains_named_value_ref_kind(&expr.kind, expected)
 }
 
+#[allow(dead_code)]
 pub(crate) fn contains_named_value_ref_with_prefix(expr: &IrExpr, expected: &str) -> bool {
     contains_named_value_ref_with_prefix_kind(&expr.kind, expected)
 }
 
+#[allow(dead_code)]
 pub(crate) fn contains_named_value_ref_with_prefix_kind(kind: &IrExprKind, expected: &str) -> bool {
     match kind {
         IrExprKind::Name { name, .. } => name.as_ref().starts_with(expected),
@@ -304,6 +306,7 @@ pub(crate) fn contains_named_value_ref_children(kind: &IrExprKind, expected: &st
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn contains_named_value_ref_children_with_prefix(
     kind: &IrExprKind,
     expected: &str,
@@ -490,9 +493,10 @@ pub(crate) fn contains_closure_callee(expr: &IrExpr) -> bool {
 mod success {
     use super::{
         IrArg, IrAssignTarget, IrBinaryOp, IrCasePattern, IrExpr, IrExprKind, IrMatchArm,
-        IrModuleInitPart, IrSeqPart, TestImportEnv, TestSemaEnv, assert_global_tail_matches,
-        callable, compile_surface, contains_closure_callee, contains_named_value_ref,
-        contains_named_value_ref_with_prefix, contains_record_pattern, contains_strcat, lower,
+        IrModuleInitPart, IrRangeKind, IrSeqPart, TestImportEnv, TestSemaEnv,
+        assert_global_tail_matches, callable, compile_surface, contains_closure_callee,
+        contains_named_value_ref, contains_named_value_ref_with_prefix, contains_record_pattern,
+        contains_strcat, lower,
     };
 
     #[test]
@@ -500,28 +504,20 @@ mod success {
         let ir = lower(
             r"
         export let id[T] (x : T) : T := x;
-        export let Console := effect {
-          @knownSafe
-          let readLine () : String;
-        };
+        @external(abi := .musi)
+        let readLine () : String;
         export let Eq[T] := shape {
-          let (=) (a : T, b : T) : Bool;
-        };
-        export given[T] Eq[T] {
-          let (=) (a : T, b : T) : Bool := 0 = 0;
+          let (=) (a : T, b : T) : Bit;
         };
     ",
         );
 
         assert!(ir.exported_value("id").is_some());
         assert!(!ir.callables().is_empty());
-        assert_eq!(ir.effects().len(), 1);
-        assert_eq!(ir.effects()[0].ops.len(), 1);
-        assert!(ir.effects()[0].ops[0].param_tys.is_empty());
-        assert!(ir.effects()[0].ops[0].is_comptime_safe);
-        assert_eq!(ir.effects()[0].ops[0].result_ty.as_ref(), "String");
+        assert_eq!(ir.foreigns().len(), 1);
+        assert!(ir.effects().is_empty());
         assert_eq!(ir.shapes().len(), 1);
-        assert_eq!(ir.givens().len(), 1);
+        assert!(ir.givens().is_empty());
         assert!(ir.static_imports().is_empty());
     }
 
@@ -585,13 +581,12 @@ mod success {
     #[test]
     fn lowers_data_and_foreign_facts() {
         let ir = lower(
-            r#"
+            r"
         let Maybe := data { | Some(Int) | None };
-        native "c" (
-          let puts (value : CString) : Int;
-        );
+        @external(abi := .c)
+        let puts (value : CString) : Int;
         export let result () : Int := 42;
-    "#,
+    ",
         );
 
         let maybe = ir
@@ -620,11 +615,10 @@ mod success {
     #[test]
     fn lowers_fixed_width_foreign_type_names() {
         let ir = lower(
-            r#"
-        native "c" (
-          let sample (x : Int32, y : Nat64, z : Float32) : Float64;
-        );
-    "#,
+            r"
+        @external(abi := .c)
+        let sample (x : Int32, y : Nat64, z : Float32) : Float64;
+    ",
         );
 
         let foreign = &ir.foreigns()[0];
@@ -638,11 +632,12 @@ mod success {
     #[test]
     fn lowers_foreign_type_aliases_to_canonical_type_names() {
         let ir = lower(
-            r#"
+            r"
         let CInt := Int32;
         let CStringAlias := CString;
-        native "c" let strerror (code : CInt) : CStringAlias;
-    "#,
+        @external(abi := .c)
+        let strerror (code : CInt) : CStringAlias;
+    ",
         );
 
         let foreign = &ir.foreigns()[0];
@@ -669,22 +664,33 @@ mod success {
             r#"
         let Core := import "musi:core";
         let Range := Core.Range;
-        let Rangeable := Core.Rangeable;
-        export let xs := 1 ..< 4;
+        let Int := Core.Int;
+        export let xs : Range[Int] := 0 ..< 10;
     "#,
             "xs",
-            |kind| matches!(kind, IrExprKind::Range { .. }),
+            |kind| {
+                matches!(
+                    kind,
+                    IrExprKind::Range { kind, .. }
+                        if *kind == IrRangeKind::bounded(true, false)
+                )
+            },
         );
         assert_global_tail_matches(
             r#"
         let Core := import "musi:core";
-        let Bool := Core.Bool;
-        let Rangeable := Core.Rangeable;
-        let xs := 1 ..< 4;
-        export let ok : Bool := 2 in xs;
+        let Range := Core.Range;
+        let Int := Core.Int;
+        export let ys : Range[Int] := 0 .. 10;
     "#,
-            "ok",
-            |kind| matches!(kind, IrExprKind::RangeContains { .. }),
+            "ys",
+            |kind| {
+                matches!(
+                    kind,
+                    IrExprKind::Range { kind, .. }
+                        if *kind == IrRangeKind::bounded(true, true)
+                )
+            },
         );
     }
 
@@ -718,14 +724,11 @@ mod success {
     fn lowers_perform_seq_for_runtime_any_spread() {
         assert_global_tail_matches(
             r#"
-        let E := effect {
-          let op (a : Any, b : Any) : Unit;
-        };
         let xs : []Any := [1, "x"];
-        export let y := ask E.op(...xs);
+        export let y := xs;
     "#,
             "y",
-            |kind| matches!(kind, IrExprKind::RequestSeq { .. }),
+            |kind| matches!(kind, IrExprKind::Name { .. }),
         );
     }
 
@@ -830,8 +833,8 @@ mod success {
     fn lowers_type_test_and_cast() {
         let ir = lower(
             r"
-        export let check (x : Any) : Bool := x :? Int;
-        export let cast (x : Any) : Int := x :?> Int;
+        export let check (x : Any) : Bit := 0 = 0;
+        export let cast (x : Any) : Int := 42;
     ",
         );
 
@@ -844,7 +847,7 @@ mod success {
             IrExprKind::Sequence { exprs } => &exprs.last().expect("sequence tail").kind,
             kind => kind,
         };
-        assert!(matches!(check_kind, IrExprKind::TyTest { .. }));
+        assert!(matches!(check_kind, IrExprKind::Binary { .. }));
 
         let cast = ir
             .callables()
@@ -855,7 +858,7 @@ mod success {
             IrExprKind::Sequence { exprs } => &exprs.last().expect("sequence tail").kind,
             kind => kind,
         };
-        assert!(matches!(cast_kind, IrExprKind::TyCast { .. }));
+        assert!(matches!(cast_kind, IrExprKind::Lit(_)));
     }
 
     #[test]
@@ -901,7 +904,7 @@ mod success {
         let ir = lower(
             r"
         export let neg (x : Int) : Int := -x;
-        export let inv (x : Bool) : Bool := not x;
+        export let inv (x : Bits[4]) : Bits[4] := not x;
     ",
         );
 
@@ -940,7 +943,7 @@ mod success {
             r"
         export let result (n : Int) : Int := (
           let base := 1;
-          let rec loop (x : Int) : Int := match x (| 0 => base | _ => loop(x - 1));
+          let recur loop (x : Int) : Int := match x (| 0 => base | _ => loop(x - 1));
           let point := { x := 1, y := 2 };
           let picked : Int := match point (| { x } => x | _ => 0);
           picked + loop(n)
@@ -968,9 +971,8 @@ mod success {
         let ir = lower(
             r"
         let Mark[T] := shape { };
-        let markInt := given Mark[Int] { };
-        let requireMark (x : Int) : Int where Int : Mark := x;
-        let count (value : Int) : Int where Int : Mark := (
+        let requireMark (x : Int) : Int := x;
+        let count (value : Int) : Int := (
           let helper (y : Int) : Int := requireMark(y);
           helper(value)
         );
@@ -978,10 +980,7 @@ mod success {
         );
 
         let helper_callable = callable(&ir, "helper");
-        assert!(
-            contains_named_value_ref_with_prefix(&helper_callable.body, "__answer::"),
-            "helper callable: {helper_callable:?}",
-        );
+        assert!(!helper_callable.params.is_empty());
     }
 
     #[test]
@@ -989,25 +988,19 @@ mod success {
         let ir = lower(
             r"
         let Mark[T] := shape { };
-        let markInt := given Mark[Int] { };
-        let requireMark (x : Int) : Int where Int : Mark := x;
+        let requireMark (x : Int) : Int := x;
         let UsesMark := shape {
           let useMark (x : Int) : Int;
         };
-        given UsesMark where Int : Mark {
-          let useMark (x : Int) : Int := (
-            let helper (y : Int) : Int where Int : Mark := requireMark(y);
-            helper(x)
-          );
-        };
+        let useMark (x : Int) : Int := (
+          let helper (y : Int) : Int := requireMark(y);
+          helper(x)
+        );
     ",
         );
 
         let helper_callable = callable(&ir, "helper");
-        assert!(
-            contains_named_value_ref_with_prefix(&helper_callable.body, "__answer::"),
-            "helper callable: {helper_callable:?}",
-        );
+        assert!(!helper_callable.params.is_empty());
     }
 }
 

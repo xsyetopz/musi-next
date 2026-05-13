@@ -1,7 +1,7 @@
 let io := import "@std/io";
 let testing := import "@std/testing";
 
-export let test () :=
+export let test() :=
   (
     testing.describe("io");
     testing.it("'write' returns without failure",
@@ -10,9 +10,9 @@ export let test () :=
           0 = 0
         ));
     testing.it(
-      "'writeLine' returns without failure",
+      "'writeLn' returns without failure",
         (
-          io.writeLine("std-io");
+          io.writeLn("std-io");
           0 = 0
         ),
     );
@@ -24,9 +24,9 @@ export let test () :=
         ),
     );
     testing.it(
-      "'writeErrLine' returns without failure",
+      "'writeErrLn' returns without failure",
         (
-          io.writeErrLine("std-io");
+          io.writeErrLn("std-io");
           0 = 0
         ),
     );

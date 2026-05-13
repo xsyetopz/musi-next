@@ -5,25 +5,56 @@ let Int := Core.Int;
 let String := Core.String;
 let Unit := Core.Unit;
 
-export opaque let Fs := effect {
-  let readText (path : String) : String;
-  let writeText (path : String, text : String) : Unit;
-  let exists (path : String) : Int;
-  let appendText (path : String, text : String) : Int;
-  let remove (path : String) : Int;
-  let createDirAll (path : String) : Int;
+@external(
+  abi := .musi
+)
+let readTextIntrinsic(path : String) : String;
+
+export let readText(path : String) : String := unsafe {
+  readTextIntrinsic(path);
 };
 
-export let readText (path : String) : String := ask Fs.readText(path);
+@external(
+  abi := .musi
+)
+let writeTextIntrinsic(path : String, text : String) : Unit;
 
-export let writeText (path : String, text : String) : Unit :=
-  ask Fs.writeText(path, text);
+export let writeText(path : String, text : String) : Unit := unsafe {
+  writeTextIntrinsic(path, text);
+};
 
-export let exists (path : String) : Int := ask Fs.exists(path);
+@external(
+  abi := .musi
+)
+let existsIntrinsic(path : String) : Int;
 
-export let appendText (path : String, text : String) : Int :=
-  ask Fs.appendText(path, text);
+export let exists(path : String) : Int := unsafe {
+  existsIntrinsic(path);
+};
 
-export let remove (path : String) : Int := ask Fs.remove(path);
+@external(
+  abi := .musi
+)
+let appendTextIntrinsic(path : String, text : String) : Int;
 
-export let createDirAll (path : String) : Int := ask Fs.createDirAll(path);
+export let appendText(path : String, text : String) : Int := unsafe {
+  appendTextIntrinsic(path, text);
+};
+
+@external(
+  abi := .musi
+)
+let removeIntrinsic(path : String) : Int;
+
+export let remove(path : String) : Int := unsafe {
+  removeIntrinsic(path);
+};
+
+@external(
+  abi := .musi
+)
+let createDirAllIntrinsic(path : String) : Int;
+
+export let createDirAll(path : String) : Int := unsafe {
+  createDirAllIntrinsic(path);
+};

@@ -5,7 +5,7 @@ let testing := import "@std/testing";
 let targetDir := path.fromString(".musi-std-fs-test");
 let filePath := targetDir.join(path.fromString("musi-std-fs-test.txt"));
 
-export let test () :=
+export let test() :=
   (
     testing.describe("fs");
     testing.it("'createDirAll' creates target dir", fs.createDirAll(targetDir),);

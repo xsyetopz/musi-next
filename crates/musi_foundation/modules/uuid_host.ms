@@ -3,8 +3,11 @@
 let Core := import "musi:core";
 let String := Core.String;
 
-export opaque let UuidHost := effect {
-  let v4 () : String;
-};
+@external(
+  abi := .musi
+)
+let v4Intrinsic() : String;
 
-export let v4 () : String := ask UuidHost.v4();
+export let v4() : String := unsafe {
+  v4Intrinsic();
+};

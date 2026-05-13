@@ -17,7 +17,7 @@ Each opcode must define:
 - which descriptor or immediate operand constrains it
 - which verifier rule makes the transition valid
 
-Source concepts do not name opcodes. There are no bytecode opcodes named `class`, `instance`, `given`, `shape`, `law`, `proof`, `answer`, `ask`, `handler`, `option`, `result`, `tuple`, `sum`, or `splice`.
+Source concepts do not name opcodes. Bytecode mnemonics describe VM operations, not source declarations or type constructors.
 
 ## Rust Comparison
 
@@ -74,7 +74,7 @@ cast    checked cast
 conv    conversion
 box     box value
 unbox   unbox value
-hdl     handler/control frame
+hdl     control frame
 raise   raise resumable operation
 resume  resume continuation
 pin     pin managed object
@@ -195,7 +195,7 @@ global     global id
 import     import id
 export     export id
 foreign    foreign ABI descriptor id
-handler    resumable handler descriptor id
+control    resumable control descriptor id
 op         resumable operation descriptor id
 block      block id
 btbl       branch table id
@@ -381,14 +381,14 @@ There is no arbitrary pointer arithmetic opcode.
 
 |       Hex | Mnemonic    | Operand | Stack effect         | Meaning                               |
 | --------: | ----------- | ------- | -------------------- | ------------------------------------- |
-|      `A0` | `hdl.push`  | handler | `Hdl ->`             | push handler/control frame            |
-|      `A1` | `hdl.pop`   | none    | `->`                 | pop handler/control frame             |
+|      `A0` | `hdl.push`  | control | `Hdl ->`             | push control frame                    |
+|      `A1` | `hdl.pop`   | none    | `->`                 | pop control frame                     |
 |      `A2` | `raise`     | op      | `args -> results`    | invoke resumable operation            |
 |      `A3` | `resume`    | none    | `Cont, results -> !` | resume one-shot continuation          |
 |      `A4` | `drop.cont` | none    | `Cont ->`            | consume continuation without resuming |
 | `A5`-`AF` | reserved    |         |                      |                                       |
 
-`raise` captures the continuation according to the operation descriptor. Handler clause methods receive the captured continuation as an ordinary parameter when the handler descriptor says they do.
+`raise` captures the continuation according to the operation descriptor. Driver clause methods receive the captured continuation as an ordinary parameter when the control descriptor says they do.
 
 ### `0xB0..0xBF` Link And Module
 
@@ -486,7 +486,7 @@ raise $Console.readLine
 hdl.pop
 ```
 
-Handler clause receives `Cont` as an ordinary argument when the handler descriptor needs resumption.
+Driver clause receives `Cont` as an ordinary argument when the control descriptor needs resumption.
 
 ```seamil
 ld.arg 0

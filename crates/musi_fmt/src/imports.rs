@@ -200,7 +200,7 @@ fn is_attached_import_line_comment(line: &str) -> bool {
 
 fn is_attached_import_block_comment_start(line: &str) -> bool {
     let trimmed = line.trim_start();
-    trimmed.starts_with("/-") && !trimmed.starts_with("/-!")
+    starts_with_block_comment(trimmed) && !starts_with_module_block_comment(trimmed)
 }
 
 fn attached_block_comment_start(
@@ -211,9 +211,21 @@ fn attached_block_comment_start(
     if !previous_line.trim_end().ends_with("-/") {
         return None;
     }
-    let block_start = source.get(..attach_start)?.rfind("/-")?;
+    let block_start = source
+        .get(..attach_start)?
+        .as_bytes()
+        .windows(2)
+        .rposition(|window| matches!(window, [b'/', b'-']))?;
     let block_opener = source.get(block_start..block_start.saturating_add(3))?;
-    (!block_opener.starts_with("/-!")).then_some(block_start)
+    (!starts_with_module_block_comment(block_opener)).then_some(block_start)
+}
+
+fn starts_with_block_comment(text: &str) -> bool {
+    text.as_bytes().starts_with(b"/-")
+}
+
+fn starts_with_module_block_comment(text: &str) -> bool {
+    text.as_bytes().starts_with(b"/-!")
 }
 
 fn previous_line_start(source: &str, line_start: usize) -> Option<usize> {
@@ -409,7 +421,10 @@ fn collect_field_ranges(
 }
 
 fn field_contains_comment(field: &str) -> bool {
-    field.contains("--") || field.contains("/-")
+    field
+        .as_bytes()
+        .windows(2)
+        .any(|window| matches!(window, [b'-' | b'/', b'-']))
 }
 
 fn sort_nested_record_fields(field: &str) -> String {

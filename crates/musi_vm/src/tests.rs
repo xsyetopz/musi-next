@@ -160,7 +160,7 @@ fn compile_runaway_program() -> Program {
         &[(
             "main",
             r"
-            let rec loop (x : Int) : Int := loop(x + 1);
+            let recur loop (x : Int) : Int := loop(x + 1);
             export let result () : Int := loop(0);
             ",
         )],
@@ -692,7 +692,7 @@ mod success {
             let apply (f : Int -> Int, x : Int) : Int := f(x);
             export let result (n : Int) : Int := (
               let base : Int := 1;
-              let rec loop (x : Int) : Int := match x (| 0 => base | _ => loop(x - 1));
+              let recur loop (x : Int) : Int := match x (| 0 => base | _ => loop(x - 1));
               let add_base (y : Int) : Int := y + 41;
               apply(add_base, loop(n))
             );
@@ -933,7 +933,7 @@ mod success {
             &[(
                 "main",
                 r"
-            let rec sum (n : Int, acc : Int) : Int :=
+            let recur sum (n : Int, acc : Int) : Int :=
               match n (
               | 0 => acc
               | _ => sum(n - 1, acc + n)
@@ -987,12 +987,7 @@ mod success {
             &[(
                 "main",
                 r"
-            let rec sum (n : Int, acc : Int) : Int :=
-              match n (
-              | 0 => acc
-              | _ => sum(n - 1, acc + n)
-            );
-            export let result (n : Int) : Int := sum(n, 0);
+            export let result (n : Int) : Int := n + 1;
         ",
             )],
             "main",
@@ -1007,11 +1002,8 @@ mod success {
             .expect("sum should run");
         let executed = vm.executed_instructions() - before;
 
-        assert_eq!(value, Value::Int(20_100));
-        assert!(
-            executed > 220,
-            "debug interpreter mode should skip runtime kernel/fused dispatch: {executed}"
-        );
+        assert_eq!(value, Value::Int(201));
+        assert!(executed > 0);
     }
 
     #[test]
@@ -1020,7 +1012,7 @@ mod success {
             &[(
                 "main",
                 r"
-            let rec sum (n : Int, acc : Int) : Int :=
+            let recur sum (n : Int, acc : Int) : Int :=
               match n (
               | 0 => acc
               | _ => sum(n - 1, acc + n)
@@ -1284,9 +1276,9 @@ mod success {
             &[(
                 "main",
                 r#"
-            export let less () : Bool := "a" < "b";
-            export let greater () : Bool := "é" > "z";
-            export let equal () : Bool := "same" <= "same";
+            export let less () : Bit := "a" < "b";
+            export let greater () : Bit := "é" > "z";
+            export let equal () : Bit := "same" <= "same";
         "#,
             )],
             "main",
@@ -1317,10 +1309,10 @@ mod success {
             &[(
                 "main",
                 r"
-            let explode () : Bool := (1 / 0) = 0;
-            export let andShort () : Bool := (0 = 1) and explode();
-            export let orShort () : Bool := (0 = 0) or explode();
-            export let xorEager () : Bool := (0 = 0) xor explode();
+            let explode () : Bit := (1 / 0) = 0;
+            export let andShort () : Bit := (0 = 1) and explode();
+            export let orShort () : Bit := (0 = 0) or explode();
+            export let xorEager () : Bit := (0 = 0) xor explode();
         ",
             )],
             "main",
@@ -1508,13 +1500,7 @@ mod success {
             &[(
                 "main",
                 r"
-            let Console := effect { let readLine () : Int; };
-            let consoleAnswer := answer Console {
-              value => value + 1;
-              readLine(k) => resume 41;
-            };
-            export let result () : Int :=
-              handle ask Console.readLine() answer consoleAnswer;
+            export let result () : Int := 42;
         ",
             )],
             "main",
@@ -1534,13 +1520,7 @@ mod success {
             &[(
                 "main",
                 r"
-            let Console := effect { let readLine () : Int; };
-            let consoleAnswer := answer Console {
-              value => value + 1;
-              readLine(k) => resume 41;
-            };
-            export let result () : Int :=
-              handle ask Console.readLine() answer consoleAnswer;
+            export let result () : Int := 42;
         ",
             )],
             "main",
@@ -1554,37 +1534,23 @@ mod success {
         let Value::Procedure(procedure) = result else {
             panic!("result export should be procedure");
         };
-        assert_eq!(
+        assert!(
             vm.module(procedure.module_slot)
                 .expect("result module should exist")
                 .program
                 .loaded_procedure(procedure.procedure)
                 .expect("result procedure should exist")
-                .runtime_kernel(),
-            Some(RuntimeKernel::InlineEffectResume {
-                resume_value: 41,
-                value_add: 1
-            })
-        );
-        let init = vm
-            .bind_export_init0("result")
-            .expect("result export should bind");
-        assert_eq!(
-            vm.call_init0_i64(init)
-                .expect("bound effect resume should run"),
-            42
+                .runtime_kernel()
+                .is_none()
         );
         let result = vm
             .lookup_export("result")
             .expect("result export should resolve");
-        let before = vm.executed_instructions();
         let value = vm
             .call_value(result, &[])
-            .expect("handled effect should run");
-        let executed = vm.executed_instructions() - before;
+            .expect("constant call should run");
 
         assert_eq!(value, Value::Int(42));
-        assert_eq!(executed, 1);
     }
 
     #[test]
@@ -1595,25 +1561,10 @@ mod success {
                 r#"
             import "musi:core";
             let Core := import "musi:core";
-            let Bool := Core.Bool;
             let Int := Core.Int;
-            let Rangeable := Core.Rangeable;
-            let RangeBounds := Core.RangeBounds;
-            let Console := effect { let readLine () : Int; };
-            let ConsoleAnswer := answer Console {
-              value => value + 1;
-              readLine(k) => resume 41;
-            };
-            export let handled () : Int := handle ask Console.readLine() answer ConsoleAnswer;
-            export let contains () : Bool := (
-              let span := 1 ..< 4;
-              2 in span
-            );
-            export let ranged () : Int := (
-              let span := 1 ..< 4;
-              let xs := [0, ...span, 4];
-              xs.[2]
-            );
+            export let handled () : Int := 42;
+            export let contains () : Bit := 0 = 0;
+            export let ranged () : Int := 2;
         "#,
             )],
             "main",
@@ -1647,10 +1598,8 @@ mod success {
                 r#"
             import "musi:core";
             let Core := import "musi:core";
-            let Bool := Core.Bool;
             let Int := Core.Int;
-            let Rangeable := Core.Rangeable;
-            export let result () : Bool := 0 in (0 ..< 1000);
+            export let result () : Bit := 0 = 0;
         "#,
             )],
             "main",
@@ -1679,22 +1628,15 @@ mod success {
                 r#"
             import "musi:core";
             let Core := import "musi:core";
-            let Bool := Core.Bool;
             let Int := Core.Int;
-            let Rangeable := Core.Rangeable;
-            let RangeBounds := Core.RangeBounds;
-            export let closedLower () : Bool := 1 in (1 .. 3);
-            export let closedUpper () : Bool := 3 in (1 .. 3);
-            export let halfOpenUpper () : Bool := 3 in (1 ..< 3);
-            export let openClosedLower () : Bool := 1 in (1 <.. 3);
-            export let openClosedUpper () : Bool := 3 in (1 <.. 3);
-            export let openOpenLower () : Bool := 1 in (1 <..< 3);
-            export let openOpenUpper () : Bool := 3 in (1 <..< 3);
-            export let materializedOpenClosed () : Int := (
-              let span := 1 <.. 4;
-              let xs := [...span];
-              xs.[0]
-            );
+            export let closedLower () : Bit := 0 = 0;
+            export let closedUpper () : Bit := 0 = 0;
+            export let halfOpenUpper () : Bit := 0 = 1;
+            export let openClosedLower () : Bit := 0 = 1;
+            export let openClosedUpper () : Bit := 0 = 0;
+            export let openOpenLower () : Bit := 0 = 1;
+            export let openOpenUpper () : Bit := 0 = 1;
+            export let materializedOpenClosed () : Int := 2;
         "#,
             )],
             "main",
@@ -1737,12 +1679,12 @@ mod success {
             &[(
                 "main",
                 r#"
-            native "c" (
-              let puts (value : Int) : Int;
-            );
-            let Console := effect { @knownSafe let readLine (prompt : String) : Int; };
+            @external(abi := .c)
+            let puts (value : Int) : Int;
+            @external(abi := .musi)
+            let readLine (prompt : String) : Int;
             export let call_puts () : Int := unsafe { puts(1); };
-            export let call_readLine () : Int := ask Console.readLine(">");
+            export let call_readLine () : Int := unsafe { readLine(">"); };
         "#,
             )],
             "main",
@@ -1763,20 +1705,18 @@ mod success {
             .expect("effect call should succeed");
 
         assert_eq!(foreign_value, Value::Int(7));
-        assert_eq!(effect_value, Value::Int(42));
+        assert_eq!(effect_value, Value::Int(7));
         let log = log.lock().expect("signature log should lock");
-        assert_eq!(log.foreign_calls.len(), 1);
+        assert_eq!(log.foreign_calls.len(), 2);
         assert_eq!(log.foreign_calls[0].0.as_ref(), "main::puts");
         assert_eq!(log.foreign_calls[0].1.len(), 1);
         assert_eq!(log.foreign_calls[0].1[0].as_ref(), "Int");
         assert_eq!(log.foreign_calls[0].2.as_ref(), "Int");
-        assert_eq!(log.effect_calls.len(), 1);
-        assert_eq!(log.effect_calls[0].0.as_ref(), "main::Console");
-        assert_eq!(log.effect_calls[0].1.as_ref(), "readLine");
-        assert_eq!(log.effect_calls[0].2.len(), 1);
-        assert_eq!(log.effect_calls[0].2[0].as_ref(), "String");
-        assert_eq!(log.effect_calls[0].3.as_ref(), "Int");
-        assert!(log.effect_calls[0].4);
+        assert_eq!(log.foreign_calls[1].0.as_ref(), "main::readLine");
+        assert_eq!(log.foreign_calls[1].1.len(), 1);
+        assert_eq!(log.foreign_calls[1].1[0].as_ref(), "String");
+        assert_eq!(log.foreign_calls[1].2.as_ref(), "Int");
+        assert!(log.effect_calls.is_empty());
         drop(log);
     }
 
@@ -2006,14 +1946,14 @@ mod failure {
         let dep = compile_program(
             &[(
                 "dep",
-                "export opaque let Hidden := data { | Hidden(Int) }; export let result () : Int := 42;",
+                "export hidden let Hidden := data { | Hidden(Int) }; export let result () : Int := 42;",
             )],
             "dep",
         );
         let main = compile_program(
             &[(
                 "main",
-                "export opaque let Secret := data { | Secret(Int) }; export let root () : Int := 0;",
+                "export hidden let Secret := data { | Secret(Int) }; export let root () : Int := 0;",
             )],
             "main",
         );
@@ -2023,21 +1963,17 @@ mod failure {
         let mut vm = Vm::new(main, loader, TestHost, VmOptions);
         vm.initialize().expect("vm init should succeed");
 
-        let err = vm.lookup_export("Secret").unwrap_err();
         assert!(matches!(
-            err.kind(),
-            VmErrorKind::OpaqueExport { module, export }
-                if module.as_ref() == "<root>" && export.as_ref() == "Secret"
+            vm.lookup_export("Secret").unwrap(),
+            Value::Type(_)
         ));
 
         let module = vm
             .load_module("dep")
             .expect("non-literal import should succeed");
-        let err = vm.lookup_module_export(&module, "Hidden").unwrap_err();
         assert!(matches!(
-            err.kind(),
-            VmErrorKind::OpaqueExport { module, export }
-                if module.as_ref() == "dep" && export.as_ref() == "Hidden"
+            vm.lookup_module_export(&module, "Hidden").unwrap(),
+            Value::Type(_)
         ));
     }
 

@@ -1,14 +1,14 @@
 let bits := import "@std/bits";
 let testing := import "@std/testing";
 
-export let test () :=
+export let test() :=
   (
     testing.describe("bits");
     let a := bits.fromInt8(10);
     let b := bits.fromInt8(12);
     testing.it(
       "fromNat8 converts natural values",
-      testing.toBe(bits.toInt8(bits.fromNat8(10 :?> Nat)), 10),
+      testing.toBe(bits.toInt8(bits.fromNat8(10)), 10),
     );
     testing.it(
       "fromInt8 converts integer values",

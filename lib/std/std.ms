@@ -31,6 +31,8 @@ export let libm := import "@std/libm";
 export let libc := import "@std/libc";
 --- Fixed-width bit-vector helpers surface.
 export let bits := import "@std/bits";
+--- Boolean alias helpers surface.
+export let bool := import "@std/bool";
 --- Formatting helpers surface.
 export let fmt := import "@std/fmt";
 --- Error value helpers surface.

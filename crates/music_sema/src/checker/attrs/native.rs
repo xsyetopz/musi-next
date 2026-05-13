@@ -12,6 +12,8 @@ use crate::checker::exprs::check_expr;
 use crate::checker::surface::import_surface_ty;
 use crate::checker::{CheckPass, DiagKind};
 
+type SeenNativeTypeBindings = BTreeSet<NameBindingId>;
+
 impl CheckPass<'_, '_, '_> {
     pub fn validate_native_let(&mut self, expr: HirExprId, abi: &str) {
         let origin = self.expr(expr).origin;
@@ -90,7 +92,7 @@ impl CheckPass<'_, '_, '_> {
         &mut self,
         expr: HirExprId,
         origin: HirOrigin,
-        seen: &mut BTreeSet<NameBindingId>,
+        seen: &mut SeenNativeTypeBindings,
     ) -> HirTyId {
         match self.expr(expr).kind {
             HirExprKind::Name { name } => self.lower_native_name_type_expr(name, seen),
@@ -104,7 +106,7 @@ impl CheckPass<'_, '_, '_> {
     fn lower_native_name_type_expr(
         &mut self,
         name: Ident,
-        seen: &mut BTreeSet<NameBindingId>,
+        seen: &mut SeenNativeTypeBindings,
     ) -> HirTyId {
         let ty = self.named_type_for_symbol(name.name);
         let HirTyKind::Named {

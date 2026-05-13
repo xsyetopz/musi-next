@@ -302,7 +302,7 @@ impl CheckPass<'_, '_, '_> {
 
     fn expected_data_def(&self, ty: HirTyId) -> Option<&DataDef> {
         match self.ty(ty).kind {
-            HirTyKind::Bool => self.data_def("Bool"),
+            HirTyKind::Bool => self.data_def("Bit"),
             HirTyKind::Named { name, .. } => self.data_def(self.resolve_symbol(name)),
             _ => None,
         }

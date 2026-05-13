@@ -1,7 +1,7 @@
 let base64 := import "@std/encoding/base64";
 let testing := import "@std/testing";
 
-export let test () :=
+export let test() :=
   (
     testing.describe("encoding/base64");
     testing.it(

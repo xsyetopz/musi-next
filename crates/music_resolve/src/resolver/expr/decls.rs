@@ -321,11 +321,7 @@ where
     fn lower_member_def(&mut self, node: SyntaxNode<'tree, 'src>) -> HirMemberDef {
         let origin = self.origin_node(node);
         let attrs = self.lower_attrs(node);
-        let kind = if node.child_tokens().any(|t| t.kind() == TokenKind::KwLaw) {
-            HirMemberKind::Law
-        } else {
-            HirMemberKind::Let
-        };
+        let kind = HirMemberKind::Let;
 
         let name_tok = node
             .child_tokens()
@@ -353,7 +349,7 @@ where
             return self.lower_receiver_method_let(node);
         }
 
-        let is_rec = node.child_tokens().any(|t| t.kind() == TokenKind::KwRec);
+        let is_rec = node.child_tokens().any(|t| t.kind() == TokenKind::KwRecur);
         let pat_node = node.child_nodes().find(|n| n.kind().is_pat());
         let binders = pat_node
             .filter(|pat| pat.kind().is_pat())
@@ -427,7 +423,7 @@ where
 
     fn lower_receiver_method_let(&mut self, node: SyntaxNode<'tree, 'src>) -> HirExprId {
         let origin = self.origin_node(node);
-        let is_rec = node.child_tokens().any(|t| t.kind() == TokenKind::KwRec);
+        let is_rec = node.child_tokens().any(|t| t.kind() == TokenKind::KwRecur);
         let head = child_of_kind(node, SyntaxNodeKind::ReceiverMethodHead);
         let (receiver_name, method_name) = self.receiver_method_names(head, node.span());
         let _ = self.alloc_binding_without_scope(method_name, NameBindingKind::AttachedMethod);

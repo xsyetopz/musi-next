@@ -3,26 +3,26 @@
 let text := import "@std/text";
 
 --- Semantic version value.
-export opaque let Version := data {
+export hidden let Version := data {
   | VersionText(value : String)
 };
 
 --- Parse semantic version text.
-export let parse (source : String) : Version := .VersionText(value := source);
+export let parse(source : String) : Version := .VersionText(value := source);
 
-let both (left : Bool, right : Bool) : Bool :=
+let both(left : Bit, right : Bit) : Bit :=
   match left (
-  | success if success => right
+  | success where success => right
   | _ => 0 = 1
   );
 
-let isDigit (value : Int) : Bool := both(value >= 48, value <= 57);
+let isDigit(value : Int) : Bit := both(value >= 48, value <= 57);
 
-let isDigitAt (source : String, index : Int) : Bool :=
+let isDigitAt(source : String, index : Int) : Bit :=
   isDigit(text.byteAt(source, index));
 
 --- Returns true when text is a valid semantic version.
-export let isValid (source : String) : Bool :=
+export let isValid(source : String) : Bit :=
   both(
     both(source.length() >= 5, isDigitAt(source, 0)),
     both(
@@ -31,33 +31,33 @@ export let isValid (source : String) : Bool :=
     ),
   );
 
-let byteOrZero (source : String, index : Int) : Int :=
+let byteOrZero(source : String, index : Int) : Int :=
   match text.byteAt(source, index) (
-  | value if value < 0 => 0
+  | value where value < 0 => 0
   | value => value
   );
 
-let compareByte (left : String, right : String, index : Int) : Int :=
+let compareByte(left : String, right : String, index : Int) : Int :=
   match byteOrZero(left, index) - byteOrZero(right, index) (
-  | diff if diff < 0 => - 1
-  | diff if diff > 0 => 1
+  | diff where diff < 0 => - 1
+  | diff where diff > 0 => 1
   | _ => 0
   );
 
 --- Compare semantic versions.
-export let compare (left : Version, right : Version) : Int :=
+export let compare(left : Version, right : Version) : Int :=
   match left (
   | .VersionText(value := leftText) => match right (
   | .VersionText(value := rightText) =>
   (
     let major := compareByte(leftText, rightText, 0);
     match major (
-    | expect if expect /= 0 => expect
+    | expect where expect /= 0 => expect
     | _ =>
       (
         let minor := compareByte(leftText, rightText, 2);
         match minor (
-        | expect if expect /= 0 => expect
+        | expect where expect /= 0 => expect
         | _ => compareByte(leftText, rightText, 4)
         )
       )
@@ -67,7 +67,7 @@ export let compare (left : Version, right : Version) : Int :=
 );
 
 --- Return normalized semantic version text.
-export let (self : Version).toString () : String :=
+export let (self : Version).toString() : String :=
   match self (
   | .VersionText(value := value) => value
   );

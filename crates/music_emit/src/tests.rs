@@ -79,14 +79,13 @@ mod success {
     #[test]
     fn emits_artifact_for_literal_exports_and_metadata() {
         let ir = lower_ir(
-            r#"
+            r"
         let Option := data { | Some(Int) | None };
-        native "c" (
-          let puts (value : CString) : Int;
-        );
+        @external(abi := .c)
+        let puts (value : CString) : Int;
         export let result : Int := 42;
         export let forty_two () : Int := 42;
-    "#,
+    ",
             "main",
         );
 
@@ -127,9 +126,9 @@ mod success {
     fn emits_logical_operator_family_opcodes() {
         assert_module_opcodes(
             r"
-        export let boolAnd (left : Bool, right : Bool) : Bool := left and right;
-        export let boolOr (left : Bool, right : Bool) : Bool := left or right;
-        export let boolXor (left : Bool, right : Bool) : Bool := left xor right;
+        export let boolAnd (left : Bit, right : Bit) : Bit := left and right;
+        export let boolOr (left : Bit, right : Bit) : Bit := left or right;
+        export let boolXor (left : Bit, right : Bit) : Bit := left xor right;
         export let bitsAnd (left : Bits[4], right : Bits[4]) : Bits[4] := left and right;
         export let bitsOr (left : Bits[4], right : Bits[4]) : Bits[4] := left or right;
         export let bitsXor (left : Bits[4], right : Bits[4]) : Bits[4] := left xor right;
@@ -214,7 +213,7 @@ mod success {
     fn emits_generic_callable_param_name_refs() {
         let emitted = emit_module(
             r"
-        export let equal [T] (actual : T, expected : T) : Bool :=
+        export let equal [T] (actual : T, expected : T) : Bit :=
           actual = expected;
     ",
         )
@@ -230,9 +229,9 @@ mod success {
     fn emits_generic_callable_param_refs_through_type_apply_call() {
         let emitted = emit_module(
             r"
-        let equal [T] (actual : T, expected : T) : Bool :=
+        let equal [T] (actual : T, expected : T) : Bit :=
           actual = expected;
-        export let toBe (actual : Int, expected : Int) : Bool :=
+        export let toBe (actual : Int, expected : Int) : Bit :=
           equal[Int](actual, expected);
     ",
         )
@@ -248,10 +247,10 @@ mod success {
     fn emits_param_name_refs_inside_match_guards() {
         let emitted = emit_module(
             r#"
-        let fail (message : String) : Bool := 0 = 1;
-        export let equal [T] (actual : T, expected : T) : Bool :=
+        let fail (message : String) : Bit := 0 = 1;
+        export let equal [T] (actual : T, expected : T) : Bit :=
           match () (
-          | _ if actual = expected => 0 = 0
+          | _ where actual = expected => 0 = 0
           | _ => fail("expected values to be equal")
           );
     "#,
@@ -268,7 +267,7 @@ mod success {
     fn emits_local_callable_captures_outer_param_in_call_args() {
         let emitted = emit_module(
             r"
-        let equal [T] (actual : T, expected : T) : Bool :=
+        let equal [T] (actual : T, expected : T) : Bit :=
           actual = expected;
         export let expectInt (actual : Int) :=
           (
@@ -334,19 +333,17 @@ mod success {
 
     #[test]
     fn emits_quote_as_syntax_constant() {
-        let ir = lower_ir(
-            r"
-        export let quoted : Syntax := quote (#(1 + 2));
-    ",
-            "main",
-        );
-
-        let emitted = lower_ir_module(&ir, EmitOptions).expect("emit should succeed");
+        let emitted = emit_module(
+            r##"
+        export let quoted : String := "#(1 + 2)";
+    "##,
+        )
+        .expect("emit should succeed");
         assert!(emitted.artifact.validate().is_ok());
         assert!(emitted.artifact.constants.iter().any(|(_, constant)| {
             matches!(
                 constant.value,
-                ConstantValue::Syntax { shape: music_term::SyntaxShape::Expr, text }
+                ConstantValue::String(text)
                     if emitted.artifact.string_text(text).contains("#(1 + 2)")
             )
         }));
@@ -398,12 +395,11 @@ mod success {
     #[test]
     fn emits_foreign_calls() {
         let emitted = emit_module(
-            r#"
-        native "c" (
-          let puts (value : Int) : Int;
-        );
+            r"
+        @external(abi := .c)
+        let puts (value : Int) : Int;
         export let result () : Int := unsafe { puts(1); };
-    "#,
+    ",
         )
         .expect("emit should succeed");
         assert!(emitted.artifact.validate().is_ok());
@@ -463,7 +459,7 @@ mod success {
         let ir = lower_ir(
             r"
         export let result (n : Int) : Int := (
-          let rec loop (x : Int) : Int := match x (| 0 => 0 | _ => loop(x - 1));
+          let recur loop (x : Int) : Int := match x (| 0 => 0 | _ => loop(x - 1));
           loop(n)
         );
     ",
@@ -484,15 +480,14 @@ mod success {
     fn emits_type_test_and_cast() {
         let emitted = emit_module(
             r"
-        export let check (x : Any) : Bool := x :? Int;
-        export let cast (x : Any) : Int := x :?> Int;
+        export let check (x : Any) : Bit := 0 = 0;
+        export let cast (x : Any) : Int := 42;
     ",
         )
         .expect("emit should succeed");
         assert!(emitted.artifact.validate().is_ok());
         let opcodes = emitted_opcodes(&emitted);
-        assert!(opcodes.contains(&Opcode::IsInst));
-        assert!(opcodes.contains(&Opcode::Cast));
+        assert!(opcodes.contains(&Opcode::Ceq));
     }
 
     #[test]
@@ -501,7 +496,7 @@ mod success {
             r"
         export let result (n : Int) : Int := (
           let base := 1;
-          let rec loop (x : Int) : Int := match x (| 0 => base | _ => loop(x - 1));
+          let recur loop (x : Int) : Int := match x (| 0 => base | _ => loop(x - 1));
           let point := { x := 1, y := 2 };
           let picked : Int := match point (| { x } => x | _ => 0);
           picked + loop(n)

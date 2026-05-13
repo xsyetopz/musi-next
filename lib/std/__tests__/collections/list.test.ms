@@ -1,7 +1,7 @@
 let list := import "@std/collections/list";
 let testing := import "@std/testing";
 
-export let test () :=
+export let test() :=
   (
     testing.describe("list");
     let values := list.fromArray[Int]([1, 2]);

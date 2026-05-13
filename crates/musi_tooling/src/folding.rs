@@ -1,8 +1,10 @@
 use std::fs;
 use std::path::Path;
 
-use music_base::{SourceMap, Span};
-use music_syntax::{Lexer, SyntaxElement, SyntaxNode, SyntaxNodeKind, TriviaKind, parse};
+use music_base::{Source, SourceMap, Span};
+use music_syntax::{
+    LexedSource, Lexer, SyntaxElement, SyntaxNode, SyntaxNodeKind, TriviaKind, parse,
+};
 
 use crate::analysis::{ToolRange, tool_range};
 
@@ -64,11 +66,7 @@ pub fn folding_ranges_for_project_file_with_overlay(
     ranges
 }
 
-fn collect_node_folds(
-    source: &music_base::Source,
-    node: SyntaxNode<'_, '_>,
-    out: &mut Vec<ToolFoldingRange>,
-) {
+fn collect_node_folds(source: &Source, node: SyntaxNode<'_, '_>, out: &mut Vec<ToolFoldingRange>) {
     if is_foldable_node(node.kind()) {
         push_fold(source, node.span(), None, out);
     }
@@ -79,11 +77,7 @@ fn collect_node_folds(
     }
 }
 
-fn collect_comment_folds(
-    source: &music_base::Source,
-    lexed: &music_syntax::LexedSource,
-    out: &mut Vec<ToolFoldingRange>,
-) {
+fn collect_comment_folds(source: &Source, lexed: &LexedSource, out: &mut Vec<ToolFoldingRange>) {
     for trivia in lexed.trivia() {
         if matches!(
             trivia.kind,
@@ -102,7 +96,7 @@ fn collect_comment_folds(
 }
 
 fn push_fold(
-    source: &music_base::Source,
+    source: &Source,
     span: Span,
     kind: Option<ToolFoldingRangeKind>,
     out: &mut Vec<ToolFoldingRange>,

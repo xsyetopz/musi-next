@@ -72,37 +72,37 @@ mod success {
         assert!(
             module_source("musi:core")
                 .unwrap()
-                .contains("export opaque let Rangeable [T] := shape")
+                .contains("export hidden let Rangeable[T] := shape")
         );
         assert!(
             module_source("musi:core")
                 .unwrap()
-                .contains("export opaque let Maybe [T] := data")
+                .contains("export hidden let Maybe[T] := data")
         );
         assert!(
             module_source("musi:env")
                 .unwrap()
-                .contains("export opaque let Env := effect")
+                .contains("let getIntrinsic(name : String) : String;")
         );
         assert!(
             module_source("musi:process")
                 .unwrap()
-                .contains("let argCount () : Int;")
+                .contains("let argCountIntrinsic() : Int;")
         );
         assert!(
             module_source("musi:test")
                 .unwrap()
-                .contains("export opaque let Sample [T] := shape")
+                .contains("export hidden let Sample[T] := shape")
         );
         assert!(
             module_source("musi:test")
                 .unwrap()
-                .contains("export opaque let SampleList [T] := data")
+                .contains("export hidden let SampleList[T] := data")
         );
         assert!(
             module_source("musi:test")
                 .unwrap()
-                .contains("export opaque let SampleCase [T] := data")
+                .contains("export hidden let SampleCase[T] := data")
         );
     }
 

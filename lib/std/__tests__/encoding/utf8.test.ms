@@ -1,7 +1,7 @@
 let utf8 := import "@std/encoding/utf8";
 let testing := import "@std/testing";
 
-export let test () :=
+export let test() :=
   (
     testing.describe("encoding/utf8");
     testing.it("'encode' keeps ordinary utf8 string", utf8.encode("hi") = "hi",);

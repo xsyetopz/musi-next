@@ -2,7 +2,7 @@ use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use musi_project::{PackageSource, ProjectOptions, load_project, load_project_ancestor};
+use musi_project::{PackageSource, Project, ProjectOptions, load_project, load_project_ancestor};
 use music_base::{Source, SourceId, Span};
 use music_hir::{HirExpr, HirExprId, HirExprKind, HirTyId, HirTyKind};
 use music_module::ModuleKey;
@@ -261,10 +261,7 @@ pub fn workspace_symbols_for_project_root(root: &Path, query: &str) -> Vec<ToolW
     symbols
 }
 
-fn workspace_module_symbols(
-    project: &musi_project::Project,
-    query: &str,
-) -> Vec<ToolWorkspaceSymbol> {
+fn workspace_module_symbols(project: &Project, query: &str) -> Vec<ToolWorkspaceSymbol> {
     let query = query.to_ascii_lowercase();
     project
         .workspace()

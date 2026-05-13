@@ -2,7 +2,7 @@ let datetime := import "@std/datetime";
 let fmt := import "@std/fmt";
 let testing := import "@std/testing";
 
-export let test () :=
+export let test() :=
   (
     testing.describe("fmt"),
     testing.it("formats ints", fmt.int(42) = "42"),

@@ -156,7 +156,7 @@ pub const SIMPLE_HIR_TYS: &[SimpleHirTyInfo] = &[
     SimpleHirTyInfo::new(HirTyKind::Any, "Any", "Any"),
     SimpleHirTyInfo::new(HirTyKind::Empty, "Empty", "Empty"),
     SimpleHirTyInfo::new(HirTyKind::Unit, "Unit", "Unit"),
-    SimpleHirTyInfo::new(HirTyKind::Bool, "Bool", "Bool"),
+    SimpleHirTyInfo::new(HirTyKind::Bool, "Bit", "Bit"),
     SimpleHirTyInfo::new(HirTyKind::Nat, "Nat", "Nat"),
     SimpleHirTyInfo::new(HirTyKind::Int, "Int", "Int"),
     SimpleHirTyInfo::new(HirTyKind::Int8, "Int8", "Int8"),

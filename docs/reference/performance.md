@@ -29,9 +29,9 @@ Rules:
 
 ## Why These Targets Are Low
 
-Musi is not a clone of loop-heavy host languages. Its own language surface makes VM overhead visible in places that other runtimes often hide behind `for`, `while`, or host-native callbacks. The grammar has `rec` as the only direct repetition modifier, `resume` as effect-continuation control flow, and no `for`, `while`, or `continue` keyword forms in the canonical lexer/parser. That means recursive calls and effect resume are not benchmark curiosities; they are core language paths.
+Musi is not a clone of loop-heavy host languages. Its own language surface makes VM overhead visible in places that other runtimes often hide behind `for`, `while`, or host-native callbacks. The grammar has `recur` as the direct repetition modifier and no `for`, `while`, or `continue` keyword forms in the canonical lexer/parser. Recursive calls remain core language paths.
 
-The low nanosecond and sub-nanosecond targets exist for Musi's market: small embeddable programs, generated programs, and agent-written code that may lean on the language's own control forms instead of host loops. When an embedder calls Musi in a tight path, export lookup, sequence return, GC barriers, recursive kernels, and effect resume can dominate the whole interaction.
+The low nanosecond and sub-nanosecond targets exist for Musi's market: small embeddable programs, generated programs, and agent-written code that may lean on the language's own control forms instead of host loops. When an embedder calls Musi in a tight path, export lookup, sequence return, GC barriers, recursive kernels, and suspension/runtime protocol costs can dominate the whole interaction.
 
 For AI agents updating this file: inspect `grammar/MusiLexer.g4`, `grammar/MusiParser.g4`, and `grammar/Musi.abnf` before changing rationale. Do not loosen targets by comparing Musi to languages with different loop/control constructs. Start from Musi semantics, then classify each row as exact peer, close family, selective path, or diagnostic-only.
 
@@ -188,7 +188,7 @@ Use it for embedder APIs and runtime specialization work. Do not compare it with
 | `closure_capture`          |               1.192 ns |           1.263 ns | Bound integer call path          |
 | `sequence_index_mutation`  |               0.765 ns |           0.810 ns | Bound typed sequence mutation    |
 | `data_match_option`        |               1.183 ns |           1.199 ns | Runtime data-match kernel        |
-| `effect_resume_equivalent` |               1.989 ns |           1.819 ns | Inline effect-resume kernel      |
+| `suspension_protocol_equivalent` |               1.989 ns |           1.819 ns | Inline suspension protocol kernel |
 | `sequence_return_alloc`    |               8.454 ns |           8.679 ns | Bound const `[8]Int` return path |
 
 Hard-target status from latest run:
@@ -373,9 +373,9 @@ Implementation checkpoints:
 
 ## Optimization Queue
 
-1. Recursion: keep `rec` fast because Musi has no `for`, `while`, or `continue` constructs; expand tail-recursive and structurally-recursive kernels only when semantics prove the shape.
+1. Recursion: keep `recur` fast because Musi has no `for`, `while`, or `continue` constructs; expand tail-recursive and structurally-recursive kernels only when semantics prove the shape.
 2. General export calls: reduce lookup, retain, and dynamic call overhead so default `call_export` can approach bound handles without requiring embedder-only APIs.
-3. Effects: optimize continuation allocation, handler dispatch, and `resume` value flow without changing handler reuse semantics.
+3. Suspension protocols: optimize continuation allocation and returned value flow without hiding source-level `yield`.
 4. Sequence return and GC diagnostics: cut explicit collection, stress collection, and returned-sequence root handling while preserving precise roots.
 5. Bound exports: expand reusable handles beyond const sequence returns so embedders avoid name lookup on hot calls.
 6. Sequence mutation: keep pushing plain nested `[2][2]Int` fast path while allowing typed/described heap payloads and rejecting untyped packed blobs.

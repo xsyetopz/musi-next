@@ -5,20 +5,47 @@ let Int := Core.Int;
 let String := Core.String;
 let Unit := Core.Unit;
 
-export opaque let Process := effect {
-  let argCount () : Int;
-  let argAt (index : Int) : String;
-  let cwd () : String;
-  let run (command : String) : Int;
-  let exit (code : Int) : Unit;
+@external(
+  abi := .musi
+)
+let argCountIntrinsic() : Int;
+
+export let argCount() : Int := unsafe {
+  argCountIntrinsic();
 };
 
-export let argCount () : Int := ask Process.argCount();
+@external(
+  abi := .musi
+)
+let argAtIntrinsic(index : Int) : String;
 
-export let argAt (index : Int) : String := ask Process.argAt(index);
+export let argAt(index : Int) : String := unsafe {
+  argAtIntrinsic(index);
+};
 
-export let cwd () : String := ask Process.cwd();
+@external(
+  abi := .musi
+)
+let cwdIntrinsic() : String;
 
-export let run (command : String) : Int := ask Process.run(command);
+export let cwd() : String := unsafe {
+  cwdIntrinsic();
+};
 
-export let exit (code : Int) : Unit := ask Process.exit(code);
+@external(
+  abi := .musi
+)
+let runIntrinsic(command : String) : Int;
+
+export let run(command : String) : Int := unsafe {
+  runIntrinsic(command);
+};
+
+@external(
+  abi := .musi
+)
+let exitIntrinsic(code : Int) : Unit;
+
+export let exit(code : Int) : Unit := unsafe {
+  exitIntrinsic(code);
+};

@@ -7,13 +7,20 @@ let Syntax := Core.Syntax;
 let Type := Core.Type;
 let Unit := Core.Unit;
 
-export opaque let SyntaxOps := effect {
-  let eval (body : Syntax, result : Type) : Any;
-  let registerModule (spec : String, body : Syntax) : Unit;
+@external(
+  abi := .musi
+)
+let evalIntrinsic(body : Syntax, result : Type) : Any;
+
+export let eval(body : Syntax, result : Type) : Any := unsafe {
+  evalIntrinsic(body, result);
 };
 
-export let eval (body : Syntax, result : Type) : Any :=
-  ask SyntaxOps.eval(body, result);
+@external(
+  abi := .musi
+)
+let registerModuleIntrinsic(spec : String, body : Syntax) : Unit;
 
-export let registerModule (spec : String, body : Syntax) : Unit :=
-  ask SyntaxOps.registerModule(spec, body);
+export let registerModule(spec : String, body : Syntax) : Unit := unsafe {
+  registerModuleIntrinsic(spec, body);
+};

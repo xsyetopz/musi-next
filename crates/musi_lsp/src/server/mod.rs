@@ -89,6 +89,8 @@ use workspace::{
 };
 
 type ServerFuture<T> = Pin<Box<dyn Future<Output = Result<T, ResponseError>> + Send + 'static>>;
+type DefinitionFuture = ServerFuture<Option<GotoDefinitionResponse>>;
+type TextEditListFuture = ServerFuture<Option<Vec<TextEdit>>>;
 type NotifyResult = ControlFlow<async_lsp::Result<()>>;
 const REFERENCES_COMMAND: &str = "musi.references";
 
@@ -240,10 +242,7 @@ impl LanguageServer for MusiLanguageServer {
         Box::pin(async move { Ok(edit) })
     }
 
-    fn will_save_wait_until(
-        &mut self,
-        params: WillSaveTextDocumentParams,
-    ) -> ServerFuture<Option<Vec<TextEdit>>> {
+    fn will_save_wait_until(&mut self, params: WillSaveTextDocumentParams) -> TextEditListFuture {
         let formatting_response = self.will_save_formatting(params);
         Box::pin(async move { Ok(formatting_response) })
     }
@@ -287,34 +286,22 @@ impl LanguageServer for MusiLanguageServer {
         Box::pin(async move { Ok(signature_help_response) })
     }
 
-    fn definition(
-        &mut self,
-        params: GotoDefinitionParams,
-    ) -> ServerFuture<Option<GotoDefinitionResponse>> {
+    fn definition(&mut self, params: GotoDefinitionParams) -> DefinitionFuture {
         let definition_response = self.definition_at(params);
         Box::pin(async move { Ok(definition_response) })
     }
 
-    fn declaration(
-        &mut self,
-        params: GotoDefinitionParams,
-    ) -> ServerFuture<Option<GotoDefinitionResponse>> {
+    fn declaration(&mut self, params: GotoDefinitionParams) -> DefinitionFuture {
         let declaration_response = self.definition_at(params);
         Box::pin(async move { Ok(declaration_response) })
     }
 
-    fn type_definition(
-        &mut self,
-        params: GotoDefinitionParams,
-    ) -> ServerFuture<Option<GotoDefinitionResponse>> {
+    fn type_definition(&mut self, params: GotoDefinitionParams) -> DefinitionFuture {
         let type_definition_response = self.type_definition_at(params);
         Box::pin(async move { Ok(type_definition_response) })
     }
 
-    fn implementation(
-        &mut self,
-        params: GotoDefinitionParams,
-    ) -> ServerFuture<Option<GotoDefinitionResponse>> {
+    fn implementation(&mut self, params: GotoDefinitionParams) -> DefinitionFuture {
         let implementation_response = self.implementation_at(params);
         Box::pin(async move { Ok(implementation_response) })
     }
@@ -463,26 +450,17 @@ impl LanguageServer for MusiLanguageServer {
         Box::pin(async move { Ok(rename_response) })
     }
 
-    fn formatting(
-        &mut self,
-        params: DocumentFormattingParams,
-    ) -> ServerFuture<Option<Vec<TextEdit>>> {
+    fn formatting(&mut self, params: DocumentFormattingParams) -> TextEditListFuture {
         let formatting_response = self.document_formatting(params);
         Box::pin(async move { Ok(formatting_response) })
     }
 
-    fn range_formatting(
-        &mut self,
-        params: DocumentRangeFormattingParams,
-    ) -> ServerFuture<Option<Vec<TextEdit>>> {
+    fn range_formatting(&mut self, params: DocumentRangeFormattingParams) -> TextEditListFuture {
         let formatting_response = self.document_range_formatting(params);
         Box::pin(async move { Ok(formatting_response) })
     }
 
-    fn on_type_formatting(
-        &mut self,
-        params: DocumentOnTypeFormattingParams,
-    ) -> ServerFuture<Option<Vec<TextEdit>>> {
+    fn on_type_formatting(&mut self, params: DocumentOnTypeFormattingParams) -> TextEditListFuture {
         let formatting_response = self.document_on_type_formatting(params);
         Box::pin(async move { Ok(formatting_response) })
     }

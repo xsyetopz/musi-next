@@ -1,16 +1,16 @@
 --! Hexadecimal encoding helpers.
 
 let maybe := import "@std/maybe";
-let both (left : Bool, right : Bool) : Bool :=
+let both(left : Bit, right : Bit) : Bit :=
   match left (
-  | success if success => right
+  | success where success => right
   | _ => 0 = 1
   );
 
 let text := import "@std/text";
 let Maybe := maybe.Maybe;
 
-let hexDigit (value : Int) : String :=
+let hexDigit(value : Int) : String :=
   match value (
   | 0 => "0"
   | 1 => "1"
@@ -30,9 +30,9 @@ let hexDigit (value : Int) : String :=
   | _ => "f"
   );
 
-let rec encodeFrom (source : String, index : Int, end : Int) : String :=
+let recur encodeFrom(source : String, index : Int, end : Int) : String :=
   match () (
-  | _ if index >= end => ""
+  | _ where index >= end => ""
   | _ =>
   (
     let value := text.byteAt(source, index);
@@ -44,34 +44,34 @@ let rec encodeFrom (source : String, index : Int, end : Int) : String :=
 );
 
 --- Encode a value into this format.
-export let encode (source : String) : String :=
+export let encode(source : String) : String :=
   encodeFrom(source, 0, source.length());
 
-let hexValue (value : Int) : Int :=
+let hexValue(value : Int) : Int :=
   match () (
-  | _ if both(value >= 48, value <= 57) => value - 48
-  | _ if both(value >= 65, value <= 70) => value - 55
-  | _ if both(value >= 97, value <= 102) => value - 87
+  | _ where both(value >= 48, value <= 57) => value - 48
+  | _ where both(value >= 65, value <= 70) => value - 55
+  | _ where both(value >= 97, value <= 102) => value - 87
   | _ => - 1
   );
 
-let rec isValidFrom (source : String, index : Int, end : Int) : Bool :=
+let recur isValidFrom(source : String, index : Int, end : Int) : Bit :=
   match () (
-  | _ if index >= end => 0 = 0
-  | _ if hexValue(text.byteAt(source, index)) < 0 => 0 = 1
+  | _ where index >= end => 0 = 0
+  | _ where hexValue(text.byteAt(source, index)) < 0 => 0 = 1
   | _ => isValidFrom(source, index + 1, end)
   );
 
 --- Returns true when source is valid for this format.
-export let isValid (source : String) : Bool :=
+export let isValid(source : String) : Bit :=
   match () (
-  | _ if source.length() % 2 /= 0 => 0 = 1
+  | _ where source.length() % 2 /= 0 => 0 = 1
   | _ => isValidFrom(source, 0, source.length())
   );
 
-let rec decodeFrom (source : String, index : Int, end : Int) : String :=
+let recur decodeFrom(source : String, index : Int, end : Int) : String :=
   match () (
-  | _ if index >= end => ""
+  | _ where index >= end => ""
   | _ =>
   (
     let hi := hexValue(text.byteAt(source, index));
@@ -81,8 +81,8 @@ let rec decodeFrom (source : String, index : Int, end : Int) : String :=
 );
 
 --- Decode a value from this format.
-export let decode (source : String) : Maybe[String] :=
+export let decode(source : String) : Maybe[String] :=
   match isValid(source) (
-  | valid if valid => maybe.Some[String](decodeFrom(source, 0, source.length()))
+  | valid where valid => maybe.Some[String](decodeFrom(source, 0, source.length()))
   | _ => maybe.None[String]()
   );

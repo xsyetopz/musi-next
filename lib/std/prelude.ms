@@ -1,6 +1,7 @@
 --! Default std prelude exports.
 
 let bytes := import "@std/bytes";
+let bool := import "@std/bool";
 let cmp := import "@std/cmp";
 let collections := import "@std/collections";
 let expect := import "@std/expect";
@@ -23,8 +24,8 @@ export let Syntax := core.Syntax;
 export let Empty := core.Empty;
 --- Prelude alias for core Unit.
 export let Unit := core.Unit;
---- Prelude alias for core Bool.
-export let Bool := core.Bool;
+--- Prelude alias for core Bit.
+export let Bit := core.Bit;
 --- Prelude alias for core Nat.
 export let Nat := core.Nat;
 --- Prelude alias for core Int.
@@ -79,24 +80,30 @@ export let List := collections.list.List;
 export let Path := path.Path;
 --- Prelude bytes type.
 export let Bytes := bytes.Bytes;
+--- Prelude boolean alias type.
+export let Bool := bool.Bool;
+--- Prelude lowercase true alias.
+export let true : Bool := bool.true;
+--- Prelude lowercase false alias.
+export let false : Bool := bool.false;
 
 -- --- Common constructors ---
 --- Build Some maybe value.
-export let Some [T] (value : T) : Maybe[T] := maybe.Some[T](value);
+export let Some[T] (value : T) : Maybe[T] := maybe.Some[T](value);
 --- Build None maybe value.
-export let None [T] () : Maybe[T] := maybe.None[T]();
+export let None[T] () : Maybe[T] := maybe.None[T]();
 --- Build successful expected value.
-export let Success [T, E] (value : T) : Expect[T, E] :=
+export let Success[T, E] (value : T) : Expect[T, E] :=
   expect.Success[T, E](value);
 --- Build failed expected value.
-export let Failure [T, E] (error : E) : Expect[T, E] :=
+export let Failure[T, E] (error : E) : Expect[T, E] :=
   expect.Failure[T, E](error);
 --- Abort current computation.
-export let abort () : Empty := core.abort();
+export let abort() : Empty := core.abort();
 
---- Prelude abort effect contract.
-export opaque let Abort := core.Abort;
+--- Prelude abort capability contract.
+export hidden let Abort := core.Abort;
 --- Prelude rangeable shape.
-export opaque let Rangeable := core.Rangeable;
+export hidden let Rangeable := core.Rangeable;
 --- Prelude range bounds shape.
-export opaque let RangeBounds := core.RangeBounds;
+export hidden let RangeBounds := core.RangeBounds;

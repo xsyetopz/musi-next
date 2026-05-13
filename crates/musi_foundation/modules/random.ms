@@ -3,22 +3,49 @@
 let Core := import "musi:core";
 let Float := Core.Float;
 let Int := Core.Int;
+let String := Core.String;
 
-export opaque let Random := effect {
-  let int () : Int;
-  let intInRange (lowerBound : Int, upperBound : Int) : Int;
-  let bool () : Int;
-  let float01 () : Float;
-  let entropyHex (count : Int) : String;
+@external(
+  abi := .musi
+)
+let intIntrinsic() : Int;
+
+export let int() : Int := unsafe {
+  intIntrinsic();
 };
 
-export let int () : Int := ask Random.int();
+@external(
+  abi := .musi
+)
+let intInRangeIntrinsic(lowerBound : Int, upperBound : Int) : Int;
 
-export let intInRange (lowerBound : Int, upperBound : Int) : Int :=
-  ask Random.intInRange(lowerBound, upperBound);
+export let intInRange(lowerBound : Int, upperBound : Int) : Int := unsafe {
+  intInRangeIntrinsic(lowerBound, upperBound);
+};
 
-export let bool () : Int := ask Random.bool();
+@external(
+  abi := .musi
+)
+let boolIntrinsic() : Int;
 
-export let float01 () : Float := ask Random.float01();
+export let bool() : Int := unsafe {
+  boolIntrinsic();
+};
 
-export let entropyHex (count : Int) : String := ask Random.entropyHex(count);
+@external(
+  abi := .musi
+)
+let float01Intrinsic() : Float;
+
+export let float01() : Float := unsafe {
+  float01Intrinsic();
+};
+
+@external(
+  abi := .musi
+)
+let entropyHexIntrinsic(count : Int) : String;
+
+export let entropyHex(count : Int) : String := unsafe {
+  entropyHexIntrinsic(count);
+};

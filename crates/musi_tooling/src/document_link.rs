@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use musi_project::{ProjectOptions, load_project_ancestor};
+use musi_project::{Project, ProjectOptions, load_project_ancestor};
 use music_base::{Source, SourceMap, Span};
 use music_module::{ImportSiteKind, ModuleSpecifier, collect_import_sites};
 use music_syntax::{Lexer, parse};
@@ -64,10 +64,7 @@ pub fn document_links_for_project_file_with_overlay(
         .collect()
 }
 
-fn target_path_for_resolved_spec(
-    project: &musi_project::Project,
-    resolved: &ModuleSpecifier,
-) -> Option<PathBuf> {
+fn target_path_for_resolved_spec(project: &Project, resolved: &ModuleSpecifier) -> Option<PathBuf> {
     project
         .workspace()
         .packages

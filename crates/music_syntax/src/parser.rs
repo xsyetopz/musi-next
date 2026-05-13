@@ -18,7 +18,6 @@ mod recover;
 const PREFIX_BP: u8 = 24;
 const MUL_BP: u8 = 20;
 const ADD_BP: u8 = 18;
-const SHIFT_BP: u8 = 16;
 const COMPARE_BP: u8 = 14;
 const AND_BP: u8 = 12;
 const XOR_BP: u8 = 10;
@@ -148,7 +147,6 @@ struct Parser<'a> {
     errors: &'a mut ParseErrorList,
     comparison_exprs: Vec<SyntaxNodeId>,
     lparen_match: Vec<Option<usize>>,
-    quote_depth: u32,
 }
 
 impl<'a> Parser<'a> {
@@ -165,7 +163,6 @@ impl<'a> Parser<'a> {
             errors,
             comparison_exprs: Vec::new(),
             lparen_match: compute_matching(tokens, TokenKind::LParen, TokenKind::RParen),
-            quote_depth: 0,
         }
     }
 }

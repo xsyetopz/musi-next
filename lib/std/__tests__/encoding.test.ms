@@ -1,7 +1,7 @@
 let encoding := import "@std/encoding";
 let testing := import "@std/testing";
 
-export let test () :=
+export let test() :=
   (
     testing.describe("encoding");
     testing.it("hex namespace is exported", encoding.hex.encode("hi") = "6869",);

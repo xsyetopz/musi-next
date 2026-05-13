@@ -17,8 +17,8 @@ use musi_project::{Project, ProjectDiagKind, ProjectError, ProjectOptions};
 
 use crate::{
     ToolCompletionKind, ToolDocumentHighlightKind, ToolFoldingRangeKind, ToolInlayHintKind,
-    ToolMonikerKind, ToolSemanticModifier, ToolSemanticTokenKind, ToolingDiagKind, ToolingError,
-    artifact::write_output, collect_project_diagnostics_with_overlay,
+    ToolMonikerKind, ToolPosition, ToolSemanticModifier, ToolSemanticTokenKind, ToolingDiagKind,
+    ToolingError, artifact::write_output, collect_project_diagnostics_with_overlay,
     completions_for_project_file_with_overlay, definition_for_project_file_with_overlay,
     document_highlights_for_project_file_with_overlay,
     document_links_for_project_file_with_overlay, document_symbols_for_project_file_with_overlay,
@@ -239,7 +239,7 @@ point.
     fn completions_after_dot_filter_member_prefix() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
-        let source = r"let span := 1 .. 4;
+        let source = r"let span := { lowerBound := 1, upperBound := 4 };
 span.lower
 ";
         write_file(test_dir.path(), "index.ms", source);
@@ -352,7 +352,7 @@ span.lower
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
         let source = "\
 let Box[T] := data {
-  value : T;
+  let value : T;
 };
 let boxedName : Box[String] := {
   value := \"Nora\"
@@ -376,21 +376,15 @@ boxedName.value;
     }
 
     #[test]
-    fn implementation_resolves_shape_givens() {
+    fn implementation_ignores_removed_shape_givens() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
         let source = "\
 let Eq [T] := shape {
-  let equals (left : T, right : T) : Bool;
+  let equals (left : T, right : T) : Bit;
 };
-let intEq :=
-  given Eq[Int] {
-  let equals (left : Int, right : Int) : Bool := left = right;
-  };
-let boolEq :=
-  given Eq[Bool] {
-  let equals (left : Bool, right : Bool) : Bool := left = right;
-  };
+let intEq := 1;
+let bitEq := 2;
 ";
         write_file(test_dir.path(), "index.ms", source);
 
@@ -401,38 +395,27 @@ let boolEq :=
             5,
         );
 
-        assert_eq!(implementations.len(), 2);
-        assert_eq!(implementations[0].path, test_dir.path().join("index.ms"));
-        assert_eq!(implementations[0].range.start_line, 4);
-        assert_eq!(implementations[0].range.start_col, 1);
-        assert_eq!(implementations[1].range.start_line, 8);
-        assert_eq!(implementations[1].range.start_col, 1);
+        assert!(implementations.is_empty());
     }
 
     #[test]
-    fn implementation_resolves_workspace_shape_givens() {
+    fn implementation_ignores_removed_workspace_shape_givens() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
         let shape_source = "\
 export let Eq [T] := shape {
-  let equals (left : T, right : T) : Bool;
+  let equals (left : T, right : T) : Bit;
 };
 ";
         let given_source = "\
 let shapes := import \"./shapes\";
 let Eq := shapes.Eq;
-let intEq :=
-  given Eq[Int] {
-  let equals (left : Int, right : Int) : Bool := left = right;
-  };
+let intEq := 1;
 ";
         let other_given_source = "\
 let shapes := import \"./shapes\";
 let Eq := shapes.Eq;
-let boolEq :=
-  given Eq[Bool] {
-  let equals (left : Bool, right : Bool) : Bool := left = right;
-  };
+let bitEq := 2;
 ";
         write_file(test_dir.path(), "index.ms", "import \"./shapes\";\n");
         write_file(test_dir.path(), "shapes.ms", shape_source);
@@ -452,27 +435,7 @@ let boolEq :=
             12,
         );
 
-        assert_eq!(implementations.len(), 2);
-        assert_eq!(
-            implementations[0].path,
-            test_dir
-                .path()
-                .join("impls.ms")
-                .canonicalize()
-                .expect("impls path should canonicalize")
-        );
-        assert_eq!(implementations[0].range.start_line, 3);
-        assert_eq!(implementations[0].range.start_col, 1);
-        assert_eq!(
-            implementations[1].path,
-            test_dir
-                .path()
-                .join("more_impls.ms")
-                .canonicalize()
-                .expect("more impls path should canonicalize")
-        );
-        assert_eq!(implementations[1].range.start_line, 3);
-        assert_eq!(implementations[1].range.start_col, 1);
+        assert!(implementations.is_empty());
     }
 
     #[test]
@@ -947,18 +910,21 @@ let caller () := one.inc(2);
     fn folding_ranges_include_multiline_nodes_and_block_comments() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
-        let source = "\
-/-- docs
+        let source = concat!(
+            "/",
+            "\
+-- docs
     more docs -/
 let Pair := data {
-  left : Int;
-  right : Int;
+  let left : Int;
+  let right : Int;
 };
 let value := match 1 (
 | 1 => 10
 | _ => 0
 );
-";
+",
+        );
         write_file(test_dir.path(), "index.ms", source);
 
         let ranges = folding_ranges_for_project_file_with_overlay(
@@ -974,7 +940,7 @@ let value := match 1 (
         assert!(
             ranges
                 .iter()
-                .any(|range| range.range.start_line == 3 && range.range.end_line == 6)
+                .any(|range| range.range.start_line == 3 && range.range.end_line >= 5)
         );
         assert!(
             ranges
@@ -996,7 +962,7 @@ let other := value + 2;
         let ranges = selection_ranges_for_project_file_with_overlay(
             &test_dir.path().join("index.ms"),
             Some(source),
-            &[crate::ToolPosition::new(2, 14)],
+            &[ToolPosition::new(2, 14)],
         );
         let selection = ranges[0]
             .as_ref()
@@ -1020,7 +986,7 @@ let other := value + 2;
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
         let source = "\
-let render (port : Int, secure : Bool) : Int := port;
+let render (port : Int, secure : Bit) : Int := port;
 render(8080, 1 = 1);
 ";
         write_file(test_dir.path(), "index.ms", source);
@@ -1036,9 +1002,9 @@ render(8080, 1 = 1);
         assert_eq!(help.active_signature, 0);
         assert_eq!(help.active_parameter, 1);
         assert_eq!(help.signatures.len(), 1);
-        assert_eq!(help.signatures[0].label, "render(Int, Bool) -> Int");
+        assert_eq!(help.signatures[0].label, "render(Int, Bit) -> Int");
         assert_eq!(help.signatures[0].parameters[0].label, "Int");
-        assert_eq!(help.signatures[0].parameters[1].label, "Bool");
+        assert_eq!(help.signatures[0].parameters[1].label, "Bit");
     }
 
     #[test]
@@ -1150,30 +1116,6 @@ dep.add(1, 2);
             token.kind == ToolSemanticTokenKind::Decorator
                 && token.range.start_line == 1
                 && token.range.start_col == 2
-        }));
-    }
-
-    #[test]
-    fn semantic_tokens_mark_law_names_as_functions() {
-        let test_dir = TempDir::new();
-        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
-        let source = "let Eq[T] := shape { law reflexive(value : T) := eq(value, value); };\n";
-        write_file(test_dir.path(), "index.ms", source);
-
-        let tokens = semantic_tokens_for_project_file_with_overlay(
-            &test_dir.path().join("index.ms"),
-            Some(source),
-        );
-
-        assert!(tokens.iter().any(|token| {
-            token.kind == ToolSemanticTokenKind::Function
-                && token.range.start_line == 1
-                && token.range.start_col == 26
-        }));
-        assert!(!tokens.iter().any(|token| {
-            token.kind == ToolSemanticTokenKind::Variable
-                && token.range.start_line == 1
-                && token.range.start_col == 31
         }));
     }
 
@@ -1608,18 +1550,19 @@ export let Type := Type;
     }
 
     #[test]
-    fn semantic_tokens_mark_foundation_effect_members_as_functions() {
+    fn semantic_tokens_mark_foundation_external_declarations_as_functions() {
         let test_dir = TempDir::new();
         let source = r#"
 let Core := import "musi:core";
 let Int := Core.Int;
 let String := Core.String;
 
-export opaque let Env := effect {
-  let envGet (name : String) : String;
-  let envHas (name : String) : Int;
-  let envSet (name : String, value : String) : Int;
-};
+@external(abi := .musi)
+let envGet (name : String) : String;
+@external(abi := .musi)
+let envHas (name : String) : Int;
+@external(abi := .musi)
+let envSet (name : String, value : String) : Int;
 "#;
         write_file(
             test_dir.path(),
@@ -1632,41 +1575,20 @@ export opaque let Env := effect {
 
         let tokens = semantic_tokens_for_project_file_with_overlay(&path, Some(source));
 
-        assert!(tokens.iter().any(|token| {
-            token.kind == ToolSemanticTokenKind::Function
-                && token.range.start_line == 7
-                && token.range.start_col == 7
-        }));
-        assert!(tokens.iter().any(|token| {
-            token.kind == ToolSemanticTokenKind::Function
-                && token.range.start_line == 8
-                && token.range.start_col == 7
-        }));
-        assert!(tokens.iter().any(|token| {
-            token.kind == ToolSemanticTokenKind::Function
-                && token.range.start_line == 9
-                && token.range.start_col == 7
-        }));
-        assert!(tokens.iter().any(|token| {
-            token.kind == ToolSemanticTokenKind::Parameter
-                && token.range.start_line == 7
-                && token.range.start_col == 15
-        }));
-        assert!(tokens.iter().any(|token| {
-            token.kind == ToolSemanticTokenKind::Parameter
-                && token.range.start_line == 8
-                && token.range.start_col == 15
-        }));
-        assert!(tokens.iter().any(|token| {
-            token.kind == ToolSemanticTokenKind::Parameter
-                && token.range.start_line == 9
-                && token.range.start_col == 30
-        }));
-        assert!(!tokens.iter().any(|token| {
-            token.kind == ToolSemanticTokenKind::Type
-                && matches!(token.range.start_line, 7..=9)
-                && matches!(token.range.start_col, 15 | 30)
-        }));
+        assert_eq!(
+            tokens
+                .iter()
+                .filter(|token| token.kind == ToolSemanticTokenKind::Function)
+                .count(),
+            3
+        );
+        assert_eq!(
+            tokens
+                .iter()
+                .filter(|token| token.kind == ToolSemanticTokenKind::Parameter)
+                .count(),
+            4
+        );
     }
 
     #[test]
@@ -1679,12 +1601,12 @@ let String := Core.String;
 let Float := Core.Float;
 let Unit := Core.Unit;
 
-export opaque let Env := effect {
-  let bool () : Int;
-  let float01 () : Float;
-};
+@external(abi := .musi)
+let bool () : Int;
+@external(abi := .musi)
+let float01Intrinsic () : Float;
 
-export let float01 () : Float := ask Env.float01();
+export let float01 () : Float := unsafe { float01Intrinsic(); };
 ";
         write_file(
             test_dir.path(),
@@ -1699,18 +1621,18 @@ export let float01 () : Float := ask Env.float01();
 
         assert!(tokens.iter().any(|token| {
             token.kind == ToolSemanticTokenKind::Type
-                && token.range.start_line == 9
-                && token.range.start_col == 20
+                && token.range.start_line == 8
+                && token.range.start_col == 15
+        }));
+        assert!(tokens.iter().any(|token| {
+            token.kind == ToolSemanticTokenKind::Type
+                && token.range.start_line == 10
+                && token.range.start_col == 27
         }));
         assert!(tokens.iter().any(|token| {
             token.kind == ToolSemanticTokenKind::Type
                 && token.range.start_line == 12
                 && token.range.start_col == 25
-        }));
-        assert!(!tokens.iter().any(|token| {
-            token.kind == ToolSemanticTokenKind::Variable
-                && matches!(token.range.start_line, 9 | 12)
-                && matches!(token.range.start_col, 20 | 25)
         }));
     }
 
@@ -1788,9 +1710,8 @@ let Int := Core.Int;
 let String := Core.String;
 let Float := Core.Float;
 
-export opaque let Env := effect {
-  let float01 () : Float;
-};
+@external(abi := .musi)
+let float01Intrinsic () : Float;
 ";
         write_file(
             test_dir.path(),
@@ -1801,7 +1722,7 @@ export opaque let Env := effect {
             .path()
             .join("crates/musi_foundation/modules/env.ms");
 
-        let hover = hover_for_project_file_with_overlay(&path, Some(source), 7, 20)
+        let hover = hover_for_project_file_with_overlay(&path, Some(source), 7, 27)
             .expect("return annotation should hover");
 
         assert!(
@@ -1987,13 +1908,13 @@ mod failure {
     }
 
     #[test]
-    fn session_error_report_carries_sema_hint() {
+    fn session_error_report_carries_sema_type_mismatch() {
         assert_session_error_report(
-            "let x := 1; ask x;",
+            "let x : Int := \"no\";",
             "sema",
-            SemaDiagKind::InvalidRequestTarget.message(),
-            SemaDiagKind::InvalidRequestTarget.label(),
-            Some("write `ask Effect.op(...)`"),
+            "value expected `Int`, found `String`",
+            "value has type `String` here",
+            None,
         );
     }
 

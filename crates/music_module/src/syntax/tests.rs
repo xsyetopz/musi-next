@@ -69,10 +69,10 @@ mod success {
     }
 
     #[test]
-    fn import_sites_ignore_quote_expr() {
+    fn import_sites_ignore_string_contents() {
         let src = r#"
         let A := import "a";
-        quote { let B := import "b"; };
+        let text := "let B := import \"b\";";
     "#;
         let lexed = Lexer::new(src).lex();
         let parsed = parse(lexed);
@@ -83,10 +83,10 @@ mod success {
     }
 
     #[test]
-    fn collects_exports_and_marks_opaque() {
+    fn collects_exports_and_marks_hidden() {
         let src = r"
         export let x := 1;
-        export opaque let y := 2;
+        export hidden let y := 2;
     ";
         let lexed = Lexer::new(src).lex();
         let parsed = parse(lexed);
@@ -128,12 +128,13 @@ mod success {
 
     #[test]
     fn export_foreign_group_collects_binding_names() {
-        let src = r#"
-        export native "c" (
+        let src = r"
+        @external(abi := .c)
+        export (
           let puts (msg : CString) : Int;
           let gets (buf : CString) : Int;
         );
-    "#;
+    ";
         let lexed = Lexer::new(src).lex();
         let parsed = parse(lexed);
         assert!(parsed.errors().is_empty(), "{:?}", parsed.errors());
@@ -144,28 +145,29 @@ mod success {
     }
 
     #[test]
-    fn export_given_is_tracked_separately() {
+    fn removed_given_exports_are_absent() {
         let src = r"
-        export given Eq[Int] { };
+        export let Eq := shape { };
     ";
         let lexed = Lexer::new(src).lex();
         let parsed = parse(lexed);
         assert!(parsed.errors().is_empty(), "{:?}", parsed.errors());
         let summary = collect_export_summary(SourceId::from_raw(0), parsed.tree());
-        assert_eq!(summary.exported_given_count(), 1);
-        assert_eq!(summary.exported_givens().count(), 1);
+        assert_eq!(summary.exported_given_count(), 0);
+        assert_eq!(summary.exported_givens().count(), 0);
     }
 
     #[test]
-    fn opaque_export_marking_is_order_independent() {
-        let src = r#"
+    fn hidden_export_marking_is_order_independent() {
+        let src = r"
         export let x := 1;
-        export native "c" (
+        @external(abi := .c)
+        export (
           let x (msg : CString) : Int;
           let y (msg : CString) : Int;
         );
-        export opaque let x := 2;
-    "#;
+        export hidden let x := 2;
+    ";
         let lexed = Lexer::new(src).lex();
         let parsed = parse(lexed);
         assert!(parsed.errors().is_empty(), "{:?}", parsed.errors());

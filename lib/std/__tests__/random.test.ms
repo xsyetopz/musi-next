@@ -1,7 +1,7 @@
 let random := import "@std/random";
 let testing := import "@std/testing";
 
-export let test () :=
+export let test() :=
   (
     testing.describe("random");
     testing.it(

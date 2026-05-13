@@ -77,9 +77,7 @@ where
         let name = self.intern_ident_token_or_placeholder(name_tok, node.span());
         self.record_use(name);
 
-        let kind = if node.child_tokens().any(|t| t.kind() == TokenKind::LtColon) {
-            HirConstraintKind::Subtype
-        } else if node.child_tokens().any(|t| t.kind() == TokenKind::TildeEq) {
+        let kind = if node.child_tokens().any(|t| t.kind() == TokenKind::TildeEq) {
             HirConstraintKind::TypeEq
         } else {
             HirConstraintKind::Implements

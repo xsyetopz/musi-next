@@ -150,7 +150,7 @@ mod success {
         assert!(!manifest.contains("\"main\""));
         assert_eq!(
             index,
-            "let io := import \"@std/io\";\n\nlet message := \"Hello, world!\";\nio.writeLine(message);\n"
+            "let io := import \"@std/io\";\n\nlet message := \"Hello, world!\";\nio.writeLn(message);\n"
         );
         assert!(!index.contains("export let main"));
         assert!(test.contains("import \"@std/testing\""));
@@ -261,7 +261,7 @@ mod success {
         write_file(
             test_dir.path(),
             "index.ms",
-            "let io := import \"@std/io\";\nio.writeLine(\"Hello\");\n",
+            "let io := import \"@std/io\";\nio.writeLn(\"Hello\");\n",
         );
 
         let output = run_musi(&["run", "index.ms"], test_dir.path());
@@ -397,8 +397,8 @@ let Log := import "musi:log";
 export let test () :=
   (
     Testing.describe("io");
-    Io.printLine("hidden stdout");
-    Io.printErrorLine("hidden stderr");
+    Io.writeLn("hidden stdout");
+    Io.writeErrLn("hidden stderr");
     Log.write(40, "hidden log");
     Testing.it("passes", Testing.toBe(1, 1));
     Testing.endDescribe()

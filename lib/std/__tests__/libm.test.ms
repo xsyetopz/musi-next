@@ -2,10 +2,10 @@ let libm := import "@std/libm";
 let maybe := import "@std/maybe";
 let testing := import "@std/testing";
 
-let close (actual : Float, expected : Float) : Bool :=
+let close(actual : Float, expected : Float) : Bit :=
   libm.fabs(actual - expected) < 0.000001;
 
-export let test () :=
+export let test() :=
   (
     testing.describe("libm");
     testing.it("'sqrt' returns square root", close(libm.sqrt(9.0), 3.0));

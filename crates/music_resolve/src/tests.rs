@@ -112,7 +112,7 @@ mod success {
     #[test]
     fn resolves_rec_name_use_in_rhs() {
         assert_name_binding(
-            "let rec f := f;",
+            "let recur f := f;",
             SourceId::from_raw(2),
             "f",
             0,
@@ -404,7 +404,7 @@ mod success {
     fn data_declarations_do_not_report_variant_or_field_names_as_unbound() {
         let src = r"
         let Maybe[T] := data { | Some(T) | None | };
-        let Pair[T] := data { left : T; right : T; };
+        let Pair[T] := data { let left : T; let right : T; };
     ";
         let source_id = SourceId::from_raw(6);
         let module_key = ModuleKey::new("main");
@@ -584,8 +584,8 @@ mod success {
     }
 
     #[test]
-    fn handle_answer_name_resolves() {
-        let src = "let h := answer x; handle x answer h;";
+    fn plain_name_use_resolves() {
+        let src = "let h := 1; h;";
         let source_id = SourceId::from_raw(13);
         let module_key = ModuleKey::new("main");
         let parsed = parse(Lexer::new(src).lex());

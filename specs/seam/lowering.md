@@ -18,16 +18,16 @@ SEAM is not where source-language constructs stay pretty.
 
 Rust 2024 is implementation substrate after or beside SEAM lowering. Rust MIR/LLVM/Cranelift concepts may inform backend implementation, but SEAM is not Rust IR and must not inherit Rust syntax or trait terminology.
 
-Frontend lowering may use Rust-style implementation strategies internally: explicit environment structs, vtables, match lowering, or unsafe wrappers. The emitted SEAM contract remains Musi/SEAM terms: contextual arguments, handler frames, continuations, native pointers, and verified domains.
+Frontend lowering may use Rust-style implementation strategies internally: explicit environment structs, vtables, match lowering, or unsafe wrappers. The emitted SEAM contract remains Musi/SEAM terms: contextual arguments, control frames, continuations, native pointers, and verified domains.
 
 ## What Must Lower Away
 
 These source-level ideas must not survive into SEAM as direct VM concepts:
 
 - pattern matching
-- source `given` contextual visibility
+- source context visibility
 - range syntax
-- source effect / answer / handle syntax
+- source suspension syntax
 - source import syntax
 - source record update sugar
 - source destructuring sugar
@@ -45,7 +45,7 @@ SEAM receives explicit machinery such as:
 - layout-guided field loads and stores
 - explicit closure environment values
 - explicit continuation payloads
-- explicit handler-frame setup and unwind paths
+- explicit driver-frame setup and unwind paths
 - explicit contextual value arguments and dispatch calls
 - explicit native pointer and pin-region operations
 
@@ -75,13 +75,13 @@ Function values use `ld.fn`, `new.fn`, and `call.ind`. Virtual, interface/shape,
 
 ### Contextual Values
 
-`given` contextual values lower to:
+Context values lower to:
 
 - dictionary values
 - explicit dictionary passing
 - explicit member dispatch
 
-SEAM does not treat source-level `given` modifiers as VM objects.
+SEAM does not treat context markers as VM objects.
 
 Dictionary dispatch uses ordinary object and stack-call operations such as `ld.fld` and `call.ind`. VM-assisted shape/protocol dispatch uses `call.iface` when the descriptor declares an interface/shape member.
 
@@ -103,16 +103,16 @@ Borrow-like views lower to `managed.views` machinery, and stable-address regions
 
 Address-like stack operations are `ld.fld.a`, `ld.elem.a`, `ld.ind`, `st.ind`, `pin`, `unpin`, and `ld.addr`. There is no arbitrary pointer arithmetic opcode.
 
-### Effects, Answers, And Handling
+### Suspension And Drivers
 
-Source `effect` / `answer` / `handle` forms lower to `resumable` machinery:
+Suspending operations lower to `resumable` machinery:
 
-- handler frame push and pop through `hdl.push` and `hdl.pop`
+- driver frame push and pop through `hdl.push` and `hdl.pop`
 - operation invocation through `raise`
-- one-shot continuation resume through `resume`
+- one-shot continuation transfer through `resume`
 - unwind restoration
 
-`raise` captures the continuation according to the operation descriptor. Handler clauses receive the continuation as an ordinary parameter when their descriptor needs resumption. There is no `ask`, `answer`, or `handler` opcode.
+`raise` captures the continuation according to the operation descriptor. Driver clauses receive the continuation as an ordinary parameter when their descriptor needs resumption.
 
 ### Arithmetic
 

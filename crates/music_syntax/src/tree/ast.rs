@@ -38,7 +38,9 @@ pub enum ExprKind {
     Resume,
     Import,
     Data,
+    Defer,
     Effect,
+    If,
     Shape,
     Given,
     Ask,
@@ -47,6 +49,7 @@ pub enum ExprKind {
     Foreign,
     Quote,
     Splice,
+    Yield,
     Other,
 }
 
@@ -222,7 +225,9 @@ fn expr_kind_from_syntax(kind: SyntaxNodeKind) -> ExprKind {
         (SyntaxNodeKind::ResumeExpr, ExprKind::Resume),
         (SyntaxNodeKind::ImportExpr, ExprKind::Import),
         (SyntaxNodeKind::DataExpr, ExprKind::Data),
+        (SyntaxNodeKind::DeferExpr, ExprKind::Defer),
         (SyntaxNodeKind::EffectExpr, ExprKind::Effect),
+        (SyntaxNodeKind::IfExpr, ExprKind::If),
         (SyntaxNodeKind::ShapeExpr, ExprKind::Shape),
         (SyntaxNodeKind::GivenExpr, ExprKind::Given),
         (SyntaxNodeKind::AskExpr, ExprKind::Ask),
@@ -231,6 +236,7 @@ fn expr_kind_from_syntax(kind: SyntaxNodeKind) -> ExprKind {
         (SyntaxNodeKind::ForeignBlockExpr, ExprKind::Foreign),
         (SyntaxNodeKind::QuoteExpr, ExprKind::Quote),
         (SyntaxNodeKind::SpliceExpr, ExprKind::Splice),
+        (SyntaxNodeKind::YieldExpr, ExprKind::Yield),
     ];
 
     EXPR_KIND_PAIRS

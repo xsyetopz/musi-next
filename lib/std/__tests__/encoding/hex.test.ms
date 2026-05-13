@@ -1,7 +1,7 @@
 let hex := import "@std/encoding/hex";
 let testing := import "@std/testing";
 
-export let test () :=
+export let test() :=
   (
     testing.describe("encoding/hex");
     testing.it(

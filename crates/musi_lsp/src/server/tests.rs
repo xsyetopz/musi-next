@@ -310,11 +310,11 @@ mod success {
     #[test]
     fn document_formatting_formats_multiline_match_like_cli_formatter() {
         let uri = Url::parse("file:///tmp/index.ms").expect("uri should parse");
-        let source = r"export let isLess (target : Ordering) : Bool := match target(
+        let source = r"export let isLess (target : Ordering) : Bit := match target(
     | .Less => 0 = 0
     | _ => 0 = 1);
 ";
-        let expected = r"export let isLess (target : Ordering) : Bool :=
+        let expected = r"export let isLess (target : Ordering) : Bit :=
   match target (
   | .Less => 0 = 0
   | _ => 0 = 1
@@ -1128,7 +1128,7 @@ point.
         .expect("manifest should be written");
         let path = root.join("index.ms");
         let source = "\
-let render (port : Int, secure : Bool) : Int := port;
+let render (port : Int, secure : Bit) : Int := port;
 render(8080, 1 = 1);
 ";
         fs::write(&path, source).expect("entry should be written");
@@ -1149,7 +1149,7 @@ render(8080, 1 = 1);
 
         assert_eq!(help.active_signature, Some(0));
         assert_eq!(help.active_parameter, Some(1));
-        assert_eq!(help.signatures[0].label, "render(Int, Bool) -> Int");
+        assert_eq!(help.signatures[0].label, "render(Int, Bit) -> Int");
     }
 
     #[test]
@@ -1167,7 +1167,7 @@ render(8080, 1 = 1);
         .expect("manifest should be written");
         let path = root.join("index.ms");
         let source = "\
-let render (port : Int, secure : Bool) : Int := port;
+let render (port : Int, secure : Bit) : Int := port;
 let icon := \"\u{1F600}\"; render(8080, 1 = 1);
 ";
         fs::write(&path, source).expect("entry should be written");
@@ -1188,7 +1188,7 @@ let icon := \"\u{1F600}\"; render(8080, 1 = 1);
 
         assert_eq!(help.active_signature, Some(0));
         assert_eq!(help.active_parameter, Some(1));
-        assert_eq!(help.signatures[0].label, "render(Int, Bool) -> Int");
+        assert_eq!(help.signatures[0].label, "render(Int, Bit) -> Int");
     }
 
     #[test]
@@ -2426,7 +2426,7 @@ let result := one.inc(2);
         let path = root.join("index.ms");
         let source = "\
 let Box[T] := data {
-  value : T;
+  let value : T;
 };
 let boxedName : Box[String] := {
   value := \"Nora\"
@@ -2457,7 +2457,7 @@ boxedName.value;
     }
 
     #[test]
-    fn implementation_resolves_shape_givens() {
+    fn implementation_returns_none_for_shape_without_givens() {
         let root = temp_project();
         fs::write(
             root.join("musi.json"),
@@ -2472,43 +2472,27 @@ boxedName.value;
         let path = root.join("index.ms");
         let source = "\
 let Eq [T] := shape {
-  let equals (left : T, right : T) : Bool;
+  let equals(left : T, right : T) : Bit;
 };
-let intEq :=
-  given Eq[Int] {
-  let equals (left : Int, right : Int) : Bool := left = right;
-  };
-let boolEq :=
-  given Eq[Bool] {
-  let equals (left : Bool, right : Bool) : Bool := left = right;
-  };
 ";
         fs::write(&path, source).expect("entry should be written");
         let uri = Url::from_file_path(&path).expect("file URI should build");
         let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
         let _ = server.open_documents.insert(uri.clone(), source.to_owned());
 
-        let response = server
-            .implementation_at(GotoDefinitionParams {
-                text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier { uri },
-                    position: Position::new(0, 4),
-                },
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: PartialResultParams::default(),
-            })
-            .expect("implementations should resolve");
-        let GotoDefinitionResponse::Array(locations) = response else {
-            panic!("implementation locations expected");
-        };
-
-        assert_eq!(locations.len(), 2);
-        assert_eq!(locations[0].range.start, Position::new(3, 0));
-        assert_eq!(locations[1].range.start, Position::new(7, 0));
+        let response = server.implementation_at(GotoDefinitionParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri },
+                position: Position::new(0, 4),
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        });
+        assert!(response.is_none());
     }
 
     #[test]
-    fn implementation_resolves_workspace_shape_givens() {
+    fn implementation_returns_none_for_workspace_shape_without_givens() {
         let root = temp_project();
         fs::write(
             root.join("musi.json"),
@@ -2525,24 +2509,16 @@ let boolEq :=
         let shape_path = root.join("shapes.ms");
         let shape_source = "\
 export let Eq [T] := shape {
-  let equals (left : T, right : T) : Bool;
+  let equals(left : T, right : T) : Bit;
 };
 ";
         let impl_source = "\
 let shapes := import \"./shapes\";
 let Eq := shapes.Eq;
-let intEq :=
-  given Eq[Int] {
-  let equals (left : Int, right : Int) : Bool := left = right;
-  };
 ";
         let more_impl_source = "\
 let shapes := import \"./shapes\";
 let Eq := shapes.Eq;
-let boolEq :=
-  given Eq[Bool] {
-  let equals (left : Bool, right : Bool) : Bool := left = right;
-  };
 ";
         fs::write(&shape_path, shape_source).expect("shape module should be written");
         fs::write(root.join("impls.ms"), impl_source).expect("impl module should be written");
@@ -2554,35 +2530,15 @@ let boolEq :=
             .open_documents
             .insert(uri.clone(), shape_source.to_owned());
 
-        let response = server
-            .implementation_at(GotoDefinitionParams {
-                text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier { uri },
-                    position: Position::new(0, 11),
-                },
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: PartialResultParams::default(),
-            })
-            .expect("workspace implementations should resolve");
-        let GotoDefinitionResponse::Array(locations) = response else {
-            panic!("implementation locations expected");
-        };
-
-        assert_eq!(locations.len(), 2);
-        assert_eq!(locations[0].range.start, Position::new(2, 0));
-        assert_eq!(locations[1].range.start, Position::new(2, 0));
-        assert!(locations.iter().any(|location| {
-            location
-                .uri
-                .to_file_path()
-                .is_ok_and(|path| path.file_name().is_some_and(|name| name == "impls.ms"))
-        }));
-        assert!(locations.iter().any(|location| {
-            location
-                .uri
-                .to_file_path()
-                .is_ok_and(|path| path.file_name().is_some_and(|name| name == "more_impls.ms"))
-        }));
+        let response = server.implementation_at(GotoDefinitionParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri },
+                position: Position::new(0, 11),
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        });
+        assert!(response.is_none());
     }
 
     #[test]
@@ -2935,7 +2891,7 @@ let other := value + value;
         let uri = Url::from_file_path(&path).expect("file URI should build");
         let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
         let _ = server.open_documents.insert(uri.clone(), source.to_owned());
-        let item = server
+        let value_hierarchy = server
             .prepare_call_hierarchy_at(CallHierarchyPrepareParams {
                 text_document_position_params: TextDocumentPositionParams {
                     text_document: TextDocumentIdentifier { uri: uri.clone() },
@@ -2948,7 +2904,7 @@ let other := value + value;
 
         let calls = server
             .call_hierarchy_incoming_calls(&CallHierarchyIncomingCallsParams {
-                item,
+                item: value_hierarchy,
                 work_done_progress_params: WorkDoneProgressParams::default(),
                 partial_result_params: PartialResultParams::default(),
             })
@@ -2981,7 +2937,7 @@ let other := value + value;
         let uri = Url::from_file_path(&path).expect("file URI should build");
         let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
         let _ = server.open_documents.insert(uri.clone(), source.to_owned());
-        let item = server
+        let target_hierarchy = server
             .prepare_call_hierarchy_at(CallHierarchyPrepareParams {
                 text_document_position_params: TextDocumentPositionParams {
                     text_document: TextDocumentIdentifier { uri },
@@ -2994,7 +2950,7 @@ let other := value + value;
 
         let calls = server
             .call_hierarchy_incoming_calls(&CallHierarchyIncomingCallsParams {
-                item,
+                item: target_hierarchy,
                 work_done_progress_params: WorkDoneProgressParams::default(),
                 partial_result_params: PartialResultParams::default(),
             })
@@ -3015,7 +2971,7 @@ let other := value + value;
         fs::write(&path, source).expect("entry should be written");
         let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
         let _ = server.open_documents.insert(uri.clone(), source.to_owned());
-        let item = server
+        let caller_hierarchy = server
             .prepare_call_hierarchy_at(CallHierarchyPrepareParams {
                 text_document_position_params: TextDocumentPositionParams {
                     text_document: TextDocumentIdentifier { uri },
@@ -3029,7 +2985,7 @@ let other := value + value;
 
         let calls = server
             .call_hierarchy_outgoing_calls(&CallHierarchyOutgoingCallsParams {
-                item,
+                item: caller_hierarchy,
                 work_done_progress_params: WorkDoneProgressParams::default(),
                 partial_result_params: PartialResultParams::default(),
             })
@@ -3066,7 +3022,7 @@ let caller () := one.inc(2);
         fs::write(&path, source).expect("entry should be written");
         let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
         let _ = server.open_documents.insert(uri.clone(), source.to_owned());
-        let item = server
+        let caller_hierarchy = server
             .prepare_call_hierarchy_at(CallHierarchyPrepareParams {
                 text_document_position_params: TextDocumentPositionParams {
                     text_document: TextDocumentIdentifier { uri },
@@ -3080,7 +3036,7 @@ let caller () := one.inc(2);
 
         let calls = server
             .call_hierarchy_outgoing_calls(&CallHierarchyOutgoingCallsParams {
-                item,
+                item: caller_hierarchy,
                 work_done_progress_params: WorkDoneProgressParams::default(),
                 partial_result_params: PartialResultParams::default(),
             })
@@ -3748,14 +3704,17 @@ let other := value + value;
         let root = temp_project();
         let path = root.join("index.ms");
         let uri = Url::from_file_path(&path).expect("file URI should build");
-        let source = "\
-/-- docs
+        let source = concat!(
+            "/",
+            "\
+-- docs
     more docs -/
 let Pair := data {
-  left : Int;
-  right : Int;
+  let left : Int;
+  let right : Int;
 };
-";
+",
+        );
         let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
         let _ = server.open_documents.insert(uri.clone(), source.to_owned());
 

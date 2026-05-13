@@ -4,14 +4,29 @@ let Core := import "musi:core";
 let Int := Core.Int;
 let Unit := Core.Unit;
 
-export opaque let Time := effect {
-  let nowUnixMs () : Int;
-  let monotonicMs () : Int;
-  let sleepMs (ms : Int) : Unit;
+@external(
+  abi := .musi
+)
+let nowUnixMsIntrinsic() : Int;
+
+export let nowUnixMs() : Int := unsafe {
+  nowUnixMsIntrinsic();
 };
 
-export let nowUnixMs () : Int := ask Time.nowUnixMs();
+@external(
+  abi := .musi
+)
+let monotonicMsIntrinsic() : Int;
 
-export let monotonicMs () : Int := ask Time.monotonicMs();
+export let monotonicMs() : Int := unsafe {
+  monotonicMsIntrinsic();
+};
 
-export let sleepMs (ms : Int) : Unit := ask Time.sleepMs(ms);
+@external(
+  abi := .musi
+)
+let sleepMsIntrinsic(ms : Int) : Unit;
+
+export let sleepMs(ms : Int) : Unit := unsafe {
+  sleepMsIntrinsic(ms);
+};

@@ -1,40 +1,64 @@
 --! System helper namespace.
 
-@link(symbol := "sys.target.os")
-native "musi" let targetOsIntrinsic () : String;
+@external(
+  abi := .musi
+)
+let targetOsIntrinsic() : String;
 
-@link(symbol := "sys.target.arch")
-native "musi" let targetArchIntrinsic () : String;
+@external(
+  abi := .musi
+)
+let targetArchIntrinsic() : String;
 
-@link(symbol := "sys.target.arch_family")
-native "musi" let targetArchFamilyIntrinsic () : String;
+@external(
+  abi := .musi
+)
+let targetArchFamilyIntrinsic() : String;
 
-@link(symbol := "sys.target.family")
-native "musi" let targetFamilyIntrinsic () : String;
+@external(
+  abi := .musi
+)
+let targetFamilyIntrinsic() : String;
 
-@link(symbol := "sys.target.pointer_width")
-native "musi" let targetPointerWidthIntrinsic () : Int;
+@external(
+  abi := .musi
+)
+let targetPointerWidthIntrinsic() : Int;
 
-@link(symbol := "sys.target.endian")
-native "musi" let targetEndianIntrinsic () : String;
+@external(
+  abi := .musi
+)
+let targetEndianIntrinsic() : String;
 
-@link(symbol := "sys.jit.supported")
-native "musi" let jitSupportedIntrinsic () : Int;
+@external(
+  abi := .musi
+)
+let jitSupportedIntrinsic() : Int;
 
-@link(symbol := "sys.jit.backend")
-native "musi" let jitBackendIntrinsic () : String;
+@external(
+  abi := .musi
+)
+let jitBackendIntrinsic() : String;
 
-@link(symbol := "sys.jit.isa")
-native "musi" let jitIsaIntrinsic () : String;
+@external(
+  abi := .musi
+)
+let jitIsaIntrinsic() : String;
 
-@link(symbol := "sys.matches.os")
-native "musi" let matchesOsIntrinsic (value : String) : Bool;
+@external(
+  abi := .musi
+)
+let matchesOsIntrinsic(value : String) : Bit;
 
-@link(symbol := "sys.matches.arch")
-native "musi" let matchesArchIntrinsic (value : String) : Bool;
+@external(
+  abi := .musi
+)
+let matchesArchIntrinsic(value : String) : Bit;
 
-@link(symbol := "sys.matches.family")
-native "musi" let matchesFamilyIntrinsic (value : String) : Bool;
+@external(
+  abi := .musi
+)
+let matchesFamilyIntrinsic(value : String) : Bit;
 
 --- Raw target operating system name.
 export let os : String := unsafe {
@@ -88,25 +112,25 @@ export let target :=
   };
 
 --- Returns true when value names current OS.
-export let matchesOs (value : String) : Bool := unsafe {
+export let matchesOs(value : String) : Bit := unsafe {
   matchesOsIntrinsic(value);
 };
 --- Returns true when value names current architecture.
-export let matchesArch (value : String) : Bool := unsafe {
+export let matchesArch(value : String) : Bit := unsafe {
   matchesArchIntrinsic(value);
 };
 --- Returns true when value names current platform family.
-export let matchesFamily (value : String) : Bool := unsafe {
+export let matchesFamily(value : String) : Bit := unsafe {
   matchesFamilyIntrinsic(value);
 };
 
 --- Returns true on Unix-family targets.
-export let isUnix () : Bool := matchesFamily("unix");
+export let isUnix() : Bit := matchesFamily("unix");
 --- Returns true on Darwin-family targets.
-export let isDarwin () : Bool := matchesFamily("darwin");
+export let isDarwin() : Bit := matchesFamily("darwin");
 --- Returns true on Windows targets.
-export let isWindows () : Bool := matchesFamily("windows");
+export let isWindows() : Bit := matchesFamily("windows");
 --- Returns true on WebAssembly-family targets.
-export let isWebAssembly () : Bool := matchesFamily("webassembly");
+export let isWebAssembly() : Bit := matchesFamily("webassembly");
 --- Returns true when current target supports JIT.
-export let supportsJit () : Bool := jit.supported;
+export let supportsJit() : Bit := jit.supported;

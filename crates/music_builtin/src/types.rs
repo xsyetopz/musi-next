@@ -61,7 +61,7 @@ pub const BUILTIN_TYPES: &[BuiltinTypeDef] = &[
     BuiltinTypeDef::new(BuiltinTypeId::Syntax, "Syntax"),
     BuiltinTypeDef::new(BuiltinTypeId::Empty, "Empty"),
     BuiltinTypeDef::new(BuiltinTypeId::Unit, "Unit"),
-    BuiltinTypeDef::new(BuiltinTypeId::Bool, "Bool"),
+    BuiltinTypeDef::new(BuiltinTypeId::Bool, "Bit"),
     BuiltinTypeDef::new(BuiltinTypeId::Nat, "Nat"),
     BuiltinTypeDef::new(BuiltinTypeId::Int, "Int"),
     BuiltinTypeDef::new(BuiltinTypeId::Int8, "Int8"),

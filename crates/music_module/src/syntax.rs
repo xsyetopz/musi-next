@@ -113,15 +113,15 @@ pub fn collect_export_summary(source_id: SourceId, tree: &SyntaxTree) -> ModuleE
         if node.kind() != SyntaxNodeKind::AttributedExpr {
             return;
         }
-        let Some(export_mod) = node
+        if !node
             .child_nodes()
-            .find(|child| child.kind() == SyntaxNodeKind::ExportMod)
-        else {
+            .any(|child| child.kind() == SyntaxNodeKind::ExportMod)
+        {
             return;
-        };
-        let is_opaque = export_mod
+        }
+        let is_opaque = node
             .child_tokens()
-            .any(|tok| tok.kind() == TokenKind::KwOpaque);
+            .any(|tok| tok.kind() == TokenKind::KwHidden);
 
         if let Some(let_expr) = node
             .child_nodes()

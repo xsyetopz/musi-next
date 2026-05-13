@@ -5,7 +5,7 @@ use async_lsp::lsp_types::{
     LinkedEditingRanges, Location, Moniker, MonikerKind, Position, Range, UniquenessLevel, Url,
 };
 use musi_tooling::{
-    ToolDocumentSymbol, ToolReferenceLens, document_links_for_project_file_with_overlay,
+    ToolDocumentSymbol, ToolRange, ToolReferenceLens, document_links_for_project_file_with_overlay,
 };
 use serde_json::{Value, json};
 
@@ -58,7 +58,7 @@ pub(super) fn symbol_at_position(
 
 pub(super) fn caller_symbol_for_reference<'a>(
     symbols: &'a [ToolDocumentSymbol],
-    range: &musi_tooling::ToolRange,
+    range: &ToolRange,
 ) -> Option<&'a ToolDocumentSymbol> {
     symbols
         .iter()
@@ -165,24 +165,21 @@ const fn position_lt(left: Position, right: Position) -> bool {
     left.line < right.line || (left.line == right.line && left.character < right.character)
 }
 
-const fn tool_range_contains_range(
-    container: &musi_tooling::ToolRange,
-    range: &musi_tooling::ToolRange,
-) -> bool {
+const fn tool_range_contains_range(container: &ToolRange, range: &ToolRange) -> bool {
     (range.start_line > container.start_line
         || range.start_line == container.start_line && range.start_col >= container.start_col)
         && (range.end_line < container.end_line
             || range.end_line == container.end_line && range.end_col <= container.end_col)
 }
 
-const fn tool_range_size(range: &musi_tooling::ToolRange) -> (usize, usize) {
+const fn tool_range_size(range: &ToolRange) -> (usize, usize) {
     (
         range.end_line.saturating_sub(range.start_line),
         range.end_col.saturating_sub(range.start_col),
     )
 }
 
-fn reference_lens_data(path: &Path, range: &musi_tooling::ToolRange) -> Option<Value> {
+fn reference_lens_data(path: &Path, range: &ToolRange) -> Option<Value> {
     Some(json!({
         "uri": Url::from_file_path(path).ok()?.as_str(),
         "line": range.start_line.saturating_sub(1),

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use musi_vm::{EffectCall, VmDiagKind, VmError, VmErrorKind};
+use musi_vm::{EffectCall, ForeignCall, VmDiagKind, VmError, VmErrorKind};
 use music_base::diag::DiagContext;
 
 fn effect_rejected(effect: &EffectCall, reason: impl Into<Box<str>>) -> VmError {
@@ -54,6 +54,12 @@ pub(super) fn runtime_effect_unsupported(effect: &EffectCall) -> VmError {
             .with("effect", effect.effect_name())
             .with("op", effect.op_name()),
     )
+}
+
+pub(super) fn foreign_rejected(foreign: &ForeignCall) -> VmError {
+    VmError::new(VmErrorKind::ForeignCallRejected {
+        foreign: foreign.name().into(),
+    })
 }
 
 fn runtime_effect_reason(effect: &EffectCall, kind: VmDiagKind, context: DiagContext) -> VmError {

@@ -1,7 +1,7 @@
 let std := import "@std";
 let testing := import "@std/testing";
 
-export let test () :=
+export let test() :=
   (
     testing.describe("std");
     let sameBytes := std.bytes.fromArray([1, 2]);
@@ -54,6 +54,7 @@ export let test () :=
       "root re-exports 'bits' family",
       testing.toBe(std.bits.toInt8(std.bits.fromInt8(3)), 3),
     );
+    testing.it("root re-exports 'bool' family", std.bool.true = .True);
     testing.it("root re-exports 'fmt' family", std.fmt.int(42) = "42");
     testing.it(
       "root re-exports 'errors' family",

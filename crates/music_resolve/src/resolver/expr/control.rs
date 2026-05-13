@@ -41,7 +41,7 @@ where
         };
 
         let mut exprs = node.child_nodes().filter(|child| child.kind().is_expr());
-        let guard = self.lower_optional_expr_clause(node, TokenKind::KwIf, &mut exprs);
+        let guard = self.lower_optional_expr_clause(node, TokenKind::KwWhere, &mut exprs);
         let expr = match exprs.next() {
             Some(expr) => self.lower_expr(expr),
             None => self.error_expr(self.origin_node(node)),

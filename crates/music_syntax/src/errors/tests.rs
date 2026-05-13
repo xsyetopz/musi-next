@@ -69,13 +69,13 @@ mod failure {
         let text = "let some := 1;";
         let diag = ParseError::new(
             ParseErrorKind::ReservedKeywordIdentifier {
-                keyword: TokenKind::KwSome,
+                keyword: TokenKind::KwKnown,
             },
             Span::new(4, 8),
         )
         .to_diag(source_id(text), text);
 
-        let context = DiagContext::new().with("keyword", TokenKind::KwSome);
+        let context = DiagContext::new().with("keyword", TokenKind::KwKnown);
         assert_eq!(
             diag.message(),
             SyntaxDiagKind::ReservedKeywordIdentifier.message_with(&context)
@@ -83,7 +83,7 @@ mod failure {
         assert!(
             diag.labels()[0]
                 .message()
-                .contains(TokenKind::KwSome.to_string().as_str())
+                .contains(TokenKind::KwKnown.to_string().as_str())
         );
         assert_eq!(
             diag.hint(),

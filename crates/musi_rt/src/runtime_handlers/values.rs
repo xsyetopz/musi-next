@@ -1,6 +1,6 @@
-use musi_vm::{EffectCall, Value, VmError, VmHostCallContext, VmHostContext};
+use musi_vm::{EffectCall, ForeignCall, Value, VmError, VmHostCallContext, VmHostContext};
 
-use super::errors::{invalid_runtime_args, runtime_effect_failed};
+use super::errors::{foreign_rejected, invalid_runtime_args, runtime_effect_failed};
 
 pub(super) fn transform_string_arg(
     ctx: VmHostCallContext<'_, '_>,
@@ -44,6 +44,19 @@ pub(super) fn string_arg<'a>(
     ctx.string(value)
         .map(|text| text.as_str())
         .ok_or_else(|| invalid_runtime_args(effect, "string argument", value.kind()))
+}
+
+pub(super) fn foreign_string_arg<'a>(
+    ctx: &'a VmHostContext<'_>,
+    foreign: &ForeignCall,
+    args: &'a [Value],
+) -> Result<&'a str, VmError> {
+    let [value] = args else {
+        return Err(foreign_rejected(foreign));
+    };
+    ctx.string(value)
+        .map(|text| text.as_str())
+        .ok_or_else(|| foreign_rejected(foreign))
 }
 
 pub(super) fn saturating_usize_to_i64(value: usize) -> i64 {

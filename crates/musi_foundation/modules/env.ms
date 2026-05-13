@@ -4,20 +4,38 @@ let Core := import "musi:core";
 let Int := Core.Int;
 let String := Core.String;
 
-export opaque let Env := effect {
-  let get (name : String) : String;
-  let has (name : String) : Int;
-  let set (name : String, value : String) : Int;
-  let remove (name : String) : Int;
+@external(
+  abi := .musi
+)
+let getIntrinsic(name : String) : String;
+
+export let get(name : String) : String := unsafe {
+  getIntrinsic(name);
 };
 
-export let get (name : String) : String := ask Env.get(name);
+@external(
+  abi := .musi
+)
+let hasIntrinsic(name : String) : Int;
 
-export let has (name : String) : Int := ask Env.has(name);
+export let has(name : String) : Int := unsafe {
+  hasIntrinsic(name);
+};
 
-export let set (
-  name : String,
-  value : String
-) : Int := ask Env.set(name, value);
+@external(
+  abi := .musi
+)
+let setIntrinsic(name : String, value : String) : Int;
 
-export let remove (name : String) : Int := ask Env.remove(name);
+export let set(name : String, value : String) : Int := unsafe {
+  setIntrinsic(name, value);
+};
+
+@external(
+  abi := .musi
+)
+let removeIntrinsic(name : String) : Int;
+
+export let remove(name : String) : Int := unsafe {
+  removeIntrinsic(name);
+};

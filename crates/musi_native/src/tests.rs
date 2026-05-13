@@ -98,12 +98,14 @@ mod success {
 
         let value = call_export_with_host(
             host,
-            r#"
-        native "c" (
-          let puts (value : Int) : Int;
-        );
+            r"
+        @external(
+          abi := .c
+        )
+        let puts (value : Int) : Int;
+
         export let result () : Int := unsafe { puts(42); };
-        "#,
+        ",
         )
         .expect("registered foreign should succeed");
 
@@ -154,13 +156,15 @@ mod success {
 
         let value = call_export_with_host(
             host,
-            r#"
+            r"
         let Maybe := data { | Some(Int) | None };
-        native "c" (
-          let inspect (value : Maybe) : Int;
-        );
+        @external(
+          abi := .c
+        )
+        let inspect (value : Maybe) : Int;
+
         export let result () : Int := unsafe { inspect(.Some(1)); };
-        "#,
+        ",
         )
         .expect("layout-aware foreign should succeed");
 
@@ -189,12 +193,14 @@ mod success {
 
         let value = call_export_with_host(
             host,
-            r#"
-        native "c" (
-          let puts (value : Int) : Int;
-        );
+            r"
+        @external(
+          abi := .c
+        )
+        let puts (value : Int) : Int;
+
         export let result () : Int := unsafe { puts(42); };
-        "#,
+        ",
         )
         .expect("scalar foreign should succeed");
 
@@ -206,7 +212,10 @@ mod success {
     fn native_abi_support_link_smoke() {
         let source = r#"
         @link(name := "c", symbol := "strlen")
-        native "c" let strlen (value : CString) : Nat;
+        @external(
+          abi := .c
+        )
+        let strlen(value : CString) : Nat;
         export let result () : Nat := unsafe { strlen("musi"); };
     "#;
         let value = call_export_with_host(NativeHost::default(), source)
@@ -222,7 +231,10 @@ mod success {
     fn native_abi_float_pair_call_roundtrips() {
         let source = r#"
         @link(name := "m", symbol := "pow")
-        native "c" let pow (base : Float, exponent : Float) : Float;
+        @external(
+          abi := .c
+        )
+        let pow(base : Float, exponent : Float) : Float;
         export let result () : Float := unsafe { pow(2.0, 5.0); };
     "#;
         let value = call_export_with_host(NativeHost::default(), source)
@@ -238,7 +250,10 @@ mod success {
     fn native_abi_float_pair_wrapper_keeps_argument_order() {
         let source = r#"
         @link(name := "m", symbol := "pow")
-        native "c" let cPow (base : Float, exponent : Float) : Float;
+        @external(
+          abi := .c
+        )
+        let cPow(base : Float, exponent : Float) : Float;
         let pow (base : Float, exponent : Float) : Float := unsafe { cPow(base, exponent); };
         export let result () : Float := pow(2.0, 5.0);
     "#;
@@ -255,7 +270,10 @@ mod success {
     fn native_abi_cstring_pair_call_roundtrips() {
         let source = r#"
         @link(name := "c", symbol := "strcmp")
-        native "c" let strcmp (left : CString, right : CString) : Int32;
+        @external(
+          abi := .c
+        )
+        let strcmp(left : CString, right : CString) : Int32;
         export let result () : Int32 :=
           unsafe { strcmp("musi", "musi"); };
     "#;
@@ -269,9 +287,15 @@ mod success {
     fn native_abi_cstring_results_roundtrip() {
         let source = r#"
         @link(name := "/usr/lib/libSystem.B.dylib", symbol := "getprogname")
-        native "c" let musi_native_test_progname () : CString;
+        @external(
+          abi := .c
+        )
+        let musi_native_test_progname() : CString;
         @link(name := "/usr/lib/libSystem.B.dylib", symbol := "strchr")
-        native "c" let strchr (value : CString, code : Int) : CString;
+        @external(
+          abi := .c
+        )
+        let strchr(value : CString, code : Int) : CString;
         export let result () : CString := unsafe { strchr(musi_native_test_progname(), 0); };
     "#;
         let program = compile_program(&[("main", source)], "main");
@@ -287,29 +311,27 @@ mod success {
     }
 
     #[test]
-    fn dispatches_registered_effect_handler() {
+    fn dispatches_registered_foreign_handler_with_context() {
         let mut host = NativeHost::new();
-        host.register_effect_handler_with_context(
-            "main::Console",
-            "readLine",
-            |ctx, _effect, args| {
-                let [prompt] = args else {
-                    panic!("expected prompt");
-                };
-                let prompt = ctx.string(prompt).expect("prompt should be string");
-                assert_eq!(prompt.as_str(), ">");
-                Ok(Value::Int(5))
-            },
-        );
+        host.register_foreign_handler_with_context("main::readLine", |_ctx, _foreign, args| {
+            let [Value::Int(value)] = args else {
+                panic!("expected integer");
+            };
+            assert_eq!(*value, 7);
+            Ok(Value::Int(5))
+        });
 
         let value = call_export_with_host(
             host,
-            r#"
-        let Console := effect { let readLine (prompt : String) : Int; };
-        export let result () : Int := ask Console.readLine(">");
-        "#,
+            r"
+        @external(
+          abi := .musi
         )
-        .expect("registered effect should succeed");
+        let readLine(value : Int) : Int;
+        export let result () : Int := unsafe { readLine(7); };
+        ",
+        )
+        .expect("registered foreign should succeed");
 
         assert_eq!(value, Value::Int(5));
     }
@@ -321,12 +343,14 @@ mod success {
 
         let value = call_export_with_host(
             host,
-            r#"
-        native "c" (
-          let puts (value : Int) : Int;
-        );
+            r"
+        @external(
+          abi := .c
+        )
+        let puts (value : Int) : Int;
+
         export let result () : Int := unsafe { puts(1); };
-        "#,
+        ",
         )
         .expect("registered foreign should win");
 
@@ -339,12 +363,14 @@ mod success {
 
         let value = call_export_with_host(
             host,
-            r#"
-        native "c" (
-          let puts (value : Int) : Int;
-        );
+            r"
+        @external(
+          abi := .c
+        )
+        let puts (value : Int) : Int;
+
         export let result () : Int := unsafe { puts(1); };
-        "#,
+        ",
         )
         .expect("fallback should handle foreign");
 
@@ -359,12 +385,14 @@ mod success {
 
         let value = call_export_with_host(
             host,
-            r#"
-        native "c" (
-          let puts (value : Int) : Int;
-        );
+            r"
+        @external(
+          abi := .c
+        )
+        let puts (value : Int) : Int;
+
         export let result () : Int := unsafe { puts(1); };
-        "#,
+        ",
         )
         .expect("shared state should be visible");
 
@@ -434,12 +462,14 @@ mod failure {
 
         let value = call_export_with_host(
             host,
-            r#"
-        native "system" (
-          let puts (value : Int) : Int;
-        );
+            r"
+        @external(
+          abi := .system
+        )
+        let puts (value : Int) : Int;
+
         export let result () : Int := unsafe { puts(42); };
-        "#,
+        ",
         )
         .expect("non-c foreign should still dispatch through registered host");
 
@@ -450,7 +480,10 @@ mod failure {
     fn native_abi_symbol_failures_report_typed_errors() {
         let source = r#"
         @link(name := "c")
-        native "c" let musi_native_test_missing_symbol (value : Int) : Int;
+        @external(
+          abi := .c
+        )
+        let musi_native_test_missing_symbol(value : Int) : Int;
         export let result () : Int := unsafe { musi_native_test_missing_symbol(1); };
     "#;
         let err = call_export_with_host(NativeHost::default(), source)
@@ -469,12 +502,14 @@ mod failure {
     fn rejects_unhandled_edges_without_fallback() {
         let err = call_export_with_host(
             NativeHost::new(),
-            r#"
-        native "c" (
-          let puts (value : Int) : Int;
-        );
+            r"
+        @external(
+          abi := .c
+        )
+        let puts (value : Int) : Int;
+
         export let result () : Int := unsafe { puts(1); };
-        "#,
+        ",
         )
         .expect_err("missing host edge should reject");
 
@@ -485,7 +520,7 @@ mod failure {
     }
 
     #[test]
-    fn rejects_test_effect_without_active_session() {
+    fn rejects_test_foreign_without_active_session() {
         let source = format!(
             r#"
         let Test := import "{spec}";
@@ -496,7 +531,10 @@ mod failure {
         let err = call_export_with_host(NativeHost::new(), source.as_str())
             .expect_err("inactive test session should reject");
 
-        assert!(matches!(err.kind(), VmErrorKind::EffectRejected { .. }));
+        assert!(matches!(
+            err.kind(),
+            VmErrorKind::ForeignCallRejected { .. }
+        ));
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
@@ -505,12 +543,18 @@ mod failure {
         let err = call_export_with_host(
             NativeHost::new(),
             r#"
-        let Console := effect { let readLine (prompt : String) : Int; };
-        export let result () : Int := ask Console.readLine(">");
+        @external(
+          abi := .musi
+        )
+        let readLine(value : Int) : Int;
+        export let result () : Int := unsafe { readLine(7); };
         "#,
         )
         .expect_err("unsupported target should reject");
 
-        assert!(matches!(err.kind(), VmErrorKind::EffectRejected { .. }));
+        assert!(matches!(
+            err.kind(),
+            VmErrorKind::ForeignCallRejected { .. }
+        ));
     }
 }

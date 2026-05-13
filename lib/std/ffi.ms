@@ -44,7 +44,7 @@ export let CDouble := core.Float64;
 --- C char ABI typedef.
 export let char := core.Int8;
 --- C bool ABI typedef.
-export let bool := core.Bool;
+export let bool := core.Bit;
 --- C int8_t ABI typedef.
 export let int8_t := core.Int8;
 --- C int16_t ABI typedef.
@@ -71,37 +71,47 @@ export let size_t := core.Nat;
 export let ptrdiff_t := core.Int;
 
 --- Typed view over a raw C pointer.
-export opaque let Ptr [T] := data {
+export hidden let Ptr[T] := data {
   | RawPtr(raw : CPtr)
 };
 
-native "musi" let ptrNullIntrinsic () : CPtr;
-native "musi" let ptrIsNullIntrinsic (raw : CPtr) : Bool;
+@external(
+  abi := .musi
+)
+let ptrNullIntrinsic() : CPtr;
+@external(
+  abi := .musi
+)
+let ptrIsNullIntrinsic(raw : CPtr) : Bit;
 
 --- Cast raw pointer into a typed pointer view.
-export let cast [T] (raw : CPtr) : Ptr[T] := .RawPtr(raw := raw);
+export let cast[T] (raw : CPtr) : Ptr[T] := .RawPtr(raw := raw);
 
 --- Null pointer.
-export let null [T] () : Ptr[T] := .RawPtr(raw := unsafe {
+export let null[T] () : Ptr[T] := .RawPtr(raw := unsafe {
     ptrNullIntrinsic();
   });
 
 --- Return raw pointer value.
-export let raw [T] (pointer : Ptr[T]) : CPtr :=
+export let raw[T] (pointer : Ptr[T]) : CPtr :=
   match pointer (
   | .RawPtr(raw := raw) => raw
   );
 
 --- Returns true when pointer is null.
-export let isNull [T] (pointer : Ptr[T]) : Bool := unsafe {
+export let isNull[T] (pointer : Ptr[T]) : Bit := unsafe {
   ptrIsNullIntrinsic(raw[T](pointer));
 };
 
 --- Foreign pointer operations.
-export native "musi" (
-  let offset [T] (pointer : Ptr[T], count : Int) : Ptr[T];
-  let read [T] (pointer : Ptr[T]) : T;
-  let write [T] (pointer : Ptr[mut T], value : T) : Unit;
+@external(
+  abi := .musi
+)
+--- Foreign pointer external functions.
+export (
+  let offset[T] (pointer : Ptr[T], count : Int) : Ptr[T];
+  let read[T] (pointer : Ptr[T]) : T;
+  let write[T] (pointer : Ptr[mut T], value : T) : Unit;
 );
 
 --- Pointer helper namespace.

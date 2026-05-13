@@ -1,30 +1,44 @@
 --! Host-backed test primitives.
 
 let Core := import "musi:core";
-let Bool := Core.Bool;
+let Bit := Core.Bit;
 let String := Core.String;
 let Unit := Core.Unit;
 
-export opaque let SampleCase [T] := data {
+export hidden let SampleCase[T] := data {
   | Case
 };
 
-export opaque let SampleList [T] := data {
+export hidden let SampleList[T] := data {
   | Nil
 };
 
-export opaque let Sample [T] := shape {
+export hidden let Sample[T] := shape {
 };
 
-export opaque let Test := effect {
-  let suiteStart (name : String) : Unit;
-  let suiteEnd () : Unit;
-  let testCase (name : String, passed : Bool) : Unit;
+@external(
+  abi := .musi
+)
+let suiteStartIntrinsic(name : String) : Unit;
+
+export let suiteStart(name : String) : Unit := unsafe {
+  suiteStartIntrinsic(name);
 };
 
-export let suiteStart (name : String) : Unit := ask Test.suiteStart(name);
+@external(
+  abi := .musi
+)
+let suiteEndIntrinsic() : Unit;
 
-export let suiteEnd () : Unit := ask Test.suiteEnd();
+export let suiteEnd() : Unit := unsafe {
+  suiteEndIntrinsic();
+};
 
-export let testCase (name : String, passed : Bool) : Unit :=
-  ask Test.testCase(name, passed);
+@external(
+  abi := .musi
+)
+let testCaseIntrinsic(name : String, passed : Bit) : Unit;
+
+export let testCase(name : String, passed : Bit) : Unit := unsafe {
+  testCaseIntrinsic(name, passed);
+};

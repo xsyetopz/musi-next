@@ -62,7 +62,7 @@ Relation to Musi specs:
 
 ## `resumable`
 
-`resumable` defines handler-driven resumable control.
+`resumable` defines driver-owned resumable control.
 
 Public features:
 
@@ -72,15 +72,15 @@ Public features:
 
 Rules:
 
-- handler frames are first-class runtime state
-- portable bytecode names the runtime frame a handler frame
+- control frames are first-class runtime state
+- portable bytecode names the runtime frame a control frame
 - continuation capture is one-shot
 - resumed continuation may not resume again
-- stack restoration and handler restoration are standardized runtime behavior
+- stack restoration and control-frame restoration are standardized runtime behavior
 - multi-shot continuations are not part of this domain
 - generators, coroutine schedulers, and async task systems are not part of this domain
 
-This domain is named for runtime behavior, not source effect syntax. SEAM bytecode uses `hdl.push`, `hdl.pop`, `raise`, `resume`, and `drop.cont` for the portable substrate; source `answer`, `ask`, and `handle` are lowering inputs only.
+This domain is named for runtime behavior, not source syntax. SEAM bytecode uses `hdl.push`, `hdl.pop`, `raise`, `resume`, and `drop.cont` for the portable substrate.
 
 ## `native`
 
