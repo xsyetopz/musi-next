@@ -130,7 +130,7 @@ fn remove_last_line(text: &mut String) {
 }
 
 fn split_long_let_signature(line: &str, options: &FormatOptions) -> Option<String> {
-    let open = line.rfind(" (")?.saturating_add(1);
+    let open = declaration_params_open(line)?;
     let close = matching_close_paren(line, open)?;
     let inner = line.get(open + 1..close)?;
     if inner.trim().is_empty() {
@@ -161,6 +161,23 @@ fn split_long_let_signature(line: &str, options: &FormatOptions) -> Option<Strin
     out.push_str(line.get(close + 1..)?.trim_end());
     out.push('\n');
     Some(out)
+}
+
+fn declaration_params_open(line: &str) -> Option<usize> {
+    let mut params_open = None;
+    for (index, _) in line.match_indices(" (") {
+        let open = index.saturating_add(1);
+        let Some(close) = matching_close_paren(line, open) else {
+            continue;
+        };
+        let Some(tail) = line.get(close.saturating_add(1)..).map(str::trim_start) else {
+            continue;
+        };
+        if tail.starts_with(':') {
+            params_open = Some(open);
+        }
+    }
+    params_open
 }
 
 fn matching_close_paren(line: &str, open: usize) -> Option<usize> {

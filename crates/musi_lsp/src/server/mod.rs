@@ -187,8 +187,8 @@ impl MusiLanguageServer {
     }
 
     fn invalidate_navigation_workspace_for_uri(&mut self, uri: &Url) {
-        if uri.to_file_path().is_ok() {
-            self.navigation_workspace.clear();
+        if let Ok(path) = uri.to_file_path() {
+            self.navigation_workspace.invalidate_path(&path);
         }
     }
 }

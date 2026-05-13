@@ -53,7 +53,7 @@ mod success {
     use super::*;
 
     #[test]
-    fn initialize_result_advertises_full_sync_and_hover() {
+    fn initialize_result_advertises_non_blocking_sync_and_hover() {
         let initialize_result = MusiLanguageServer::initialize_result();
 
         assert_eq!(
@@ -67,7 +67,7 @@ mod success {
                     open_close: Some(true),
                     change: Some(TextDocumentSyncKind::FULL),
                     will_save: None,
-                    will_save_wait_until: Some(true),
+                    will_save_wait_until: None,
                     save: Some(TextDocumentSyncSaveOptions::Supported(true)),
                 }
             ))
@@ -227,7 +227,7 @@ mod success {
             Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
                 identifier: Some("musi".to_owned()),
                 inter_file_dependencies: true,
-                workspace_diagnostics: true,
+                workspace_diagnostics: false,
                 work_done_progress_options: WorkDoneProgressOptions {
                     work_done_progress: None,
                 },

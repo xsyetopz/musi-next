@@ -27,7 +27,12 @@ impl CstFormatter<'_> {
         if self.write_ignored_token(kind, text, span) || self.skip_current_token(span, options) {
             return;
         }
-        if options.break_before_operator() {
+        if options.break_before_else()
+            && let Some(frame) = self.parens.last_mut()
+        {
+            frame.broke = true;
+        }
+        if options.break_before_operator() || options.break_before_else() {
             self.continuation_indent = self.continuation_indent.max(1);
             self.newline();
         }
@@ -247,6 +252,29 @@ impl CstFormatter<'_> {
             .saturating_add(usize::from(next_len > 0))
             .saturating_add(next_len)
             > self.options.line_width
+    }
+
+    pub(super) fn should_break_before_current_else(
+        &self,
+        lexed: &LexedSource,
+        token_index: usize,
+    ) -> bool {
+        let token = lexed.tokens()[token_index];
+        if self.options.line_width == 0 || self.at_line_start || token.kind != TokenKind::KwElse {
+            return false;
+        }
+        let Some(text) = lexed.token_text(token_index) else {
+            return false;
+        };
+        let else_len = rhs_flat_len(lexed, token_index.saturating_add(1));
+        else_len > 0
+            && self
+                .line_len
+                .saturating_add(usize::from(self.needs_space_before(TokenKind::KwElse)))
+                .saturating_add(text.len())
+                .saturating_add(1)
+                .saturating_add(else_len)
+                > self.options.line_width
     }
 
     pub(super) fn should_break_after_current_colon_eq(

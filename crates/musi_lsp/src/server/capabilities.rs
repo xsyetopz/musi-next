@@ -25,7 +25,7 @@ pub(super) fn initialize_result(references_command: &str) -> InitializeResult {
                     open_close: Some(true),
                     change: Some(TextDocumentSyncKind::FULL),
                     will_save: None,
-                    will_save_wait_until: Some(true),
+                    will_save_wait_until: None,
                     save: Some(TextDocumentSyncSaveOptions::Supported(true)),
                 },
             )),
@@ -94,7 +94,7 @@ pub(super) fn initialize_result(references_command: &str) -> InitializeResult {
             diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
                 identifier: Some("musi".to_owned()),
                 inter_file_dependencies: true,
-                workspace_diagnostics: true,
+                workspace_diagnostics: false,
                 work_done_progress_options: WorkDoneProgressOptions {
                     work_done_progress: None,
                 },

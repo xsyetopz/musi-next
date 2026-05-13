@@ -1,5 +1,5 @@
 use std::cmp::Reverse;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::path::{Path, PathBuf};
 
@@ -90,9 +90,8 @@ impl NavigationWorkspace {
         self.analyses.clear();
     }
 
-    pub fn invalidate_path(&mut self, path: &Path) {
-        let key = navigation_cache_key(path);
-        let _ = self.analyses.remove(&key);
+    pub fn invalidate_path(&mut self, _path: &Path) {
+        self.analyses.clear();
     }
 
     #[cfg(test)]
@@ -788,6 +787,8 @@ impl SymbolAnalysis {
             return Vec::new();
         };
         let binding_name = resolved.bindings.get(binding_id).name;
+        let has_workspace_import_record_references =
+            self.has_workspace_import_record_references(binding_id);
         let mut locations = Vec::new();
         locations.extend(
             resolved
@@ -797,7 +798,9 @@ impl SymbolAnalysis {
                 .filter_map(|(site, _)| self.site_location(*site)),
         );
         locations.extend(self.member_references(binding_id));
-        locations.extend(self.workspace_import_record_member_references(binding_name));
+        if has_workspace_import_record_references {
+            locations.extend(self.workspace_import_record_member_references(binding_name));
+        }
         locations.sort_by_key(|location| {
             (
                 location.path.clone(),
@@ -1042,8 +1045,9 @@ impl SymbolAnalysis {
         bindings.sort_by_key(|(_, site, _)| site.span.start);
         let workspace_reference_counts = bindings
             .iter()
+            .filter(|(binding_id, _, _)| self.has_workspace_import_record_references(*binding_id))
             .map(|(_, _, name)| *name)
-            .collect::<std::collections::HashSet<_>>()
+            .collect::<HashSet<_>>()
             .into_iter()
             .map(|name| {
                 (
@@ -1070,6 +1074,24 @@ impl SymbolAnalysis {
             .collect();
         self.reference_lenses = Some(lenses.clone());
         lenses
+    }
+
+    fn has_workspace_import_record_references(&self, binding_id: NameBindingId) -> bool {
+        let Some(resolved) = self.resolved() else {
+            return false;
+        };
+        let Some(sema) = self.sema() else {
+            return false;
+        };
+        let binding = resolved.bindings.get(binding_id);
+        if !matches!(
+            binding.kind,
+            NameBindingKind::Let | NameBindingKind::Pin | NameBindingKind::AttachedMethod
+        ) {
+            return false;
+        }
+        let name = self.session.resolve_symbol(binding.name);
+        sema.surface().exported_value(name).is_some()
     }
 
     fn outgoing_calls(&self, line: usize, character: usize) -> Vec<ToolOutgoingCall> {

@@ -143,6 +143,7 @@ impl CstFormatter<'_> {
             .with_break_before_operator(
                 self.should_break_before_current_operator(lexed, token_index),
             )
+            .with_break_before_else(self.should_break_before_current_else(lexed, token_index))
             .with_break_after_colon_eq(self.should_break_after_current_colon_eq(lexed, token_index))
             .with_break_after_open_group(self.should_break_after_current_open_group(
                 lexed,
@@ -274,6 +275,7 @@ impl TokenWriteOptions {
     const BREAK_BEFORE_OPERATOR: u8 = 1 << 2;
     const BREAK_AFTER_COLON_EQ: u8 = 1 << 3;
     const BREAK_AFTER_OPEN_GROUP: u8 = 1 << 4;
+    const BREAK_BEFORE_ELSE: u8 = 1 << 5;
 
     const fn empty() -> Self {
         Self(0)
@@ -289,6 +291,10 @@ impl TokenWriteOptions {
 
     const fn with_break_before_operator(self, enabled: bool) -> Self {
         self.with_flag(Self::BREAK_BEFORE_OPERATOR, enabled)
+    }
+
+    const fn with_break_before_else(self, enabled: bool) -> Self {
+        self.with_flag(Self::BREAK_BEFORE_ELSE, enabled)
     }
 
     const fn with_break_after_colon_eq(self, enabled: bool) -> Self {
@@ -309,6 +315,10 @@ impl TokenWriteOptions {
 
     const fn break_before_operator(self) -> bool {
         self.has_flag(Self::BREAK_BEFORE_OPERATOR)
+    }
+
+    const fn break_before_else(self) -> bool {
+        self.has_flag(Self::BREAK_BEFORE_ELSE)
     }
 
     const fn break_after_colon_eq(self) -> bool {
@@ -595,7 +605,19 @@ impl CstFormatter<'_> {
         ) {
             return false;
         }
-        if current == TokenKind::Dot && matches!(previous, TokenKind::ColonEq | TokenKind::Pipe) {
+        if current == TokenKind::Dot
+            && (matches!(
+                previous,
+                TokenKind::ColonEq
+                    | TokenKind::KwElse
+                    | TokenKind::KwLet
+                    | TokenKind::KwThen
+                    | TokenKind::Pipe
+            ) || is_operator(previous))
+        {
+            return true;
+        }
+        if matches!(current, TokenKind::KwElse | TokenKind::KwThen) {
             return true;
         }
         if current == TokenKind::LBrace
@@ -621,7 +643,7 @@ impl CstFormatter<'_> {
         if current == TokenKind::LParen && previous == TokenKind::KwMatch {
             return true;
         }
-        if current == TokenKind::LParen {
+        if current == TokenKind::LParen && previous != TokenKind::Colon {
             return false;
         }
         if matches!(previous, TokenKind::LParen | TokenKind::LBracket) {

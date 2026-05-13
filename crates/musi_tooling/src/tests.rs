@@ -531,12 +531,12 @@ let bitEq := 2;
             workspace.references_for_project_file_with_overlay(&path, None, 1, 5, false);
         assert_eq!(
             workspace.cached_reference_data_len(&path),
-            Some((1, 1, false))
+            Some((1, 0, false))
         );
         let lenses = workspace.reference_lenses_for_project_file_with_overlay(&path, None);
         assert_eq!(
             workspace.cached_reference_data_len(&path),
-            Some((1, 2, true))
+            Some((1, 0, true))
         );
         let lenses_again = workspace.reference_lenses_for_project_file_with_overlay(&path, None);
 
@@ -546,6 +546,33 @@ let bitEq := 2;
         assert_eq!(lenses_again, lenses);
 
         workspace.invalidate_path(&path);
+
+        assert_eq!(workspace.cached_paths_len(), 0);
+    }
+
+    #[test]
+    fn navigation_workspace_invalidation_clears_cross_file_analysis() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        write_file(test_dir.path(), "index.ms", "export let value := 1;\n");
+        write_file(
+            test_dir.path(),
+            "use.ms",
+            "let app := import \"./index\";\nlet result := app.value;\n",
+        );
+        let index_path = test_dir.path().join("index.ms");
+        let use_path = test_dir.path().join("use.ms");
+        let mut workspace = NavigationWorkspace::new();
+
+        let index_lenses =
+            workspace.reference_lenses_for_project_file_with_overlay(&index_path, None);
+        let use_lenses = workspace.reference_lenses_for_project_file_with_overlay(&use_path, None);
+
+        assert_eq!(index_lenses[0].reference_count, 1);
+        assert!(use_lenses.iter().any(|lens| lens.reference_count == 1));
+        assert_eq!(workspace.cached_paths_len(), 2);
+
+        workspace.invalidate_path(&use_path);
 
         assert_eq!(workspace.cached_paths_len(), 0);
     }

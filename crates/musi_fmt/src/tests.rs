@@ -210,6 +210,125 @@ mod success {
     }
 
     #[test]
+    fn spaces_empty_tuple_function_type_after_annotation_colon() {
+        let source = "let value (fallback :() -> T) : T := fallback();";
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "let value (fallback : () -> T) : T := fallback();\n"
+        );
+        let second = format_source(&formatted_result.text, &options()).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
+    fn spaces_dot_variants_after_infix_operator() {
+        let source = "let value := bool.true =.True;";
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(formatted_result.text, "let value := bool.true = .True;\n");
+        let second = format_source(&formatted_result.text, &options()).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
+    fn wraps_rhs_when_inserted_dot_variant_space_exceeds_width() {
+        let mut options = options();
+        options.line_width = 29;
+        let source = "let value := bool.true =.True;";
+
+        let formatted_result = format_source(source, &options).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "let value :=\n  bool.true = .True;\n"
+        );
+        let second = format_source(&formatted_result.text, &options).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
+    fn spaces_compact_if_then_else_boundaries() {
+        let source = "let value := if isLower(value)then.True else fail()else .False;";
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "let value := if isLower(value) then .True else fail() else .False;\n"
+        );
+        let second = format_source(&formatted_result.text, &options()).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
+    fn spaces_let_else_dot_variant() {
+        let source = "let .Some(value):=maybe else.None;";
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "let .Some(value) := maybe else .None;\n"
+        );
+        let second = format_source(&formatted_result.text, &options()).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
+    fn wraps_long_if_else_before_else() {
+        let mut options = options();
+        options.line_width = 72;
+        let source = "let value := if conditionIsVeryLong(target) then resultWhenTrue(target) else resultWhenFalse(target);";
+
+        let formatted_result = format_source(source, &options).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "let value :=\n  if conditionIsVeryLong(target) then resultWhenTrue(target)\n  else resultWhenFalse(target);\n"
+        );
+        let second = format_source(&formatted_result.text, &options).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
+    fn wraps_long_nested_if_else_before_else() {
+        let mut options = options();
+        options.line_width = 72;
+        let source = "let value := choose(if conditionIsVeryLong(target) then resultWhenTrue(target) else resultWhenFalse(target));";
+
+        let formatted_result = format_source(source, &options).unwrap();
+
+        assert!(
+            formatted_result
+                .text
+                .lines()
+                .all(|line| line.chars().count() <= options.line_width)
+        );
+        let second = format_source(&formatted_result.text, &options).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
+    fn wraps_long_let_else_before_else() {
+        let mut options = options();
+        options.line_width = 72;
+        let source = "let .Some(value) := maybeResultWithLongName(target) else fallbackWhenMissingWithLongName(target);";
+
+        let formatted_result = format_source(source, &options).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "let .Some(value) :=\n  maybeResultWithLongName(target)\n  else fallbackWhenMissingWithLongName(target);\n"
+        );
+        let second = format_source(&formatted_result.text, &options).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
     fn wraps_long_word_operator_chain_at_default_width() {
         let source = "let value := aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa and bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb and cccccccccccccccccccccccccccccccccccccccc;";
 
