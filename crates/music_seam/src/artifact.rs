@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::vec;
 
 use music_arena::Idx;
@@ -11,16 +12,17 @@ use crate::diag::artifact_error_kind;
 
 use crate::Opcode;
 use crate::descriptor::{
-    ConstantDescriptor, ConstantValue, DataDescriptor, ExportDescriptor, ExportTarget,
-    ForeignDescriptor, GlobalDescriptor, MetaDescriptor, ProcedureDescriptor, ShapeDescriptor,
-    TypeDescriptor,
+    BlockSignatureDescriptor, ClosureDescriptor, ConstantDescriptor, ConstantValue, DataDescriptor,
+    ExportDescriptor, ExportTarget, ForeignDescriptor, GlobalDescriptor, ImportDescriptor,
+    ManifestDescriptor, MetaDescriptor, ProcedureDescriptor, RootMapDescriptor, ShapeDescriptor,
+    StackEffectDescriptor, TypeDescriptor,
 };
 use crate::instruction::{CodeEntry, Instruction, Label, LabelId, Operand, OperandShape};
 
 pub const SEAM_MAGIC: [u8; 4] = *b"SEAM";
-const BINARY_MAJOR_VERSION_U32: u32 = 14;
+const BINARY_MAJOR_VERSION_U32: u32 = 18;
 const BINARY_MINOR_VERSION_U32: u32 = 0;
-pub const BINARY_MAJOR_VERSION: u16 = 14;
+pub const BINARY_MAJOR_VERSION: u16 = 18;
 pub const BINARY_MINOR_VERSION: u16 = 0;
 pub const BINARY_VERSION: u32 = (BINARY_MAJOR_VERSION_U32 << 16) | BINARY_MINOR_VERSION_U32;
 
@@ -37,6 +39,12 @@ pub enum SectionTag {
     Exports = 8,
     Data = 9,
     Meta = 10,
+    Manifest = 11,
+    Imports = 12,
+    RootMaps = 13,
+    StackEffects = 14,
+    BlockSignatures = 15,
+    Closures = 16,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -135,6 +143,10 @@ pub type ForeignId = Idx<ForeignDescriptor>;
 pub type ExportId = Idx<ExportDescriptor>;
 pub type DataId = Idx<DataDescriptor>;
 pub type MetaId = Idx<MetaDescriptor>;
+pub type RootMapId = Idx<RootMapDescriptor>;
+pub type StackEffectId = Idx<StackEffectDescriptor>;
+pub type BlockSignatureId = Idx<BlockSignatureDescriptor>;
+pub type ClosureId = Idx<ClosureDescriptor>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Artifact {
@@ -148,14 +160,23 @@ pub struct Artifact {
     pub exports: Table<ExportDescriptor>,
     pub data: Table<DataDescriptor>,
     pub meta: Table<MetaDescriptor>,
+    pub manifest: Table<ManifestDescriptor>,
+    pub imports: Table<ImportDescriptor>,
+    pub root_maps: Table<RootMapDescriptor>,
+    pub stack_effects: Table<StackEffectDescriptor>,
+    pub block_signatures: Table<BlockSignatureDescriptor>,
+    pub closures: Table<ClosureDescriptor>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArtifactError {
     InvalidReference { table: &'static str },
+    SectionLimitExceeded { table: &'static str },
     DuplicateLabel { procedure: String },
     MissingLabel { procedure: String },
     OperandShapeMismatch { opcode: &'static str },
+    InternalOpcodeSerialized { opcode: &'static str },
+    BranchTableTargetStackMismatch { procedure: String },
 }
 
 impl ArtifactError {
@@ -171,11 +192,18 @@ impl ArtifactError {
 
     fn diag_context(&self) -> DiagContext {
         match self {
-            Self::InvalidReference { table } => DiagContext::new().with("table", *table),
+            Self::InvalidReference { table } | Self::SectionLimitExceeded { table } => {
+                DiagContext::new().with("table", *table)
+            }
             Self::DuplicateLabel { procedure } | Self::MissingLabel { procedure } => {
                 DiagContext::new().with("procedure", procedure)
             }
-            Self::OperandShapeMismatch { opcode } => DiagContext::new().with("opcode", *opcode),
+            Self::OperandShapeMismatch { opcode } | Self::InternalOpcodeSerialized { opcode } => {
+                DiagContext::new().with("opcode", *opcode)
+            }
+            Self::BranchTableTargetStackMismatch { procedure } => {
+                DiagContext::new().with("procedure", procedure)
+            }
         }
     }
 }
@@ -252,6 +280,7 @@ impl Artifact {
     pub fn validate(&self) -> Result<(), ArtifactError> {
         self.validate_types()?;
         self.validate_constants()?;
+        self.validate_stack_effects()?;
         self.validate_globals()?;
         self.validate_shapes()?;
         self.validate_foreigns()?;
@@ -259,11 +288,61 @@ impl Artifact {
         self.validate_exports()?;
         self.validate_procedures()?;
         self.validate_meta()?;
+        self.validate_manifest()?;
+        self.validate_imports()?;
+        self.validate_root_maps()?;
+        self.validate_block_signatures()?;
+        self.validate_closures()?;
         Ok(())
     }
 
-    fn validate_procedure(&self, procedure: &ProcedureDescriptor) -> Result<(), ArtifactError> {
+    fn validate_procedure(
+        &self,
+        procedure_id: ProcedureId,
+        procedure: &ProcedureDescriptor,
+    ) -> Result<(), ArtifactError> {
         self.require_string(procedure.name)?;
+        if u16::try_from(procedure.param_tys.len()).is_err() {
+            return Err(ArtifactError::SectionLimitExceeded {
+                table: "procedure parameter types",
+            });
+        }
+        for ty in procedure.param_tys.iter().copied() {
+            self.require_type(ty)?;
+        }
+        if u16::try_from(procedure.local_tys.len()).is_err() {
+            return Err(ArtifactError::SectionLimitExceeded {
+                table: "procedure local types",
+            });
+        }
+        for ty in procedure.local_tys.iter().copied() {
+            self.require_type(ty)?;
+        }
+        if u16::try_from(procedure.result_tys.len()).is_err() {
+            return Err(ArtifactError::SectionLimitExceeded {
+                table: "procedure result types",
+            });
+        }
+        for ty in procedure.result_tys.iter().copied() {
+            self.require_type(ty)?;
+        }
+        if let Some(block_signature_table) = procedure.block_signature_table {
+            self.require_block_signature(block_signature_table)?;
+        }
+        if let Some(root_map_table) = procedure.root_map_table {
+            self.require_root_map(root_map_table)?;
+        }
+        if u16::try_from(procedure.domain_requirements.len()).is_err() {
+            return Err(ArtifactError::SectionLimitExceeded {
+                table: "procedure domain requirements",
+            });
+        }
+        for domain in procedure.domain_requirements.iter().copied() {
+            self.require_string(domain)?;
+        }
+        if procedure_has_tail_call(procedure) {
+            self.validate_tail_call_cleanup_root_map(procedure_id, procedure)?;
+        }
         let mut defined = vec![false; procedure.labels.len()];
         for label in &procedure.labels {
             self.require_string(*label)?;
@@ -285,15 +364,52 @@ impl Artifact {
                     *slot = true;
                 }
                 CodeEntry::Instruction(instruction) => {
-                    self.validate_instruction(procedure, instruction)?;
+                    self.validate_instruction(procedure_id, procedure, instruction)?;
                 }
             }
+        }
+        self.validate_procedure_branch_stack_rules(procedure_id, procedure)?;
+        Ok(())
+    }
+
+    fn validate_tail_call_cleanup_root_map(
+        &self,
+        procedure_id: ProcedureId,
+        procedure: &ProcedureDescriptor,
+    ) -> Result<(), ArtifactError> {
+        let Some(root_map_id) = procedure.root_map_table else {
+            return Err(ArtifactError::InvalidReference {
+                table: "tail-call cleanup root map",
+            });
+        };
+        let root_map = self
+            .root_maps
+            .as_slice()
+            .get(usize::try_from(root_map_id.raw()).unwrap_or(usize::MAX))
+            .ok_or(ArtifactError::InvalidReference {
+                table: "tail-call cleanup root map",
+            })?;
+        if root_map.procedure != Some(procedure_id) {
+            return Err(ArtifactError::InvalidReference {
+                table: "tail-call cleanup procedure root map",
+            });
+        }
+        if !root_map.defer_slots.is_empty() {
+            return Err(ArtifactError::InvalidReference {
+                table: "tail-call cleanup defer slots",
+            });
+        }
+        if !root_map.pin_slots.is_empty() {
+            return Err(ArtifactError::InvalidReference {
+                table: "tail-call cleanup pin slots",
+            });
         }
         Ok(())
     }
 
     fn validate_instruction(
         &self,
+        procedure_id: ProcedureId,
         procedure: &ProcedureDescriptor,
         instruction: &Instruction,
     ) -> Result<(), ArtifactError> {
@@ -302,14 +418,21 @@ impl Artifact {
                 opcode: instruction.opcode.mnemonic(),
             });
         }
-        self.validate_instruction_operand(procedure, &instruction.operand)
+        if instruction.opcode.is_internal() {
+            return Err(ArtifactError::InternalOpcodeSerialized {
+                opcode: instruction.opcode.mnemonic(),
+            });
+        }
+        self.validate_instruction_operand(procedure_id, procedure, instruction)
     }
 
     fn validate_instruction_operand(
         &self,
+        procedure_id: ProcedureId,
         procedure: &ProcedureDescriptor,
-        operand: &Operand,
+        instruction: &Instruction,
     ) -> Result<(), ArtifactError> {
+        let operand = &instruction.operand;
         match operand {
             Operand::None | Operand::I16(_) | Operand::Local(_) => {}
             Operand::String(id) => {
@@ -346,9 +469,364 @@ impl Artifact {
                 for label in labels.iter().copied() {
                     require_label(procedure, label)?;
                 }
+                if instruction.opcode == Opcode::BrTbl {
+                    self.validate_branch_table_target_stacks(procedure_id, labels)?;
+                }
             }
         }
         Ok(())
+    }
+
+    fn validate_branch_table_target_stacks(
+        &self,
+        procedure_id: ProcedureId,
+        labels: &[LabelId],
+    ) -> Result<(), ArtifactError> {
+        let _ = self.branch_table_common_target_stack(procedure_id, labels)?;
+        Ok(())
+    }
+
+    fn branch_table_common_target_stack<'a>(
+        &'a self,
+        procedure_id: ProcedureId,
+        labels: &[LabelId],
+    ) -> Result<Option<&'a [TypeId]>, ArtifactError> {
+        if !labels.iter().copied().any(|label| {
+            self.block_signature_for_label(procedure_id, label)
+                .is_some()
+        }) {
+            return Ok(None);
+        }
+        let mut common_stack: Option<&[TypeId]> = None;
+        for label in labels.iter().copied() {
+            let signature = self
+                .block_signature_for_label(procedure_id, label)
+                .ok_or_else(|| ArtifactError::InvalidReference {
+                    table: "branch table target block signatures",
+                })?;
+            match common_stack {
+                Some(expected) if expected != signature.incoming_tys.as_ref() => {
+                    let procedure = self.procedures.get(procedure_id);
+                    return Err(ArtifactError::BranchTableTargetStackMismatch {
+                        procedure: self.procedure_name_owned(procedure),
+                    });
+                }
+                Some(_) => {}
+                None => common_stack = Some(signature.incoming_tys.as_ref()),
+            }
+        }
+        Ok(common_stack)
+    }
+
+    fn block_signature_for_label(
+        &self,
+        procedure_id: ProcedureId,
+        label: LabelId,
+    ) -> Option<&BlockSignatureDescriptor> {
+        self.block_signatures.iter().find_map(|(_, signature)| {
+            (signature.procedure == procedure_id && signature.label == label).then_some(signature)
+        })
+    }
+
+    fn validate_procedure_branch_stack_rules(
+        &self,
+        procedure_id: ProcedureId,
+        procedure: &ProcedureDescriptor,
+    ) -> Result<(), ArtifactError> {
+        if procedure.param_tys.len() != usize::from(procedure.params)
+            || procedure.local_tys.len() != usize::from(procedure.locals)
+        {
+            return Ok(());
+        }
+        let mut current_stack: Option<ProcedureTypeStack> = None;
+        for entry in &procedure.code {
+            match entry {
+                CodeEntry::Label(Label { id }) => {
+                    current_stack = self
+                        .block_signature_for_label(procedure_id, *id)
+                        .map(block_signature_stack);
+                }
+                CodeEntry::Instruction(instruction) => {
+                    let Some(stack) = current_stack.as_mut() else {
+                        continue;
+                    };
+                    match instruction.opcode {
+                        Opcode::Br => {
+                            self.verify_branch_stack(procedure_id, instruction, stack)?;
+                            current_stack = None;
+                        }
+                        Opcode::BrFalse => {
+                            self.verify_branch_false_stack(procedure_id, instruction, stack)?;
+                        }
+                        Opcode::BrTbl => {
+                            self.verify_branch_table_stack(procedure_id, instruction, stack)?;
+                            current_stack = None;
+                        }
+                        Opcode::Ret => {
+                            self.verify_return_stack(procedure, stack)?;
+                            current_stack = None;
+                        }
+                        _ => {
+                            if !self.apply_stack_effect(procedure, instruction, stack) {
+                                current_stack = None;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn verify_branch_stack(
+        &self,
+        procedure_id: ProcedureId,
+        instruction: &Instruction,
+        current_stack: &[ProcedureStackType],
+    ) -> Result<(), ArtifactError> {
+        let Operand::Label(label) = instruction.operand else {
+            return Ok(());
+        };
+        let Some(signature) = self.block_signature_for_label(procedure_id, label) else {
+            return Ok(());
+        };
+        if stack_matches_types(current_stack, signature.incoming_tys.as_ref()) {
+            Ok(())
+        } else {
+            Err(ArtifactError::InvalidReference {
+                table: "branch target incoming stack",
+            })
+        }
+    }
+
+    fn verify_branch_false_stack(
+        &self,
+        procedure_id: ProcedureId,
+        instruction: &Instruction,
+        current_stack: &mut ProcedureTypeStack,
+    ) -> Result<(), ArtifactError> {
+        let Operand::Label(label) = instruction.operand else {
+            return Ok(());
+        };
+        let remaining_len =
+            current_stack
+                .len()
+                .checked_sub(1)
+                .ok_or(ArtifactError::InvalidReference {
+                    table: "branch-false target incoming stack",
+                })?;
+        if let Some(signature) = self.block_signature_for_label(procedure_id, label)
+            && !stack_matches_types(
+                &current_stack[..remaining_len],
+                signature.incoming_tys.as_ref(),
+            )
+        {
+            return Err(ArtifactError::InvalidReference {
+                table: "branch-false target incoming stack",
+            });
+        }
+        current_stack.truncate(remaining_len);
+        Ok(())
+    }
+
+    fn verify_branch_table_stack(
+        &self,
+        procedure_id: ProcedureId,
+        instruction: &Instruction,
+        current_stack: &[ProcedureStackType],
+    ) -> Result<(), ArtifactError> {
+        let Operand::BranchTable(labels) = &instruction.operand else {
+            return Ok(());
+        };
+        let Some(common_stack) = self.branch_table_common_target_stack(procedure_id, labels)?
+        else {
+            return Ok(());
+        };
+        let remaining_len =
+            current_stack
+                .len()
+                .checked_sub(1)
+                .ok_or(ArtifactError::InvalidReference {
+                    table: "branch table incoming stack",
+                })?;
+        if stack_matches_types(&current_stack[..remaining_len], common_stack) {
+            Ok(())
+        } else {
+            Err(ArtifactError::InvalidReference {
+                table: "branch table incoming stack",
+            })
+        }
+    }
+
+    fn verify_return_stack(
+        &self,
+        procedure: &ProcedureDescriptor,
+        current_stack: &[ProcedureStackType],
+    ) -> Result<(), ArtifactError> {
+        if stack_matches_types(current_stack, procedure.result_tys.as_ref()) {
+            Ok(())
+        } else {
+            Err(ArtifactError::InvalidReference {
+                table: "return result stack",
+            })
+        }
+    }
+
+    fn apply_stack_effect(
+        &self,
+        procedure: &ProcedureDescriptor,
+        instruction: &Instruction,
+        stack: &mut ProcedureTypeStack,
+    ) -> bool {
+        let opcode = instruction.opcode;
+        match opcode {
+            Opcode::LdC
+            | Opcode::LdCI4
+            | Opcode::LdStr
+            | Opcode::LdGlob
+            | Opcode::LdFfi
+            | Opcode::LdType => {
+                stack.push(ProcedureStackType::Unknown);
+                true
+            }
+            Opcode::LdLoc => {
+                let Operand::Local(local) = instruction.operand else {
+                    return false;
+                };
+                let value_ty = procedure
+                    .local_tys
+                    .get(usize::from(local))
+                    .copied()
+                    .map_or(ProcedureStackType::Unknown, ProcedureStackType::Known);
+                stack.push(value_ty);
+                true
+            }
+            Opcode::StLoc | Opcode::StGlob => pop_stack(stack, 1),
+            Opcode::LdFld | Opcode::LdElem => {
+                if !pop_stack(stack, 2) {
+                    return false;
+                }
+                let value_ty = match instruction.operand {
+                    Operand::Type(ty) => ProcedureStackType::Known(ty),
+                    _ => ProcedureStackType::Unknown,
+                };
+                stack.push(value_ty);
+                true
+            }
+            Opcode::StFld => pop_stack(stack, 2),
+            Opcode::Add
+            | Opcode::Sub
+            | Opcode::Mul
+            | Opcode::DivS
+            | Opcode::RemS
+            | Opcode::And
+            | Opcode::Or
+            | Opcode::Xor => {
+                if !pop_stack(stack, 2) {
+                    return false;
+                }
+                stack.push(ProcedureStackType::Unknown);
+                true
+            }
+            Opcode::Not => {
+                let Some(value_ty) = stack.pop() else {
+                    return false;
+                };
+                stack.push(value_ty);
+                true
+            }
+            Opcode::Ceq
+            | Opcode::Cne
+            | Opcode::CltS
+            | Opcode::CgtS
+            | Opcode::CleS
+            | Opcode::CgeS => {
+                if !pop_stack(stack, 2) {
+                    return false;
+                }
+                stack.push(ProcedureStackType::Unknown);
+                true
+            }
+            Opcode::Call => {
+                let Operand::Procedure(callee_id) = instruction.operand else {
+                    return false;
+                };
+                let callee = self.procedures.get(callee_id);
+                if !pop_stack(stack, callee.param_tys.len()) {
+                    return false;
+                }
+                for ty in callee.result_tys.iter().copied() {
+                    stack.push(ProcedureStackType::Known(ty));
+                }
+                true
+            }
+            Opcode::CallInd => false,
+            Opcode::CallFfi => {
+                let Operand::Foreign(foreign_id) = instruction.operand else {
+                    return false;
+                };
+                let foreign = self.foreigns.get(foreign_id);
+                if !pop_stack(stack, foreign.param_tys.len()) {
+                    return false;
+                }
+                stack.push(ProcedureStackType::Known(foreign.result_ty));
+                true
+            }
+            Opcode::TailCall => false,
+            Opcode::NewFn => {
+                let Operand::WideProcedureCaptures { captures, .. } = instruction.operand else {
+                    return false;
+                };
+                if !pop_stack(stack, usize::from(captures)) {
+                    return false;
+                }
+                stack.push(ProcedureStackType::Unknown);
+                true
+            }
+            Opcode::NewObj | Opcode::NewArr => {
+                let Operand::TypeLen { len, .. } = instruction.operand else {
+                    return false;
+                };
+                if !pop_stack(stack, usize::from(len)) {
+                    return false;
+                }
+                stack.push(ProcedureStackType::Unknown);
+                true
+            }
+            Opcode::StElem => pop_stack(stack, 3),
+            Opcode::LdLen => {
+                if !pop_stack(stack, 1) {
+                    return false;
+                }
+                stack.push(ProcedureStackType::Unknown);
+                true
+            }
+            Opcode::IsInst => {
+                if !pop_stack(stack, 1) {
+                    return false;
+                }
+                stack.push(ProcedureStackType::Unknown);
+                true
+            }
+            Opcode::Cast => {
+                let Operand::Type(ty) = instruction.operand else {
+                    return false;
+                };
+                if !pop_stack(stack, 1) {
+                    return false;
+                }
+                stack.push(ProcedureStackType::Known(ty));
+                true
+            }
+            Opcode::LdModDyn | Opcode::LdExpDyn => {
+                if !pop_stack(stack, 1) {
+                    return false;
+                }
+                stack.push(ProcedureStackType::Unknown);
+                true
+            }
+            Opcode::Br | Opcode::BrFalse | Opcode::BrTbl | Opcode::Ret => true,
+        }
     }
 
     fn validate_types(&self) -> Result<(), ArtifactError> {
@@ -371,6 +849,31 @@ impl Artifact {
         Ok(())
     }
 
+    fn validate_stack_effects(&self) -> Result<(), ArtifactError> {
+        for (_, descriptor) in self.stack_effects.iter() {
+            self.require_string(descriptor.name)?;
+            let input_len = u16::try_from(descriptor.input_tys.len());
+            if input_len.is_err() {
+                return Err(ArtifactError::SectionLimitExceeded {
+                    table: "stack effect input types",
+                });
+            }
+            let output_len = u16::try_from(descriptor.output_tys.len());
+            if output_len.is_err() {
+                return Err(ArtifactError::SectionLimitExceeded {
+                    table: "stack effect output types",
+                });
+            }
+            for ty in descriptor.input_tys.iter().copied() {
+                self.require_type(ty)?;
+            }
+            for ty in descriptor.output_tys.iter().copied() {
+                self.require_type(ty)?;
+            }
+        }
+        Ok(())
+    }
+
     fn validate_globals(&self) -> Result<(), ArtifactError> {
         for (_, descriptor) in self.globals.iter() {
             self.require_string(descriptor.name)?;
@@ -384,6 +887,18 @@ impl Artifact {
     fn validate_shapes(&self) -> Result<(), ArtifactError> {
         for (_, descriptor) in self.shapes.iter() {
             self.require_string(descriptor.name)?;
+            if let Some(payload_ty) = descriptor.payload_ty {
+                self.require_type(payload_ty)?;
+            }
+            if let Some(witness) = descriptor.witness {
+                self.require_string(witness)?;
+            }
+            if let Some(dispatch_table) = descriptor.dispatch_table {
+                self.require_string(dispatch_table)?;
+            }
+            if let Some(layout_identity) = descriptor.layout_identity {
+                self.require_type(layout_identity)?;
+            }
         }
         Ok(())
     }
@@ -400,6 +915,37 @@ impl Artifact {
             if let Some(link) = descriptor.link {
                 self.require_string(link)?;
             }
+            if let Some(domain) = descriptor.domain {
+                self.require_string(domain)?;
+            }
+            if let Some(lifetime) = descriptor.lifetime {
+                self.require_string(lifetime)?;
+            }
+            if u16::try_from(descriptor.pinned_params.len()).is_err() {
+                return Err(ArtifactError::SectionLimitExceeded {
+                    table: "foreign pinned params",
+                });
+            }
+            if u16::try_from(descriptor.nullable_params.len()).is_err() {
+                return Err(ArtifactError::SectionLimitExceeded {
+                    table: "foreign nullable params",
+                });
+            }
+            let param_count = descriptor.param_tys.len();
+            for index in descriptor.pinned_params.iter().copied() {
+                if usize::from(index) >= param_count {
+                    return Err(ArtifactError::InvalidReference {
+                        table: "foreign pinned params",
+                    });
+                }
+            }
+            for index in descriptor.nullable_params.iter().copied() {
+                if usize::from(index) >= param_count {
+                    return Err(ArtifactError::InvalidReference {
+                        table: "foreign nullable params",
+                    });
+                }
+            }
         }
         Ok(())
     }
@@ -412,9 +958,30 @@ impl Artifact {
                 for ty in &variant.field_tys {
                     self.require_type(*ty)?;
                 }
+                if !variant.layout_fields.is_empty()
+                    && variant.layout_fields.len() != variant.field_tys.len()
+                {
+                    return Err(ArtifactError::InvalidReference {
+                        table: "data layout fields",
+                    });
+                }
+                for field in &variant.layout_fields {
+                    if let Some(name) = field.name {
+                        self.require_string(name)?;
+                    }
+                    self.require_type(field.ty)?;
+                    if let Some(storage) = field.storage {
+                        self.require_string(storage)?;
+                    }
+                }
             }
             if let Some(repr) = descriptor.repr_kind {
                 self.require_string(repr)?;
+            }
+            if let Some(header) = &descriptor.object_header
+                && let Some(layout_ty) = header.layout_ty
+            {
+                self.require_type(layout_ty)?;
             }
         }
         Ok(())
@@ -439,8 +1006,8 @@ impl Artifact {
     }
 
     fn validate_procedures(&self) -> Result<(), ArtifactError> {
-        for (_, descriptor) in self.procedures.iter() {
-            self.validate_procedure(descriptor)?;
+        for (procedure_id, descriptor) in self.procedures.iter() {
+            self.validate_procedure(procedure_id, descriptor)?;
         }
         Ok(())
     }
@@ -451,6 +1018,329 @@ impl Artifact {
             self.require_string(descriptor.key)?;
             for value in &descriptor.values {
                 self.require_string(*value)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_manifest(&self) -> Result<(), ArtifactError> {
+        for (_, descriptor) in self.manifest.iter() {
+            self.require_string(descriptor.package)?;
+            self.require_string(descriptor.version)?;
+            self.require_string(descriptor.profile)?;
+            if let Some(entry) = descriptor.entry {
+                self.require_string(entry)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_imports(&self) -> Result<(), ArtifactError> {
+        for (_, descriptor) in self.imports.iter() {
+            self.require_string(descriptor.spec)?;
+            self.require_string(descriptor.resolved)?;
+        }
+        Ok(())
+    }
+
+    fn validate_root_maps(&self) -> Result<(), ArtifactError> {
+        for (_, descriptor) in self.root_maps.iter() {
+            self.require_string(descriptor.safe_point)?;
+            let procedure = if let Some(procedure_id) = descriptor.procedure {
+                self.require_procedure(procedure_id)?;
+                Some((procedure_id, self.procedures.get(procedure_id)))
+            } else {
+                None
+            };
+            Self::validate_root_map_slot_list_len(
+                descriptor.local_slots.as_ref(),
+                "root map local slots",
+            )?;
+            Self::validate_root_map_slot_list_len(
+                descriptor.stack_slots.as_ref(),
+                "root map stack slots",
+            )?;
+            Self::validate_root_map_slot_list_len(
+                descriptor.capture_slots.as_ref(),
+                "root map capture slots",
+            )?;
+            Self::validate_root_map_slot_list_len(
+                descriptor.defer_slots.as_ref(),
+                "root map defer slots",
+            )?;
+            Self::validate_root_map_slot_list_len(
+                descriptor.pin_slots.as_ref(),
+                "root map pin slots",
+            )?;
+            Self::validate_unique_root_map_slots(
+                descriptor.local_slots.as_ref(),
+                "root map local slots",
+            )?;
+            Self::validate_unique_root_map_slots(
+                descriptor.stack_slots.as_ref(),
+                "root map stack slots",
+            )?;
+            Self::validate_unique_root_map_slots(
+                descriptor.capture_slots.as_ref(),
+                "root map capture slots",
+            )?;
+            Self::validate_unique_root_map_slots(
+                descriptor.defer_slots.as_ref(),
+                "root map defer slots",
+            )?;
+            Self::validate_unique_root_map_slots(
+                descriptor.pin_slots.as_ref(),
+                "root map pin slots",
+            )?;
+            if let Some((procedure_id, procedure)) = procedure {
+                self.validate_root_map_safe_point_for_procedure(procedure, descriptor)?;
+                self.validate_root_map_slots_for_procedure(procedure_id, procedure, descriptor)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_root_map_safe_point_for_procedure(
+        &self,
+        procedure: &ProcedureDescriptor,
+        descriptor: &RootMapDescriptor,
+    ) -> Result<(), ArtifactError> {
+        if procedure.labels.is_empty() {
+            return Ok(());
+        }
+        let procedure_name = self.string_text(procedure.name);
+        let safe_point = self.string_text(descriptor.safe_point);
+        let matches_label = procedure.labels.iter().copied().any(|label| {
+            let label_name = self.string_text(label);
+            safe_point == format!("{procedure_name}.{label_name}")
+                || safe_point == format!("{procedure_name}:{label_name}")
+        });
+        if !matches_label {
+            return Err(ArtifactError::InvalidReference {
+                table: "root map safe point",
+            });
+        }
+        Ok(())
+    }
+
+    fn validate_root_map_slots_for_procedure(
+        &self,
+        procedure_id: ProcedureId,
+        procedure: &ProcedureDescriptor,
+        descriptor: &RootMapDescriptor,
+    ) -> Result<(), ArtifactError> {
+        let local_slot_limit = usize::from(procedure.locals.max(procedure.params));
+        Self::validate_root_map_slot_bounds(
+            descriptor.local_slots.as_ref(),
+            local_slot_limit,
+            "root map local slots",
+        )?;
+        if let Some(stack_slot_limit) = self.root_map_stack_slot_limit(procedure_id, procedure) {
+            Self::validate_root_map_slot_bounds(
+                descriptor.stack_slots.as_ref(),
+                stack_slot_limit,
+                "root map stack slots",
+            )?;
+        }
+        if let Some(capture_slot_limit) = self.root_map_capture_slot_limit(procedure_id) {
+            Self::validate_root_map_slot_bounds(
+                descriptor.capture_slots.as_ref(),
+                capture_slot_limit,
+                "root map capture slots",
+            )?;
+        }
+        Ok(())
+    }
+
+    fn root_map_stack_slot_limit(
+        &self,
+        procedure_id: ProcedureId,
+        procedure: &ProcedureDescriptor,
+    ) -> Option<usize> {
+        if procedure.param_tys.len() != usize::from(procedure.params)
+            || procedure.local_tys.len() != usize::from(procedure.locals)
+        {
+            return None;
+        }
+        let mut known_stack = None::<ProcedureTypeStack>;
+        let mut max_depth = 0usize;
+        let mut has_known_stack = false;
+        for entry in &procedure.code {
+            match entry {
+                CodeEntry::Label(Label { id }) => {
+                    known_stack = self
+                        .block_signature_for_label(procedure_id, *id)
+                        .map(block_signature_stack);
+                    if let Some(stack) = known_stack.as_ref() {
+                        has_known_stack = true;
+                        max_depth = max_depth.max(stack.len());
+                    }
+                }
+                CodeEntry::Instruction(instruction) => {
+                    let Some(stack) = known_stack.as_mut() else {
+                        continue;
+                    };
+                    has_known_stack = true;
+                    max_depth = max_depth.max(stack.len());
+                    match instruction.opcode {
+                        Opcode::Br => {
+                            if self
+                                .verify_branch_stack(procedure_id, instruction, stack)
+                                .is_err()
+                            {
+                                return None;
+                            }
+                            known_stack = None;
+                        }
+                        Opcode::BrFalse => {
+                            if self
+                                .verify_branch_false_stack(procedure_id, instruction, stack)
+                                .is_err()
+                            {
+                                return None;
+                            }
+                            max_depth = max_depth.max(stack.len());
+                        }
+                        Opcode::BrTbl => {
+                            if self
+                                .verify_branch_table_stack(procedure_id, instruction, stack)
+                                .is_err()
+                            {
+                                return None;
+                            }
+                            known_stack = None;
+                        }
+                        Opcode::Ret => {
+                            if self.verify_return_stack(procedure, stack).is_err() {
+                                return None;
+                            }
+                            known_stack = None;
+                        }
+                        _ => {
+                            if !self.apply_stack_effect(procedure, instruction, stack) {
+                                known_stack = None;
+                            } else {
+                                max_depth = max_depth.max(stack.len());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        has_known_stack.then_some(max_depth)
+    }
+
+    fn root_map_capture_slot_limit(&self, procedure_id: ProcedureId) -> Option<usize> {
+        self.closures
+            .iter()
+            .filter_map(|(_, descriptor)| {
+                (descriptor.procedure == procedure_id).then_some(
+                    descriptor
+                        .capture_tys
+                        .len()
+                        .max(usize::from(descriptor.capture_count)),
+                )
+            })
+            .max()
+    }
+
+    fn validate_root_map_slot_list_len(
+        slots: &[u16],
+        table: &'static str,
+    ) -> Result<(), ArtifactError> {
+        if u16::try_from(slots.len()).is_err() {
+            return Err(ArtifactError::SectionLimitExceeded { table });
+        }
+        Ok(())
+    }
+
+    fn validate_unique_root_map_slots(
+        slots: &[u16],
+        table: &'static str,
+    ) -> Result<(), ArtifactError> {
+        let mut seen = BTreeSet::new();
+        for slot in slots.iter().copied() {
+            if !seen.insert(slot) {
+                return Err(ArtifactError::InvalidReference { table });
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_root_map_slot_bounds(
+        slots: &[u16],
+        slot_limit: usize,
+        table: &'static str,
+    ) -> Result<(), ArtifactError> {
+        for slot in slots.iter().copied() {
+            if usize::from(slot) >= slot_limit {
+                return Err(ArtifactError::InvalidReference { table });
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_block_signatures(&self) -> Result<(), ArtifactError> {
+        for (_, descriptor) in self.block_signatures.iter() {
+            self.require_procedure(descriptor.procedure)?;
+            let procedure = self.procedures.get(descriptor.procedure);
+            if procedure
+                .labels
+                .get(usize::from(descriptor.label))
+                .is_none()
+            {
+                return Err(ArtifactError::InvalidReference {
+                    table: "block signature labels",
+                });
+            }
+            if u16::try_from(descriptor.incoming_tys.len()).is_err() {
+                return Err(ArtifactError::SectionLimitExceeded {
+                    table: "block signature incoming types",
+                });
+            }
+            for ty in descriptor.incoming_tys.iter().copied() {
+                self.require_type(ty)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_closures(&self) -> Result<(), ArtifactError> {
+        for (_, descriptor) in self.closures.iter() {
+            self.require_string(descriptor.name)?;
+            self.require_procedure(descriptor.procedure)?;
+            if u16::try_from(descriptor.capture_tys.len()).is_err() {
+                return Err(ArtifactError::SectionLimitExceeded {
+                    table: "closure capture types",
+                });
+            }
+            for ty in descriptor.capture_tys.iter().copied() {
+                self.require_type(ty)?;
+            }
+            if let Some(env_layout) = descriptor.env_layout {
+                self.require_data(env_layout)?;
+            }
+            if u16::try_from(descriptor.param_tys.len()).is_err() {
+                return Err(ArtifactError::SectionLimitExceeded {
+                    table: "closure parameter types",
+                });
+            }
+            for ty in descriptor.param_tys.iter().copied() {
+                self.require_type(ty)?;
+            }
+            if u16::try_from(descriptor.result_tys.len()).is_err() {
+                return Err(ArtifactError::SectionLimitExceeded {
+                    table: "closure result types",
+                });
+            }
+            for ty in descriptor.result_tys.iter().copied() {
+                self.require_type(ty)?;
+            }
+            if let Some(domain) = descriptor.domain {
+                self.require_string(domain)?;
+            }
+            if let Some(effect) = descriptor.effect {
+                self.require_string(effect)?;
             }
         }
         Ok(())
@@ -526,6 +1416,35 @@ impl Artifact {
             .ok_or(ArtifactError::InvalidReference { table: "shapes" })?;
         Ok(())
     }
+
+    fn require_data(&self, id: DataId) -> Result<(), ArtifactError> {
+        let _ = self
+            .data
+            .as_slice()
+            .get(usize::try_from(id.raw()).unwrap_or(usize::MAX))
+            .ok_or(ArtifactError::InvalidReference { table: "data" })?;
+        Ok(())
+    }
+
+    fn require_root_map(&self, id: RootMapId) -> Result<(), ArtifactError> {
+        let _ = self
+            .root_maps
+            .as_slice()
+            .get(usize::try_from(id.raw()).unwrap_or(usize::MAX))
+            .ok_or(ArtifactError::InvalidReference { table: "root maps" })?;
+        Ok(())
+    }
+
+    fn require_block_signature(&self, id: BlockSignatureId) -> Result<(), ArtifactError> {
+        let _ = self
+            .block_signatures
+            .as_slice()
+            .get(usize::try_from(id.raw()).unwrap_or(usize::MAX))
+            .ok_or(ArtifactError::InvalidReference {
+                table: "block signatures",
+            })?;
+        Ok(())
+    }
 }
 
 fn same_source_or_qualified_name(left: &str, right: &str) -> bool {
@@ -580,4 +1499,52 @@ fn operand_matches_opcode(operand: &Operand, opcode: Opcode) -> bool {
         }
         _ => operand_matches_shape(operand, opcode.operand_shape()),
     }
+}
+
+fn procedure_has_tail_call(procedure: &ProcedureDescriptor) -> bool {
+    procedure.code.iter().any(|entry| {
+        matches!(
+            entry,
+            CodeEntry::Instruction(Instruction {
+                opcode: Opcode::TailCall,
+                ..
+            })
+        )
+    })
+}
+
+type ProcedureTypeStack = Vec<ProcedureStackType>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProcedureStackType {
+    Known(TypeId),
+    Unknown,
+}
+
+fn block_signature_stack(signature: &BlockSignatureDescriptor) -> ProcedureTypeStack {
+    signature
+        .incoming_tys
+        .iter()
+        .copied()
+        .map(ProcedureStackType::Known)
+        .collect()
+}
+
+fn pop_stack(stack: &mut ProcedureTypeStack, count: usize) -> bool {
+    if stack.len() < count {
+        return false;
+    }
+    stack.truncate(stack.len() - count);
+    true
+}
+
+fn stack_matches_types(stack: &[ProcedureStackType], expected: &[TypeId]) -> bool {
+    stack.len() == expected.len()
+        && stack
+            .iter()
+            .zip(expected)
+            .all(|(value, expected_ty)| match value {
+                ProcedureStackType::Known(found_ty) => found_ty == expected_ty,
+                ProcedureStackType::Unknown => true,
+            })
 }

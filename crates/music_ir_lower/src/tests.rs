@@ -498,6 +498,16 @@ mod success {
         contains_strcat, lower,
     };
 
+    fn call_callee_name(expr: &IrExpr) -> Option<&str> {
+        let IrExprKind::Call { callee, .. } = &expr.kind else {
+            return None;
+        };
+        let IrExprKind::Name { name, .. } = &callee.kind else {
+            return None;
+        };
+        Some(name.as_ref())
+    }
+
     #[test]
     fn lowers_exports_and_semantic_metadata() {
         let ir = lower(
@@ -932,6 +942,204 @@ mod success {
             kind => kind,
         };
         assert!(matches!(inv_kind, IrExprKind::Not { .. }));
+    }
+
+    #[test]
+    fn lowers_sequence_defer_cleanups_in_lifo_order() {
+        let ir = lower(
+            r"
+        let cleanupA () : Unit := (let _ : Int := 0);
+        let cleanupB () : Unit := (let _ : Int := 0);
+        export let value () : Int := (
+          defer cleanupA() where 0 = 0;
+          defer cleanupB() where 1 = 1;
+          7
+        );
+    ",
+        );
+
+        let value = callable(&ir, "value");
+        let IrExprKind::Sequence { exprs } = &value.body.kind else {
+            panic!("expected sequence body");
+        };
+        assert_eq!(exprs.len(), 6);
+        assert!(matches!(exprs[0].kind, IrExprKind::Unit));
+        assert!(matches!(exprs[1].kind, IrExprKind::Unit));
+
+        let IrExprKind::TempLet {
+            temp: stored_temp,
+            value: stored_value,
+        } = &exprs[2].kind
+        else {
+            panic!("expected temp-let before deferred cleanup tail");
+        };
+        assert!(matches!(stored_value.kind, IrExprKind::Lit(_)));
+
+        let IrExprKind::If {
+            then_expr: first_then,
+            ..
+        } = &exprs[3].kind
+        else {
+            panic!("expected first deferred cleanup branch");
+        };
+        assert_eq!(call_callee_name(first_then).unwrap_or(""), "cleanupB");
+
+        let IrExprKind::If {
+            then_expr: second_then,
+            ..
+        } = &exprs[4].kind
+        else {
+            panic!("expected second deferred cleanup branch");
+        };
+        assert_eq!(call_callee_name(second_then).unwrap_or(""), "cleanupA");
+
+        let IrExprKind::Temp { temp: result_temp } = &exprs[5].kind else {
+            panic!("expected sequence tail to reload deferred result");
+        };
+        assert_eq!(*stored_temp, *result_temp);
+    }
+
+    #[test]
+    fn lowers_defer_guard_as_cleanup_time_branch() {
+        let ir = lower(
+            r"
+        let cleanup () : Unit := (let _ : Int := 0);
+        export let value (flag : Bit) : Bit := (
+          defer cleanup() where flag;
+          flag
+        );
+    ",
+        );
+
+        let value = callable(&ir, "value");
+        let IrExprKind::Sequence { exprs } = &value.body.kind else {
+            panic!("expected sequence body");
+        };
+        assert_eq!(exprs.len(), 4);
+        assert!(matches!(exprs[0].kind, IrExprKind::Unit));
+        assert!(matches!(exprs[1].kind, IrExprKind::TempLet { .. }));
+
+        let IrExprKind::If {
+            condition,
+            then_expr,
+            else_expr,
+        } = &exprs[2].kind
+        else {
+            panic!("expected deferred guard branch");
+        };
+        assert!(matches!(
+            condition.kind,
+            IrExprKind::Name { ref name, .. } if name.as_ref() == "flag"
+        ));
+        assert_eq!(call_callee_name(then_expr).unwrap_or(""), "cleanup");
+        assert!(matches!(else_expr.kind, IrExprKind::Unit));
+        assert!(matches!(exprs[3].kind, IrExprKind::Temp { .. }));
+    }
+
+    #[test]
+    fn lowers_let_else_primary_value_with_prior_defer_cleanup() {
+        let ir = lower(
+            r"
+        let cleanup () : Unit := (let _ : Int := 0);
+        export let value () : Int := (
+          defer cleanup() where 1 = 1;
+          let kept := 1 else 2;
+          kept
+        );
+    ",
+        );
+
+        let value = callable(&ir, "value");
+        let IrExprKind::Sequence { exprs } = &value.body.kind else {
+            panic!("expected sequence body");
+        };
+        assert_eq!(exprs.len(), 5);
+        assert!(matches!(exprs[0].kind, IrExprKind::Unit));
+
+        let IrExprKind::Let {
+            value: bound_value, ..
+        } = &exprs[1].kind
+        else {
+            panic!("expected let binding before deferred cleanup tail");
+        };
+        let IrExprKind::Lit(music_ir::IrLit::Int { raw }) = &bound_value.kind else {
+            panic!("expected integer literal let value");
+        };
+        assert_eq!(raw.as_ref(), "1");
+
+        let IrExprKind::If {
+            then_expr: cleanup_then,
+            ..
+        } = &exprs[3].kind
+        else {
+            panic!("expected deferred cleanup branch");
+        };
+        assert_eq!(call_callee_name(cleanup_then).unwrap_or(""), "cleanup");
+    }
+
+    #[test]
+    fn lowers_refutable_let_else_as_early_exit_match() {
+        let ir = lower(
+            r"
+        export let value (input : Int + String) : Int := (
+          let .Left(x) := input else 9;
+          x + 1
+        );
+    ",
+        );
+
+        let value = callable(&ir, "value");
+        let IrExprKind::Sequence { exprs } = &value.body.kind else {
+            panic!("expected sequence body");
+        };
+        assert_eq!(exprs.len(), 1);
+        let IrExprKind::Match { arms, .. } = &exprs[0].kind else {
+            panic!("expected let-else to lower as match");
+        };
+        assert_eq!(arms.len(), 2);
+        let IrExprKind::Lit(music_ir::IrLit::Int { raw }) = &arms[1].expr.kind else {
+            panic!("expected fallback arm literal");
+        };
+        assert_eq!(raw.as_ref(), "9");
+    }
+
+    #[test]
+    fn lowers_refutable_let_else_with_defer_cleanup_exit() {
+        let ir = lower(
+            r"
+        let cleanup () : Unit := (let _ : Int := 0);
+        export let value (input : Int + String) : Int := (
+          defer cleanup() where 1 = 1;
+          let .Left(x) := input else 9;
+          x
+        );
+    ",
+        );
+
+        let value = callable(&ir, "value");
+        let IrExprKind::Sequence { exprs } = &value.body.kind else {
+            panic!("expected sequence body");
+        };
+        assert_eq!(exprs.len(), 4);
+        let IrExprKind::TempLet {
+            value: deferred_value,
+            ..
+        } = &exprs[1].kind
+        else {
+            panic!("expected deferred temp-let");
+        };
+        let IrExprKind::Match { arms, .. } = &deferred_value.kind else {
+            panic!("expected deferred value to be let-else match");
+        };
+        assert_eq!(arms.len(), 2);
+        let IrExprKind::If {
+            then_expr: cleanup_then,
+            ..
+        } = &exprs[2].kind
+        else {
+            panic!("expected deferred cleanup branch");
+        };
+        assert_eq!(call_callee_name(cleanup_then).unwrap_or(""), "cleanup");
     }
 
     #[test]

@@ -1,12 +1,14 @@
+use super::pats::lower_case_patterns;
 use super::{
     HirArg, HirArrayItem, HirBinaryOp, HirExprId, HirExprKind, HirLetMods, HirLitId, HirLitKind,
     HirParamRange, HirPatId, HirPatKind, HirPrefixOp, HirRecordItemRange, HirTemplatePart,
-    HirTyKind, Ident, IrBinaryOp, IrExpr, IrExprKind, IrLit, IrOrigin, IrTempId, LowerCtx,
-    LoweringResult, NameBindingId, NameSite, SemaModule, SliceRange, array, assign, binary,
-    bind_expr_constraint_evidence, call, destructure, is_type_value_expr, lower_comptime_value,
-    lower_field_expr, lower_in_expr, lower_index_expr, lower_lambda_expr, lower_local_callable_let,
-    lower_match_expr, lower_partial_range_expr, lower_range_expr, lower_variant_expr,
-    lowering_invariant_violation, record, render_ty_name, render_type_value_expr_name,
+    HirTyKind, Ident, IrBinaryOp, IrCasePattern, IrExpr, IrExprKind, IrLit, IrLoweredMatchArm,
+    IrOrigin, IrTempId, LowerCtx, LoweringResult, NameBindingId, NameSite, SemaModule, SliceRange,
+    array, assign, binary, bind_expr_constraint_evidence, call, destructure, is_type_value_expr,
+    lower_comptime_value, lower_field_expr, lower_in_expr, lower_index_expr, lower_lambda_expr,
+    lower_local_callable_let, lower_match_expr, lower_partial_range_expr, lower_range_expr,
+    lower_variant_expr, lowering_invariant_violation, record, render_ty_name,
+    render_type_value_expr_name,
 };
 
 pub(crate) fn lower_expr(ctx: &mut LowerCtx<'_>, expr_id: HirExprId) -> IrExpr {
@@ -192,6 +194,22 @@ pub(crate) fn lower_misc_expr(
         HirExprKind::Import { arg } => {
             if sema.expr_import_record_target(expr_id).is_some() {
                 IrExprKind::Unit
+            } else if let Some(items) = import_tuple_items(sema, *arg) {
+                let items = items.to_vec();
+                IrExprKind::Tuple {
+                    ty_name: render_ty_name(
+                        sema,
+                        sema.try_expr_ty(expr_id).unwrap_or_else(|| {
+                            lowering_invariant_violation("expr type missing for import tuple")
+                        }),
+                        interner,
+                    ),
+                    items: items
+                        .into_iter()
+                        .map(|item| lower_import_arg_expr(ctx, item))
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                }
             } else {
                 IrExprKind::ModuleLoad {
                     spec: lower_boxed_expr(ctx, *arg),
@@ -199,6 +217,36 @@ pub(crate) fn lower_misc_expr(
             }
         }
         _ => lowering_invariant_violation("misc expr dispatcher mismatch"),
+    }
+}
+
+fn import_tuple_items(sema: &SemaModule, arg: HirExprId) -> Option<&[HirExprId]> {
+    match sema.module().store.exprs.get(arg).kind {
+        HirExprKind::Tuple { items } | HirExprKind::Sequence { exprs: items } => {
+            Some(sema.module().store.expr_ids.get(items))
+        }
+        _ => None,
+    }
+}
+
+fn lower_import_arg_expr(ctx: &mut LowerCtx<'_>, arg: HirExprId) -> IrExpr {
+    let sema = ctx.sema;
+    let origin = sema.module().store.exprs.get(arg).origin;
+    let origin = IrOrigin::new(origin.source_id, origin.span);
+    if sema
+        .resolved()
+        .imports
+        .iter()
+        .any(|import| import.span == origin.span)
+    {
+        IrExpr::new(origin, IrExprKind::Unit)
+    } else {
+        IrExpr::new(
+            origin,
+            IrExprKind::ModuleLoad {
+                spec: Box::new(lower_expr(ctx, arg)),
+            },
+        )
     }
 }
 
@@ -353,9 +401,141 @@ pub(crate) fn lower_sequence_expr(
     ctx: &mut LowerCtx<'_>,
     exprs: SliceRange<HirExprId>,
 ) -> IrExprKind {
-    IrExprKind::Sequence {
-        exprs: lower_expr_list(ctx, exprs),
+    lower_sequence_expr_ids(ctx, ctx.sema.module().store.expr_ids.get(exprs))
+}
+
+fn lower_sequence_expr_ids(ctx: &mut LowerCtx<'_>, expr_ids: &[HirExprId]) -> IrExprKind {
+    let sema = ctx.sema;
+    let interner = ctx.interner;
+    let mut lowered_exprs = Vec::<IrExpr>::new();
+    let mut deferred_cleanups = Vec::<DeferredCleanup>::new();
+    for (index, expr_id) in expr_ids.iter().copied().enumerate() {
+        let expr = sema.module().store.exprs.get(expr_id);
+        if let HirExprKind::Defer { cleanup, guard } = expr.kind {
+            let origin = IrOrigin::new(expr.origin.source_id, expr.origin.span);
+            lowered_exprs.push(IrExpr::new(origin, IrExprKind::Unit));
+            deferred_cleanups.push(DeferredCleanup {
+                origin,
+                cleanup,
+                guard,
+            });
+            continue;
+        }
+        if let HirExprKind::Let {
+            mods,
+            pat,
+            has_param_clause,
+            params,
+            value,
+            ..
+        } = &expr.kind
+            && let Some(fallback) = mods.fallback
+            && !pat_is_irrefutable_for_let_lowering(sema, *pat)
+        {
+            let is_callable =
+                *has_param_clause || !sema.module().store.params.get(params.clone()).is_empty();
+            if is_callable {
+                lowering_invariant_violation(
+                    "refutable let-else lowering does not support local callable declarations",
+                );
+            }
+            let continuation = if index + 1 < expr_ids.len() {
+                IrExpr::new(
+                    IrOrigin::new(expr.origin.source_id, expr.origin.span),
+                    lower_sequence_expr_ids(ctx, &expr_ids[index + 1..]),
+                )
+            } else {
+                IrExpr::new(
+                    IrOrigin::new(expr.origin.source_id, expr.origin.span),
+                    IrExprKind::Unit,
+                )
+            };
+            let mut arms = lower_case_patterns(sema, *pat, interner)
+                .into_iter()
+                .map(|pattern| IrLoweredMatchArm {
+                    pattern,
+                    guard: None,
+                    expr: continuation.clone(),
+                })
+                .collect::<Vec<_>>();
+            if arms.is_empty() {
+                lowering_invariant_violation(
+                    "refutable let-else pattern lowered to zero match arms",
+                );
+            }
+            arms.push(IrLoweredMatchArm {
+                pattern: IrCasePattern::Wildcard,
+                guard: None,
+                expr: lower_expr(ctx, fallback),
+            });
+            let origin = IrOrigin::new(expr.origin.source_id, expr.origin.span);
+            lowered_exprs.push(IrExpr::new(
+                origin,
+                IrExprKind::Match {
+                    scrutinee: Box::new(lower_expr(ctx, *value)),
+                    arms: arms.into_boxed_slice(),
+                },
+            ));
+            break;
+        }
+        lowered_exprs.push(lower_expr(ctx, expr_id));
     }
+    if deferred_cleanups.is_empty() {
+        return IrExprKind::Sequence {
+            exprs: lowered_exprs.into_boxed_slice(),
+        };
+    }
+
+    let deferred_result = fresh_temp(ctx);
+    let tail_expr = lowered_exprs
+        .pop()
+        .unwrap_or_else(|| lowering_invariant_violation("defer sequence missing tail expr"));
+    lowered_exprs.push(IrExpr::new(
+        tail_expr.origin,
+        IrExprKind::TempLet {
+            temp: deferred_result,
+            value: Box::new(tail_expr),
+        },
+    ));
+    for deferred_cleanup in deferred_cleanups.into_iter().rev() {
+        lowered_exprs.push(lower_deferred_cleanup_expr(ctx, deferred_cleanup));
+    }
+    lowered_exprs.push(IrExpr::new(
+        lowered_exprs.last().map_or_else(
+            || lowering_invariant_violation("defer sequence missing temp origin"),
+            |expr| expr.origin,
+        ),
+        IrExprKind::Temp {
+            temp: deferred_result,
+        },
+    ));
+    IrExprKind::Sequence {
+        exprs: lowered_exprs.into_boxed_slice(),
+    }
+}
+
+#[derive(Clone, Copy)]
+struct DeferredCleanup {
+    origin: IrOrigin,
+    cleanup: HirExprId,
+    guard: Option<HirExprId>,
+}
+
+fn lower_deferred_cleanup_expr(
+    ctx: &mut LowerCtx<'_>,
+    deferred_cleanup: DeferredCleanup,
+) -> IrExpr {
+    if let Some(guard) = deferred_cleanup.guard {
+        return IrExpr::new(
+            deferred_cleanup.origin,
+            IrExprKind::If {
+                condition: lower_boxed_expr(ctx, guard),
+                then_expr: lower_boxed_expr(ctx, deferred_cleanup.cleanup),
+                else_expr: Box::new(IrExpr::new(deferred_cleanup.origin, IrExprKind::Unit)),
+            },
+        );
+    }
+    lower_expr(ctx, deferred_cleanup.cleanup)
 }
 
 pub(crate) fn lower_tuple_expr(
@@ -403,6 +583,11 @@ pub(crate) fn lower_let_expr(
 ) -> IrExprKind {
     let sema = ctx.sema;
     let interner = ctx.interner;
+    if mods.fallback.is_some() && !pat_is_irrefutable_for_let_lowering(sema, pat) {
+        lowering_invariant_violation(
+            "let-else lowering for refutable patterns requires dedicated fallback-exit lowering",
+        );
+    }
     let is_callable =
         has_param_clause || !sema.module().store.params.get(params.clone()).is_empty();
 
@@ -423,6 +608,32 @@ pub(crate) fn lower_let_expr(
         },
         _ => destructure::lower_destructure_let(ctx, origin, pat, value)
             .unwrap_or_else(|description| lowering_invariant_violation(description)),
+    }
+}
+
+fn pat_is_irrefutable_for_let_lowering(sema: &SemaModule, pat: HirPatId) -> bool {
+    match &sema.module().store.pats.get(pat).kind {
+        HirPatKind::Error | HirPatKind::Wildcard | HirPatKind::Bind { .. } => true,
+        HirPatKind::Tuple { items } | HirPatKind::Array { items } => sema
+            .module()
+            .store
+            .pat_ids
+            .get(items.clone())
+            .iter()
+            .all(|item| pat_is_irrefutable_for_let_lowering(sema, *item)),
+        HirPatKind::Record { fields } => sema
+            .module()
+            .store
+            .record_pat_fields
+            .get(fields.clone())
+            .iter()
+            .all(|field| {
+                field
+                    .value
+                    .is_none_or(|value| pat_is_irrefutable_for_let_lowering(sema, value))
+            }),
+        HirPatKind::As { pat, .. } => pat_is_irrefutable_for_let_lowering(sema, *pat),
+        HirPatKind::Lit { .. } | HirPatKind::Variant { .. } | HirPatKind::Or { .. } => false,
     }
 }
 
