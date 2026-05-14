@@ -1,5 +1,9 @@
 use super::*;
 
+mod data;
+mod foreigns;
+mod procedures;
+
 /// Decodes a sectioned `.seam` byte stream into a validated SEAM artifact.
 ///
 /// # Errors
@@ -30,26 +34,7 @@ pub fn decode_binary(bytes: &[u8]) -> AssemblyResult<Artifact> {
     decode_exports(&mut cursor, &mut artifact)?;
     decode_data(&mut cursor, &mut artifact)?;
     while !cursor.is_eof() {
-        let next = cursor
-            .peek_u8()
-            .ok_or(AssemblyError::BinaryPayloadTruncated)?;
-        if next == section_tag_byte(SectionTag::StackEffects) {
-            decode_stack_effects(&mut cursor, &mut artifact)?;
-        } else if next == section_tag_byte(SectionTag::RootMaps) {
-            decode_root_maps(&mut cursor, &mut artifact)?;
-        } else if next == section_tag_byte(SectionTag::BlockSignatures) {
-            decode_block_signatures(&mut cursor, &mut artifact)?;
-        } else if next == section_tag_byte(SectionTag::Closures) {
-            decode_closures(&mut cursor, &mut artifact)?;
-        } else if next == section_tag_byte(SectionTag::Meta) {
-            decode_meta(&mut cursor, &mut artifact)?;
-        } else if next == section_tag_byte(SectionTag::Manifest) {
-            decode_manifest(&mut cursor, &mut artifact)?;
-        } else if next == section_tag_byte(SectionTag::Imports) {
-            decode_imports(&mut cursor, &mut artifact)?;
-        } else {
-            return Err(AssemblyError::text_parse_source("unknown trailing section"));
-        }
+        decode_next_trailing_section(&mut cursor, &mut artifact)?;
     }
     artifact.validate()?;
     Ok(artifact)
@@ -135,116 +120,31 @@ fn decode_globals(cursor: &mut Cursor<'_>, artifact: &mut Artifact) -> AssemblyR
     Ok(())
 }
 
-fn decode_procedures(cursor: &mut Cursor<'_>, artifact: &mut Artifact) -> AssemblyResult {
-    require_section(cursor, SectionTag::Procedures)?;
-    for _ in 0..cursor.read_u32()? {
-        let name = cursor.read_idx()?;
-        let params = cursor.read_u16()?;
-        let locals = cursor.read_u16()?;
-        let param_ty_count = usize::from(cursor.read_u16()?);
-        let mut param_tys = Vec::with_capacity(param_ty_count);
-        for _ in 0..param_ty_count {
-            param_tys.push(cursor.read_idx()?);
+fn decode_next_trailing_section(
+    cursor: &mut Cursor<'_>,
+    artifact: &mut Artifact,
+) -> AssemblyResult {
+    let next = cursor
+        .peek_u8()
+        .ok_or(AssemblyError::BinaryPayloadTruncated)?;
+    match next {
+        tag if tag == section_tag_byte(SectionTag::StackEffects) => {
+            decode_stack_effects(cursor, artifact)
         }
-        let local_ty_count = usize::from(cursor.read_u16()?);
-        let mut local_tys = Vec::with_capacity(local_ty_count);
-        for _ in 0..local_ty_count {
-            local_tys.push(cursor.read_idx()?);
+        tag if tag == section_tag_byte(SectionTag::RootMaps) => decode_root_maps(cursor, artifact),
+        tag if tag == section_tag_byte(SectionTag::BlockSignatures) => {
+            decode_block_signatures(cursor, artifact)
         }
-        let result_ty_count = usize::from(cursor.read_u16()?);
-        let mut result_tys = Vec::with_capacity(result_ty_count);
-        for _ in 0..result_ty_count {
-            result_tys.push(cursor.read_idx()?);
-        }
-        let entry_label = cursor.read_u16()?;
-        let bytecode_body = cursor.read_u32()?;
-        let block_signature_table = match cursor.read_u8()? {
-            0 => None,
-            1 => Some(Idx::from_raw(cursor.read_u32()?)),
-            _ => {
-                return Err(AssemblyError::text_parse_source(
-                    "invalid procedure block table marker",
-                ));
-            }
-        };
-        let root_map_table = match cursor.read_u8()? {
-            0 => None,
-            1 => Some(Idx::from_raw(cursor.read_u32()?)),
-            _ => {
-                return Err(AssemblyError::text_parse_source(
-                    "invalid procedure root map marker",
-                ));
-            }
-        };
-        let domain_count = usize::from(cursor.read_u16()?);
-        let mut domain_requirements = Vec::with_capacity(domain_count);
-        for _ in 0..domain_count {
-            domain_requirements.push(cursor.read_idx()?);
-        }
-        let Some(calling_convention) = ProcedureCallingConvention::from_wire(cursor.read_u8()?)
-        else {
-            return Err(AssemblyError::text_parse_source(
-                "unknown procedure calling convention",
-            ));
-        };
-        let Some(visibility) = ProcedureVisibility::from_wire(cursor.read_u8()?) else {
-            return Err(AssemblyError::text_parse_source(
-                "unknown procedure visibility",
-            ));
-        };
-        let export = cursor.read_u8()? != 0;
-        let hot = cursor.read_u8()? != 0;
-        let cold = cursor.read_u8()? != 0;
-        let label_count = usize::from(cursor.read_u16()?);
-        let mut labels = Vec::with_capacity(label_count);
-        for _ in 0..label_count {
-            labels.push(cursor.read_idx()?);
-        }
-        let code_count = read_len(cursor, "code entry count")?;
-        let mut code = Vec::with_capacity(code_count);
-        for _ in 0..code_count {
-            let kind = cursor.read_u8()?;
-            let entry = match kind {
-                0 => CodeEntry::Label(Label {
-                    id: cursor.read_u16()?,
-                }),
-                1 => {
-                    let opcode_code = decode_opcode(cursor)?;
-                    let Some(opcode) = Opcode::from_wire_code(opcode_code) else {
-                        return Err(AssemblyError::UnknownOpcode(opcode_code));
-                    };
-                    let operand = decode_operand(cursor)?;
-                    CodeEntry::Instruction(Instruction::new(opcode, operand))
-                }
-                _ => {
-                    return Err(AssemblyError::text_parse_source("unknown code entry kind"));
-                }
-            };
-            code.push(entry);
-        }
-        let mut descriptor =
-            ProcedureDescriptor::new(name, params, locals, code.into_boxed_slice())
-                .with_param_tys(param_tys.into_boxed_slice())
-                .with_local_tys(local_tys.into_boxed_slice())
-                .with_result_tys(result_tys.into_boxed_slice())
-                .with_entry_label(entry_label)
-                .with_bytecode_body(bytecode_body)
-                .with_domain_requirements(domain_requirements.into_boxed_slice())
-                .with_calling_convention(calling_convention)
-                .with_visibility(visibility)
-                .with_export(export)
-                .with_hot(hot)
-                .with_cold(cold)
-                .with_labels(labels.into_boxed_slice());
-        if let Some(block_signature_table) = block_signature_table {
-            descriptor = descriptor.with_block_signature_table(block_signature_table);
-        }
-        if let Some(root_map_table) = root_map_table {
-            descriptor = descriptor.with_root_map_table(root_map_table);
-        }
-        let _ = artifact.procedures.alloc(descriptor);
+        tag if tag == section_tag_byte(SectionTag::Closures) => decode_closures(cursor, artifact),
+        tag if tag == section_tag_byte(SectionTag::Meta) => decode_meta(cursor, artifact),
+        tag if tag == section_tag_byte(SectionTag::Manifest) => decode_manifest(cursor, artifact),
+        tag if tag == section_tag_byte(SectionTag::Imports) => decode_imports(cursor, artifact),
+        _ => Err(AssemblyError::text_parse_source("unknown trailing section")),
     }
-    Ok(())
+}
+
+fn decode_procedures(cursor: &mut Cursor<'_>, artifact: &mut Artifact) -> AssemblyResult {
+    procedures::decode_procedures(cursor, artifact)
 }
 
 fn decode_shapes(cursor: &mut Cursor<'_>, artifact: &mut Artifact) -> AssemblyResult {
@@ -290,75 +190,7 @@ fn decode_shapes(cursor: &mut Cursor<'_>, artifact: &mut Artifact) -> AssemblyRe
 }
 
 fn decode_foreigns(cursor: &mut Cursor<'_>, artifact: &mut Artifact) -> AssemblyResult {
-    require_section(cursor, SectionTag::Foreigns)?;
-    for _ in 0..cursor.read_u32()? {
-        let name = cursor.read_idx()?;
-        let param_len = usize::from(cursor.read_u16()?);
-        let mut param_tys = Vec::with_capacity(param_len);
-        for _ in 0..param_len {
-            param_tys.push(cursor.read_idx()?);
-        }
-        let result_ty = cursor.read_idx()?;
-        let abi = cursor.read_idx()?;
-        let symbol = cursor.read_idx()?;
-        let link = match cursor.read_u8()? {
-            0 => None,
-            1 => Some(cursor.read_idx()?),
-            _ => {
-                return Err(AssemblyError::text_parse_source(
-                    "invalid foreign link marker",
-                ));
-            }
-        };
-        let domain = match cursor.read_u8()? {
-            0 => None,
-            1 => Some(cursor.read_idx()?),
-            _ => {
-                return Err(AssemblyError::text_parse_source(
-                    "invalid foreign domain marker",
-                ));
-            }
-        };
-        let pinned_len = usize::from(cursor.read_u16()?);
-        let mut pinned_params = Vec::with_capacity(pinned_len);
-        for _ in 0..pinned_len {
-            pinned_params.push(cursor.read_u16()?);
-        }
-        let nullable_len = usize::from(cursor.read_u16()?);
-        let mut nullable_params = Vec::with_capacity(nullable_len);
-        for _ in 0..nullable_len {
-            nullable_params.push(cursor.read_u16()?);
-        }
-        let nullable_result = cursor.read_u8()? != 0;
-        let lifetime = match cursor.read_u8()? {
-            0 => None,
-            1 => Some(cursor.read_idx()?),
-            _ => {
-                return Err(AssemblyError::text_parse_source(
-                    "invalid foreign lifetime marker",
-                ));
-            }
-        };
-        let mut descriptor =
-            ForeignDescriptor::new(name, param_tys.into_boxed_slice(), result_ty, abi, symbol)
-                .with_pinned_params(pinned_params.into_boxed_slice())
-                .with_nullable_params(nullable_params.into_boxed_slice())
-                .with_nullable_result(nullable_result)
-                .with_export(cursor.read_u8()? != 0)
-                .with_hot(cursor.read_u8()? != 0)
-                .with_cold(cursor.read_u8()? != 0);
-        if let Some(link) = link {
-            descriptor = descriptor.with_link(link);
-        }
-        if let Some(domain) = domain {
-            descriptor = descriptor.with_domain(domain);
-        }
-        if let Some(lifetime) = lifetime {
-            descriptor = descriptor.with_lifetime(lifetime);
-        }
-        let _ = artifact.foreigns.alloc(descriptor);
-    }
-    Ok(())
+    foreigns::decode_foreigns(cursor, artifact)
 }
 
 fn decode_exports(cursor: &mut Cursor<'_>, artifact: &mut Artifact) -> AssemblyResult {
@@ -385,120 +217,7 @@ fn decode_exports(cursor: &mut Cursor<'_>, artifact: &mut Artifact) -> AssemblyR
 }
 
 fn decode_data(cursor: &mut Cursor<'_>, artifact: &mut Artifact) -> AssemblyResult {
-    require_section(cursor, SectionTag::Data)?;
-    let count = cursor.read_u32()?;
-    for _ in 0..count {
-        let name = Idx::from_raw(cursor.read_u32()?);
-        let variant_count = cursor.read_u32()?;
-        let field_count = cursor.read_u32()?;
-        let variant_len = cursor.read_u32()?;
-        let mut variants = Vec::with_capacity(usize::try_from(variant_len).unwrap_or(usize::MAX));
-        for _ in 0..variant_len {
-            let variant_name = Idx::from_raw(cursor.read_u32()?);
-            let tag = cursor.read_i64()?;
-            let field_len = cursor.read_u32()?;
-            let mut field_tys =
-                Vec::with_capacity(usize::try_from(field_len).unwrap_or(usize::MAX));
-            for _ in 0..field_len {
-                field_tys.push(Idx::from_raw(cursor.read_u32()?));
-            }
-            let layout_field_len = cursor.read_u32()?;
-            let mut layout_fields =
-                Vec::with_capacity(usize::try_from(layout_field_len).unwrap_or(usize::MAX));
-            for _ in 0..layout_field_len {
-                let name = if cursor.read_u8()? != 0 {
-                    Some(cursor.read_idx()?)
-                } else {
-                    None
-                };
-                let ty = cursor.read_idx()?;
-                let logical_index = cursor.read_u32()?;
-                let offset = if cursor.read_u8()? != 0 {
-                    Some(cursor.read_u32()?)
-                } else {
-                    None
-                };
-                let storage = if cursor.read_u8()? != 0 {
-                    Some(cursor.read_idx()?)
-                } else {
-                    None
-                };
-                let mut field = DataFieldDescriptor::new(ty, logical_index);
-                if let Some(name) = name {
-                    field = field.with_name(name);
-                }
-                if let Some(offset) = offset {
-                    field = field.with_offset(offset);
-                }
-                if let Some(storage) = storage {
-                    field = field.with_storage(storage);
-                }
-                field = field
-                    .with_mutable(cursor.read_u8()? != 0)
-                    .with_gc_pointer(cursor.read_u8()? != 0)
-                    .with_public(cursor.read_u8()? != 0)
-                    .with_hidden(cursor.read_u8()? != 0);
-                layout_fields.push(field);
-            }
-            variants.push(
-                DataVariantDescriptor::new(variant_name, tag, field_tys.into_boxed_slice())
-                    .with_layout_fields(layout_fields.into_boxed_slice())
-                    .with_public(cursor.read_u8()? != 0)
-                    .with_hidden(cursor.read_u8()? != 0),
-            );
-        }
-        let repr_kind = if cursor.read_u8()? != 0 {
-            Some(Idx::from_raw(cursor.read_u32()?))
-        } else {
-            None
-        };
-        let layout_align = if cursor.read_u8()? != 0 {
-            Some(cursor.read_u32()?)
-        } else {
-            None
-        };
-        let layout_pack = if cursor.read_u8()? != 0 {
-            Some(cursor.read_u32()?)
-        } else {
-            None
-        };
-        let frozen = cursor.read_u8()? != 0;
-        let mut descriptor = DataDescriptor::new(name, variants.into_boxed_slice());
-        debug_assert_eq!(descriptor.variant_count, variant_count);
-        debug_assert_eq!(descriptor.field_count, field_count);
-        if let Some(repr_kind) = repr_kind {
-            descriptor = descriptor.with_repr_kind(repr_kind);
-        }
-        if let Some(layout_align) = layout_align {
-            descriptor = descriptor.with_layout_align(layout_align);
-        }
-        if let Some(layout_pack) = layout_pack {
-            descriptor = descriptor.with_layout_pack(layout_pack);
-        }
-        descriptor = descriptor.with_frozen(frozen);
-        if cursor.read_u8()? != 0 {
-            let layout_ty = if cursor.read_u8()? != 0 {
-                Some(cursor.read_idx()?)
-            } else {
-                None
-            };
-            let mut header = ObjectHeaderDescriptor::new()
-                .with_mark_bits(cursor.read_u8()?)
-                .with_generation_bits(cursor.read_u8()?)
-                .with_pinned(cursor.read_u8()? != 0)
-                .with_remembered(cursor.read_u8()? != 0)
-                .with_large(cursor.read_u8()? != 0)
-                .with_weak_capable(cursor.read_u8()? != 0)
-                .with_forwarding(cursor.read_u8()? != 0)
-                .with_size_field(cursor.read_u8()? != 0);
-            if let Some(layout_ty) = layout_ty {
-                header = header.with_layout_ty(layout_ty);
-            }
-            descriptor = descriptor.with_object_header(header);
-        }
-        let _ = artifact.data.alloc(descriptor);
-    }
-    Ok(())
+    data::decode_data(cursor, artifact)
 }
 
 fn decode_meta(cursor: &mut Cursor<'_>, artifact: &mut Artifact) -> AssemblyResult {

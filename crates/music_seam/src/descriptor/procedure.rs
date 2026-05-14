@@ -1,5 +1,6 @@
 use crate::artifact::{BlockSignatureId, RootMapId, StringId, TypeId};
 use crate::instruction::{CodeEntry, LabelId};
+use std::str::FromStr;
 
 pub type ProcedureTypeIdList = Box<[TypeId]>;
 pub type ProcedureDomainList = Box<[StringId]>;
@@ -25,17 +26,6 @@ impl ProcedureCallingConvention {
     }
 
     #[must_use]
-    pub fn from_str(text: &str) -> Option<Self> {
-        match text {
-            "managed" => Some(Self::Managed),
-            "ffi-wrapper" => Some(Self::FfiWrapper),
-            "runtime-helper" => Some(Self::RuntimeHelper),
-            "loader-generated" => Some(Self::LoaderGenerated),
-            _ => None,
-        }
-    }
-
-    #[must_use]
     pub const fn from_wire(byte: u8) -> Option<Self> {
         match byte {
             0 => Some(Self::Managed),
@@ -43,6 +33,30 @@ impl ProcedureCallingConvention {
             2 => Some(Self::RuntimeHelper),
             3 => Some(Self::LoaderGenerated),
             _ => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn wire_code(self) -> u8 {
+        match self {
+            Self::Managed => 0,
+            Self::FfiWrapper => 1,
+            Self::RuntimeHelper => 2,
+            Self::LoaderGenerated => 3,
+        }
+    }
+}
+
+impl FromStr for ProcedureCallingConvention {
+    type Err = ();
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        match text {
+            "managed" => Ok(Self::Managed),
+            "ffi-wrapper" => Ok(Self::FfiWrapper),
+            "runtime-helper" => Ok(Self::RuntimeHelper),
+            "loader-generated" => Ok(Self::LoaderGenerated),
+            _ => Err(()),
         }
     }
 }
@@ -66,22 +80,34 @@ impl ProcedureVisibility {
     }
 
     #[must_use]
-    pub fn from_str(text: &str) -> Option<Self> {
-        match text {
-            "private" => Some(Self::Private),
-            "module-export" => Some(Self::ModuleExport),
-            "external-export" => Some(Self::ExternalExport),
-            _ => None,
-        }
-    }
-
-    #[must_use]
     pub const fn from_wire(byte: u8) -> Option<Self> {
         match byte {
             0 => Some(Self::Private),
             1 => Some(Self::ModuleExport),
             2 => Some(Self::ExternalExport),
             _ => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn wire_code(self) -> u8 {
+        match self {
+            Self::Private => 0,
+            Self::ModuleExport => 1,
+            Self::ExternalExport => 2,
+        }
+    }
+}
+
+impl FromStr for ProcedureVisibility {
+    type Err = ();
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        match text {
+            "private" => Ok(Self::Private),
+            "module-export" => Ok(Self::ModuleExport),
+            "external-export" => Ok(Self::ExternalExport),
+            _ => Err(()),
         }
     }
 }

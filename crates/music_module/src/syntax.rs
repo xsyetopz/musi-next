@@ -135,7 +135,6 @@ pub fn collect_export_summary(_source_id: SourceId, tree: &SyntaxTree) -> Module
                     summary.push_export(name, is_opaque);
                 }
             }
-            return;
         }
     });
     summary

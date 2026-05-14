@@ -10,6 +10,7 @@ use super::{
     lower_variant_expr, lowering_invariant_violation, record, render_ty_name,
     render_type_value_expr_name,
 };
+use music_hir::HirExpr;
 
 pub(crate) fn lower_expr(ctx: &mut LowerCtx<'_>, expr_id: HirExprId) -> IrExpr {
     let sema = ctx.sema;
@@ -406,7 +407,6 @@ pub(crate) fn lower_sequence_expr(
 
 fn lower_sequence_expr_ids(ctx: &mut LowerCtx<'_>, expr_ids: &[HirExprId]) -> IrExprKind {
     let sema = ctx.sema;
-    let interner = ctx.interner;
     let mut lowered_exprs = Vec::<IrExpr>::new();
     let mut deferred_cleanups = Vec::<DeferredCleanup>::new();
     for (index, expr_id) in expr_ids.iter().copied().enumerate() {
@@ -439,42 +439,13 @@ fn lower_sequence_expr_ids(ctx: &mut LowerCtx<'_>, expr_ids: &[HirExprId]) -> Ir
                     "refutable let-else lowering does not support local callable declarations",
                 );
             }
-            let continuation = if index + 1 < expr_ids.len() {
-                IrExpr::new(
-                    IrOrigin::new(expr.origin.source_id, expr.origin.span),
-                    lower_sequence_expr_ids(ctx, &expr_ids[index + 1..]),
-                )
-            } else {
-                IrExpr::new(
-                    IrOrigin::new(expr.origin.source_id, expr.origin.span),
-                    IrExprKind::Unit,
-                )
-            };
-            let mut arms = lower_case_patterns(sema, *pat, interner)
-                .into_iter()
-                .map(|pattern| IrLoweredMatchArm {
-                    pattern,
-                    guard: None,
-                    expr: continuation.clone(),
-                })
-                .collect::<Vec<_>>();
-            if arms.is_empty() {
-                lowering_invariant_violation(
-                    "refutable let-else pattern lowered to zero match arms",
-                );
-            }
-            arms.push(IrLoweredMatchArm {
-                pattern: IrCasePattern::Wildcard,
-                guard: None,
-                expr: lower_expr(ctx, fallback),
-            });
-            let origin = IrOrigin::new(expr.origin.source_id, expr.origin.span);
-            lowered_exprs.push(IrExpr::new(
-                origin,
-                IrExprKind::Match {
-                    scrutinee: Box::new(lower_expr(ctx, *value)),
-                    arms: arms.into_boxed_slice(),
-                },
+            lowered_exprs.push(lower_refutable_let_else_match(
+                ctx,
+                expr,
+                *pat,
+                *value,
+                fallback,
+                &expr_ids[index + 1..],
             ));
             break;
         }
@@ -512,6 +483,47 @@ fn lower_sequence_expr_ids(ctx: &mut LowerCtx<'_>, expr_ids: &[HirExprId]) -> Ir
     IrExprKind::Sequence {
         exprs: lowered_exprs.into_boxed_slice(),
     }
+}
+
+fn lower_refutable_let_else_match(
+    ctx: &mut LowerCtx<'_>,
+    expr: &HirExpr,
+    pat: HirPatId,
+    value: HirExprId,
+    fallback: HirExprId,
+    trailing_expr_ids: &[HirExprId],
+) -> IrExpr {
+    let sema = ctx.sema;
+    let interner = ctx.interner;
+    let origin = IrOrigin::new(expr.origin.source_id, expr.origin.span);
+    let continuation = if trailing_expr_ids.is_empty() {
+        IrExpr::new(origin, IrExprKind::Unit)
+    } else {
+        IrExpr::new(origin, lower_sequence_expr_ids(ctx, trailing_expr_ids))
+    };
+    let mut arms = lower_case_patterns(sema, pat, interner)
+        .into_iter()
+        .map(|pattern| IrLoweredMatchArm {
+            pattern,
+            guard: None,
+            expr: continuation.clone(),
+        })
+        .collect::<Vec<_>>();
+    if arms.is_empty() {
+        lowering_invariant_violation("refutable let-else pattern lowered to zero match arms");
+    }
+    arms.push(IrLoweredMatchArm {
+        pattern: IrCasePattern::Wildcard,
+        guard: None,
+        expr: lower_expr(ctx, fallback),
+    });
+    IrExpr::new(
+        origin,
+        IrExprKind::Match {
+            scrutinee: Box::new(lower_expr(ctx, value)),
+            arms: arms.into_boxed_slice(),
+        },
+    )
 }
 
 #[derive(Clone, Copy)]
@@ -618,7 +630,7 @@ fn pat_is_irrefutable_for_let_lowering(sema: &SemaModule, pat: HirPatId) -> bool
             .module()
             .store
             .pat_ids
-            .get(items.clone())
+            .get(*items)
             .iter()
             .all(|item| pat_is_irrefutable_for_let_lowering(sema, *item)),
         HirPatKind::Record { fields } => sema

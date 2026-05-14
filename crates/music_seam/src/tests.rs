@@ -379,28 +379,27 @@ mod success {
     #[test]
     fn validates_tail_call_with_empty_cleanup_root_map() {
         let mut artifact = Artifact::new();
-        let caller_name = artifact.intern_string("caller");
-        let callee_name = artifact.intern_string("callee");
+        let entry_name = artifact.intern_string("caller");
+        let target_name = artifact.intern_string("callee");
         let safe_point = artifact.intern_string("caller.L0");
-        let callee_id =
+        let target_id =
             artifact
                 .procedures
-                .alloc(ProcedureDescriptor::new(callee_name, 0, 0, Box::new([])));
-        let caller_id =
+                .alloc(ProcedureDescriptor::new(target_name, 0, 0, Box::new([])));
+        let entry_id =
             artifact
                 .procedures
-                .alloc(ProcedureDescriptor::new(caller_name, 0, 0, Box::new([])));
+                .alloc(ProcedureDescriptor::new(entry_name, 0, 0, Box::new([])));
         let root_map = artifact.root_maps.alloc(
-            RootMapDescriptor::new(safe_point, Box::new([]), Box::new([]))
-                .with_procedure(caller_id),
+            RootMapDescriptor::new(safe_point, Box::new([]), Box::new([])).with_procedure(entry_id),
         );
-        *artifact.procedures.get_mut(caller_id) = ProcedureDescriptor::new(
-            caller_name,
+        *artifact.procedures.get_mut(entry_id) = ProcedureDescriptor::new(
+            entry_name,
             0,
             0,
             Box::new([CodeEntry::Instruction(Instruction::new(
                 Opcode::TailCall,
-                Operand::Procedure(callee_id),
+                Operand::Procedure(target_id),
             ))]),
         )
         .with_root_map_table(root_map);
@@ -712,8 +711,7 @@ mod success {
         assert_eq!(from_name.variant_count, 1);
     }
 
-    #[test]
-    fn roundtrips_data_layout_metadata_through_binary_and_text() {
+    fn build_data_layout_roundtrip_fixture() -> Artifact {
         let mut artifact = Artifact::new();
         let point_name = artifact.intern_string("main::Point");
         let point_ty = artifact
@@ -772,8 +770,10 @@ mod success {
                 .with_export(true),
         );
         let foreign_name = artifact.intern_string("main::puts");
-        let int_ty = artifact.intern_string("Int");
-        let int_ty = artifact.types.alloc(TypeDescriptor::new(int_ty, int_ty));
+        let int_name = artifact.intern_string("Int");
+        let int_ty = artifact
+            .types
+            .alloc(TypeDescriptor::new(int_name, int_name));
         let abi = artifact.intern_string("c");
         let symbol = artifact.intern_string("puts");
         let _ = artifact.foreigns.alloc(
@@ -781,50 +781,59 @@ mod success {
                 .with_cold(true),
         );
 
-        let binary = encode_binary(&artifact).expect("binary encode should succeed");
+        artifact
+    }
+
+    fn assert_binary_data_layout_roundtrip(artifact: &Artifact) {
+        let binary = encode_binary(artifact).expect("binary encode should succeed");
         let decoded = decode_binary(&binary).expect("binary decode should succeed");
         let (_, binary_layout) = decoded
-            .data_for_type(point_ty)
-            .expect("binary data layout by type");
-        assert_eq!(binary_layout.repr_kind, Some(repr_c));
-        assert_eq!(binary_layout.layout_align, Some(8));
-        assert_eq!(binary_layout.layout_pack, Some(4));
-        assert!(binary_layout.frozen);
+            .data_by_name("main::Point")
+            .expect("binary data layout by name");
+        assert!(binary_layout.variants.len() == 1);
+        let variant = &binary_layout.variants[0];
+        assert!(variant.layout_fields.len() == 2);
+        let first_field = &variant.layout_fields[0];
+        let second_field = &variant.layout_fields[1];
         let binary_header = binary_layout
             .object_header
             .as_ref()
             .expect("binary object header");
-        assert_eq!(binary_header.layout_ty, Some(point_ty));
+
+        assert_eq!(
+            decoded.string_text(binary_layout.repr_kind.expect("repr kind")),
+            "c"
+        );
+        assert_eq!(binary_layout.layout_align, Some(8));
+        assert_eq!(binary_layout.layout_pack, Some(4));
+        assert!(binary_layout.frozen);
         assert_eq!(binary_header.mark_bits, 2);
         assert_eq!(binary_header.generation_bits, 3);
-        assert!(binary_header.pinned);
-        assert!(binary_header.remembered);
-        assert!(binary_header.large);
-        assert!(binary_header.weak_capable);
-        assert!(binary_header.forwarding);
-        assert!(binary_header.size_field);
+        assert!(binary_header.shape_flags.pinned);
+        assert!(binary_header.shape_flags.remembered);
+        assert!(binary_header.shape_flags.large);
+        assert!(binary_header.runtime_flags.weak_capable);
+        assert!(binary_header.runtime_flags.forwarding);
+        assert!(binary_header.runtime_flags.size_field);
         assert_eq!(binary_layout.variants.len(), 1);
-        assert_eq!(binary_layout.variants[0].tag, 30);
+        assert_eq!(variant.tag, 30);
+        assert_eq!(variant.field_tys.len(), 2);
+        assert_eq!(variant.layout_fields.len(), 2);
+        assert!(variant.public);
+        assert!(variant.hidden);
         assert_eq!(
-            binary_layout.variants[0].field_tys.as_ref(),
-            &[point_ty, point_ty]
+            decoded.string_text(first_field.name.expect("x field name")),
+            "x"
         );
-        assert_eq!(binary_layout.variants[0].layout_fields.len(), 2);
-        assert!(binary_layout.variants[0].public);
-        assert!(binary_layout.variants[0].hidden);
+        assert_eq!(first_field.offset, Some(0));
         assert_eq!(
-            binary_layout.variants[0].layout_fields[0].name,
-            Some(x_name)
+            decoded.string_text(first_field.storage.expect("x storage")),
+            "inline"
         );
-        assert_eq!(binary_layout.variants[0].layout_fields[0].offset, Some(0));
-        assert_eq!(
-            binary_layout.variants[0].layout_fields[0].storage,
-            Some(inline_storage)
-        );
-        assert!(binary_layout.variants[0].layout_fields[0].mutable);
-        assert!(binary_layout.variants[0].layout_fields[0].gc_pointer);
-        assert!(binary_layout.variants[0].layout_fields[0].public);
-        assert!(binary_layout.variants[0].layout_fields[1].hidden);
+        assert!(first_field.mutability.mutable);
+        assert!(first_field.mutability.gc_pointer);
+        assert!(first_field.visibility.public);
+        assert!(second_field.visibility.hidden);
         let (_, decoded_procedure) = decoded
             .procedures
             .iter()
@@ -837,14 +846,22 @@ mod success {
             .iter()
             .next()
             .expect("decoded native should exist");
-        assert!(!decoded_foreign.hot);
+        assert!(!decoded_foreign.behavior.hot);
         assert!(decoded_foreign.cold);
+    }
 
-        let text = format_disasm(&artifact);
+    fn assert_text_data_layout_roundtrip(artifact: &Artifact) {
+        let text = format_disasm(artifact);
         let parsed = parse_disasm(&text).expect("text parse should succeed");
         let (_, text_layout) = parsed
             .data_by_name("main::Point")
             .expect("text data layout by name");
+        assert!(text_layout.variants.len() == 1);
+        let variant = &text_layout.variants[0];
+        assert!(variant.layout_fields.len() == 2);
+        let first_field = &variant.layout_fields[0];
+        let second_field = &variant.layout_fields[1];
+
         assert_eq!(text_layout.variant_count, 1);
         assert_eq!(text_layout.field_count, 2);
         assert_eq!(text_layout.layout_align, Some(8));
@@ -852,15 +869,15 @@ mod success {
         assert!(text_layout.frozen);
         assert!(text_layout.object_header.is_some());
         assert_eq!(text_layout.variants.len(), 1);
-        assert_eq!(text_layout.variants[0].tag, 30);
-        assert_eq!(text_layout.variants[0].field_tys.len(), 2);
-        assert_eq!(text_layout.variants[0].layout_fields.len(), 2);
-        assert!(text_layout.variants[0].public);
-        assert!(text_layout.variants[0].hidden);
-        assert!(text_layout.variants[0].layout_fields[0].mutable);
-        assert!(text_layout.variants[0].layout_fields[0].gc_pointer);
-        assert!(text_layout.variants[0].layout_fields[0].public);
-        assert!(text_layout.variants[0].layout_fields[1].hidden);
+        assert_eq!(variant.tag, 30);
+        assert_eq!(variant.field_tys.len(), 2);
+        assert_eq!(variant.layout_fields.len(), 2);
+        assert!(variant.public);
+        assert!(variant.hidden);
+        assert!(first_field.mutability.mutable);
+        assert!(first_field.mutability.gc_pointer);
+        assert!(first_field.visibility.public);
+        assert!(second_field.visibility.hidden);
         assert!(text.contains("variant $main::Point tag 30 public hidden"));
         assert!(text.contains(
             "layout_field name $x type $main::Point index 0 offset 0 storage \"inline\" mut gc public"
@@ -879,6 +896,13 @@ mod success {
                 ".native $main::puts param $Int result $Int abi \"c\" symbol \"puts\" cold"
             )
         );
+    }
+
+    #[test]
+    fn roundtrips_data_layout_metadata_through_binary_and_text() {
+        let artifact = build_data_layout_roundtrip_fixture();
+        assert_binary_data_layout_roundtrip(&artifact);
+        assert_text_data_layout_roundtrip(&artifact);
     }
 
     #[test]
@@ -1331,19 +1355,19 @@ mod failure {
     #[test]
     fn rejects_tail_call_without_cleanup_root_map_metadata() {
         let mut artifact = Artifact::new();
-        let caller_name = artifact.intern_string("caller");
-        let callee_name = artifact.intern_string("callee");
-        let callee_id =
+        let entry_name = artifact.intern_string("caller");
+        let target_name = artifact.intern_string("callee");
+        let target_id =
             artifact
                 .procedures
-                .alloc(ProcedureDescriptor::new(callee_name, 0, 0, Box::new([])));
+                .alloc(ProcedureDescriptor::new(target_name, 0, 0, Box::new([])));
         let _ = artifact.procedures.alloc(ProcedureDescriptor::new(
-            caller_name,
+            entry_name,
             0,
             0,
             Box::new([CodeEntry::Instruction(Instruction::new(
                 Opcode::TailCall,
-                Operand::Procedure(callee_id),
+                Operand::Procedure(target_id),
             ))]),
         ));
 
@@ -1358,29 +1382,29 @@ mod failure {
     #[test]
     fn rejects_tail_call_with_pending_defer_cleanup_metadata() {
         let mut artifact = Artifact::new();
-        let caller_name = artifact.intern_string("caller");
-        let callee_name = artifact.intern_string("callee");
+        let entry_name = artifact.intern_string("caller");
+        let target_name = artifact.intern_string("callee");
         let safe_point = artifact.intern_string("caller.L0");
-        let callee_id =
+        let target_id =
             artifact
                 .procedures
-                .alloc(ProcedureDescriptor::new(callee_name, 0, 0, Box::new([])));
-        let caller_id =
+                .alloc(ProcedureDescriptor::new(target_name, 0, 0, Box::new([])));
+        let entry_id =
             artifact
                 .procedures
-                .alloc(ProcedureDescriptor::new(caller_name, 0, 0, Box::new([])));
+                .alloc(ProcedureDescriptor::new(entry_name, 0, 0, Box::new([])));
         let root_map = artifact.root_maps.alloc(
             RootMapDescriptor::new(safe_point, Box::new([]), Box::new([]))
-                .with_procedure(caller_id)
+                .with_procedure(entry_id)
                 .with_defer_slots(Box::new([0])),
         );
-        *artifact.procedures.get_mut(caller_id) = ProcedureDescriptor::new(
-            caller_name,
+        *artifact.procedures.get_mut(entry_id) = ProcedureDescriptor::new(
+            entry_name,
             0,
             0,
             Box::new([CodeEntry::Instruction(Instruction::new(
                 Opcode::TailCall,
-                Operand::Procedure(callee_id),
+                Operand::Procedure(target_id),
             ))]),
         )
         .with_root_map_table(root_map);
@@ -1396,29 +1420,29 @@ mod failure {
     #[test]
     fn rejects_tail_call_with_active_pin_cleanup_metadata() {
         let mut artifact = Artifact::new();
-        let caller_name = artifact.intern_string("caller");
-        let callee_name = artifact.intern_string("callee");
+        let entry_name = artifact.intern_string("caller");
+        let target_name = artifact.intern_string("callee");
         let safe_point = artifact.intern_string("caller.L0");
-        let callee_id =
+        let target_id =
             artifact
                 .procedures
-                .alloc(ProcedureDescriptor::new(callee_name, 0, 0, Box::new([])));
-        let caller_id =
+                .alloc(ProcedureDescriptor::new(target_name, 0, 0, Box::new([])));
+        let entry_id =
             artifact
                 .procedures
-                .alloc(ProcedureDescriptor::new(caller_name, 0, 0, Box::new([])));
+                .alloc(ProcedureDescriptor::new(entry_name, 0, 0, Box::new([])));
         let root_map = artifact.root_maps.alloc(
             RootMapDescriptor::new(safe_point, Box::new([]), Box::new([]))
-                .with_procedure(caller_id)
+                .with_procedure(entry_id)
                 .with_pin_slots(Box::new([0])),
         );
-        *artifact.procedures.get_mut(caller_id) = ProcedureDescriptor::new(
-            caller_name,
+        *artifact.procedures.get_mut(entry_id) = ProcedureDescriptor::new(
+            entry_name,
             0,
             0,
             Box::new([CodeEntry::Instruction(Instruction::new(
                 Opcode::TailCall,
-                Operand::Procedure(callee_id),
+                Operand::Procedure(target_id),
             ))]),
         )
         .with_root_map_table(root_map);

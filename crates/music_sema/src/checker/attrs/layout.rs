@@ -78,7 +78,7 @@ impl PassBase<'_, '_, '_> {
     ) {
         let form = match self.expr(expr).kind {
             HirExprKind::Variant { tag, .. } | HirExprKind::Name { name: tag } => {
-                Some(self.resolve_symbol(tag.name).to_string())
+                Some(self.resolve_symbol(tag.name).to_owned())
             }
             _ => None,
         };

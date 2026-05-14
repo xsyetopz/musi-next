@@ -727,7 +727,7 @@ fn emit_procedure_root_maps(
     first_root_map
 }
 
-fn safe_point_kind_for_opcode(opcode: Opcode) -> Option<SafePointKind> {
+const fn safe_point_kind_for_opcode(opcode: Opcode) -> Option<SafePointKind> {
     match opcode {
         Opcode::Call | Opcode::TailCall => Some(SafePointKind::Call),
         Opcode::CallInd => Some(SafePointKind::CallIndirect),

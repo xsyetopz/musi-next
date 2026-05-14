@@ -8,8 +8,8 @@ mod variants;
 use music_arena::SliceRange;
 use music_base::diag::DiagContext;
 use music_hir::{
-    HirExprId, HirExprKind, HirLitId, HirLitKind, HirMatchArm, HirOrigin, HirParam, HirPrefixOp,
-    HirTemplatePart, HirTyId, HirTyKind,
+    HirArg, HirExprId, HirExprKind, HirLitId, HirLitKind, HirMatchArm, HirOrigin, HirParam,
+    HirPrefixOp, HirTemplatePart, HirTyId, HirTyKind,
 };
 use music_names::{Ident, NameBindingId};
 
@@ -262,105 +262,64 @@ impl CheckPass<'_, '_, '_> {
         in_lambda: bool,
     ) -> Option<Ident> {
         match self.expr(expr_id).kind {
-            HirExprKind::Error | HirExprKind::Lit { .. } | HirExprKind::ArrayTy { .. } => None,
+            HirExprKind::Error
+            | HirExprKind::Lit { .. }
+            | HirExprKind::ArrayTy { .. }
+            | HirExprKind::Pi { .. }
+            | HirExprKind::Data { .. }
+            | HirExprKind::Shape { .. } => None,
             HirExprKind::Name { name } => {
-                if in_lambda
-                    && self
-                        .binding_id_for_use(name)
-                        .is_some_and(|binding| binding == pin_binding)
-                {
-                    Some(name)
-                } else {
-                    None
-                }
+                self.find_pin_capture_for_name(name, pin_binding, in_lambda)
             }
-            HirExprKind::Template { parts } => {
-                for part in self.template_parts(parts) {
-                    if let HirTemplatePart::Expr { expr } = part
-                        && let Some(captured_name) =
-                            self.find_pin_capture_in_expr(expr, pin_binding, in_lambda)
-                    {
-                        return Some(captured_name);
-                    }
-                }
-                None
-            }
+            HirExprKind::Template { parts } => self.find_pin_capture_in_expr_iter(
+                self.template_parts(parts)
+                    .into_iter()
+                    .filter_map(|part| match part {
+                        HirTemplatePart::Expr { expr } => Some(expr),
+                        HirTemplatePart::Text { .. } => None,
+                    }),
+                pin_binding,
+                in_lambda,
+            ),
             HirExprKind::Sequence { exprs } | HirExprKind::Tuple { items: exprs } => {
                 self.find_pin_capture_in_exprs(exprs, pin_binding, in_lambda)
             }
-            HirExprKind::Array { items } => {
-                for item in self.array_items(items) {
-                    if let Some(captured_name) =
-                        self.find_pin_capture_in_expr(item.expr, pin_binding, in_lambda)
-                    {
-                        return Some(captured_name);
-                    }
-                }
-                None
-            }
-            HirExprKind::Record { items } => {
-                for item in self.record_items(items) {
-                    if let Some(captured_name) =
-                        self.find_pin_capture_in_expr(item.value, pin_binding, in_lambda)
-                    {
-                        return Some(captured_name);
-                    }
-                }
-                None
-            }
-            HirExprKind::Variant { args, .. } => {
-                for arg in self.args(args) {
-                    if let Some(captured_name) =
-                        self.find_pin_capture_in_expr(arg.expr, pin_binding, in_lambda)
-                    {
-                        return Some(captured_name);
-                    }
-                }
-                None
-            }
-            HirExprKind::Pi { .. } => None,
+            HirExprKind::Array { items } => self.find_pin_capture_in_expr_iter(
+                self.array_items(items).into_iter().map(|item| item.expr),
+                pin_binding,
+                in_lambda,
+            ),
+            HirExprKind::Record { items } => self.find_pin_capture_in_expr_iter(
+                self.record_items(items).into_iter().map(|item| item.value),
+                pin_binding,
+                in_lambda,
+            ),
+            HirExprKind::Variant { args, .. } => self.find_pin_capture_in_expr_iter(
+                self.args(args).into_iter().map(|arg| arg.expr),
+                pin_binding,
+                in_lambda,
+            ),
             HirExprKind::Lambda { body, .. } => {
                 self.find_pin_capture_in_expr(body, pin_binding, true)
             }
             HirExprKind::Call { callee, args } => {
-                if let Some(captured_name) =
-                    self.find_pin_capture_in_expr(callee, pin_binding, in_lambda)
-                {
-                    return Some(captured_name);
-                }
-                for arg in self.args(args) {
-                    if let Some(captured_name) =
-                        self.find_pin_capture_in_expr(arg.expr, pin_binding, in_lambda)
-                    {
-                        return Some(captured_name);
-                    }
-                }
-                None
+                self.find_pin_capture_for_call(callee, args, pin_binding, in_lambda)
             }
             HirExprKind::Apply { callee, args } | HirExprKind::Index { base: callee, args } => {
-                if let Some(captured_name) =
-                    self.find_pin_capture_in_expr(callee, pin_binding, in_lambda)
-                {
-                    return Some(captured_name);
-                }
-                self.find_pin_capture_in_exprs(args, pin_binding, in_lambda)
+                self.find_pin_capture_for_apply(callee, args, pin_binding, in_lambda)
             }
-            HirExprKind::Field { base, .. } => {
+            HirExprKind::Field { base, .. }
+            | HirExprKind::TypeTest { base, .. }
+            | HirExprKind::TypeCast { base, .. } => {
                 self.find_pin_capture_in_expr(base, pin_binding, in_lambda)
             }
-            HirExprKind::RecordUpdate { base, items } => {
-                for item in self.record_items(items) {
-                    if let Some(captured_name) =
-                        self.find_pin_capture_in_expr(item.value, pin_binding, in_lambda)
-                    {
-                        return Some(captured_name);
-                    }
-                }
-                self.find_pin_capture_in_expr(base, pin_binding, in_lambda)
-            }
-            HirExprKind::TypeTest { base, .. } | HirExprKind::TypeCast { base, .. } => {
-                self.find_pin_capture_in_expr(base, pin_binding, in_lambda)
-            }
+            HirExprKind::RecordUpdate { base, items } => self
+                .find_pin_capture_in_expr_iter(
+                    self.record_items(items).into_iter().map(|item| item.value),
+                    pin_binding,
+                    in_lambda,
+                )
+                .or_else(|| self.find_pin_capture_in_expr(base, pin_binding, in_lambda)),
             HirExprKind::Prefix { expr, .. } | HirExprKind::PartialRange { expr, .. } => {
                 self.find_pin_capture_in_expr(expr, pin_binding, in_lambda)
             }
@@ -376,55 +335,153 @@ impl CheckPass<'_, '_, '_> {
                 let callable_scope = receiver.is_some() || !self.params(params).is_empty();
                 self.find_pin_capture_in_expr(value, pin_binding, in_lambda || callable_scope)
             }
-            HirExprKind::Import { arg } => {
+            HirExprKind::Import { arg }
+            | HirExprKind::Yield { value: arg }
+            | HirExprKind::Unsafe { body: arg } => {
                 self.find_pin_capture_in_expr(arg, pin_binding, in_lambda)
             }
-            HirExprKind::Yield { value } => {
-                self.find_pin_capture_in_expr(value, pin_binding, in_lambda)
+            HirExprKind::Defer { cleanup, guard } => {
+                self.find_pin_capture_for_defer(cleanup, guard, pin_binding, in_lambda)
             }
-            HirExprKind::Defer { cleanup, guard } => self
-                .find_pin_capture_in_expr(cleanup, pin_binding, in_lambda)
+            HirExprKind::Match { scrutinee, arms } => self
+                .find_pin_capture_in_expr(scrutinee, pin_binding, in_lambda)
                 .or_else(|| {
-                    guard.and_then(|guard| {
-                        self.find_pin_capture_in_expr(guard, pin_binding, in_lambda)
-                    })
+                    self.find_pin_capture_in_match_arms(
+                        self.match_arms(arms),
+                        pin_binding,
+                        in_lambda,
+                    )
                 }),
-            HirExprKind::Match { scrutinee, arms } => {
-                if let Some(captured_name) =
-                    self.find_pin_capture_in_expr(scrutinee, pin_binding, in_lambda)
-                {
-                    return Some(captured_name);
-                }
-                for arm in self.match_arms(arms) {
-                    if let Some(captured_name) = arm.guard.and_then(|guard| {
-                        self.find_pin_capture_in_expr(guard, pin_binding, in_lambda)
-                    }) {
-                        return Some(captured_name);
-                    }
-                    if let Some(captured_name) =
-                        self.find_pin_capture_in_expr(arm.expr, pin_binding, in_lambda)
-                    {
-                        return Some(captured_name);
-                    }
-                }
-                None
-            }
             HirExprKind::If {
                 condition,
                 then_expr,
                 else_expr,
-            } => self
-                .find_pin_capture_in_expr(condition, pin_binding, in_lambda)
-                .or_else(|| self.find_pin_capture_in_expr(then_expr, pin_binding, in_lambda))
-                .or_else(|| self.find_pin_capture_in_expr(else_expr, pin_binding, in_lambda)),
-            HirExprKind::Data { .. } | HirExprKind::Shape { .. } => None,
-            HirExprKind::Unsafe { body } => {
-                self.find_pin_capture_in_expr(body, pin_binding, in_lambda)
-            }
+            } => self.find_pin_capture_for_if(
+                condition,
+                then_expr,
+                else_expr,
+                pin_binding,
+                in_lambda,
+            ),
             HirExprKind::Pin { value, body, .. } => self
                 .find_pin_capture_in_expr(value, pin_binding, in_lambda)
                 .or_else(|| self.find_pin_capture_in_expr(body, pin_binding, in_lambda)),
         }
+    }
+
+    fn find_pin_capture_for_name(
+        &self,
+        name: Ident,
+        pin_binding: NameBindingId,
+        in_lambda: bool,
+    ) -> Option<Ident> {
+        if in_lambda
+            && self
+                .binding_id_for_use(name)
+                .is_some_and(|binding| binding == pin_binding)
+        {
+            Some(name)
+        } else {
+            None
+        }
+    }
+
+    fn find_pin_capture_for_call(
+        &self,
+        callee: HirExprId,
+        args: SliceRange<HirArg>,
+        pin_binding: NameBindingId,
+        in_lambda: bool,
+    ) -> Option<Ident> {
+        self.find_pin_capture_in_expr(callee, pin_binding, in_lambda)
+            .or_else(|| {
+                self.find_pin_capture_in_expr_iter(
+                    self.args(args).into_iter().map(|arg| arg.expr),
+                    pin_binding,
+                    in_lambda,
+                )
+            })
+    }
+
+    fn find_pin_capture_for_apply(
+        &self,
+        callee: HirExprId,
+        args: SliceRange<HirExprId>,
+        pin_binding: NameBindingId,
+        in_lambda: bool,
+    ) -> Option<Ident> {
+        self.find_pin_capture_in_expr(callee, pin_binding, in_lambda)
+            .or_else(|| self.find_pin_capture_in_exprs(args, pin_binding, in_lambda))
+    }
+
+    fn find_pin_capture_for_defer(
+        &self,
+        cleanup: HirExprId,
+        guard: Option<HirExprId>,
+        pin_binding: NameBindingId,
+        in_lambda: bool,
+    ) -> Option<Ident> {
+        self.find_pin_capture_in_expr(cleanup, pin_binding, in_lambda)
+            .or_else(|| {
+                guard.and_then(|expr| self.find_pin_capture_in_expr(expr, pin_binding, in_lambda))
+            })
+    }
+
+    fn find_pin_capture_for_if(
+        &self,
+        condition: HirExprId,
+        then_expr: HirExprId,
+        else_expr: HirExprId,
+        pin_binding: NameBindingId,
+        in_lambda: bool,
+    ) -> Option<Ident> {
+        self.find_pin_capture_in_expr(condition, pin_binding, in_lambda)
+            .or_else(|| self.find_pin_capture_in_expr(then_expr, pin_binding, in_lambda))
+            .or_else(|| self.find_pin_capture_in_expr(else_expr, pin_binding, in_lambda))
+    }
+
+    fn find_pin_capture_in_expr_iter<I>(
+        &self,
+        exprs: I,
+        pin_binding: NameBindingId,
+        in_lambda: bool,
+    ) -> Option<Ident>
+    where
+        I: IntoIterator<Item = HirExprId>,
+    {
+        for expr_id in exprs {
+            if let Some(captured_name) =
+                self.find_pin_capture_in_expr(expr_id, pin_binding, in_lambda)
+            {
+                return Some(captured_name);
+            }
+        }
+        None
+    }
+
+    fn find_pin_capture_in_match_arms<I>(
+        &self,
+        arms: I,
+        pin_binding: NameBindingId,
+        in_lambda: bool,
+    ) -> Option<Ident>
+    where
+        I: IntoIterator<Item = HirMatchArm>,
+    {
+        for arm in arms {
+            if let Some(captured_name) = arm
+                .guard
+                .and_then(|guard| self.find_pin_capture_in_expr(guard, pin_binding, in_lambda))
+            {
+                return Some(captured_name);
+            }
+            if let Some(captured_name) =
+                self.find_pin_capture_in_expr(arm.expr, pin_binding, in_lambda)
+            {
+                return Some(captured_name);
+            }
+        }
+        None
     }
 
     fn find_pin_capture_in_exprs(

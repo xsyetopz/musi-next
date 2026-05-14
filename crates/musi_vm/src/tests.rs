@@ -1405,7 +1405,7 @@ mod success {
 
         let err = vm
             .call_export("branch", &[Value::Int(0)])
-        .expect_err("br.z should reject Int");
+            .expect_err("br.z should reject Int");
         assert!(matches!(
             err.kind(),
             VmErrorKind::InvalidValueKind {

@@ -504,7 +504,7 @@ fn write_field_bytes(
                 return Err(native_arg_issue(
                     ctx.foreign,
                     ctx.arg_index,
-            "nested `@layout(form := .c)` product FFI metadata missing",
+                    "nested `@layout(form := .c)` product FFI metadata missing",
                 ));
             };
             let (nested, nested_strings) = marshal_record_bytes(
@@ -615,7 +615,7 @@ fn unmarshal_result_value(
                     let Some(offset) = offsets.get(index).copied() else {
                         return Err(native_result_issue(
                             foreign,
-            "`@layout(form := .c)` result offset missing",
+                            "`@layout(form := .c)` result offset missing",
                         ));
                     };
                     read_field_value(
@@ -685,7 +685,7 @@ fn read_field_value(
             let Some(ffi) = ffi else {
                 return Err(native_result_issue(
                     foreign,
-            "`@layout(form := .c)` result foreign function interface metadata missing",
+                    "`@layout(form := .c)` result foreign function interface metadata missing",
                 ));
             };
             let offsets = ffi.struct_offsets().unwrap_or(&[]);
@@ -696,7 +696,7 @@ fn read_field_value(
                     let Some(field_offset) = offsets.get(index).copied() else {
                         return Err(native_result_issue(
                             foreign,
-            "`@layout(form := .c)` result offset missing",
+                            "`@layout(form := .c)` result offset missing",
                         ));
                     };
                     read_field_value(

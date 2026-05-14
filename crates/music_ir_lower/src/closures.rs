@@ -138,10 +138,10 @@ pub(crate) fn lower_user_params(ctx: &LowerCtx<'_>, params: &HirParamRange) -> L
         let binding = decl_binding_id(sema, param.name)
             .unwrap_or_else(|| lowering_invariant_violation("param binding missing"));
         bindings.push(binding);
-        let ty = sema
-            .binding_type(binding)
-            .map(|ty| super::render_ty_name(sema, ty, interner))
-            .unwrap_or_else(|| "Unknown".into());
+        let ty = sema.binding_type(binding).map_or_else(
+            || "Unknown".into(),
+            |ty| super::render_ty_name(sema, ty, interner),
+        );
         lowered.push(IrParam::new(binding, interner.resolve(param.name.name), ty));
     }
     LoweredParams {
@@ -294,11 +294,10 @@ pub(crate) fn lower_capture_params(
         .iter()
         .map(|capture| match capture {
             ClosureCapture::Binding(binding) => {
-                let ty = ctx
-                    .sema
-                    .binding_type(*binding)
-                    .map(|ty| super::render_ty_name(ctx.sema, ty, ctx.interner))
-                    .unwrap_or_else(|| "Unknown".into());
+                let ty = ctx.sema.binding_type(*binding).map_or_else(
+                    || "Unknown".into(),
+                    |ty| super::render_ty_name(ctx.sema, ty, ctx.interner),
+                );
                 IrParam::new(*binding, binding_name(ctx, *binding), ty)
             }
             ClosureCapture::Synthetic(name) => IrParam::synthetic(name.clone()),

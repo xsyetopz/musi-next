@@ -1,6 +1,33 @@
 use super::symbols::{must_get, parse_local, parse_meta_value, parse_quoted, parse_symbol};
 use super::*;
 
+#[derive(Default)]
+struct DataMetadata {
+    repr_kind: Option<StringId>,
+    layout_align: Option<u32>,
+    layout_pack: Option<u32>,
+    frozen: bool,
+    object_header: Option<ObjectHeaderDescriptor>,
+}
+
+#[derive(Default)]
+struct ForeignOptions {
+    profile: ForeignProfileFlags,
+    link: Option<String>,
+    domain: Option<String>,
+    lifetime: Option<String>,
+    pinned_params: Vec<u16>,
+    nullable_params: Vec<u16>,
+    nullable_result: bool,
+}
+
+#[derive(Default)]
+struct ForeignProfileFlags {
+    export: bool,
+    hot: bool,
+    cold: bool,
+}
+
 impl TextBuilder {
     fn parse_data_variant(
         &mut self,
@@ -140,21 +167,17 @@ impl TextBuilder {
         &mut self,
         parts: &[String],
         idx: &mut usize,
-        repr_kind: &mut Option<StringId>,
-        layout_align: &mut Option<u32>,
-        layout_pack: &mut Option<u32>,
-        frozen: &mut bool,
-        object_header: &mut Option<ObjectHeaderDescriptor>,
+        metadata: &mut DataMetadata,
     ) -> AssemblyResult {
         match must_get(parts.get(*idx), "data metadata key")? {
             "repr" => {
                 let repr_token = must_get(parts.get(*idx + 1), "data metadata value")?;
-                *repr_kind = Some(self.intern_string(&parse_quoted(repr_token)?));
+                metadata.repr_kind = Some(self.intern_string(&parse_quoted(repr_token)?));
                 *idx = (*idx).saturating_add(2);
             }
             "align" => {
                 let align_token = must_get(parts.get(*idx + 1), "data metadata value")?;
-                *layout_align = Some(
+                metadata.layout_align = Some(
                     align_token
                         .parse()
                         .map_err(|_| text_invalid_operand("align", align_token))?,
@@ -163,7 +186,7 @@ impl TextBuilder {
             }
             "pack" => {
                 let pack_token = must_get(parts.get(*idx + 1), "data metadata value")?;
-                *layout_pack = Some(
+                metadata.layout_pack = Some(
                     pack_token
                         .parse()
                         .map_err(|_| text_invalid_operand("pack", pack_token))?,
@@ -171,12 +194,12 @@ impl TextBuilder {
                 *idx = (*idx).saturating_add(2);
             }
             "frozen" => {
-                *frozen = true;
+                metadata.frozen = true;
                 *idx = (*idx).saturating_add(1);
             }
             "header" => {
                 *idx = (*idx).saturating_add(1);
-                *object_header = Some(self.parse_object_header(parts, idx)?);
+                metadata.object_header = Some(self.parse_object_header(parts, idx)?);
             }
             _ => {
                 return Err(text_unknown_symbol("data metadata", parts[*idx].as_str()));
@@ -327,11 +350,7 @@ impl TextBuilder {
             .map_err(|_| text_invalid_operand("field count", parts[5].as_str()))?;
 
         let mut variants = Vec::<DataVariantDescriptor>::new();
-        let mut repr_kind: Option<StringId> = None;
-        let mut layout_align: Option<u32> = None;
-        let mut layout_pack: Option<u32> = None;
-        let mut frozen = false;
-        let mut object_header = None;
+        let mut metadata = DataMetadata::default();
         let mut idx = 6usize;
         while idx < parts.len() {
             if parts[idx].as_str() == "variant" {
@@ -342,15 +361,7 @@ impl TextBuilder {
                 )?);
                 continue;
             }
-            self.parse_data_metadata(
-                parts,
-                &mut idx,
-                &mut repr_kind,
-                &mut layout_align,
-                &mut layout_pack,
-                &mut frozen,
-                &mut object_header,
-            )?;
+            self.parse_data_metadata(parts, &mut idx, &mut metadata)?;
         }
 
         let name_id = self.intern_string(&name);
@@ -364,19 +375,19 @@ impl TextBuilder {
                     .saturating_add(descriptor.field_count),
             ));
         }
-        if let Some(repr_kind) = repr_kind {
+        if let Some(repr_kind) = metadata.repr_kind {
             descriptor = descriptor.with_repr_kind(repr_kind);
         }
-        if let Some(layout_align) = layout_align {
+        if let Some(layout_align) = metadata.layout_align {
             descriptor = descriptor.with_layout_align(layout_align);
         }
-        if let Some(layout_pack) = layout_pack {
+        if let Some(layout_pack) = metadata.layout_pack {
             descriptor = descriptor.with_layout_pack(layout_pack);
         }
-        if frozen {
+        if metadata.frozen {
             descriptor = descriptor.with_frozen(true);
         }
-        if let Some(object_header) = object_header {
+        if let Some(object_header) = metadata.object_header {
             descriptor = descriptor.with_object_header(object_header);
         }
         let id = self.artifact.data.alloc(descriptor);
@@ -684,8 +695,9 @@ impl TextBuilder {
             match parts[idx].as_str() {
                 "kind" => {
                     let token = must_get(parts.get(idx + 1), "root-map kind")?;
-                    kind = SafePointKind::from_str(token)
-                        .ok_or_else(|| text_invalid_operand("root-map kind", token))?;
+                    kind = token
+                        .parse::<SafePointKind>()
+                        .map_err(|()| text_invalid_operand("root-map kind", token))?;
                     idx = idx.saturating_add(2);
                 }
                 "procedure" => {
@@ -767,71 +779,7 @@ impl TextBuilder {
                 u16::try_from(index).map_err(|_| text_invalid_operand("label index", index))
             })?;
 
-        let mut incoming_tys = Vec::<TypeId>::new();
-        let mut index = 6usize;
-        let first = must_get(parts.get(index), "block signature incoming types")?;
-        let mut list_closed = false;
-        if first == "[" {
-            index = index.saturating_add(1);
-        } else if let Some(inline) = first.strip_prefix('[') {
-            if let Some(single) = inline.strip_suffix(']') {
-                if !single.is_empty() {
-                    let type_name = parse_symbol(single)?;
-                    let ty = *self
-                        .types
-                        .get(&type_name)
-                        .ok_or_else(|| text_unknown_symbol("type", &type_name))?;
-                    incoming_tys.push(ty);
-                }
-                list_closed = true;
-                index = index.saturating_add(1);
-            } else if inline.is_empty() {
-                index = index.saturating_add(1);
-            } else {
-                let type_name = parse_symbol(inline)?;
-                let ty = *self
-                    .types
-                    .get(&type_name)
-                    .ok_or_else(|| text_unknown_symbol("type", &type_name))?;
-                incoming_tys.push(ty);
-                index = index.saturating_add(1);
-            }
-        } else {
-            return Err(text_expected_form(
-                ".block_sig procedure $Procedure label $Label stack [$Type ...]",
-            ));
-        }
-
-        while !list_closed {
-            let Some(token) = parts.get(index) else {
-                return Err(text_missing_operand(
-                    "block signature incoming types closing `]`",
-                ));
-            };
-            if token == "]" {
-                index = index.saturating_add(1);
-                break;
-            }
-            if let Some(last_type) = token.strip_suffix(']') {
-                if !last_type.is_empty() {
-                    let type_name = parse_symbol(last_type)?;
-                    let ty = *self
-                        .types
-                        .get(&type_name)
-                        .ok_or_else(|| text_unknown_symbol("type", &type_name))?;
-                    incoming_tys.push(ty);
-                }
-                index = index.saturating_add(1);
-                break;
-            }
-            let type_name = parse_symbol(token)?;
-            let ty = *self
-                .types
-                .get(&type_name)
-                .ok_or_else(|| text_unknown_symbol("type", &type_name))?;
-            incoming_tys.push(ty);
-            index = index.saturating_add(1);
-        }
+        let (incoming_tys, index) = self.parse_block_sig_stack_types(parts, 6)?;
 
         if index != parts.len() {
             return Err(text_expected_form(
@@ -850,19 +798,66 @@ impl TextBuilder {
         Ok(())
     }
 
+    fn parse_block_sig_stack_types(
+        &self,
+        parts: &[String],
+        mut index: usize,
+    ) -> AssemblyResult<(Vec<TypeId>, usize)> {
+        let first = must_get(parts.get(index), "block signature incoming types")?;
+        let mut incoming_tys = Vec::<TypeId>::new();
+        if first == "[" {
+            index = index.saturating_add(1);
+        } else if let Some(inline) = first.strip_prefix('[') {
+            if let Some(single) = inline.strip_suffix(']') {
+                if !single.is_empty() {
+                    incoming_tys.push(self.lookup_known_type(single)?);
+                }
+                return Ok((incoming_tys, index.saturating_add(1)));
+            }
+            if !inline.is_empty() {
+                incoming_tys.push(self.lookup_known_type(inline)?);
+            }
+            index = index.saturating_add(1);
+        } else {
+            return Err(text_expected_form(
+                ".block_sig procedure $Procedure label $Label stack [$Type ...]",
+            ));
+        }
+
+        loop {
+            let Some(token) = parts.get(index) else {
+                return Err(text_missing_operand(
+                    "block signature incoming types closing `]`",
+                ));
+            };
+            if token == "]" {
+                return Ok((incoming_tys, index.saturating_add(1)));
+            }
+            if let Some(last_type) = token.strip_suffix(']') {
+                if !last_type.is_empty() {
+                    incoming_tys.push(self.lookup_known_type(last_type)?);
+                }
+                return Ok((incoming_tys, index.saturating_add(1)));
+            }
+            incoming_tys.push(self.lookup_known_type(token)?);
+            index = index.saturating_add(1);
+        }
+    }
+
+    fn lookup_known_type(&self, type_token: &str) -> AssemblyResult<TypeId> {
+        let type_name = parse_symbol(type_token)?;
+        self.types
+            .get(&type_name)
+            .copied()
+            .ok_or_else(|| text_unknown_symbol("type", &type_name))
+    }
+
     pub(crate) fn parse_foreign(&mut self, parts: &[String]) -> AssemblyResult {
         if parts.len() < 6 {
             return Err(text_expected_form(
                 r#".native $Name [param $Type ...] result $Type abi "c" symbol "puts" [link "c"] [domain "native"] [pin %0] [nullable %1] [nullable_result] [lifetime "call"] [export] [hot] [cold]"#,
             ));
         }
-        let mut export = false;
-        let mut link = None::<String>;
-        let mut domain = None::<String>;
-        let mut lifetime = None::<String>;
-        let mut pinned_params = Vec::new();
-        let mut nullable_params = Vec::new();
-        let mut nullable_result = false;
         let mut param_tys = Vec::new();
         let mut base = 2;
         while parts.get(base).map(String::as_str) == Some("param") {
@@ -881,57 +876,7 @@ impl TextBuilder {
         let result_ty = parse_symbol(must_get(parts.get(base + 1), "foreign result type")?)?;
         let abi = parse_quoted(must_get(parts.get(base + 3), "foreign abi")?)?;
         let symbol = parse_quoted(must_get(parts.get(base + 5), "foreign symbol")?)?;
-        let mut hot = false;
-        let mut cold = false;
-        let mut idx = base + 6;
-        while idx < parts.len() {
-            match parts[idx].as_str() {
-                "export" => {
-                    export = true;
-                    idx += 1;
-                }
-                "hot" => {
-                    hot = true;
-                    idx += 1;
-                }
-                "cold" => {
-                    cold = true;
-                    idx += 1;
-                }
-                "link" => {
-                    let link_token = must_get(parts.get(idx + 1), "foreign link")?;
-                    link = Some(parse_quoted(link_token)?);
-                    idx += 2;
-                }
-                "domain" => {
-                    let domain_token = must_get(parts.get(idx + 1), "foreign domain")?;
-                    domain = Some(parse_quoted(domain_token)?);
-                    idx += 2;
-                }
-                "pin" => {
-                    pinned_params.push(parse_local(parts.get(idx + 1))?);
-                    idx += 2;
-                }
-                "nullable" => {
-                    nullable_params.push(parse_local(parts.get(idx + 1))?);
-                    idx += 2;
-                }
-                "nullable_result" => {
-                    nullable_result = true;
-                    idx += 1;
-                }
-                "lifetime" => {
-                    let lifetime_token = must_get(parts.get(idx + 1), "foreign lifetime")?;
-                    lifetime = Some(parse_quoted(lifetime_token)?);
-                    idx += 2;
-                }
-                _ => {
-                    return Err(text_expected_form(
-                        r#".native $Name [param $Type ...] result $Type abi "c" symbol "puts" [link "c"] [domain "native"] [pin %0] [nullable %1] [nullable_result] [lifetime "call"] [export] [hot] [cold]"#,
-                    ));
-                }
-            }
-        }
+        let options = Self::parse_foreign_options(parts, base + 6)?;
         let name = parse_symbol(must_get(parts.get(1), "foreign name")?)?;
         let mut descriptor = ForeignDescriptor::new(
             self.intern_string(&name),
@@ -940,24 +885,78 @@ impl TextBuilder {
             self.intern_string(&abi),
             self.intern_string(&symbol),
         )
-        .with_export(export)
-        .with_hot(hot)
-        .with_cold(cold)
-        .with_pinned_params(pinned_params.into_boxed_slice())
-        .with_nullable_params(nullable_params.into_boxed_slice())
-        .with_nullable_result(nullable_result);
-        if let Some(link) = link.as_deref().map(|text| self.intern_string(text)) {
+        .with_export(options.profile.export)
+        .with_hot(options.profile.hot)
+        .with_cold(options.profile.cold)
+        .with_pinned_params(options.pinned_params.into_boxed_slice())
+        .with_nullable_params(options.nullable_params.into_boxed_slice())
+        .with_nullable_result(options.nullable_result);
+        if let Some(link) = options.link.as_deref().map(|text| self.intern_string(text)) {
             descriptor = descriptor.with_link(link);
         }
-        if let Some(domain) = domain.as_deref().map(|text| self.intern_string(text)) {
+        if let Some(domain) = options
+            .domain
+            .as_deref()
+            .map(|text| self.intern_string(text))
+        {
             descriptor = descriptor.with_domain(domain);
         }
-        if let Some(lifetime) = lifetime.as_deref().map(|text| self.intern_string(text)) {
+        if let Some(lifetime) = options
+            .lifetime
+            .as_deref()
+            .map(|text| self.intern_string(text))
+        {
             descriptor = descriptor.with_lifetime(lifetime);
         }
         let id = self.artifact.foreigns.alloc(descriptor);
         let _ = self.foreigns.insert(name, id);
         Ok(())
+    }
+
+    fn parse_foreign_options(parts: &[String], mut idx: usize) -> AssemblyResult<ForeignOptions> {
+        let mut options = ForeignOptions::default();
+        while idx < parts.len() {
+            match parts[idx].as_str() {
+                "export" => options.profile.export = true,
+                "hot" => options.profile.hot = true,
+                "cold" => options.profile.cold = true,
+                "link" => {
+                    options.link =
+                        Some(parse_quoted(must_get(parts.get(idx + 1), "foreign link")?)?)
+                }
+                "domain" => {
+                    options.domain = Some(parse_quoted(must_get(
+                        parts.get(idx + 1),
+                        "foreign domain",
+                    )?)?);
+                }
+                "pin" => options.pinned_params.push(parse_local(parts.get(idx + 1))?),
+                "nullable" => options
+                    .nullable_params
+                    .push(parse_local(parts.get(idx + 1))?),
+                "nullable_result" => options.nullable_result = true,
+                "lifetime" => {
+                    options.lifetime = Some(parse_quoted(must_get(
+                        parts.get(idx + 1),
+                        "foreign lifetime",
+                    )?)?);
+                }
+                _ => {
+                    return Err(text_expected_form(
+                        r#".native $Name [param $Type ...] result $Type abi "c" symbol "puts" [link "c"] [domain "native"] [pin %0] [nullable %1] [nullable_result] [lifetime "call"] [export] [hot] [cold]"#,
+                    ));
+                }
+            }
+            idx += if matches!(
+                parts[idx].as_str(),
+                "export" | "hot" | "cold" | "nullable_result"
+            ) {
+                1
+            } else {
+                2
+            };
+        }
+        Ok(options)
     }
 
     pub(crate) fn parse_export(&mut self, parts: &[String]) -> AssemblyResult {

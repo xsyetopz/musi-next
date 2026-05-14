@@ -527,8 +527,7 @@ fn lower_params(ctx: &LowerCtx<'_>, params: SliceRange<HirParam>) -> Box<[IrPara
                 .unwrap_or_else(|| lowering_invariant_violation("param binding missing"));
             let ty = sema
                 .binding_type(binding)
-                .map(|ty| render_ty_name(sema, ty, interner))
-                .unwrap_or_else(|| "Unknown".into());
+                .map_or_else(|| "Unknown".into(), |ty| render_ty_name(sema, ty, interner));
             IrParam::new(binding, interner.resolve(param.name.name), ty)
         })
         .collect::<Vec<_>>()

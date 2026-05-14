@@ -6,9 +6,19 @@ pub struct ObjectHeaderDescriptor {
     pub layout_ty: Option<TypeId>,
     pub mark_bits: u8,
     pub generation_bits: u8,
+    pub shape_flags: ObjectHeaderShapeFlags,
+    pub runtime_flags: ObjectHeaderRuntimeFlags,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ObjectHeaderShapeFlags {
     pub pinned: bool,
     pub remembered: bool,
     pub large: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ObjectHeaderRuntimeFlags {
     pub weak_capable: bool,
     pub forwarding: bool,
     pub size_field: bool,
@@ -21,12 +31,16 @@ impl ObjectHeaderDescriptor {
             layout_ty: None,
             mark_bits: 0,
             generation_bits: 0,
-            pinned: false,
-            remembered: false,
-            large: false,
-            weak_capable: false,
-            forwarding: false,
-            size_field: false,
+            shape_flags: ObjectHeaderShapeFlags {
+                pinned: false,
+                remembered: false,
+                large: false,
+            },
+            runtime_flags: ObjectHeaderRuntimeFlags {
+                weak_capable: false,
+                forwarding: false,
+                size_field: false,
+            },
         }
     }
 
@@ -50,37 +64,37 @@ impl ObjectHeaderDescriptor {
 
     #[must_use]
     pub const fn with_pinned(mut self, pinned: bool) -> Self {
-        self.pinned = pinned;
+        self.shape_flags.pinned = pinned;
         self
     }
 
     #[must_use]
     pub const fn with_remembered(mut self, remembered: bool) -> Self {
-        self.remembered = remembered;
+        self.shape_flags.remembered = remembered;
         self
     }
 
     #[must_use]
     pub const fn with_large(mut self, large: bool) -> Self {
-        self.large = large;
+        self.shape_flags.large = large;
         self
     }
 
     #[must_use]
     pub const fn with_weak_capable(mut self, weak_capable: bool) -> Self {
-        self.weak_capable = weak_capable;
+        self.runtime_flags.weak_capable = weak_capable;
         self
     }
 
     #[must_use]
     pub const fn with_forwarding(mut self, forwarding: bool) -> Self {
-        self.forwarding = forwarding;
+        self.runtime_flags.forwarding = forwarding;
         self
     }
 
     #[must_use]
     pub const fn with_size_field(mut self, size_field: bool) -> Self {
-        self.size_field = size_field;
+        self.runtime_flags.size_field = size_field;
         self
     }
 }
@@ -98,8 +112,18 @@ pub struct DataFieldDescriptor {
     pub logical_index: u32,
     pub offset: Option<u32>,
     pub storage: Option<StringId>,
+    pub mutability: DataFieldMutability,
+    pub visibility: DataFieldVisibility,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct DataFieldMutability {
     pub mutable: bool,
     pub gc_pointer: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct DataFieldVisibility {
     pub public: bool,
     pub hidden: bool,
 }
@@ -113,10 +137,14 @@ impl DataFieldDescriptor {
             logical_index,
             offset: None,
             storage: None,
-            mutable: false,
-            gc_pointer: false,
-            public: false,
-            hidden: false,
+            mutability: DataFieldMutability {
+                mutable: false,
+                gc_pointer: false,
+            },
+            visibility: DataFieldVisibility {
+                public: false,
+                hidden: false,
+            },
         }
     }
 
@@ -140,25 +168,25 @@ impl DataFieldDescriptor {
 
     #[must_use]
     pub const fn with_mutable(mut self, mutable: bool) -> Self {
-        self.mutable = mutable;
+        self.mutability.mutable = mutable;
         self
     }
 
     #[must_use]
     pub const fn with_gc_pointer(mut self, gc_pointer: bool) -> Self {
-        self.gc_pointer = gc_pointer;
+        self.mutability.gc_pointer = gc_pointer;
         self
     }
 
     #[must_use]
     pub const fn with_public(mut self, public: bool) -> Self {
-        self.public = public;
+        self.visibility.public = public;
         self
     }
 
     #[must_use]
     pub const fn with_hidden(mut self, hidden: bool) -> Self {
-        self.hidden = hidden;
+        self.visibility.hidden = hidden;
         self
     }
 }

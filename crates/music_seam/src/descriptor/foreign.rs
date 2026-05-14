@@ -11,11 +11,16 @@ pub struct ForeignDescriptor {
     pub domain: Option<StringId>,
     pub pinned_params: Box<[u16]>,
     pub nullable_params: Box<[u16]>,
-    pub nullable_result: bool,
+    pub behavior: ForeignBehavior,
     pub lifetime: Option<StringId>,
+    pub cold: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ForeignBehavior {
+    pub nullable_result: bool,
     pub export: bool,
     pub hot: bool,
-    pub cold: bool,
 }
 
 impl ForeignDescriptor {
@@ -37,10 +42,8 @@ impl ForeignDescriptor {
             domain: None,
             pinned_params: Box::new([]),
             nullable_params: Box::new([]),
-            nullable_result: false,
+            behavior: ForeignBehavior::default(),
             lifetime: None,
-            export: false,
-            hot: false,
             cold: false,
         }
     }
@@ -71,7 +74,7 @@ impl ForeignDescriptor {
 
     #[must_use]
     pub const fn with_nullable_result(mut self, nullable_result: bool) -> Self {
-        self.nullable_result = nullable_result;
+        self.behavior.nullable_result = nullable_result;
         self
     }
 
@@ -83,13 +86,13 @@ impl ForeignDescriptor {
 
     #[must_use]
     pub const fn with_export(mut self, export: bool) -> Self {
-        self.export = export;
+        self.behavior.export = export;
         self
     }
 
     #[must_use]
     pub const fn with_hot(mut self, hot: bool) -> Self {
-        self.hot = hot;
+        self.behavior.hot = hot;
         self
     }
 

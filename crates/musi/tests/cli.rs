@@ -581,10 +581,10 @@ export let test () :=
         write_file(
             test_dir.path(),
             "index.ms",
-            r#"let hiddenVeryLongPrivateGlobalForReleaseFat : Int := 41;
+            r"let hiddenVeryLongPrivateGlobalForReleaseFat : Int := 41;
 let hiddenVeryLongPrivateHelperProcedureForReleaseFat (x : Int) : Int := hiddenVeryLongPrivateGlobalForReleaseFat;
 export let value : Int := hiddenVeryLongPrivateHelperProcedureForReleaseFat(1);
-"#,
+",
         );
 
         let debug_output = run_musi(

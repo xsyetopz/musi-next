@@ -734,21 +734,13 @@ mod success {
             "{}",
             output.disasm
         );
-        assert!(
-            output.disasm.contains("export hot"),
-            "{}",
-            output.disasm
-        );
+        assert!(output.disasm.contains("export hot"), "{}", output.disasm);
         assert!(
             output.disasm.contains(".procedure $main::coldWork"),
             "{}",
             output.disasm
         );
-        assert!(
-            output.disasm.contains("export cold"),
-            "{}",
-            output.disasm
-        );
+        assert!(output.disasm.contains("export cold"), "{}", output.disasm);
     }
 
     #[test]

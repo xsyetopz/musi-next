@@ -1,4 +1,5 @@
 use crate::artifact::{ProcedureId, StringId};
+use std::str::FromStr;
 
 pub type RootSlotList = Box<[u16]>;
 
@@ -33,22 +34,6 @@ impl SafePointKind {
     }
 
     #[must_use]
-    pub fn from_str(text: &str) -> Option<Self> {
-        match text {
-            "call" => Some(Self::Call),
-            "call.ind" => Some(Self::CallIndirect),
-            "call.ffi" => Some(Self::CallForeign),
-            "allocation" => Some(Self::Allocation),
-            "collection" => Some(Self::Collection),
-            "pin.enter" => Some(Self::PinEnter),
-            "pin.exit" => Some(Self::PinExit),
-            "yield" => Some(Self::Yield),
-            "trap" => Some(Self::Trap),
-            _ => None,
-        }
-    }
-
-    #[must_use]
     pub const fn from_wire(byte: u8) -> Option<Self> {
         match byte {
             0 => Some(Self::Call),
@@ -61,6 +46,40 @@ impl SafePointKind {
             7 => Some(Self::Yield),
             8 => Some(Self::Trap),
             _ => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn wire_code(self) -> u8 {
+        match self {
+            Self::Call => 0,
+            Self::CallIndirect => 1,
+            Self::CallForeign => 2,
+            Self::Allocation => 3,
+            Self::Collection => 4,
+            Self::PinEnter => 5,
+            Self::PinExit => 6,
+            Self::Yield => 7,
+            Self::Trap => 8,
+        }
+    }
+}
+
+impl FromStr for SafePointKind {
+    type Err = ();
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        match text {
+            "call" => Ok(Self::Call),
+            "call.ind" => Ok(Self::CallIndirect),
+            "call.ffi" => Ok(Self::CallForeign),
+            "allocation" => Ok(Self::Allocation),
+            "collection" => Ok(Self::Collection),
+            "pin.enter" => Ok(Self::PinEnter),
+            "pin.exit" => Ok(Self::PinExit),
+            "yield" => Ok(Self::Yield),
+            "trap" => Ok(Self::Trap),
+            _ => Err(()),
         }
     }
 }

@@ -303,11 +303,10 @@ fn lower_runtime_params(ctx: &LowerCtx<'_>, params: &[HirParam]) -> Vec<IrParam>
         .map(|param| {
             let binding = super::decl_binding_id(ctx.sema, param.name)
                 .unwrap_or_else(|| lowering_invariant_violation("param binding missing"));
-            let ty = ctx
-                .sema
-                .binding_type(binding)
-                .map(|ty| super::render_ty_name(ctx.sema, ty, ctx.interner))
-                .unwrap_or_else(|| "Unknown".into());
+            let ty = ctx.sema.binding_type(binding).map_or_else(
+                || "Unknown".into(),
+                |ty| super::render_ty_name(ctx.sema, ty, ctx.interner),
+            );
             IrParam::new(binding, ctx.interner.resolve(param.name.name), ty)
         })
         .collect()

@@ -251,17 +251,13 @@ impl<'artifact> DecompNamePolicy<'artifact> {
     }
 
     fn data_name(&self, data_id: DataId) -> &str {
-        self.data_names
-            .get(&data_id)
-            .map(String::as_str)
-            .unwrap_or("__t")
+        self.data_names.get(&data_id).map_or("__t", String::as_str)
     }
 
     fn procedure_name(&self, procedure_id: ProcedureId) -> &str {
         self.procedure_names
             .get(&procedure_id)
-            .map(String::as_str)
-            .unwrap_or("__f")
+            .map_or("__f", String::as_str)
     }
 
     fn variant_name(
@@ -362,16 +358,16 @@ fn format_data(out: &mut String, artifact: &Artifact) {
                     out.push_str(" storage ");
                     push_quoted(out, artifact.string_text(storage));
                 }
-                if field.mutable {
+                if field.mutability.mutable {
                     out.push_str(" mut");
                 }
-                if field.gc_pointer {
+                if field.mutability.gc_pointer {
                     out.push_str(" gc");
                 }
-                if field.public {
+                if field.visibility.public {
                     out.push_str(" public");
                 }
-                if field.hidden {
+                if field.visibility.hidden {
                     out.push_str(" hidden");
                 }
             }
@@ -401,22 +397,22 @@ fn format_data(out: &mut String, artifact: &Artifact) {
             write!(out, "{}", header.mark_bits).expect("write to string");
             out.push_str(" generation_bits ");
             write!(out, "{}", header.generation_bits).expect("write to string");
-            if header.pinned {
+            if header.shape_flags.pinned {
                 out.push_str(" pinned");
             }
-            if header.remembered {
+            if header.shape_flags.remembered {
                 out.push_str(" remembered");
             }
-            if header.large {
+            if header.shape_flags.large {
                 out.push_str(" large");
             }
-            if header.weak_capable {
+            if header.runtime_flags.weak_capable {
                 out.push_str(" weak_capable");
             }
-            if header.forwarding {
+            if header.runtime_flags.forwarding {
                 out.push_str(" forwarding");
             }
-            if header.size_field {
+            if header.runtime_flags.size_field {
                 out.push_str(" size_field");
             }
         }
@@ -581,23 +577,23 @@ fn format_root_maps(out: &mut String, artifact: &Artifact) {
             let procedure_name = artifact.procedures.get(procedure).name;
             push_symbol_ref(out, artifact.string_text(procedure_name));
         }
-        for local_slot in descriptor.local_slots.iter().copied() {
+        for local_slot in &descriptor.local_slots {
             out.push_str(" local %");
             write!(out, "{local_slot}").expect("write to string");
         }
-        for stack_slot in descriptor.stack_slots.iter().copied() {
+        for stack_slot in &descriptor.stack_slots {
             out.push_str(" stack %");
             write!(out, "{stack_slot}").expect("write to string");
         }
-        for capture_slot in descriptor.capture_slots.iter().copied() {
+        for capture_slot in &descriptor.capture_slots {
             out.push_str(" capture %");
             write!(out, "{capture_slot}").expect("write to string");
         }
-        for defer_slot in descriptor.defer_slots.iter().copied() {
+        for defer_slot in &descriptor.defer_slots {
             out.push_str(" defer %");
             write!(out, "{defer_slot}").expect("write to string");
         }
-        for pin_slot in descriptor.pin_slots.iter().copied() {
+        for pin_slot in &descriptor.pin_slots {
             out.push_str(" pin %");
             write!(out, "{pin_slot}").expect("write to string");
         }
@@ -742,25 +738,25 @@ fn format_foreigns(out: &mut String, artifact: &Artifact) {
             out.push_str(" domain ");
             push_quoted(out, artifact.string_text(domain));
         }
-        for index in descriptor.pinned_params.iter().copied() {
+        for index in &descriptor.pinned_params {
             out.push_str(" pin %");
             write!(out, "{index}").expect("write to string");
         }
-        for index in descriptor.nullable_params.iter().copied() {
+        for index in &descriptor.nullable_params {
             out.push_str(" nullable %");
             write!(out, "{index}").expect("write to string");
         }
-        if descriptor.nullable_result {
+        if descriptor.behavior.nullable_result {
             out.push_str(" nullable_result");
         }
         if let Some(lifetime) = descriptor.lifetime {
             out.push_str(" lifetime ");
             push_quoted(out, artifact.string_text(lifetime));
         }
-        if descriptor.export {
+        if descriptor.behavior.export {
             out.push_str(" export");
         }
-        if descriptor.hot {
+        if descriptor.behavior.hot {
             out.push_str(" hot");
         }
         if descriptor.cold {

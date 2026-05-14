@@ -26,8 +26,8 @@ const ENTRIES: &[CatalogEntry] = &[
     CatalogEntry {
         kind: SemaDiagKind::AttrReprRequiresKindString,
         code: 3001,
-        message: "`@layout form` needs variant value",
-        primary: "`@layout form` needs variant value",
+        message: "`@layout form needs variant value",
+        primary: "`@layout form needs variant value",
         secondary: None,
         help: None,
     },

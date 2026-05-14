@@ -164,8 +164,8 @@ fn encode_procedures(out: &mut Vec<u8>, artifact: &Artifact) {
         for domain in entry.domain_requirements.iter().copied() {
             push_u32(out, domain.raw());
         }
-        out.push(entry.calling_convention as u8);
-        out.push(entry.visibility as u8);
+        out.push(entry.calling_convention.wire_code());
+        out.push(entry.visibility.wire_code());
         out.push(u8::from(entry.export));
         out.push(u8::from(entry.hot));
         out.push(u8::from(entry.cold));
@@ -277,15 +277,15 @@ fn encode_foreigns(out: &mut Vec<u8>, artifact: &Artifact) {
         for index in entry.nullable_params.iter().copied() {
             push_u16(out, index);
         }
-        out.push(u8::from(entry.nullable_result));
+        out.push(u8::from(entry.behavior.nullable_result));
         if let Some(lifetime) = entry.lifetime {
             out.push(1);
             push_u32(out, lifetime.raw());
         } else {
             out.push(0);
         }
-        out.push(u8::from(entry.export));
-        out.push(u8::from(entry.hot));
+        out.push(u8::from(entry.behavior.export));
+        out.push(u8::from(entry.behavior.hot));
         out.push(u8::from(entry.cold));
     }
 }
@@ -331,102 +331,96 @@ fn encode_data(out: &mut Vec<u8>, artifact: &Artifact) {
         u32::try_from(artifact.data.len()).expect("section overflow"),
     );
     for (_, entry) in artifact.data.iter() {
-        push_u32(out, entry.name.raw());
-        push_u32(out, entry.variant_count);
-        push_u32(out, entry.field_count);
-        push_u32(
-            out,
-            u32::try_from(entry.variants.len()).expect("data variant overflow"),
-        );
-        for variant in &entry.variants {
-            push_u32(out, variant.name.raw());
-            push_i64(out, variant.tag);
-            push_u32(
-                out,
-                u32::try_from(variant.field_tys.len()).expect("data field overflow"),
-            );
-            for ty in &variant.field_tys {
-                push_u32(out, ty.raw());
-            }
-            push_u32(
-                out,
-                u32::try_from(variant.layout_fields.len()).expect("data layout field overflow"),
-            );
-            for field in &variant.layout_fields {
-                match field.name {
-                    Some(name) => {
-                        out.push(1);
-                        push_u32(out, name.raw());
-                    }
-                    None => out.push(0),
-                }
-                push_u32(out, field.ty.raw());
-                push_u32(out, field.logical_index);
-                match field.offset {
-                    Some(offset) => {
-                        out.push(1);
-                        push_u32(out, offset);
-                    }
-                    None => out.push(0),
-                }
-                match field.storage {
-                    Some(storage) => {
-                        out.push(1);
-                        push_u32(out, storage.raw());
-                    }
-                    None => out.push(0),
-                }
-                out.push(u8::from(field.mutable));
-                out.push(u8::from(field.gc_pointer));
-                out.push(u8::from(field.public));
-                out.push(u8::from(field.hidden));
-            }
-            out.push(u8::from(variant.public));
-            out.push(u8::from(variant.hidden));
+        encode_data_entry(out, entry);
+    }
+}
+
+fn encode_data_entry(out: &mut Vec<u8>, entry: &DataDescriptor) {
+    push_u32(out, entry.name.raw());
+    push_u32(out, entry.variant_count);
+    push_u32(out, entry.field_count);
+    push_u32(
+        out,
+        u32::try_from(entry.variants.len()).expect("data variant overflow"),
+    );
+    for variant in &entry.variants {
+        encode_data_variant(out, variant);
+    }
+    push_optional_idx(out, entry.repr_kind);
+    push_optional_u32(out, entry.layout_align);
+    push_optional_u32(out, entry.layout_pack);
+    out.push(u8::from(entry.frozen));
+    encode_object_header(out, entry.object_header.as_ref());
+}
+
+fn encode_data_variant(out: &mut Vec<u8>, variant: &DataVariantDescriptor) {
+    push_u32(out, variant.name.raw());
+    push_i64(out, variant.tag);
+    push_u32(
+        out,
+        u32::try_from(variant.field_tys.len()).expect("data field overflow"),
+    );
+    for ty in &variant.field_tys {
+        push_u32(out, ty.raw());
+    }
+    push_u32(
+        out,
+        u32::try_from(variant.layout_fields.len()).expect("data layout field overflow"),
+    );
+    for field in &variant.layout_fields {
+        encode_data_field(out, field);
+    }
+    out.push(u8::from(variant.public));
+    out.push(u8::from(variant.hidden));
+}
+
+fn encode_data_field(out: &mut Vec<u8>, field: &DataFieldDescriptor) {
+    push_optional_idx(out, field.name);
+    push_u32(out, field.ty.raw());
+    push_u32(out, field.logical_index);
+    push_optional_u32(out, field.offset);
+    push_optional_idx(out, field.storage);
+    out.push(u8::from(field.mutability.mutable));
+    out.push(u8::from(field.mutability.gc_pointer));
+    out.push(u8::from(field.visibility.public));
+    out.push(u8::from(field.visibility.hidden));
+}
+
+fn encode_object_header(out: &mut Vec<u8>, header: Option<&ObjectHeaderDescriptor>) {
+    match header {
+        Some(header) => {
+            out.push(1);
+            push_optional_idx(out, header.layout_ty);
+            out.push(header.mark_bits);
+            out.push(header.generation_bits);
+            out.push(u8::from(header.shape_flags.pinned));
+            out.push(u8::from(header.shape_flags.remembered));
+            out.push(u8::from(header.shape_flags.large));
+            out.push(u8::from(header.runtime_flags.weak_capable));
+            out.push(u8::from(header.runtime_flags.forwarding));
+            out.push(u8::from(header.runtime_flags.size_field));
         }
-        match entry.repr_kind {
-            Some(id) => {
-                out.push(1);
-                push_u32(out, id.raw());
-            }
-            None => out.push(0),
+        None => out.push(0),
+    }
+}
+
+fn push_optional_idx<T>(out: &mut Vec<u8>, id: Option<Idx<T>>) {
+    match id {
+        Some(id) => {
+            out.push(1);
+            push_u32(out, id.raw());
         }
-        match entry.layout_align {
-            Some(value) => {
-                out.push(1);
-                push_u32(out, value);
-            }
-            None => out.push(0),
+        None => out.push(0),
+    }
+}
+
+fn push_optional_u32(out: &mut Vec<u8>, value: Option<u32>) {
+    match value {
+        Some(value) => {
+            out.push(1);
+            push_u32(out, value);
         }
-        match entry.layout_pack {
-            Some(value) => {
-                out.push(1);
-                push_u32(out, value);
-            }
-            None => out.push(0),
-        }
-        out.push(u8::from(entry.frozen));
-        match &entry.object_header {
-            Some(header) => {
-                out.push(1);
-                match header.layout_ty {
-                    Some(ty) => {
-                        out.push(1);
-                        push_u32(out, ty.raw());
-                    }
-                    None => out.push(0),
-                }
-                out.push(header.mark_bits);
-                out.push(header.generation_bits);
-                out.push(u8::from(header.pinned));
-                out.push(u8::from(header.remembered));
-                out.push(u8::from(header.large));
-                out.push(u8::from(header.weak_capable));
-                out.push(u8::from(header.forwarding));
-                out.push(u8::from(header.size_field));
-            }
-            None => out.push(0),
-        }
+        None => out.push(0),
     }
 }
 
@@ -466,7 +460,7 @@ fn encode_root_maps(out: &mut Vec<u8>, artifact: &Artifact) {
     );
     for (_, entry) in artifact.root_maps.iter() {
         push_u32(out, entry.safe_point.raw());
-        out.push(entry.kind as u8);
+        out.push(entry.kind.wire_code());
         if let Some(procedure) = entry.procedure {
             out.push(1);
             push_u32(out, procedure.raw());

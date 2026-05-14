@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::cli::{BuildPackageArg, BuildProfileArg};
 use crate::error::{MusiError, MusiResult};
-use musi_project::{ProjectOptions, load_project_ancestor};
+use musi_project::{Project, ProjectEntry, ProjectOptions, load_project_ancestor};
 use musi_tooling::write_artifact_bytes;
 use music_base::{Source, SourceMap};
 use music_module::ModuleKey;
@@ -100,7 +100,7 @@ fn archive_modules(
 ) -> MusiResult<Vec<MarModuleEntry>> {
     if profile == BuildProfileArg::Release && package == BuildPackageArg::Fat {
         let output = session.compile_entry(entry_module_key)?;
-        let blob = apply_release_fat_module_policy(output.bytes)?;
+        let blob = apply_release_fat_module_policy(&output.bytes)?;
         return Ok(vec![MarModuleEntry::new(entry_module_key.as_str(), blob)]);
     }
     let outputs = if package == BuildPackageArg::Fat {
@@ -117,8 +117,8 @@ fn archive_modules(
         .collect())
 }
 
-fn apply_release_fat_module_policy(bytes: Vec<u8>) -> MusiResult<Vec<u8>> {
-    let mut artifact = decode_binary(&bytes)?;
+fn apply_release_fat_module_policy(bytes: &[u8]) -> MusiResult<Vec<u8>> {
+    let mut artifact = decode_binary(bytes)?;
     mangle_private_symbol_names(&mut artifact);
     Ok(encode_binary(&artifact)?)
 }
@@ -223,10 +223,10 @@ fn rename_private_procedure_names(
 ) {
     let mut suffix = 0_u32;
     for name_id in name_ids {
-        let old_name = artifact.strings.get(name_id).text.to_string();
+        let old_name = artifact.strings.get(name_id).text.clone();
         let mangled_name = next_mangled_name(prefix, &mut suffix, used_names);
         artifact.strings.get_mut(name_id).text = mangled_name.clone().into_boxed_str();
-        rename_root_map_safe_point_prefix(artifact, &old_name, &mangled_name);
+        rename_root_map_safe_point_prefix(artifact, old_name.as_ref(), &mangled_name);
         let _ = used_names.insert(mangled_name);
     }
 }
@@ -240,7 +240,7 @@ fn rename_root_map_safe_point_prefix(artifact: &mut Artifact, old_name: &str, ne
         .map(|(_, root_map_descriptor)| root_map_descriptor.safe_point)
         .collect::<Vec<_>>();
     for safe_point_id in safe_point_ids {
-        let safe_point_text = artifact.strings.get(safe_point_id).text.to_string();
+        let safe_point_text = artifact.strings.get(safe_point_id).text.clone();
         let rewritten = safe_point_text
             .strip_prefix(&old_colon_prefix)
             .map(|suffix| format!("{new_name}:{suffix}"))
@@ -315,11 +315,11 @@ fn source_map_source_payload(source: &Source) -> Value {
     let _ = payload.insert("path".to_owned(), Value::String(path_string(source.path())));
     let _ = payload.insert(
         "line_count".to_owned(),
-        Value::from(source.line_count() as u64),
+        Value::from(u64::try_from(source.line_count()).expect("source line count overflow")),
     );
     let _ = payload.insert(
         "byte_length".to_owned(),
-        Value::from(source.text().len() as u64),
+        Value::from(u64::try_from(source.text().len()).expect("source byte length overflow")),
     );
     let _ = payload.insert("text".to_owned(), Value::String(source.text().to_owned()));
     Value::Object(payload)
@@ -370,10 +370,10 @@ fn validate_archive_options(
 
 fn build_output_path(
     out: Option<&Path>,
-    project: &musi_project::Project,
-    entry: &musi_project::ProjectEntry,
+    project: &Project,
+    entry: &ProjectEntry,
     archive: bool,
-) -> std::path::PathBuf {
+) -> PathBuf {
     if let Some(out) = out {
         return out.to_path_buf();
     }

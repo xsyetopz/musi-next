@@ -268,7 +268,7 @@ mod success {
             .find_map(|(id, binding)| {
                 (interner.resolve(binding.name) == "y"
                     && binding.kind == NameBindingKind::PatternBind)
-                .then_some(id)
+                    .then_some(id)
             })
             .expect("y pattern binding");
         assert_eq!(
@@ -276,7 +276,11 @@ mod success {
             NameBindingKind::PatternBind
         );
         assert!(
-            resolved.names.refs.values().any(|binding| *binding == y_binding),
+            resolved
+                .names
+                .refs
+                .values()
+                .any(|binding| *binding == y_binding),
             "expected at least one `y` reference to resolve"
         );
 
@@ -478,7 +482,11 @@ mod success {
             NameBindingKind::Let
         );
         assert!(
-            resolved.names.refs.values().any(|binding| *binding == io_binding),
+            resolved
+                .names
+                .refs
+                .values()
+                .any(|binding| *binding == io_binding),
             "expected at least one `IO` reference to resolve"
         );
         assert!(
