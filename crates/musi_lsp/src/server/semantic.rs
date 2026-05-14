@@ -109,6 +109,7 @@ pub(super) fn semantic_tokens_delta(
     previous: &SemanticTokenSnapshot,
     next: &SemanticTokenSnapshot,
 ) -> SemanticTokensDelta {
+    const TOKEN_COMPONENTS: usize = 5;
     let mut prefix_len = 0usize;
     while prefix_len < previous.data.len()
         && prefix_len < next.data.len()
@@ -128,8 +129,15 @@ pub(super) fn semantic_tokens_delta(
     SemanticTokensDelta {
         result_id: Some(next.result_id.clone()),
         edits: vec![SemanticTokensEdit {
-            start: len_to_u32(prefix_len),
-            delete_count: len_to_u32(previous.data.len() - prefix_len - suffix_len),
+            start: len_to_u32(prefix_len.saturating_mul(TOKEN_COMPONENTS)),
+            delete_count: len_to_u32(
+                previous
+                    .data
+                    .len()
+                    .saturating_sub(prefix_len)
+                    .saturating_sub(suffix_len)
+                    .saturating_mul(TOKEN_COMPONENTS),
+            ),
             data: (!inserted.is_empty()).then_some(inserted),
         }],
     }

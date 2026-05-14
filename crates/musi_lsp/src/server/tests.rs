@@ -2253,6 +2253,110 @@ let other := value;
     }
 
     #[test]
+    fn definition_on_import_record_member_jumps_to_exported_binding() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let index_path = root.join("index.ms");
+        let core_path = root.join("core.ms");
+        fs::write(
+            &index_path,
+            "let core := import \"./core\";\nlet value := core.Word;\n",
+        )
+        .expect("entry should be written");
+        fs::write(&core_path, "export let Word := Type;\n").expect("core should be written");
+        let uri = Url::from_file_path(&index_path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(
+            uri.clone(),
+            "let core := import \"./core\";\nlet value := core.Word;\n".to_owned(),
+        );
+
+        let definition = server
+            .definition_at(GotoDefinitionParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 19),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("member definition should resolve");
+
+        let GotoDefinitionResponse::Scalar(location) = definition else {
+            panic!("definition should return scalar location");
+        };
+        let location_path = location
+            .uri
+            .to_file_path()
+            .expect("location URI should be a file path");
+        assert_eq!(
+            location_path,
+            fs::canonicalize(core_path).expect("core path should canonicalize")
+        );
+        assert_eq!(
+            location.range,
+            Range::new(Position::new(0, 11), Position::new(0, 15))
+        );
+    }
+
+    #[test]
+    fn definition_on_variant_value_jumps_to_variant_declaration() {
+        let root = temp_project();
+        fs::write(
+            root.join("musi.json"),
+            r#"{
+  "name": "app",
+  "version": "0.1.0",
+  "entry": "index.ms"
+}
+"#,
+        )
+        .expect("manifest should be written");
+        let index_path = root.join("index.ms");
+        let source = "\
+let Option := data { | A | B };
+let first := .A;
+";
+        fs::write(&index_path, source).expect("entry should be written");
+        let uri = Url::from_file_path(&index_path).expect("file URI should build");
+        let mut server = MusiLanguageServer::new(ClientSocket::new_closed());
+        let _ = server.open_documents.insert(uri.clone(), source.to_owned());
+
+        let definition = server
+            .definition_at(GotoDefinitionParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position::new(1, 14),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .expect("variant definition should resolve");
+
+        let GotoDefinitionResponse::Scalar(location) = definition else {
+            panic!("definition should return scalar location");
+        };
+        let location_path = location
+            .uri
+            .to_file_path()
+            .expect("location URI should be a file path");
+        assert!(paths_match(&location_path, &index_path));
+        assert_eq!(
+            location.range,
+            Range::new(Position::new(0, 23), Position::new(0, 24))
+        );
+    }
+
+    #[test]
     fn references_on_import_string_find_matching_imports() {
         let root = temp_project();
         fs::write(
@@ -3610,7 +3714,7 @@ let other := value + value;
         let value_lens = server.resolve_code_lens(value_lens.clone());
         let command = value_lens.command.as_ref().expect("lens command");
         assert_eq!(command.title, "2 references");
-        assert_eq!(command.command, "editor.action.showReferences");
+        assert_eq!(command.command, SHOW_REFERENCES_COMMAND);
         let arguments = command.arguments.as_ref().expect("lens arguments");
         assert_eq!(arguments.len(), 3);
         assert_eq!(arguments[0].as_str(), Some(uri.as_str()));
@@ -3668,7 +3772,7 @@ let other := value + value;
         let value_lens = server.resolve_code_lens(value_lens.clone());
         let command = value_lens.command.as_ref().expect("lens command");
         assert_eq!(command.title, "1 reference");
-        assert_eq!(command.command, "editor.action.showReferences");
+        assert_eq!(command.command, SHOW_REFERENCES_COMMAND);
         let arguments = command.arguments.as_ref().expect("lens arguments");
         let locations: Vec<Location> =
             serde_json::from_value(arguments[2].clone()).expect("locations should deserialize");
@@ -4436,6 +4540,8 @@ let other := value + 2;
         };
         assert!(delta.result_id.is_some());
         assert_eq!(delta.edits.len(), 1);
+        assert_eq!(delta.edits[0].start % 5, 0);
+        assert_eq!(delta.edits[0].delete_count % 5, 0);
     }
 
     #[test]

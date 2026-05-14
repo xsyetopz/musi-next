@@ -922,7 +922,7 @@ impl TextBuilder {
                 "cold" => options.profile.cold = true,
                 "link" => {
                     options.link =
-                        Some(parse_quoted(must_get(parts.get(idx + 1), "foreign link")?)?)
+                        Some(parse_quoted(must_get(parts.get(idx + 1), "foreign link")?)?);
                 }
                 "domain" => {
                     options.domain = Some(parse_quoted(must_get(

@@ -286,6 +286,20 @@ mod success {
     }
 
     #[test]
+    fn spaces_compact_chained_if_then_else_boundaries() {
+        let source = "let value := if isLower(value)then.True else if hasDigit(value)then.False else .Unknown;";
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "let value :=\n  if isLower(value) then .True else if hasDigit(value) then .False else .Unknown;\n"
+        );
+        let second = format_source(&formatted_result.text, &options()).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
     fn spaces_let_else_dot_variant() {
         let source = "let .Some(value):=maybe else.None;";
 

@@ -347,6 +347,60 @@ span.lower
     }
 
     #[test]
+    fn definition_resolves_import_record_member_from_reference() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        write_file(test_dir.path(), "core.ms", "export let Word := Type;\n");
+        let source = "let core := import \"./core\";\nlet value := core.Word;\n";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let location = definition_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            2,
+            20,
+        )
+        .expect("import record member definition should resolve");
+
+        assert_eq!(
+            location.path,
+            test_dir
+                .path()
+                .join("core.ms")
+                .canonicalize()
+                .expect("core path should canonicalize")
+        );
+        assert_eq!(location.range.start_line, 1);
+        assert_eq!(location.range.start_col, 12);
+        assert_eq!(location.range.end_col, 16);
+    }
+
+    #[test]
+    fn definition_resolves_local_variant_from_variant_value() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "\
+let Option := data { | A | B };
+let first := .A;
+let second := .B;
+";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let location = definition_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            2,
+            15,
+        )
+        .expect("variant definition should resolve");
+
+        assert_eq!(location.path, test_dir.path().join("index.ms"));
+        assert_eq!(location.range.start_line, 1);
+        assert_eq!(location.range.start_col, 24);
+        assert_eq!(location.range.end_col, 25);
+    }
+
+    #[test]
     fn type_definition_resolves_named_value_type() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
@@ -456,6 +510,75 @@ let bitEq := 2;
         assert_eq!(references.len(), 2);
         assert_eq!(references[0].range.start_line, 1);
         assert_eq!(references[1].range.start_line, 2);
+    }
+
+    #[test]
+    fn references_include_import_record_member_definition_and_usage() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        write_file(test_dir.path(), "core.ms", "export let Word := Type;\n");
+        let source = "let core := import \"./core\";\nlet value := core.Word;\n";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let references = references_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            2,
+            20,
+            true,
+        );
+
+        assert!(references.iter().any(|location| {
+            location.path
+                == test_dir
+                    .path()
+                    .join("core.ms")
+                    .canonicalize()
+                    .expect("core path should canonicalize")
+                && location.range.start_line == 1
+                && location.range.start_col == 12
+        }));
+        assert!(references.iter().any(|location| {
+            location.path
+                == test_dir
+                    .path()
+                    .join("index.ms")
+                    .canonicalize()
+                    .expect("index path should canonicalize")
+                && location.range.start_line == 2
+                && location.range.start_col == 19
+        }));
+    }
+
+    #[test]
+    fn references_include_variant_definition_and_uses() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "\
+let Option := data { | A | B };
+let first := .A;
+match first (| .A => 1 | .B => 0);
+";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let references = references_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+            2,
+            15,
+            true,
+        );
+
+        assert!(references.iter().any(|location| {
+            location.path == test_dir.path().join("index.ms")
+                && location.range.start_line == 1
+                && location.range.start_col == 24
+        }));
+        assert!(references.iter().any(|location| {
+            location.path == test_dir.path().join("index.ms")
+                && location.range.start_line == 2
+                && location.range.start_col == 15
+        }));
     }
 
     #[test]

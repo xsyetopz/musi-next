@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use musi_project::{PackageSource, Project, ProjectOptions, load_project, load_project_ancestor};
 use music_base::{Source, SourceId, Span};
-use music_hir::{HirExpr, HirExprId, HirExprKind, HirTyId, HirTyKind};
+use music_hir::{HirExpr, HirExprId, HirExprKind, HirPatKind, HirTyId, HirTyKind};
 use music_module::ModuleKey;
 use music_names::{NameBinding, NameBindingId, NameBindingKind, NameResolution, NameSite, Symbol};
 use music_sema::{ExprMemberKind, SemaModule};
@@ -184,8 +184,12 @@ pub fn definition_for_project_file_with_overlay(
     character: usize,
 ) -> Option<ToolLocation> {
     let context = SymbolAnalysis::new(path, overlay_text)?;
-    let binding_id = context.binding_at(line, character)?;
-    context.binding_location(binding_id)
+    if let Some(binding_id) = context.binding_at(line, character) {
+        return context.binding_location(binding_id);
+    }
+    context
+        .import_record_member_definition_at(line, character)
+        .or_else(|| context.variant_definition_at(line, character))
 }
 
 #[must_use]
@@ -245,10 +249,13 @@ pub fn references_for_project_file_with_overlay(
     let Some(mut context) = SymbolAnalysis::new(path, overlay_text) else {
         return Vec::new();
     };
-    let Some(binding_id) = context.binding_at(line, character) else {
-        return Vec::new();
-    };
-    context.references(binding_id, include_declaration)
+    if let Some(binding_id) = context.binding_at(line, character) {
+        return context.references(binding_id, include_declaration);
+    }
+    context
+        .import_record_member_references_at(line, character, include_declaration)
+        .or_else(|| context.variant_references_at(line, character, include_declaration))
+        .unwrap_or_default()
 }
 
 #[must_use]
@@ -525,6 +532,18 @@ struct SymbolAnalysis {
     reference_lenses: Option<Vec<ToolReferenceLens>>,
 }
 
+#[derive(Debug, Clone)]
+struct ImportRecordMemberTarget {
+    name: Symbol,
+    target: ModuleKey,
+}
+
+#[derive(Debug, Clone)]
+struct VariantTarget {
+    data_name: Symbol,
+    variant_name: Symbol,
+}
+
 impl SymbolAnalysis {
     fn new(path: &Path, overlay_text: Option<&str>) -> Option<Self> {
         let (session, module_key) = analysis_session(path, overlay_text)?;
@@ -608,6 +627,315 @@ impl SymbolAnalysis {
                     })
                     .map(|(binding_id, binding)| (binding_id, binding.site))
             })
+    }
+
+    fn import_record_member_definition_at(
+        &self,
+        line: usize,
+        character: usize,
+    ) -> Option<ToolLocation> {
+        let source = self.source()?;
+        let offset = source.offset(line, character)?;
+        let target = self.import_record_member_target_at_offset(offset)?;
+        self.export_location_for_target_name(&target.target, target.name)
+    }
+
+    fn import_record_member_references_at(
+        &self,
+        line: usize,
+        character: usize,
+        include_declaration: bool,
+    ) -> Option<Vec<ToolLocation>> {
+        let source = self.source()?;
+        let offset = source.offset(line, character)?;
+        let target = self.import_record_member_target_at_offset(offset)?;
+        let target_path = self.path_map.get(target.target.as_str())?;
+        let mut target_analysis = Self::new(target_path, None)?;
+        let binding_id = target_analysis.export_binding_id(target.name)?;
+        Some(target_analysis.references(binding_id, include_declaration))
+    }
+
+    fn variant_definition_at(&self, line: usize, character: usize) -> Option<ToolLocation> {
+        let source = self.source()?;
+        let offset = source.offset(line, character)?;
+        let target = self.variant_target_at_offset(offset)?;
+        self.find_variant_definition_location(&target)
+    }
+
+    fn variant_references_at(
+        &self,
+        line: usize,
+        character: usize,
+        include_declaration: bool,
+    ) -> Option<Vec<ToolLocation>> {
+        let source = self.source()?;
+        let offset = source.offset(line, character)?;
+        let target = self.variant_target_at_offset(offset)?;
+        let data_name = self.session.resolve_symbol(target.data_name).to_owned();
+        let variant_name = self.session.resolve_symbol(target.variant_name).to_owned();
+        let mut locations =
+            self.variant_reference_locations_in_module_by_names(&data_name, &variant_name);
+        for (module_key, module_path) in &self.workspace_modules {
+            if module_key == &self.module_key {
+                continue;
+            }
+            let Some(analysis) = Self::new(module_path, None) else {
+                continue;
+            };
+            locations.extend(
+                analysis.variant_reference_locations_in_module_by_names(&data_name, &variant_name),
+            );
+        }
+        if include_declaration
+            && let Some(definition) = self.find_variant_definition_location(&target)
+        {
+            locations.push(definition);
+        }
+        locations.sort_by_key(|location| {
+            (
+                location.path.clone(),
+                location.range.start_line,
+                location.range.start_col,
+                location.range.end_line,
+                location.range.end_col,
+            )
+        });
+        locations.dedup_by_key(|location| {
+            (
+                location.path.clone(),
+                location.range.start_line,
+                location.range.start_col,
+                location.range.end_line,
+                location.range.end_col,
+            )
+        });
+        Some(locations)
+    }
+
+    fn import_record_member_target_at_offset(
+        &self,
+        offset: u32,
+    ) -> Option<ImportRecordMemberTarget> {
+        let sema = self.sema()?;
+        sema.module()
+            .store
+            .exprs
+            .iter()
+            .filter_map(|(expr_id, expr)| {
+                let HirExprKind::Field { base, name, .. } = expr.kind else {
+                    return None;
+                };
+                if expr.origin.source_id != self.source_id || !name.span.contains(offset) {
+                    return None;
+                }
+                let fact = sema.expr_member_fact(expr_id)?;
+                if fact.kind != ExprMemberKind::ImportRecordExport {
+                    return None;
+                }
+                let target = fact
+                    .import_record_target
+                    .clone()
+                    .or_else(|| sema.expr_import_record_target(expr_id).cloned())
+                    .or_else(|| sema.expr_import_record_target(base).cloned())?;
+                Some((
+                    name.span.end.saturating_sub(name.span.start),
+                    ImportRecordMemberTarget {
+                        name: fact.name,
+                        target,
+                    },
+                ))
+            })
+            .min_by_key(|(span_len, _)| *span_len)
+            .map(|(_, target)| target)
+    }
+
+    fn export_binding_id(&self, name: Symbol) -> Option<NameBindingId> {
+        let sema = self.sema()?;
+        let _export = sema
+            .surface()
+            .exported_value(self.session.resolve_symbol(name))?;
+        self.resolved()?
+            .bindings
+            .iter()
+            .filter(|(_, binding)| binding.name == name)
+            .filter(|(_, binding)| !matches!(binding.kind, NameBindingKind::Prelude))
+            .min_by_key(|(_, binding)| binding.site.span.start)
+            .map(|(binding_id, _)| binding_id)
+    }
+
+    fn export_location_for_target_name(
+        &self,
+        target: &ModuleKey,
+        name: Symbol,
+    ) -> Option<ToolLocation> {
+        let target_path = self.path_map.get(target.as_str())?;
+        let target_analysis = Self::new(target_path, None)?;
+        let binding_id = target_analysis.export_binding_id(name)?;
+        target_analysis.binding_location(binding_id)
+    }
+
+    fn variant_target_at_offset(&self, offset: u32) -> Option<VariantTarget> {
+        let sema = self.sema()?;
+        let expr_target = sema
+            .module()
+            .store
+            .exprs
+            .iter()
+            .filter_map(|(expr_id, expr)| {
+                let HirExprKind::Variant { tag, .. } = expr.kind else {
+                    return None;
+                };
+                if expr.origin.source_id != self.source_id || !tag.span.contains(offset) {
+                    return None;
+                }
+                let ty = sema.try_expr_ty(expr_id)?;
+                let data_name = ty_named_symbol(sema, ty)?;
+                Some((
+                    tag.span.end.saturating_sub(tag.span.start),
+                    VariantTarget {
+                        data_name,
+                        variant_name: tag.name,
+                    },
+                ))
+            })
+            .min_by_key(|(span_len, _)| *span_len);
+        let pat_target = sema
+            .module()
+            .store
+            .pats
+            .iter()
+            .filter_map(|(pat_id, pat)| {
+                let HirPatKind::Variant { tag, .. } = pat.kind else {
+                    return None;
+                };
+                if pat.origin.source_id != self.source_id || !tag.span.contains(offset) {
+                    return None;
+                }
+                let ty = sema.try_pat_ty(pat_id)?;
+                let data_name = ty_named_symbol(sema, ty)?;
+                Some((
+                    tag.span.end.saturating_sub(tag.span.start),
+                    VariantTarget {
+                        data_name,
+                        variant_name: tag.name,
+                    },
+                ))
+            })
+            .min_by_key(|(span_len, _)| *span_len);
+        match (expr_target, pat_target) {
+            (Some(expr), Some(pat)) => Some(if expr.0 <= pat.0 { expr.1 } else { pat.1 }),
+            (Some(expr), None) => Some(expr.1),
+            (None, Some(pat)) => Some(pat.1),
+            (None, None) => None,
+        }
+    }
+
+    fn find_variant_definition_location(&self, target: &VariantTarget) -> Option<ToolLocation> {
+        let data_name = self.session.resolve_symbol(target.data_name).to_owned();
+        let variant_name = self.session.resolve_symbol(target.variant_name).to_owned();
+        if let Some(location) =
+            self.variant_definition_location_in_module_by_names(&data_name, &variant_name)
+        {
+            return Some(location);
+        }
+        for (module_key, module_path) in &self.workspace_modules {
+            if module_key == &self.module_key {
+                continue;
+            }
+            let Some(analysis) = Self::new(module_path, None) else {
+                continue;
+            };
+            if let Some(location) =
+                analysis.variant_definition_location_in_module_by_names(&data_name, &variant_name)
+            {
+                return Some(location);
+            }
+        }
+        None
+    }
+
+    fn variant_definition_location_in_module_by_names(
+        &self,
+        data_name: &str,
+        variant_name: &str,
+    ) -> Option<ToolLocation> {
+        let sema = self.sema()?;
+        let mut best_location = None;
+        let mut best_span_len = u32::MAX;
+        for (_, expr) in &sema.module().store.exprs {
+            let HirExprKind::Let { pat, value, .. } = expr.kind else {
+                continue;
+            };
+            let pat = sema.module().store.pats.get(pat);
+            let HirPatKind::Bind { name } = pat.kind else {
+                continue;
+            };
+            if self.session.resolve_symbol(name.name) != data_name {
+                continue;
+            }
+            let value_expr = sema.module().store.exprs.get(value);
+            let HirExprKind::Data { ref variants, .. } = value_expr.kind else {
+                continue;
+            };
+            for variant in sema.module().store.variants.get(variants.clone()) {
+                if self.session.resolve_symbol(variant.name.name) != variant_name {
+                    continue;
+                }
+                let span_len = variant
+                    .name
+                    .span
+                    .end
+                    .saturating_sub(variant.name.span.start);
+                if span_len < best_span_len {
+                    let site = NameSite::new(variant.origin.source_id, variant.name.span);
+                    let Some(location) = self.site_location(site) else {
+                        continue;
+                    };
+                    best_span_len = span_len;
+                    best_location = Some(location);
+                }
+            }
+        }
+        best_location
+    }
+
+    fn variant_reference_locations_in_module_by_names(
+        &self,
+        data_name: &str,
+        variant_name: &str,
+    ) -> Vec<ToolLocation> {
+        let Some(sema) = self.sema() else {
+            return Vec::new();
+        };
+        let mut locations = sema
+            .module()
+            .store
+            .exprs
+            .iter()
+            .filter_map(|(expr_id, expr)| {
+                let HirExprKind::Variant { tag, .. } = expr.kind else {
+                    return None;
+                };
+                let ty = sema.try_expr_ty(expr_id)?;
+                let ty_name = self.session.resolve_symbol(ty_named_symbol(sema, ty)?);
+                if ty_name != data_name || self.session.resolve_symbol(tag.name) != variant_name {
+                    return None;
+                }
+                self.site_location(NameSite::new(expr.origin.source_id, tag.span))
+            })
+            .collect::<Vec<_>>();
+        locations.extend(sema.module().store.pats.iter().filter_map(|(pat_id, pat)| {
+            let HirPatKind::Variant { tag, .. } = pat.kind else {
+                return None;
+            };
+            let ty = sema.try_pat_ty(pat_id)?;
+            let ty_name = self.session.resolve_symbol(ty_named_symbol(sema, ty)?);
+            if ty_name != data_name || self.session.resolve_symbol(tag.name) != variant_name {
+                return None;
+            }
+            self.site_location(NameSite::new(pat.origin.source_id, tag.span))
+        }));
+        locations
     }
 
     fn type_definition_at(&self, line: usize, character: usize) -> Option<ToolLocation> {
@@ -1196,6 +1524,14 @@ fn expr_ty_at_offset(sema: &SemaModule, source_id: SourceId, offset: u32) -> Opt
         })
         .min_by_key(|(_, span)| span.end.saturating_sub(span.start))
         .and_then(|(expr_id, _)| sema.try_expr_ty(expr_id))
+}
+
+fn ty_named_symbol(sema: &SemaModule, ty: HirTyId) -> Option<Symbol> {
+    match sema.ty(ty).kind {
+        HirTyKind::Named { name, .. } => Some(name),
+        HirTyKind::Mut { inner } => ty_named_symbol(sema, inner),
+        _ => None,
+    }
 }
 
 fn member_binding_site_at_offset(
