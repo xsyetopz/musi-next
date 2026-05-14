@@ -55,6 +55,9 @@ Each layer depends only on earlier layers and stable `musi:*` foundation
 modules. Compiler-in-Musi modules avoid cycles between source packages so the
 graph stays compatible with the current package resolver and self-hosting path.
 
+Bootstrap phase tracking for compiler-side preparation lives in
+`docs/where/compiler-bootstrap-roadmap.md`.
+
 ## Package Placement
 
 `packages/` is the Musi-source analog of Rust `crates/` and Node.js

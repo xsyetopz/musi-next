@@ -2,6 +2,7 @@
 
 Status: `active`
 Roadmap link: `docs/__smallcore__/PLAN.md`
+Compiler bootstrap roadmap: `docs/where/compiler-bootstrap-roadmap.md`
 Decision log: `docs/__smallcore__/decisions/2026-05-14-roadmap-kickoff.md`
 Checkpoint log: `docs/__smallcore__/checkpoint-log.md`
 
@@ -25,3 +26,8 @@ Checkpoint log: `docs/__smallcore__/checkpoint-log.md`
 - Gate 3: runtime reviewer sign-off.
 - Gate 4: artifacts reviewer sign-off.
 - Gate 5: tooling reviewer sign-off.
+
+## Compiler-side phase trackers
+
+- P00 syntax contracts: `docs/where/compiler-bootstrap-phase-00-syntax-contracts.md`
+- P01 module/name graph: `docs/where/compiler-bootstrap-phase-01-module-name-graph.md`
