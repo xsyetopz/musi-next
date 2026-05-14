@@ -735,7 +735,7 @@ dependencies = [
 
 [[package]]
 name = "musi"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "clap",
  "musi_fmt",
@@ -751,15 +751,16 @@ dependencies = [
  "music_sema",
  "music_session",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]
 name = "musi_diaggen"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 
 [[package]]
 name = "musi_fmt"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "musi_project",
  "music_base",
@@ -769,7 +770,7 @@ dependencies = [
 
 [[package]]
 name = "musi_foundation"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "music_builtin",
  "music_module",
@@ -779,7 +780,7 @@ dependencies = [
 
 [[package]]
 name = "musi_lsp"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "async-lsp",
  "musi_fmt",
@@ -791,7 +792,7 @@ dependencies = [
 
 [[package]]
 name = "musi_native"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "musi_foundation",
  "musi_native_ffi",
@@ -803,7 +804,7 @@ dependencies = [
 
 [[package]]
 name = "musi_native_ffi"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "musi_vm",
  "music_base",
@@ -812,7 +813,7 @@ dependencies = [
 
 [[package]]
 name = "musi_project"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "musi_foundation",
  "music_base",
@@ -829,7 +830,7 @@ dependencies = [
 
 [[package]]
 name = "musi_rt"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "base64",
  "getrandom",
@@ -847,7 +848,7 @@ dependencies = [
 
 [[package]]
 name = "musi_tooling"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "musi_foundation",
  "musi_project",
@@ -866,7 +867,7 @@ dependencies = [
 
 [[package]]
 name = "musi_vm"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "criterion",
  "musi_foundation",
@@ -880,7 +881,7 @@ dependencies = [
 
 [[package]]
 name = "music"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "clap",
  "musi_tooling",
@@ -893,11 +894,11 @@ dependencies = [
 
 [[package]]
 name = "music_arena"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 
 [[package]]
 name = "music_base"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "criterion",
  "thiserror",
@@ -905,11 +906,11 @@ dependencies = [
 
 [[package]]
 name = "music_builtin"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 
 [[package]]
 name = "music_emit"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "music_base",
  "music_ir",
@@ -925,7 +926,7 @@ dependencies = [
 
 [[package]]
 name = "music_hir"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "music_arena",
  "music_base",
@@ -934,7 +935,7 @@ dependencies = [
 
 [[package]]
 name = "music_ir"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "musi_foundation",
  "music_arena",
@@ -950,7 +951,7 @@ dependencies = [
 
 [[package]]
 name = "music_ir_lower"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "musi_foundation",
  "music_arena",
@@ -967,7 +968,7 @@ dependencies = [
 
 [[package]]
 name = "music_module"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "music_base",
  "music_syntax",
@@ -976,7 +977,7 @@ dependencies = [
 
 [[package]]
 name = "music_names"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "music_arena",
  "music_base",
@@ -985,7 +986,7 @@ dependencies = [
 
 [[package]]
 name = "music_resolve"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "music_arena",
  "music_base",
@@ -997,7 +998,7 @@ dependencies = [
 
 [[package]]
 name = "music_seam"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "music_arena",
  "music_base",
@@ -1006,7 +1007,7 @@ dependencies = [
 
 [[package]]
 name = "music_sema"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "music_arena",
  "music_base",
@@ -1021,7 +1022,7 @@ dependencies = [
 
 [[package]]
 name = "music_session"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "musi_vm",
  "music_base",
@@ -1040,7 +1041,7 @@ dependencies = [
 
 [[package]]
 name = "music_syntax"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "criterion",
  "music_arena",
@@ -1050,7 +1051,7 @@ dependencies = [
 
 [[package]]
 name = "music_term"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "music_syntax",
  "serde",

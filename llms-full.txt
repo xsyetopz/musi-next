@@ -4,7 +4,7 @@
 
 ## Project Summary
 
-Musi is an expression-first programming language with typed effects, a SEAM bytecode pipeline, package tooling around `.ms` source files, Rust compiler/runtime/tooling crates, and a first-party standard library. The workspace version is `0.1.0-alpha.1`; the language and stdlib are actively evolving.
+Musi is an expression-first programming language with typed effects, a SEAM bytecode pipeline, package tooling around `.ms` source files, Rust compiler/runtime/tooling crates, and a first-party standard library. The workspace version is `0.1.0`; language contracts are frozen for the 0.1.0 baseline.
 
 Two user-facing binaries ship from the workspace:
 
@@ -367,19 +367,19 @@ let maybe := std.maybe;
 
 `as` is not import alias syntax. It aliases matched or refined values only.
 
-External boundaries use `@external` metadata on ordinary declarations. There is no `native`, `extern`, `pub`, or `foreign` source keyword in the small core.
+External boundaries use `@foreign` metadata on ordinary declarations. There is no `native`, `extern`, `pub`, or `foreign` source keyword in the small core.
 
 Rules:
 
-- `@external` plus a declaration without a body imports an external implementation.
-- `@external` plus `export` plus a body exports an external entry point.
-- `export` without `@external` is a public Musi API only.
-- `@external` without `export` but with a body is invalid.
-- `@external` with `export` but without a body is invalid in the core.
+- `@foreign` plus a declaration without a body imports an external implementation.
+- `@foreign` plus `export` plus a body exports an external entry point.
+- `export` without `@foreign` is a public Musi API only.
+- `@foreign` without `export` but with a body is invalid.
+- `@foreign` with `export` but without a body is invalid in the core.
 - Do not duplicate direction with `mode`, `import`, or `export` keys.
 
 ```musi
-@external(
+@foreign(
   name := "musi_read",
   abi := .c,
   stack := [Word, Ptr[Byte], Nat ; Nat]
@@ -395,10 +395,16 @@ Accepted public source attributes:
 @deprecated
 @skip
 @layout
-@external
+@foreign
+@link
+@target
 ```
 
 Attribute names and keys use camelCase where needed.
+
+`@link` carries native library link requirements for foreign bindings.
+
+`@target` carries target/platform availability predicates.
 
 Compiler-owned builtin bindings use reserved namespaced metadata:
 
@@ -421,7 +427,7 @@ Compiler-owned facts:
 - `music_builtin` owns compiler builtin names, foundation module specs, std package file paths, and intrinsic symbols.
 - `musi:core`, focused `musi:*` host/VM primitive modules, and `@std/*` expose stable public APIs over the hidden builtin layer.
 - `Pin[T]` is a compiler-owned scoped pin capability created only by `pin value as name in expr`.
-- External boundary facts are modeled with `@external` metadata, stack effects, explicit unsafe surfaces, and ordinary import/export records.
+- External boundary facts are modeled with `@foreign` metadata, stack effects, explicit unsafe surfaces, and ordinary import/export records.
 
 ## Shapes And Capability Values
 

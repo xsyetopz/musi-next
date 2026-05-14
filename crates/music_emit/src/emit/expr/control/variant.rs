@@ -306,7 +306,7 @@ impl ProcedureEmitter<'_, '_> {
             Operand::None,
         )));
         self.code.push(CodeEntry::Instruction(Instruction::new(
-            Opcode::BrFalse,
+            Opcode::BrZ,
             Operand::Label(next_label),
         )));
     }

@@ -10,7 +10,7 @@ where
     pub(super) fn lower_attributed_expr(&mut self, node: SyntaxNode<'tree, 'src>) -> HirExprId {
         let origin = self.origin_node(node);
         let attrs = self.lower_attrs(node);
-        let external_abi = self.external_abi_from_attrs(attrs.clone());
+        let foreign_abi = self.foreign_abi_from_attrs(attrs.clone());
 
         let export_mod_node = node
             .child_nodes()
@@ -27,8 +27,8 @@ where
         {
             mods = mods.with_native(HirNativeMod::new(export_foreign_abi));
         }
-        if let Some(external_abi) = external_abi {
-            mods = mods.with_native(HirNativeMod::new(Some(external_abi)));
+        if let Some(foreign_abi) = foreign_abi {
+            mods = mods.with_native(HirNativeMod::new(Some(foreign_abi)));
         }
 
         let target = node.child_nodes().find(|n| {
@@ -108,7 +108,7 @@ where
         (Some(HirExportMod::new(false)), None)
     }
 
-    fn external_abi_from_attrs(&mut self, attrs: SliceRange<HirAttr>) -> Option<Symbol> {
+    fn foreign_abi_from_attrs(&mut self, attrs: SliceRange<HirAttr>) -> Option<Symbol> {
         for attr in self.store.attrs.get(attrs) {
             let path = self
                 .store
@@ -117,14 +117,21 @@ where
                 .iter()
                 .map(|ident| self.interner.resolve(ident.name))
                 .collect::<Vec<_>>();
-            if path.as_slice() != ["external"] {
+            if path.as_slice() != ["foreign"] {
                 continue;
             }
+            let mut positional_index: usize = 0;
             for arg in self.store.attr_args.get(attr.args.clone()) {
-                let Some(name) = arg.name.map(|ident| self.interner.resolve(ident.name)) else {
-                    continue;
+                let is_abi_arg = match arg.name.map(|ident| self.interner.resolve(ident.name)) {
+                    Some("abi") => true,
+                    Some(_) => false,
+                    None => {
+                        let is_first_positional = positional_index == 0;
+                        positional_index += 1;
+                        is_first_positional
+                    }
                 };
-                if name != "abi" {
+                if !is_abi_arg {
                     continue;
                 }
                 match self.store.exprs.get(arg.value).kind {

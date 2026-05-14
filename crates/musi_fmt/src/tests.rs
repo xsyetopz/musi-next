@@ -1123,13 +1123,13 @@ mod success {
     fn formats_stack_effect_attribute() {
         let mut options = options();
         options.trailing_commas = TrailingCommas::MultiLine;
-        let source = "@external(stack := [Word, Word ; Word]) let f() : Int;";
+        let source = "@foreign(stack := [Word, Word ; Word]) let f() : Int;";
 
         let formatted_result = format_source(source, &options).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            "@external(stack := [Word, Word;
+            "@foreign(stack := [Word, Word;
     Word])
 let f () : Int;\n"
         );
@@ -1160,7 +1160,7 @@ let f () : Int;\n"
 
     #[test]
     fn keeps_attribute_attached_on_own_line_before_native() {
-        let source = "@external(abi := .musi)\nlet writeIntrinsic(message : String) : Unit;";
+        let source = "@foreign(abi := .musi)\nlet writeIntrinsic(message : String) : Unit;";
 
         let mut options = options();
         options.trailing_commas = TrailingCommas::Never;
@@ -1169,7 +1169,7 @@ let f () : Int;\n"
 
         assert_eq!(
             formatted_result.text,
-            "@external(abi := .musi)\nlet writeIntrinsic (message : String) : Unit;\n"
+            "@foreign(abi := .musi)\nlet writeIntrinsic (message : String) : Unit;\n"
         );
         let second = format_source(&formatted_result.text, &options).unwrap();
         assert_eq!(second.text, formatted_result.text);
@@ -1177,7 +1177,7 @@ let f () : Int;\n"
 
     #[test]
     fn formats_multiple_attributes_as_attached_lines() {
-        let source = "@target(os := \"linux\") @external(abi := .c) let puts(msg : CString) : Int;";
+        let source = "@target(os := \"linux\") @foreign(abi := .c) let puts(msg : CString) : Int;";
 
         let mut options = options();
         options.trailing_commas = TrailingCommas::Never;
@@ -1186,7 +1186,7 @@ let f () : Int;\n"
 
         assert_eq!(
             formatted_result.text,
-            "@target(os := \"linux\")\n@external(abi := .c)\nlet puts (msg : CString) : Int;\n"
+            "@target(os := \"linux\")\n@foreign(abi := .c)\nlet puts (msg : CString) : Int;\n"
         );
     }
 
@@ -1873,7 +1873,7 @@ export let test () :=
             "export let command (value : String) : Command := .Command(value := value);",
             "export let values : []Int := [1, 2, 3];",
             "export let cast[T](raw : CPtr) : Ptr[T] := .Ptr(raw := raw);",
-            "@external(abi := .musi)\nexport let offset[T](pointer : Ptr[T], count : Int) : Ptr[T];\n@external(abi := .musi)\nexport let read[T](pointer : Ptr[T]) : T;",
+            "@foreign(abi := .musi)\nexport let offset[T](pointer : Ptr[T], count : Int) : Ptr[T];\n@foreign(abi := .musi)\nexport let read[T](pointer : Ptr[T]) : T;",
             "--- Documented value.\nexport let x : Int := 1;",
             "let x := 1; -- trailing\nlet y := /- inline -/ 2;",
         ];

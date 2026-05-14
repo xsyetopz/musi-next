@@ -238,7 +238,7 @@ impl CheckPass<'_, '_, '_> {
         self.validate_string_attr_args(
             attr,
             origin,
-            &[known.name_key, known.symbol_key],
+            &[known.name_key],
             DiagKind::AttrLinkRequiresStringValue,
         );
     }

@@ -198,9 +198,7 @@ impl CheckPass<'_, '_, '_> {
         );
         let origin = self.expr(expr_id).origin;
         let is_exported = self.expr(expr_id).mods.export.is_some();
-        if is_native_declaration && is_exported {
-            self.diag(origin.span, DiagKind::ExternalImportCannotBeExported, "");
-        } else if !is_native_declaration && !is_exported {
+        if !is_native_declaration && !is_exported {
             self.diag(origin.span, DiagKind::ExternalBodyRequiresExport, "");
         }
         if let Some((binding, _)) = self.native_binding_from_let(expr_id) {
@@ -345,33 +343,42 @@ impl CheckPass<'_, '_, '_> {
         let mut out = ForeignLinkInfo::new();
         for attr in attrs {
             let path = self.attr_path(attr);
-            if path.as_slice() != ["link"] {
-                continue;
-            }
-            let mut positional = Vec::<String>::new();
-            for arg in self.attr_args(attr.args.clone()) {
-                let Some(value) = self.string_lit_value(arg.value) else {
-                    continue;
-                };
-                if let Some(name) = arg.name.map(|ident| self.resolve_symbol(ident.name)) {
-                    match name {
-                        "name" => out = out.with_name(value),
-                        "symbol" => out = out.with_symbol(value),
-                        _ => {}
+            match path.as_slice() {
+                ["link"] => {
+                    for arg in self.attr_args(attr.args.clone()) {
+                        let Some(value) = self.string_lit_value(arg.value) else {
+                            continue;
+                        };
+                        if let Some(name) = arg.name.map(|ident| self.resolve_symbol(ident.name)) {
+                            if name == "name" {
+                                out = out.with_name(value);
+                            }
+                        } else if out.name.is_none() {
+                            out.name = Some(value.into_boxed_str());
+                        }
                     }
-                } else {
-                    positional.push(value);
                 }
-            }
-            if out.name.is_none()
-                && let Some(value) = positional.first().cloned()
-            {
-                out.name = Some(value.into_boxed_str());
-            }
-            if out.symbol.is_none()
-                && let Some(value) = positional.get(1).cloned()
-            {
-                out.symbol = Some(value.into_boxed_str());
+                ["foreign"] => {
+                    let mut positional_index: usize = 0;
+                    for arg in self.attr_args(attr.args.clone()) {
+                        if let Some(name) = arg.name.map(|ident| self.resolve_symbol(ident.name)) {
+                            if name == "symbol"
+                                && let Some(value) = self.string_lit_value(arg.value)
+                            {
+                                out = out.with_symbol(value);
+                            }
+                        } else {
+                            if positional_index == 1
+                                && out.symbol.is_none()
+                                && let Some(value) = self.string_lit_value(arg.value)
+                            {
+                                out.symbol = Some(value.into_boxed_str());
+                            }
+                            positional_index += 1;
+                        }
+                    }
+                }
+                _ => {}
             }
         }
         out

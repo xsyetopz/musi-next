@@ -3,50 +3,50 @@
 let maybe := import "@std/maybe";
 let Maybe := maybe.Maybe;
 
-@external(abi := .c, symbol := "acos")
+@foreign(abi := .c, symbol := "acos")
 let C__acos (value : Float) : Float;
-@external(abi := .c, symbol := "asin")
+@foreign(abi := .c, symbol := "asin")
 let C__asin (value : Float) : Float;
-@external(abi := .c, symbol := "atan")
+@foreign(abi := .c, symbol := "atan")
 let C__atan (value : Float) : Float;
-@external(abi := .c, symbol := "atan2")
+@foreign(abi := .c, symbol := "atan2")
 let C__atan2 (y : Float, x : Float) : Float;
-@external(abi := .c, symbol := "ceil")
+@foreign(abi := .c, symbol := "ceil")
 let C__ceil (value : Float) : Float;
-@external(abi := .c, symbol := "cos")
+@foreign(abi := .c, symbol := "cos")
 let C__cos (value : Float) : Float;
-@external(abi := .c, symbol := "exp")
+@foreign(abi := .c, symbol := "exp")
 let C__exp (value : Float) : Float;
-@external(abi := .c, symbol := "fabs")
+@foreign(abi := .c, symbol := "fabs")
 let C__fabs (value : Float) : Float;
-@external(abi := .c, symbol := "floor")
+@foreign(abi := .c, symbol := "floor")
 let C__floor (value : Float) : Float;
-@external(abi := .c, symbol := "fmod")
+@foreign(abi := .c, symbol := "fmod")
 let C__fmod (left : Float, right : Float) : Float;
-@external(abi := .c, symbol := "hypot")
+@foreign(abi := .c, symbol := "hypot")
 let C__hypot (left : Float, right : Float) : Float;
-@external(abi := .c, symbol := "log")
+@foreign(abi := .c, symbol := "log")
 let C__log (value : Float) : Float;
-@external(abi := .c, symbol := "log10")
+@foreign(abi := .c, symbol := "log10")
 let C__log10 (value : Float) : Float;
-@external(abi := .c, symbol := "pow")
+@foreign(abi := .c, symbol := "pow")
 let C__pow (base : Float, exponent : Float) : Float;
-@external(abi := .c, symbol := "round")
+@foreign(abi := .c, symbol := "round")
 let C__round (value : Float) : Float;
-@external(abi := .c, symbol := "sin")
+@foreign(abi := .c, symbol := "sin")
 let C__sin (value : Float) : Float;
-@external(abi := .c, symbol := "sqrt")
+@foreign(abi := .c, symbol := "sqrt")
 let C__sqrt (value : Float) : Float;
-@external(abi := .c, symbol := "tan")
+@foreign(abi := .c, symbol := "tan")
 let C__tan (value : Float) : Float;
-@external(abi := .c, symbol := "trunc")
+@foreign(abi := .c, symbol := "trunc")
 let C__trunc (value : Float) : Float;
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__floatIsNan (value : Float) : Bit;
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__floatIsInfinite (value : Float) : Bit;
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__floatIsFinite (value : Float) : Bit;
 
 --- Archimedes constant.

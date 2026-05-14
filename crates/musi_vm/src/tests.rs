@@ -1370,7 +1370,7 @@ mod success {
     }
 
     #[test]
-    fn brfalse_rejects_non_bool_condition() {
+    fn brz_rejects_non_bit_condition() {
         let mut artifact = Artifact::new();
         let l0 = artifact.intern_string("L0");
         let l1 = artifact.intern_string("L1");
@@ -1383,7 +1383,7 @@ mod success {
                 Box::new([
                     CodeEntry::Label(music_seam::Label { id: 0 }),
                     CodeEntry::Instruction(Instruction::new(Opcode::LdLoc, Operand::Local(0))),
-                    CodeEntry::Instruction(Instruction::new(Opcode::BrFalse, Operand::Label(1))),
+                    CodeEntry::Instruction(Instruction::new(Opcode::BrZ, Operand::Label(1))),
                     CodeEntry::Instruction(Instruction::new(Opcode::LdCI4, Operand::I16(1))),
                     CodeEntry::Instruction(Instruction::new(Opcode::Ret, Operand::None)),
                     CodeEntry::Label(music_seam::Label { id: 1 }),
@@ -1405,7 +1405,7 @@ mod success {
 
         let err = vm
             .call_export("branch", &[Value::Int(0)])
-            .expect_err("br.false should reject Int");
+        .expect_err("br.z should reject Int");
         assert!(matches!(
             err.kind(),
             VmErrorKind::InvalidValueKind {
@@ -1678,9 +1678,9 @@ mod success {
             &[(
                 "main",
                 r#"
-            @external(abi := .c)
+            @foreign(abi := .c)
             let puts (value : Int) : Int;
-            @external(abi := .musi)
+            @foreign(abi := .musi)
             let readLine (prompt : String) : Int;
             export let call_puts () : Int := unsafe (puts(1));
             export let call_readLine () : Int := unsafe (readLine(">"));

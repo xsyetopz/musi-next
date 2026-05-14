@@ -57,7 +57,7 @@ export let notEq [T] (left : T, right : T) : Bit := left /= right;
 export let compareInt (left : Int, right : Int) : Ordering :=
   if left < right then less() else if left > right then greater() else equal();
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__compareFloatTotal (left : Float, right : Float) : Int;
 
 --- Compare two floats with total ordering.

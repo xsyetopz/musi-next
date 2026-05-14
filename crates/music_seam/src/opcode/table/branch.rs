@@ -12,9 +12,9 @@ pub(super) const OPCODES: &[OpcodeInfo] = &[
         0x42,
     ),
     opcode_info(
-        Opcode::BrFalse,
+        Opcode::BrZ,
         OpcodeFamily::Branch,
-        "br.false",
+        "br.z",
         OperandShape::Label,
         0x44,
     ),

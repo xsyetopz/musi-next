@@ -9,11 +9,11 @@ let Int32 := ffi.CInt;
 let Nat := ffi.CSize;
 let Ordering := cmp.Ordering;
 
-@external(abi := .c, symbol := "strcmp")
+@foreign(abi := .c, symbol := "strcmp")
 let C__strcmp (left : CString, right : CString) : Int32;
-@external(abi := .c, symbol := "strerror")
+@foreign(abi := .c, symbol := "strerror")
 let C__strerror (code : CInt) : CString;
-@external(abi := .c, symbol := "strlen")
+@foreign(abi := .c, symbol := "strlen")
 let C__strlen (value : CString) : Nat;
 
 --- C `strcmp`.

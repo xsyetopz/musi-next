@@ -46,9 +46,9 @@ export hidden let Ptr [T] := data {
   | RawPtr(raw : CPtr)
 };
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__ptrNull () : CPtr;
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__ptrIsNull (raw : CPtr) : Bit;
 
 --- Cast raw pointer into a typed pointer view.
@@ -67,12 +67,12 @@ export let raw [T] (pointer : Ptr[T]) : CPtr :=
 export let isNull [T] (pointer : Ptr[T]) : Bit := unsafe (Musi__ptrIsNull(raw[T](pointer)));
 
 --- Foreign pointer operations.
-@external(abi := .musi)
+@foreign(abi := .musi)
 --- Foreign pointer external functions.
 export let offset [T] (pointer : Ptr[T], count : Int) : Ptr[T];
-@external(abi := .musi)
+@foreign(abi := .musi)
 export let read [T] (pointer : Ptr[T]) : T;
-@external(abi := .musi)
+@foreign(abi := .musi)
 export let write [T] (pointer : Ptr[mut T], value : T) : Unit;
 
 --- Pointer tools.

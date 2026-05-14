@@ -1,6 +1,6 @@
 # Specs
 
-Status: proposed
+Status: host-language and SEAM frozen at 0.1.0 baseline; runtime and interop tracks remain active
 
 ## Host-Language Comparison Baseline
 

@@ -89,7 +89,7 @@ impl CheckPass<'_, '_, '_> {
                     self.diag(origin.span, DiagKind::AttrLinkRequiresForeignLet, "");
                 }
                 ["target"] => self.validate_when_attr(&attr, origin),
-                ["repr" | "layout"] if !self.is_data_target(inner) => {
+                ["layout"] if !self.is_data_target(inner) => {
                     self.diag(origin.span, DiagKind::AttrDataLayoutRequiresDataTarget, "");
                 }
                 ["frozen"] => self.validate_frozen_attr(origin, inner),

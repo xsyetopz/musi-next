@@ -133,7 +133,7 @@ fn mangle_private_symbol_names(artifact: &mut Artifact) {
         .collect::<BTreeSet<_>>();
     let private_procedure_names = private_procedure_name_ids(artifact, &preserved_name_ids);
     let private_global_names = private_global_name_ids(artifact, &preserved_name_ids);
-    rename_symbol_names(artifact, private_procedure_names, "__p", &mut used_names);
+    rename_private_procedure_names(artifact, private_procedure_names, "__p", &mut used_names);
     rename_symbol_names(artifact, private_global_names, "__g", &mut used_names);
 }
 
@@ -212,6 +212,46 @@ fn rename_symbol_names(
         let mangled_name = next_mangled_name(prefix, &mut suffix, used_names);
         artifact.strings.get_mut(name_id).text = mangled_name.clone().into_boxed_str();
         let _ = used_names.insert(mangled_name);
+    }
+}
+
+fn rename_private_procedure_names(
+    artifact: &mut Artifact,
+    name_ids: BTreeSet<StringId>,
+    prefix: &str,
+    used_names: &mut BTreeSet<String>,
+) {
+    let mut suffix = 0_u32;
+    for name_id in name_ids {
+        let old_name = artifact.strings.get(name_id).text.to_string();
+        let mangled_name = next_mangled_name(prefix, &mut suffix, used_names);
+        artifact.strings.get_mut(name_id).text = mangled_name.clone().into_boxed_str();
+        rename_root_map_safe_point_prefix(artifact, &old_name, &mangled_name);
+        let _ = used_names.insert(mangled_name);
+    }
+}
+
+fn rename_root_map_safe_point_prefix(artifact: &mut Artifact, old_name: &str, new_name: &str) {
+    let old_colon_prefix = format!("{old_name}:");
+    let old_dot_prefix = format!("{old_name}.");
+    let safe_point_ids = artifact
+        .root_maps
+        .iter()
+        .map(|(_, root_map_descriptor)| root_map_descriptor.safe_point)
+        .collect::<Vec<_>>();
+    for safe_point_id in safe_point_ids {
+        let safe_point_text = artifact.strings.get(safe_point_id).text.to_string();
+        let rewritten = safe_point_text
+            .strip_prefix(&old_colon_prefix)
+            .map(|suffix| format!("{new_name}:{suffix}"))
+            .or_else(|| {
+                safe_point_text
+                    .strip_prefix(&old_dot_prefix)
+                    .map(|suffix| format!("{new_name}.{suffix}"))
+            });
+        if let Some(text) = rewritten {
+            artifact.strings.get_mut(safe_point_id).text = text.into_boxed_str();
+        }
     }
 }
 

@@ -1205,7 +1205,7 @@ dep.add(1, 2);
     fn semantic_tokens_mark_attribute_names_as_decorators() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
-        let source = "@link(symbol := \"data.tag\")\nlet message : String := \"Hello\";\n";
+        let source = "@link(name := \"m\")\nlet message : String := \"Hello\";\n";
         write_file(test_dir.path(), "index.ms", source);
 
         let tokens = semantic_tokens_for_project_file_with_overlay(
@@ -1676,11 +1676,11 @@ let Core := import "musi:core";
 let Int := Core.Int;
 let String := Core.String;
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let envGet (name : String) : String;
-@external(abi := .musi)
+@foreign(abi := .musi)
 let envHas (name : String) : Int;
-@external(abi := .musi)
+@foreign(abi := .musi)
 let envSet (name : String, value : String) : Int;
 "#;
         write_file(
@@ -1720,9 +1720,9 @@ let String := Core.String;
 let Float := Core.Float;
 let Unit := Core.Unit;
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let bool () : Int;
-@external(abi := .musi)
+@foreign(abi := .musi)
 let float01Intrinsic () : Float;
 
 export let float01 () : Float := unsafe (float01Intrinsic());
@@ -1829,7 +1829,7 @@ let Int := Core.Int;
 let String := Core.String;
 let Float := Core.Float;
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let float01Intrinsic () : Float;
 ";
         write_file(

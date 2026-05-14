@@ -1,6 +1,6 @@
 # Yield And Capability Objects
 
-Status: proposed
+Status: frozen 0.1.0 host-language baseline
 
 Musi small core uses capability objects for authority and `yield` for the only primitive suspension point.
 

@@ -21,6 +21,6 @@ Musi builtins use a hidden catalog, not a public raw `Builtin` module.
 - Type equivalence uses `~=`. Static casts use `:>`. Runtime type tests use `:?>`.
 - `@std/io` uses `write`, `writeLn`, `writeErr`, and `writeErrLn` for output, following the Ada/Pascal/C# `WriteLine` family.
 - `Pin[T]` is compiler-owned scoped pin capability created only by `pin value as name in expr`.
-- External boundary facts are modeled with `@external` metadata, stack effects, explicit unsafe APIs, and ordinary import/export records.
+- External boundary facts are modeled with `@foreign` metadata, stack effects, explicit unsafe APIs, and ordinary import/export records.
 
 This keeps user code on stdlib APIs while giving future VM work one central source of truth.

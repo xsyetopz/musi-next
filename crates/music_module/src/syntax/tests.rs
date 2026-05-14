@@ -129,7 +129,7 @@ mod success {
     fn hidden_export_marking_is_order_independent() {
         let src = r"
         export let x := 1;
-        @external(abi := .c)
+        @foreign(abi := .c)
         export let y (msg : CString) : Int;
         export hidden let x := 2;
     ";

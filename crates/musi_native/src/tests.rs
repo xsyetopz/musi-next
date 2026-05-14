@@ -83,7 +83,7 @@ mod success {
         let value = call_export_with_host(
             host,
             r"
-        @external(
+        @foreign(
           abi := .c
         )
         let puts (value : Int) : Int;
@@ -142,7 +142,7 @@ mod success {
             host,
             r"
         let Maybe := data { | Some(Int) | None };
-        @external(
+        @foreign(
           abi := .c
         )
         let inspect (value : Maybe) : Int;
@@ -178,7 +178,7 @@ mod success {
         let value = call_export_with_host(
             host,
             r"
-        @external(
+        @foreign(
           abi := .c
         )
         let puts (value : Int) : Int;
@@ -195,9 +195,10 @@ mod success {
     #[test]
     fn native_abi_support_link_smoke() {
         let source = r#"
-        @link(name := "c", symbol := "strlen")
-        @external(
-          abi := .c
+        @link(name := "c")
+        @foreign(
+          abi := .c,
+          symbol := "strlen"
         )
         let strlen(value : CString) : Nat;
         export let result () : Nat := unsafe (strlen("musi"));
@@ -214,9 +215,10 @@ mod success {
     #[test]
     fn native_abi_float_pair_call_roundtrips() {
         let source = r#"
-        @link(name := "m", symbol := "pow")
-        @external(
-          abi := .c
+        @link(name := "m")
+        @foreign(
+          abi := .c,
+          symbol := "pow"
         )
         let pow(base : Float, exponent : Float) : Float;
         export let result () : Float := unsafe (pow(2.0, 5.0));
@@ -233,9 +235,10 @@ mod success {
     #[test]
     fn native_abi_float_pair_wrapper_keeps_argument_order() {
         let source = r#"
-        @link(name := "m", symbol := "pow")
-        @external(
-          abi := .c
+        @link(name := "m")
+        @foreign(
+          abi := .c,
+          symbol := "pow"
         )
         let C__pow(base : Float, exponent : Float) : Float;
         let pow (base : Float, exponent : Float) : Float := unsafe (C__pow(base, exponent));
@@ -253,9 +256,10 @@ mod success {
     #[test]
     fn native_abi_cstring_pair_call_roundtrips() {
         let source = r#"
-        @link(name := "c", symbol := "strcmp")
-        @external(
-          abi := .c
+        @link(name := "c")
+        @foreign(
+          abi := .c,
+          symbol := "strcmp"
         )
         let strcmp(left : CString, right : CString) : Int32;
         export let result () : Int32 :=
@@ -270,14 +274,16 @@ mod success {
     #[test]
     fn native_abi_cstring_results_roundtrip() {
         let source = r#"
-        @link(name := "/usr/lib/libSystem.B.dylib", symbol := "getprogname")
-        @external(
-          abi := .c
+        @link(name := "/usr/lib/libSystem.B.dylib")
+        @foreign(
+          abi := .c,
+          symbol := "getprogname"
         )
         let musi_native_test_progname() : CString;
-        @link(name := "/usr/lib/libSystem.B.dylib", symbol := "strchr")
-        @external(
-          abi := .c
+        @link(name := "/usr/lib/libSystem.B.dylib")
+        @foreign(
+          abi := .c,
+          symbol := "strchr"
         )
         let strchr(value : CString, code : Int) : CString;
         export let result () : CString := unsafe (strchr(musi_native_test_progname(), 0));
@@ -308,7 +314,7 @@ mod success {
         let value = call_export_with_host(
             host,
             r"
-        @external(
+        @foreign(
           abi := .musi
         )
         let readLine(value : Int) : Int;
@@ -328,7 +334,7 @@ mod success {
         let value = call_export_with_host(
             host,
             r"
-        @external(
+        @foreign(
           abi := .c
         )
         let puts (value : Int) : Int;
@@ -348,7 +354,7 @@ mod success {
         let value = call_export_with_host(
             host,
             r"
-        @external(
+        @foreign(
           abi := .c
         )
         let puts (value : Int) : Int;
@@ -370,7 +376,7 @@ mod success {
         let value = call_export_with_host(
             host,
             r"
-        @external(
+        @foreign(
           abi := .c
         )
         let puts (value : Int) : Int;
@@ -447,7 +453,7 @@ mod failure {
         let value = call_export_with_host(
             host,
             r"
-        @external(
+        @foreign(
           abi := .system
         )
         let puts (value : Int) : Int;
@@ -464,7 +470,7 @@ mod failure {
     fn native_abi_symbol_failures_report_typed_errors() {
         let source = r#"
         @link(name := "c")
-        @external(
+        @foreign(
           abi := .c
         )
         let musi_native_test_missing_symbol(value : Int) : Int;
@@ -487,7 +493,7 @@ mod failure {
         let err = call_export_with_host(
             NativeHost::new(),
             r"
-        @external(
+        @foreign(
           abi := .c
         )
         let puts (value : Int) : Int;
@@ -527,7 +533,7 @@ mod failure {
         let err = call_export_with_host(
             NativeHost::new(),
             r#"
-        @external(
+        @foreign(
           abi := .musi
         )
         let readLine(value : Int) : Int;

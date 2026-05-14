@@ -5,12 +5,12 @@ let Float := Core.Float;
 let Int := Core.Int;
 let String := Core.String;
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__int (value : Int) : String;
 
 export let int (value : Int) : String := unsafe (Musi__int(value));
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__float (value : Float) : String;
 
 export let float (value : Float) : String := unsafe (Musi__float(value));

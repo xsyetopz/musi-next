@@ -269,7 +269,7 @@ mod success {
                 r#"
             let Core := import "musi:core";
             let String := Core.String;
-            @external(
+            @foreign(
               abi := .musi
             )
             let puts(value : Int) : Int;
@@ -298,7 +298,7 @@ mod success {
             .register_module_text(
                 "main",
                 r"
-            @external(
+            @foreign(
               abi := .musi
             )
             let readInt(value : Int) : Int;
@@ -322,7 +322,7 @@ mod success {
             .register_module_text(
                 "main",
                 r"
-            @external(
+            @foreign(
               abi := .c
             )
             let puts(value : Int) : Int;

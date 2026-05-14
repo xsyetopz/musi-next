@@ -43,7 +43,7 @@ pub enum Opcode {
     CleS,
     CgeS,
     Br,
-    BrFalse,
+    BrZ,
     BrTbl,
     Ret,
     Call,

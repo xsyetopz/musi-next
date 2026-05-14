@@ -129,7 +129,7 @@ fn decode_runtime_instruction(
         return runtime.with_fused(fused);
     }
     match instruction.opcode {
-        Opcode::Br | Opcode::BrFalse => decode_branch_target(runtime, &instruction.operand, labels),
+        Opcode::Br | Opcode::BrZ => decode_branch_target(runtime, &instruction.operand, labels),
         Opcode::Call | Opcode::TailCall => decode_call(
             runtime,
             index,
@@ -294,7 +294,7 @@ fn decode_local_smi_compare_branch(
         return None;
     };
     let compare = compare_op(compare.opcode)?;
-    let (Opcode::BrFalse, Operand::Label(label)) = (branch.opcode, &branch.operand) else {
+    let (Opcode::BrZ, Operand::Label(label)) = (branch.opcode, &branch.operand) else {
         return None;
     };
     let target = labels.get(label).copied()?;
@@ -693,7 +693,7 @@ fn decode_compare_branch(
     let Some(next) = instructions.get(index.saturating_add(1)) else {
         return runtime;
     };
-    if !matches!(next.opcode, Opcode::BrFalse) {
+    if !matches!(next.opcode, Opcode::BrZ) {
         return runtime;
     }
     let Operand::Label(label) = next.operand else {

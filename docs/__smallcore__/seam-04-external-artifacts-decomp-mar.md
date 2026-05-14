@@ -1,6 +1,12 @@
 # SEAM External Boundaries, Artifacts, Archives, Decompilation, and Source Maps
 
-Status: freeze-candidate design document.
+## Set-in-Stone Header
+
+- Set-in-stone track: `docs/__smallcore__/PLAN.md`
+- Set-in-stone status: frozen 0.1.0 baseline active as of `2026-05-14`.
+- Reconciliation source: `docs/__smallcore__/reconciliation.md`
+
+Status: normative freeze document (0.1.0 baseline).
 
 Covers:
 
@@ -208,15 +214,15 @@ Manifest syntax is not frozen here. It can be compact binary, table-like, or Mus
 Source-level accepted attribute name:
 
 ```musi
-@external
+@foreign
 ```
 
-The exact body keys are not frozen here. The semantic rule is frozen:
+Attribute payload keys are implementation detail. The semantic rule is frozen:
 
 ```text
-@external + declaration without body       imported external implementation
-@external + export + body                  exposed external entry point
-export without @external                   public Musi API only
+@foreign + declaration without body       imported external implementation
+@foreign + export + body                  exposed external entry point
+export without @foreign                   public Musi API only
 ```
 
 No redundant `mode` key is needed for direction. Source shape already provides direction.
@@ -309,6 +315,16 @@ Pin is lexical.
 ```
 
 External descriptors must respect these rules.
+
+`@foreign` direction rules are frozen by body/export shape:
+
+```text
+body?   export?   meaning
+yes     yes       Musi-defined foreign ABI export
+yes     no        invalid
+no      yes       foreign import re-exported by this module
+no      no        private foreign import
+```
 
 ## Decompilation layers
 
@@ -527,13 +543,13 @@ call File_read
 st.loc 2
 ld.loc 2
 ld.fld tag
-brz Lfail
+br.z Lfail
 ld.loc 2
 ld.fld 0
 call parse
 ret
 Lfail:
-ld.const ReadFailed
+ld.c ReadFailed
 new.obj Failure
 ret
 ```
@@ -654,6 +670,45 @@ music check
 
 Exact command surfaces can evolve, but `disasm` / `decomp` distinction should remain.
 
+## Source Evidence Map (current repo)
+
+This section records where the current implementation surfaces live so
+seam-04 decisions stay tied to authored code.
+
+Artifact and descriptor surfaces:
+
+```text
+crates/music_seam/src/artifact.rs
+crates/music_seam/src/descriptor/
+crates/music_seam/src/mar.rs
+```
+
+Binary and text transport surfaces:
+
+```text
+crates/music_seam/src/binary/encode.rs
+crates/music_seam/src/binary/decode.rs
+crates/music_seam/src/text/format.rs
+crates/music_seam/src/text/parse.rs
+crates/music_seam/src/text/builder/
+```
+
+CLI disassembly/decompilation entry surfaces:
+
+```text
+crates/musi/src/commands/disasm.rs
+crates/musi/src/commands/build.rs
+crates/musi/src/commands/mod.rs
+```
+
+Validation and regression surfaces:
+
+```text
+crates/music_seam/src/tests.rs
+crates/music_seam/src/assembly_tests.rs
+crates/musi/tests/cli.rs
+```
+
 ## Freeze checklist
 
 ```text
@@ -666,6 +721,23 @@ Exact command surfaces can evolve, but `disasm` / `decomp` distinction should re
 [x] source map as only authorship recovery layer
 [x] `disasm` vs `decomp` naming
 [x] `__` generated-name namespace and user-name ban
-[x] `@external` direction-by-shape rule
+[x] `@foreign` direction-by-shape rule
 [x] external descriptor required facts
+```
+
+## Completion Audit Status
+
+Seam-04 is complete for the current small-core phase.
+
+Verification evidence:
+
+```text
+rtk grep "\[ \]" docs/__smallcore__/seam-04-external-artifacts-decomp-mar.md -m 40
+-> 0 matches
+
+rtk cargo test -p music_seam --lib
+-> pass
+
+rtk cargo test -p music_ir_lower --lib
+-> pass
 ```

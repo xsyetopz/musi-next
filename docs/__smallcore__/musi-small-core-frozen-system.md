@@ -1,5 +1,13 @@
 # Musi Small-Core Frozen System
 
+## Set-in-Stone Header
+
+- Set-in-stone track: `docs/__smallcore__/PLAN.md`
+- Set-in-stone status: final; freeze decision active as of `2026-05-14`.
+- Reconciliation source: `docs/__smallcore__/reconciliation.md`
+
+Roadmap linkage: `docs/__smallcore__/PLAN.md`
+
 This document records the current frozen language system for the stripped-down Musi design. It is written as a set of hard rules, not a brainstorm.
 
 Musi is a small, embeddable systems language for SEAM, the **Stack Effect Abstract Machine**. SEAM is both the VM identity and the bytecode artifact identity, analogous in spirit to Erlang/BEAM and `.beam`, but designed around explicit stack effects, compact artifacts, and lowered source projection.
@@ -800,6 +808,34 @@ Empty match alternatives are valid only for uninhabited subjects:
 match impossible (|)
 ```
 
+### Pattern forms (frozen)
+
+Pattern forms are:
+
+- wildcard: `_`
+- literal pattern
+- binder pattern: `name`
+- variant destructure: `.Tag(...)`
+- record destructure: `{field}` or `{field: innerPattern}`
+- tuple destructure: `(a, b, ...)`
+- array destructure: `[a, b, ...]`
+
+Pattern operators are:
+
+- alias pattern: `pat as name`
+- alternative pattern: `left or right`
+
+Precedence:
+
+- `as` binds tighter than `or`
+- `or` chains left-to-right
+
+Named variant payload destructuring uses `name := pattern`.
+
+Trailing commas are accepted in tuple/array/variant/record pattern forms where list syntax appears.
+
+Casts and type tests do not use `as`; they use `:>` and `:?>`.
+
 ## 24. Refutable binding: `let ... else`
 
 `let pattern := expr else fallback;` is refutable forward binding.
@@ -1053,7 +1089,9 @@ Accepted attribute names:
 @deprecated
 @skip
 @layout
-@external
+@foreign
+@link
+@target
 ```
 
 Attribute names and keys use camelCase.
@@ -1072,16 +1110,24 @@ Explicit skipped compiler/verifier check attribution.
 
 Memory/storage layout attribution.
 
-### `@external`
+### `@foreign`
 
 Cross-Musi boundary attribution.
 
 Rules:
 
-- `@external` on a declaration without a body means an imported external implementation.
-- `@external` with `export` and a body means a Musi implementation exposed across an external boundary.
-- `export` without `@external` means public Musi API only.
-- `@external` does not need a `mode` key because direction is determined by body presence and `export`.
+- `@foreign` on a declaration without a body means an imported external implementation.
+- `@foreign` with `export` and a body means a Musi implementation exposed across an external boundary.
+- `export` without `@foreign` means public Musi API only.
+- `@foreign` direction is determined by body presence and `export`; no `mode` key is part of the frozen surface.
+
+### `@link`
+
+Native library/link requirement attribution for foreign bindings.
+
+### `@target`
+
+Target/platform availability predicate attribution.
 
 The core language reserves these attribute names. Domain-specific attribute payload schemas are compiler/tool contracts, not additional source keywords.
 
@@ -1095,7 +1141,6 @@ Rejected attribute names:
 @memory
 @trusted
 @unchecked
-@link
 @host
 ```
 

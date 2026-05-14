@@ -1,6 +1,6 @@
 # Shapes And Capability Values
 
-Status: proposed
+Status: frozen 0.1.0 host-language baseline
 
 `shape` defines a static interface or contract shape. Musi small core uses ordinary values and parameters for capability flow.
 

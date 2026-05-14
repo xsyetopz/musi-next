@@ -1,6 +1,6 @@
 # SEAM Domains
 
-Status: proposed
+Status: frozen 0.1.0 baseline (2026-05-14)
 
 This spec defines the final public SEAM domain contract.
 

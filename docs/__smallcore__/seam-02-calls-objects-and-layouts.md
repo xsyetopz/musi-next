@@ -1,6 +1,12 @@
 # SEAM Calls, Frames, Objects, Variants, and Layouts
 
-Status: freeze-candidate design document.
+## Set-in-Stone Header
+
+- Set-in-stone track: `docs/__smallcore__/PLAN.md`
+- Set-in-stone status: frozen 0.1.0 baseline active as of `2026-05-14`.
+- Reconciliation source: `docs/__smallcore__/reconciliation.md`
+
+Status: normative freeze document (0.1.0 baseline).
 
 Covers:
 
@@ -63,11 +69,10 @@ call.tail   direct tail call
 call.ind.tail or tail.ind, if direct encoding is needed
 ```
 
-Display spelling can be dotted or spaced:
+Display spelling uses canonical dotted mnemonics:
 
 ```text
 call.ffi 3
-call ffi 3
 ```
 
 The display string is not identity.
@@ -321,7 +326,7 @@ new.obj Expect.Success 1
 or if unified layout:
 
 ```text
-ld.const tagSuccess
+ld.c tagSuccess
 ld.loc bytes
 new.obj Expect 2
 ```
@@ -353,7 +358,7 @@ Possible text sketch:
 ```text
 ld.loc result
 ld.fld tag
-br.tab expectTable
+br.tbl expectTable
 
 L_success stack []:
   ld.loc result
@@ -471,25 +476,9 @@ function table refs
 Dynamic module loading, if needed, should use action-first display names:
 
 ```text
-ld.mod
-ld.exp
+ld.mod.dyn
+ld.exp.dyn
 ```
-
-or operand tags:
-
-```text
-ld mod
-ld exp
-```
-
-Reject module-first display names like:
-
-```text
-mdl.load
-mdl.get
-```
-
-because they violate action-first VM naming.
 
 ## Capability objects
 

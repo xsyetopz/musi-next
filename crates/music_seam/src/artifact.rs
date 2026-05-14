@@ -555,7 +555,7 @@ impl Artifact {
                             self.verify_branch_stack(procedure_id, instruction, stack)?;
                             current_stack = None;
                         }
-                        Opcode::BrFalse => {
+                        Opcode::BrZ => {
                             self.verify_branch_false_stack(procedure_id, instruction, stack)?;
                         }
                         Opcode::BrTbl => {
@@ -825,7 +825,7 @@ impl Artifact {
                 stack.push(ProcedureStackType::Unknown);
                 true
             }
-            Opcode::Br | Opcode::BrFalse | Opcode::BrTbl | Opcode::Ret => true,
+            Opcode::Br | Opcode::BrZ | Opcode::BrTbl | Opcode::Ret => true,
         }
     }
 
@@ -1115,7 +1115,10 @@ impl Artifact {
             safe_point == format!("{procedure_name}.{label_name}")
                 || safe_point == format!("{procedure_name}:{label_name}")
         });
-        if !matches_label {
+        let matches_instruction_safe_point = safe_point
+            .strip_prefix(&format!("{procedure_name}:sp"))
+            .is_some_and(|suffix| !suffix.is_empty() && suffix.chars().all(|ch| ch.is_ascii_digit()));
+        if !matches_label && !matches_instruction_safe_point {
             return Err(ArtifactError::InvalidReference {
                 table: "root map safe point",
             });
@@ -1192,7 +1195,7 @@ impl Artifact {
                             }
                             known_stack = None;
                         }
-                        Opcode::BrFalse => {
+                        Opcode::BrZ => {
                             if self
                                 .verify_branch_false_stack(procedure_id, instruction, stack)
                                 .is_err()

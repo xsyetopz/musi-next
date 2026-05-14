@@ -33,7 +33,7 @@ impl ProcedureEmitter<'_, '_> {
         let end_label = self.alloc_label();
         self.compile_expr(condition, true, diags);
         self.code.push(CodeEntry::Instruction(Instruction::new(
-            Opcode::BrFalse,
+            Opcode::BrZ,
             Operand::Label(else_label),
         )));
         self.compile_expr(then_expr, true, diags);
@@ -71,7 +71,7 @@ impl ProcedureEmitter<'_, '_> {
             )));
         }
         self.code.push(CodeEntry::Instruction(Instruction::new(
-            Opcode::BrFalse,
+            Opcode::BrZ,
             Operand::Label(end_label),
         )));
         self.compile_expr(right, true, diags);

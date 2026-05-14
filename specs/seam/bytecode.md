@@ -1,6 +1,6 @@
 # SEAM Bytecode
 
-Status: proposed
+Status: frozen 0.1.0 baseline (2026-05-14)
 
 This spec defines SEAM BC/IL: the canonical stack-based bytecode transported by `.seam` and displayed as textual bytecode by `disasm`.
 
@@ -50,11 +50,9 @@ Rules:
 - no aliases
 - no leading, trailing, or repeated dots
 - lowercase ASCII only
-- dots separate stack action, target root, and qualifier
-- `mod` is not a root because it conflicts with mathematical modulus
-- `nat` is not a root because it conflicts with natural numbers
+- dots separate action, target, and qualifier segments
 
-Canonical roots:
+Canonical mnemonic segments:
 
 ```text
 ld      load/push value
@@ -73,11 +71,15 @@ len     length
 obj     object/layout aggregate
 fn      function/callable
 ind     indirect target/address from stack
-mdl     module
 ffi     foreign function interface / ABI edge
-meta    metadata
-attr    attribute
-syn     syntax object, only in syntax-domain metadata
+c       constant-table value
+i4      Int32 compact immediate qualifier
+str     string-table value
+z       branch-on-zero-Bit qualifier
+tbl     branch-table qualifier
+mod     module lookup qualifier
+exp     module export lookup qualifier
+dyn     dynamic lookup qualifier
 ```
 
 Meaning distinctions:
@@ -113,7 +115,7 @@ Branches transfer the whole current stack.
 
 Verifier rule:
 
-1. `br.false` pops one `Bit`; `br.tbl` pops one integer index.
+1. `br.z` pops one `Bit`; `br.tbl` pops one integer index.
 2. The remaining current stack must exactly match the target block `stack [...]` signature.
 3. The target receives that whole stack.
 
@@ -170,7 +172,7 @@ method,u8  method table id plus capture count
 
 ## Opcode Table
 
-Numeric opcode positions are canonical for this design. Gaps are reserved.
+Numeric opcode positions are frozen for the 0.1.0 baseline. Gaps are reserved.
 
 ### `0x00..0x0F` Stack And Constants
 
@@ -200,39 +202,39 @@ Numeric opcode positions are canonical for this design. Gaps are reserved.
 
 ### `0x20..0x4F` Arithmetic, Comparison, Control Flow
 
-|       Hex | Mnemonic   | Operand | Stack effect         | Meaning              |
-| --------: | ---------- | ------- | -------------------- | -------------------- |
-|      `21` | `add`      | none    | `N, N -> N`          | arithmetic add       |
-|      `22` | `sub`      | none    | `N, N -> N`          | arithmetic subtract  |
-|      `23` | `mul`      | none    | `N, N -> N`          | arithmetic multiply  |
-|      `27` | `div.s`    | none    | `Int, Int -> Int`    | signed division      |
-|      `29` | `rem.s`    | none    | `Int, Int -> Int`    | signed remainder     |
-|      `2B` | `and`      | none    | `A, A -> A`          | bitwise/boolean and  |
-|      `2C` | `or`       | none    | `A, A -> A`          | bitwise/boolean or   |
-|      `2D` | `xor`      | none    | `A, A -> A`          | bitwise/boolean xor  |
-|      `2E` | `not`      | none    | `A -> A`             | bitwise/boolean not  |
-|      `37` | `cmp.eq`   | none    | `A, A -> Bit`        | equality compare     |
-|      `38` | `cmp.ne`   | none    | `A, A -> Bit`        | inequality compare   |
-|      `39` | `cmp.lt`   | none    | `A, A -> Bit`        | signed less-than     |
-|      `3B` | `cmp.gt`   | none    | `A, A -> Bit`        | signed greater-than  |
-|      `3D` | `cmp.le`   | none    | `A, A -> Bit`        | signed less/equal    |
-|      `40` | `cmp.ge`   | none    | `A, A -> Bit`        | signed greater/equal |
-|      `42` | `br`       | block   | `S -> target.S`      | unconditional branch |
-|      `44` | `br.false` | block   | `S, Bit -> target.S` | branch if false      |
-|      `45` | `br.tbl`   | btbl    | `S, Int -> target.S` | table branch         |
-|      `47` | `ret`      | none    | `results ->`         | return result stack  |
-| `20`-`20` | reserved   |         |                      | reserved             |
-| `24`-`26` | reserved   |         |                      | reserved             |
-| `28`-`28` | reserved   |         |                      | reserved             |
-| `2A`-`2A` | reserved   |         |                      | reserved             |
-| `2F`-`36` | reserved   |         |                      | reserved             |
-| `3A`-`3A` | reserved   |         |                      | reserved             |
-| `3C`-`3C` | reserved   |         |                      | reserved             |
-| `3E`-`3F` | reserved   |         |                      | reserved             |
-| `41`-`41` | reserved   |         |                      | reserved             |
-| `43`-`43` | reserved   |         |                      | reserved             |
-| `46`-`46` | reserved   |         |                      | reserved             |
-| `48`-`4F` | reserved   |         |                      | reserved             |
+|       Hex | Mnemonic | Operand | Stack effect         | Meaning                      |
+| --------: | -------- | ------- | -------------------- | ---------------------------- |
+|      `21` | `add`    | none    | `N, N -> N`          | arithmetic add               |
+|      `22` | `sub`    | none    | `N, N -> N`          | arithmetic subtract          |
+|      `23` | `mul`    | none    | `N, N -> N`          | arithmetic multiply          |
+|      `27` | `div.s`  | none    | `Int, Int -> Int`    | signed division              |
+|      `29` | `rem.s`  | none    | `Int, Int -> Int`    | signed remainder             |
+|      `2B` | `and`    | none    | `A, A -> A`          | bitwise and (Bit/Word lanes) |
+|      `2C` | `or`     | none    | `A, A -> A`          | bitwise or (Bit/Word lanes)  |
+|      `2D` | `xor`    | none    | `A, A -> A`          | bitwise xor (Bit/Word lanes) |
+|      `2E` | `not`    | none    | `A -> A`             | bitwise not (Bit/Word lanes) |
+|      `37` | `cmp.eq` | none    | `A, A -> Bit`        | equality compare             |
+|      `38` | `cmp.ne` | none    | `A, A -> Bit`        | inequality compare           |
+|      `39` | `cmp.lt` | none    | `A, A -> Bit`        | signed less-than             |
+|      `3B` | `cmp.gt` | none    | `A, A -> Bit`        | signed greater-than          |
+|      `3D` | `cmp.le` | none    | `A, A -> Bit`        | signed less/equal            |
+|      `40` | `cmp.ge` | none    | `A, A -> Bit`        | signed greater/equal         |
+|      `42` | `br`     | block   | `S -> target.S`      | unconditional branch         |
+|      `44` | `br.z`   | block   | `S, Bit -> target.S` | branch when top Bit = 0      |
+|      `45` | `br.tbl` | btbl    | `S, Int -> target.S` | table branch                 |
+|      `47` | `ret`    | none    | `results ->`         | return result stack          |
+| `20`-`20` | reserved |         |                      | reserved                     |
+| `24`-`26` | reserved |         |                      | reserved                     |
+| `28`-`28` | reserved |         |                      | reserved                     |
+| `2A`-`2A` | reserved |         |                      | reserved                     |
+| `2F`-`36` | reserved |         |                      | reserved                     |
+| `3A`-`3A` | reserved |         |                      | reserved                     |
+| `3C`-`3C` | reserved |         |                      | reserved                     |
+| `3E`-`3F` | reserved |         |                      | reserved                     |
+| `41`-`41` | reserved |         |                      | reserved                     |
+| `43`-`43` | reserved |         |                      | reserved                     |
+| `46`-`46` | reserved |         |                      | reserved                     |
+| `48`-`4F` | reserved |         |                      | reserved                     |
 
 ### `0x50..0x6F` Calls And Function Values
 
@@ -332,7 +334,7 @@ ld.loc opt
 ld.fld 0
 ld.c.i4 1
 cmp.eq
-br.false none
+br.z none
 ```
 
 ### Shape / Interface Dispatch

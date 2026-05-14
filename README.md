@@ -2,8 +2,8 @@
 
 Musi is an expression-first programming language with a compact core, a SEAM bytecode pipeline, and package tooling built around `.ms` source files.
 
-> [!WARNING]
-> Musi is `v0.1.0-alpha.1`. Language, tooling, and stdlib shape will still change.
+> [!NOTE]
+> Musi documentation tracks the frozen `0.1.0` host-language baseline: Rust 2024 is the host substrate for the compiler/runtime, and the source + SEAM contracts in this repo are the `0.1.0` canon.
 
 ## Overview
 

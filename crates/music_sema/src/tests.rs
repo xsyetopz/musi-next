@@ -1752,7 +1752,7 @@ mod success {
     fn foreign_call_inside_unsafe_block_passes_unsafe_check() {
         let module = check(
             r"
-        @external(abi := .c) let clock () : Int;
+        @foreign(abi := .c) let clock () : Int;
         let value := unsafe (clock());
     ",
         );
@@ -1763,15 +1763,40 @@ mod success {
     }
 
     #[test]
-    fn external_import_cannot_be_exported() {
+    fn external_import_may_be_exported_for_module_visibility() {
         let sema = check(
             r"
-        @external(abi := .c)
+        @foreign(abi := .c)
         export let clock () : Int;
     ",
         );
         assert!(
-            has_diag(&sema, SemaDiagKind::ExternalImportCannotBeExported),
+            !has_diag(&sema, SemaDiagKind::ExternalImportCannotBeExported),
+            "{:?}",
+            sema.diags()
+        );
+        assert!(
+            !has_diag(&sema, SemaDiagKind::ExternalBodyRequiresExport),
+            "{:?}",
+            sema.diags()
+        );
+    }
+
+    #[test]
+    fn external_import_without_export_stays_module_local() {
+        let sema = check(
+            r"
+        @foreign(abi := .c)
+        let clock () : Int;
+    ",
+        );
+        assert!(
+            !has_diag(&sema, SemaDiagKind::ExternalImportCannotBeExported),
+            "{:?}",
+            sema.diags()
+        );
+        assert!(
+            !has_diag(&sema, SemaDiagKind::ExternalBodyRequiresExport),
             "{:?}",
             sema.diags()
         );
@@ -1781,7 +1806,7 @@ mod success {
     fn external_body_requires_export() {
         let sema = check(
             r"
-        @external(abi := .c)
+        @foreign(abi := .c)
         let clock () : Int := 1;
     ",
         );
@@ -1796,7 +1821,7 @@ mod success {
     fn external_export_with_body_sets_direction_by_shape() {
         let sema = check(
             r"
-        @external(abi := .c)
+        @foreign(abi := .c)
         export let clock () : Int := 1;
     ",
         );
@@ -1831,7 +1856,7 @@ mod success {
         let Core := import "a";
         let CInt := Core.Int32;
         let CStringAlias := Core.CString;
-        @external(abi := .c) let strerror (
+        @foreign(abi := .c) let strerror (
           code : CInt,
           directCode : Core.CInt,
           ch : Core.char,
@@ -2686,7 +2711,7 @@ mod failure {
     fn foreign_call_requires_unsafe_block() {
         let module = check(
             r"
-        @external(abi := .c) let clock () : Int;
+        @foreign(abi := .c) let clock () : Int;
         let value := clock();
     ",
         );

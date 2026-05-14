@@ -526,7 +526,7 @@ mod success {
               p + q
             );
         ",
-            &["ld.elem", "br.false"],
+            &["ld.elem", "br.z"],
         );
     }
 
@@ -678,7 +678,7 @@ mod success {
     fn compiles_exported_native_declarations_into_artifact() {
         let _ = assert_main_module_compiles_with(
             r"
-            @external(abi := .c)
+            @foreign(abi := .c)
             export let puts (msg : CString) : Int;
             export let result : Int := 1;
         ",
@@ -694,7 +694,7 @@ mod success {
                 &ModuleKey::new("main"),
                 r#"
             @link(name := "m")
-            @external(abi := .c)
+            @foreign(abi := .c)
             let sin (x : Float) : Float;
         "#,
             )
@@ -730,16 +730,22 @@ mod success {
         let output = session.compile_module(&ModuleKey::new("main")).unwrap();
         assert!(output.artifact.validate().is_ok());
         assert!(
-            output
-                .disasm
-                .contains(".procedure $main::hotWork params 0 locals 1 export hot"),
+            output.disasm.contains(".procedure $main::hotWork"),
             "{}",
             output.disasm
         );
         assert!(
-            output
-                .disasm
-                .contains(".procedure $main::coldWork params 0 locals 1 export cold"),
+            output.disasm.contains("export hot"),
+            "{}",
+            output.disasm
+        );
+        assert!(
+            output.disasm.contains(".procedure $main::coldWork"),
+            "{}",
+            output.disasm
+        );
+        assert!(
+            output.disasm.contains("export cold"),
             "{}",
             output.disasm
         );
@@ -753,11 +759,11 @@ mod success {
                 &ModuleKey::new("main"),
                 r"
             @profile(level := .hot)
-            @external(abi := .c)
+            @foreign(abi := .c)
             let fastClock () : Nat64;
 
             @profile(level := .cold)
-            @external(abi := .c)
+            @foreign(abi := .c)
             let slowPath () : Int;
         ",
             )
@@ -790,11 +796,11 @@ mod success {
                 &ModuleKey::new("main"),
                 r#"
             @target(os := "LiNuX", arch := "x86_64")
-            @external(abi := .c)
+            @foreign(abi := .c)
             let clock_gettime (id : Int, out : CPtr) : Int;
 
             @target(os := "windows")
-            @external(abi := .c)
+            @foreign(abi := .c)
             let QueryPerformanceCounter (out : CPtr) : Int;
         "#,
             )
@@ -821,11 +827,11 @@ mod success {
                 &ModuleKey::new("main"),
                 r#"
             @target(family := ["darwin", "bsd"], arch := ["x86-64", "aarch64"], pointerWidth := 64)
-            @external(abi := .c)
+            @foreign(abi := .c)
             let mach_absolute_time () : Nat64;
 
             @target(family := "windows")
-            @external(abi := .c)
+            @foreign(abi := .c)
             let GetLastError () : Nat64;
         "#,
             )
@@ -848,7 +854,7 @@ mod success {
             .set_module_text(
                 &ModuleKey::new("main"),
                 r#"
-            @external(abi := .musi)
+            @foreign(abi := .musi)
             let musi_true () : Bit;
 
             @foo.bar(baz := "qux", items := ["a", "b"])

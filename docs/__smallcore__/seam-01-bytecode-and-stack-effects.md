@@ -1,6 +1,12 @@
 # SEAM Bytecode and Stack-Effect Verifier
 
-Status: freeze-candidate design document.
+## Set-in-Stone Header
+
+- Set-in-stone track: `docs/__smallcore__/PLAN.md`
+- Set-in-stone status: frozen 0.1.0 baseline active as of `2026-05-14`.
+- Reconciliation source: `docs/__smallcore__/reconciliation.md`
+
+Status: normative freeze document (0.1.0 baseline).
 
 Covers:
 
@@ -190,7 +196,7 @@ nullable/raw pointer conventions
 domain requirements
 ```
 
-`@external` in source contributes to this table, but `@external` body keys are not frozen in this document.
+`@foreign` in source contributes to this table; direction follows shape (`body` presence plus `export`) per `seam-04-external-artifacts-decomp-mar.md`.
 
 ### Bytecode bodies
 
@@ -252,8 +258,6 @@ ld     load/push value
 st     store/pop value
 new    construct/allocate value
 br     branch
-brz    branch if zero
-brnz   branch if nonzero
 call   call
 ret    return
 drop   discard stack value
@@ -275,7 +279,8 @@ glob   global
 fld    field
 elem   element
 len    length
-const  constant table
+c      constant table
+i4     Int32 compact immediate
 obj    object/layout aggregate
 arr    array
 fn     function/callable
@@ -285,7 +290,9 @@ tail   tail call qualifier
 type   type descriptor
 mod    module
 exp    export
-tab    branch table
+dyn    dynamic lookup
+z      branch-on-zero-Bit qualifier
+tbl    branch table
 ```
 
 ### Rejected display naming
@@ -295,7 +302,7 @@ Reject source-shaped or verbose display names:
 ```text
 loadLocal
 storeField
-branchIfFalse
+branchIfZero
 compareGreaterOrEqual
 invokeExternalFunction
 match
@@ -303,25 +310,11 @@ letElse
 yieldStatement
 ```
 
-Reject inconsistent root ordering:
+Use canonical module mnemonics:
 
 ```text
-mdl.load
-mdl.get
-```
-
-Prefer action-first:
-
-```text
-ld.mod
-ld.exp
-```
-
-or use separate operand classes:
-
-```text
-ld mod
-ld exp
+ld.mod.dyn
+ld.exp.dyn
 ```
 
 ## Public vs loader-specialized opcodes
@@ -417,7 +410,7 @@ st.fld f        [Obj, T ;]
 ld.elem         [Array[T], Int ; T]
 st.elem         [Array[mut T], Int, T ;]
 ld.len          [Array[T] ; Nat]
-ld.const c      [; T]
+ld.c c          [; T]
 new.obj id,n    [field0, field1, ... fieldN ; Obj]
 new.arr T,n     [item0, item1, ... itemN ; Array[T]]
 new.fn m,c      [capture0, ... captureC ; Fn]
@@ -426,9 +419,8 @@ call.ind        [Fn, args... ; results...]
 call.ffi d      [args... ; results...]
 ret             [results... ;]
 br target       [S ; target.S]
-brz target      [S, Bit ; target.S]
-brnz target     [S, Bit ; target.S]
-br.tab table    [S, Int ; selectedTarget.S]
+br.z target [S, Bit ; target.S]
+br.tbl table    [S, Int ; selectedTarget.S]
 drop            [A ;]
 dup             [A ; A, A]
 swap            [A, B ; B, A]
@@ -441,7 +433,7 @@ not             [A ; A]
 trap            [; Never] or polymorphic non-returning transition
 ```
 
-`Bool` should be avoided in SEAM. Musi’s primitive condition type is `Bit`. Branch opcodes consume `Bit`, not truthy integers.
+`Bit` is SEAM’s branch predicate type. Branch opcodes consume `Bit` (`0` branches, `1` falls through). Integers are never reinterpreted as predicates.
 
 ## Method signatures
 
@@ -488,7 +480,7 @@ join stack [Int]:
   ret
 ```
 
-A branch transfers the whole current stack after popping its condition/index if applicable. There is no partial branch payload convention.
+A branch transfers the whole current stack after popping its branch operand (`Bit` for `br.z`, index for `br.tbl`). There is no partial branch payload convention.
 
 ## Branch stack rule
 
@@ -504,24 +496,24 @@ Verifier rule:
 current stack must exactly equal target incoming stack
 ```
 
-For zero branch:
+For `br.z` branch:
 
 ```text
-brz target
+br.z target
 ```
 
 Verifier rule:
 
 ```text
 current stack must be target incoming stack + Bit on top
-condition Bit is popped
+top `Bit` is popped
 remaining stack must exactly match target incoming stack
 ```
 
 For table branch:
 
 ```text
-br.tab table
+br.tbl table
 ```
 
 Verifier rule:
@@ -570,24 +562,11 @@ xor
 not
 cmp.eq
 cmp.ne
-cmp.lt.s
-cmp.le.s
-cmp.gt.s
-cmp.ge.s
+cmp.lt
+cmp.le
+cmp.gt
+cmp.ge
 ```
-
-Display spelling can later normalize comparisons to:
-
-```text
-cmp.eq
-cmp.ne
-cmp.lt.s
-cmp.le.s
-cmp.gt.s
-cmp.ge.s
-```
-
-Binary opcode values can remain stable after freeze. Text display can be adjusted before freeze.
 
 Shift/rotate source syntax should be named functions via UFCS. SEAM may still have compact VM mnemonics if they are primitive transitions:
 
@@ -608,14 +587,14 @@ Constants should load through generic constant-table instructions and a small se
 Examples:
 
 ```text
-ld.const c
-ld.i4 small
+ld.c c
+ld.c.i4 small
 ld.str s
 ld.zero type
 ld.one type
 ```
 
-Whether `ld.zero` / `ld.one` exist is an encoding choice. They should not imply source `false` / `true` keywords.
+Whether `ld.zero` / `ld.one` exist is an encoding choice. They denote `0`/`1` bit-or-word constants, not source keyword spelling.
 
 ## Error and trap model at bytecode level
 
@@ -641,7 +620,7 @@ Musi source failures use `Expect[T,E]`. `trap` is not source failure handling. I
 
 ## No exceptions in core SEAM
 
-SEAM should not add exception tables as default control. Source `Expect` and `Maybe` lower to data. Cleanup lowers through explicit exit paths or runtime frame cleanup records. If a host ABI can throw, `@external`/external descriptors must specify the boundary behavior; source does not gain `throw`/`catch`.
+SEAM should not add exception tables as default control. Source `Expect` and `Maybe` lower to data. Cleanup lowers through explicit exit paths or runtime frame cleanup records. If a host ABI can throw, `@foreign`/external descriptors must specify the boundary behavior; source does not gain `throw`/`catch`.
 
 ## Diagnostics
 
@@ -654,7 +633,7 @@ target expects:    [Word]
 ```
 
 ```text
-error: `brz` requires Bit on top of stack
+error: `br.z` requires Bit on top of stack
 found: Int
 ```
 
@@ -672,7 +651,7 @@ Freeze these before opcode numbers:
 [x] rightmost-is-top convention
 [x] block signature syntax
 [x] method result stack syntax
-[ ] branch stack rule
+[x] branch stack rule
 [x] table-branch common-target-stack rule
 [x] display segment naming convention
 [x] public/internal opcode split

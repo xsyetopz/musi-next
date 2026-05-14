@@ -54,7 +54,7 @@ impl Vm {
             Opcode::DivS => self.exec_fast_int_op(runtime, i64::checked_div),
             Opcode::RemS => self.exec_fast_int_op(runtime, i64::checked_rem),
             Opcode::Br => self.exec_fast_br(runtime),
-            Opcode::BrFalse => self.exec_fast_brfalse(runtime),
+            Opcode::BrZ => self.exec_fast_brz(runtime),
             Opcode::Call => self.execute_runtime_call(runtime),
             Opcode::TailCall => self.exec_fast_tail_call(runtime),
             Opcode::CallInd | Opcode::NewFn => self.exec_fast_call_edge(runtime),
@@ -106,7 +106,7 @@ impl Vm {
             | Opcode::Or
             | Opcode::Xor
             | Opcode::Not => self.exec_scalar(instruction),
-            Opcode::Br | Opcode::BrFalse | Opcode::BrTbl => self.exec_branch(instruction),
+            Opcode::Br | Opcode::BrZ | Opcode::BrTbl => self.exec_branch(instruction),
             Opcode::Call if matches!(instruction.operand, music_seam::Operand::I16(_)) => {
                 self.exec_type(instruction)
             }

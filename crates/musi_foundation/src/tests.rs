@@ -235,7 +235,7 @@ mod success {
             }
 
             assert!(
-                source.contains("@external(abi := .musi)"),
+                source.contains("@foreign(abi := .musi)"),
                 "{} should stay a native host module or move to @std",
                 module.spec
             );

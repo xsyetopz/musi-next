@@ -1,6 +1,6 @@
 # Builtin Items, Intrinsics, And Attributes
 
-Status: current small-core draft
+Status: frozen 0.1.0 host-language baseline
 
 `known` is source syntax for compiler-known phase information. Reserved
 `@musi.*` attributes mark compiler-owned foundation bindings and intrinsics.
@@ -40,7 +40,9 @@ Accepted public source attributes:
 @deprecated
 @skip
 @layout
-@external
+@foreign
+@link
+@target
 ```
 
 Attribute names and keys use camelCase where needed.
@@ -83,19 +85,49 @@ let Header := data {
 };
 ```
 
-## `@external`
+Common forms:
 
-External linkage uses `@external` on ordinary declarations. Direction is visible
+```text
+.packed
+.c
+.transparent
+```
+
+## `@foreign`
+
+Foreign ABI linkage uses `@foreign` on callable declarations. Direction is derived
 from `export` and body presence.
 
 Rules:
 
-- `@external` plus a declaration without a body imports an external implementation.
-- `@external` plus `export` plus a body exports an external entry point.
-- `export` without `@external` is a public Musi API only.
-- `@external` without `export` but with a body is invalid.
-- `@external` with `export` but without a body is invalid in the core.
+- `@foreign` plus a declaration without a body imports an external implementation.
+- `@foreign` plus `export` plus a body exports an external entry point.
+- `export` without `@foreign` is a public Musi API only.
+- `@foreign` without `export` but with a body is invalid.
 - Do not duplicate direction with `mode`, `import`, or `export` keys.
 
-The body may include external facts not already visible in source, such as ABI,
-external name, and stack effect.
+The attribute may include external facts such as ABI and foreign symbol name.
+
+```musi
+@foreign(abi := .c, symbol := "strlen")
+export let strlen (value : CString) : Nat;
+```
+
+## `@link`
+
+Declares a native library/link requirement for a foreign binding.
+
+```musi
+@link(name := "m")
+@foreign(abi := .c, symbol := "pow")
+let pow (base : Float, exponent : Float) : Float;
+```
+
+## `@target`
+
+Target/platform availability predicate.
+
+```musi
+@target(os := "linux", arch := "x86_64", pointerWidth := 64)
+let platformWordSize := 64;
+```

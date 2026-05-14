@@ -640,7 +640,7 @@ mod success {
                     CodeEntry::Label(Label { id: 0 }),
                     CodeEntry::Instruction(Instruction::new(Opcode::LdLoc, Operand::Local(0))),
                     CodeEntry::Instruction(Instruction::new(Opcode::LdLoc, Operand::Local(1))),
-                    CodeEntry::Instruction(Instruction::new(Opcode::BrFalse, Operand::Label(1))),
+                    CodeEntry::Instruction(Instruction::new(Opcode::BrZ, Operand::Label(1))),
                     CodeEntry::Instruction(Instruction::new(Opcode::Br, Operand::Label(2))),
                     CodeEntry::Label(Label { id: 1 }),
                     CodeEntry::Instruction(Instruction::new(Opcode::Br, Operand::Label(2))),
@@ -1753,7 +1753,7 @@ mod failure {
                     CodeEntry::Label(Label { id: 0 }),
                     CodeEntry::Instruction(Instruction::new(Opcode::LdLoc, Operand::Local(0))),
                     CodeEntry::Instruction(Instruction::new(Opcode::LdLoc, Operand::Local(1))),
-                    CodeEntry::Instruction(Instruction::new(Opcode::BrFalse, Operand::Label(1))),
+                    CodeEntry::Instruction(Instruction::new(Opcode::BrZ, Operand::Label(1))),
                     CodeEntry::Label(Label { id: 1 }),
                 ]),
             )

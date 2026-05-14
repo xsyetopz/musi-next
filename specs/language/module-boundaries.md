@@ -1,8 +1,8 @@
 # Import, Export, And External Boundaries
 
-Status: proposed
+Status: frozen 0.1.0 host-language baseline
 
-Musi uses `import` and `export` for module visibility. Native or host ABI boundaries use `@external` metadata on ordinary declarations. There is no `native`, `extern`, `pub`, or `foreign` source keyword in the small core.
+Musi uses `import` and `export` for module visibility. Native or host ABI boundaries use `@foreign` metadata on ordinary declarations. There is no `native`, `extern`, `pub`, or `foreign` source keyword in the small core.
 
 ## Exports
 
@@ -30,14 +30,14 @@ export hidden let File := data {
 let io := import "@std/io";
 ```
 
-`as` is not import alias syntax. It aliases matched or refined values only.
+`as` is not import alias syntax. It is pattern alias syntax (`pat as name`). Casts and type tests use `:>` and `:?>`.
 
 ## External Boundaries
 
-`@external + declaration without body` imports an external implementation. `@external + export + body` exports an external entry point. Direction is visible from `export` and body presence; do not duplicate direction with `mode`, `import`, or `export` keys.
+`@foreign + declaration without body` imports an external implementation. `@foreign + export + body` exports an external entry point. Direction is visible from `export` and body presence; do not duplicate direction with `mode`, `import`, or `export` keys.
 
 ```musi
-@external(
+@foreign(
   name := "musi_read",
   abi := .c,
   stack := [Word, Ptr[Byte], Nat ; Nat]
@@ -45,4 +45,4 @@ let io := import "@std/io";
 let readFd(fd : Word, ptr : Ptr[Byte], len : Nat) : Nat;
 ```
 
-Exact `@external` body keys beyond non-direction facts are not canonicalized here.
+Exact `@foreign` body keys beyond non-direction facts are not canonicalized here.

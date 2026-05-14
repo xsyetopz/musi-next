@@ -14,9 +14,9 @@ options {
 // Surface policy: - `let` names values. Form keywords (`data`, `shape`, `import`, `if`, `match`,
 // `defer`, `yield`, `unsafe`, `pin`) build expressions; they do not name values. - Keywords never
 // become callees. `import "a"` and tuple imports like `import ("a", "b")` remain keyword syntax,
-// not calls on an identifier named `import`. - Structural blocks use `{ ... }`;
-// imperative/sequence blocks use `( ... )`. - Lambdas must start with `\`, so `=>` can remain
-// unambiguous branch-arm syntax too.
+// not calls on an identifier named `import`. - Structural blocks use `{ ... }`; imperative/sequence
+// blocks use `( ... )`. - Lambdas must start with `\`, so `=>` can remain unambiguous branch-arm
+// syntax too.
 
 root: root_stmt* EOF;
 
@@ -258,7 +258,11 @@ constraint: ident (PIPE_EQ | TILDE_EQ) expr;
 
 // --- Patterns ---
 
-pattern: pattern_primary;
+pattern: pattern_or;
+
+pattern_or: pattern_as (KW_OR pattern_as)*;
+
+pattern_as: pattern_primary (KW_AS ident)?;
 
 pattern_primary:
 	UNDERSCORE
@@ -274,11 +278,11 @@ variant_pat_arg_list:
 
 variant_pat_arg: ident COLON_EQ pattern | pattern;
 
-rec_pat_fields: rec_pat_field (COMMA rec_pat_field)*;
+rec_pat_fields: rec_pat_field (COMMA rec_pat_field)* COMMA?;
 
 rec_pat_field: ident (COLON pattern)?;
 
-pat_list: pattern (COMMA pattern)*;
+pat_list: pattern (COMMA pattern)* COMMA?;
 
 // --- Attributes ---
 

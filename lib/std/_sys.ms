@@ -1,30 +1,30 @@
 --! System module.
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__targetOs () : String;
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__targetArch () : String;
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__targetArchFamily () : String;
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__targetFamily () : String;
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__targetPointerWidth () : Int;
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__targetEndian () : String;
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__matchesOs (value : String) : Bit;
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__matchesArch (value : String) : Bit;
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__matchesFamily (value : String) : Bit;
 
 --- Raw target operating system name.

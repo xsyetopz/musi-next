@@ -1,6 +1,6 @@
 # SEAM Module Format
 
-Status: proposed
+Status: frozen 0.1.0 baseline (2026-05-14)
 
 This spec defines the public SEAM module formats.
 
@@ -181,7 +181,7 @@ Opcode wire model:
 
 - primary opcode: one byte (`0x00..0xFE`)
 - extended opcode: prefix `0xFF` plus a two-byte opcode id
-- `disasm` mnemonics are canonical dotted names such as `ld.loc`, `br.false`, `call.ind`, `new.obj`, and `call.ffi`
+- `disasm` mnemonics are canonical dotted names such as `ld.loc`, `br.z`, `call.ind`, `new.obj`, and `call.ffi`
 - assembler/disassembler mnemonics are canonical and alias-free
 - opcode semantics, stack effects, and numeric positions are defined by `specs/seam/bytecode.md`
 

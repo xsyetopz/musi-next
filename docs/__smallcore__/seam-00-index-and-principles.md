@@ -1,6 +1,14 @@
 # SEAM Design Documents — Index and Principles
 
-Status: freeze-candidate discussion document.
+## Set-in-Stone Header
+
+- Set-in-stone track: `docs/__smallcore__/PLAN.md`
+- Set-in-stone status: frozen 0.1.0 baseline active as of `2026-05-14`.
+- Reconciliation source: `docs/__smallcore__/reconciliation.md`
+
+Status: normative freeze document (0.1.0 baseline).
+
+Roadmap linkage: `docs/__smallcore__/PLAN.md`
 
 This set of documents defines the SEAM bytecode and VM direction for the stripped-down Musi language. It assumes the source language has already frozen the small-core direction: expression-based source, `if then else`, `match`, `let ... else`, `mut`, `known`, `pin`, `defer`, `yield`, `hidden`, `erased`, `Maybe`, `Expect`, `?T`, `E!T`, `??`, capability objects, UFCS/UDNS, and source maps as the only authorship recovery layer.
 
@@ -34,7 +42,7 @@ There is no canonical `.seamil` peer file. Textual bytecode is a **view** of `.s
 2. `seam-01-bytecode-and-stack-effects.md` — bytecode artifact shape, opcode/mnemonic design, stack-effect notation, verifier model, and branch rules.
 3. `seam-02-calls-objects-and-layouts.md` — function/call/frame model plus object, variant, data, layout, module, and descriptor model.
 4. `seam-03-runtime-gc-pinning-yield-defer.md` — runtime, generational mark-region/Immix GC, root maps, `defer`, `pin`, `yield`, and coroutine frame design.
-5. `seam-04-external-artifacts-decomp-mar.md` — external ABI boundary, `@external`, `.seam`, `.mar`, debug/release/fat/thin profiles, `disasm`, `decomp`, source maps, and name mangling.
+5. `seam-04-external-artifacts-decomp-mar.md` — external ABI boundary, `@foreign`, `.seam`, `.mar`, debug/release/fat/thin profiles, `disasm`, `decomp`, source maps, and name mangling.
 
 Together these cover the nine SEAM design topics:
 
@@ -192,35 +200,26 @@ cmp.eq
 
 is not the bytecode identity. Binary `.seam` stores numeric opcode ids, variant ids, descriptor indexes, immediates, and table offsets.
 
-A disassembler may show either:
+A disassembler shows canonical dotted mnemonics:
 
 ```text
 ld.loc 0
 call.ffi 3
 ```
 
-or:
-
-```text
-ld loc 0
-call ffi 3
-```
-
-The display style is not the machine identity.
+The text style is fixed for this baseline.
 
 ## Opcode naming constraints
 
 Mnemonic segments should be short, conventional, and technological. Segment length should usually be 2–5 characters.
 
-Good roots:
+Frozen root families:
 
 ```text
 ld     load/push
 st     store/pop
 new    construct/allocate
 br     branch
-brz    branch if zero
-brnz   branch if nonzero
 call   call
 ret    return
 cmp    compare
@@ -234,7 +233,16 @@ pin    pin lease op, if represented in bytecode
 yld    yield/suspend op, if represented in bytecode
 ```
 
-Good variants/targets:
+Frozen branch and module qualifiers:
+
+```text
+br.z        branch when top Bit = 0
+br.tbl      branch-table dispatch
+ld.mod.dyn  dynamic module load
+ld.exp.dyn  dynamic module export lookup
+```
+
+Frozen target/operand qualifiers:
 
 ```text
 loc    local
@@ -242,7 +250,8 @@ glob   global
 fld    field
 elem   element
 len    length
-const  constant pool
+c      constant pool
+i4     Int32 compact immediate
 obj    object/layout aggregate
 arr    array
 fn     function/callable
@@ -250,9 +259,10 @@ ind    indirect target
 ffi    foreign ABI edge
 tail   tail call qualifier
 type   type descriptor
-mod    module
-exp    export
-tab    branch table
+mod    module qualifier
+exp    export qualifier
+dyn    dynamic lookup qualifier
+tbl    branch-table qualifier
 ```
 
 No aliases. No cute names. No source words as opcodes unless the VM transition is truly identical.
@@ -400,6 +410,6 @@ The main deliberate revisions are:
 ```text
 `.seamil` becomes a disassembly view, not a canonical peer artifact.
 Dotted mnemonic spelling becomes display text, not bytecode identity.
-`mdl.load`-style module-first action order is rejected in favor of action-first families.
+Old module-first spellings are removed; canonical forms are `ld.mod.dyn` and `ld.exp.dyn`.
 `.mar` is a stable archive format with debug/release and thin/fat profiles.
 ```

@@ -1,6 +1,6 @@
 # Source Syntax
 
-Status: current small-core draft
+Status: frozen 0.1.0 host-language baseline
 
 ## Delimiters
 
@@ -77,6 +77,34 @@ match value (
 
 `let pattern := expr else fallback;` is refutable forward binding.
 
+## Patterns
+
+Pattern forms are:
+
+- wildcard: `_`
+- literal pattern
+- binder pattern: `name`
+- variant destructure: `.Tag(...)`
+- record destructure: `{field}` or `{field: innerPattern}`
+- tuple destructure: `(a, b, ...)`
+- array destructure: `[a, b, ...]`
+
+Pattern operators are frozen as:
+
+- alias pattern: `pat as name`
+- alternative pattern: `left or right`
+
+Precedence is:
+
+- `as` binds tighter than `or`
+- `or` chains left-to-right
+
+Named variant payload destructuring uses `name := pattern`.
+
+Trailing commas are accepted in tuple/array/variant/record pattern forms where list syntax appears.
+
+Casts and type tests do not use `as`; they use `:>` and `:?>`.
+
 ## Functions And Calls
 
 Lambdas start with `\`. Function types use `->`.
@@ -113,8 +141,15 @@ Accepted source attributes are:
 @deprecated
 @skip
 @layout
-@external
+@foreign
+@link
+@target
 ```
 
-`@external` direction comes from `export` and body presence; it does not use
+`@foreign` direction comes from `export` and body presence; it does not use
 `mode`, `import`, or `export` keys.
+
+`@link` declares native library link requirements for foreign bindings.
+
+`@target` gates declarations with target predicates such as OS, architecture,
+or pointer width.

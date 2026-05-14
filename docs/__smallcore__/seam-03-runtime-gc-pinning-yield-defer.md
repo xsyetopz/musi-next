@@ -1,6 +1,12 @@
 # SEAM Runtime, GC, Root Maps, `defer`, `pin`, `yield`, and Coroutines
 
-Status: freeze-candidate design document.
+## Set-in-Stone Header
+
+- Set-in-stone track: `docs/__smallcore__/PLAN.md`
+- Set-in-stone status: frozen 0.1.0 baseline active as of `2026-05-14`.
+- Reconciliation source: `docs/__smallcore__/reconciliation.md`
+
+Status: normative freeze document (0.1.0 baseline).
 
 Covers:
 

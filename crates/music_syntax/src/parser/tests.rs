@@ -174,7 +174,7 @@ mod success {
     }
 
     #[test]
-    fn parses_as_for_pattern_and_type_test_aliases() {
+    fn parses_as_pattern_alias_in_match_arms() {
         let parsed = parse(
             Lexer::new(
                 r"
@@ -309,6 +309,16 @@ mod success {
             )
             .lex(),
         );
+        assert!(
+            parsed.errors().is_empty(),
+            "unexpected errors: {:?}",
+            parsed.errors()
+        );
+    }
+
+    #[test]
+    fn parses_record_destructuring_with_trailing_comma() {
+        let parsed = parse(Lexer::new("let {a, b: c,} := source;").lex());
         assert!(
             parsed.errors().is_empty(),
             "unexpected errors: {:?}",

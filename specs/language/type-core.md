@@ -1,6 +1,6 @@
 # Core Type Model
 
-Status: current small-core draft
+Status: frozen 0.1.0 host-language baseline
 
 ## Primitive And Library Types
 
@@ -26,8 +26,8 @@ T |= Shape
 
 Read this as "`T` conforms to `Shape`".
 
-The word `fits` is reserved for diagnostics or future tooling, but it is not
-current source syntax.
+The word `fits` is reserved for diagnostics and tooling prose, but it is not
+source syntax.
 
 Type equivalence uses `~=`:
 

@@ -177,7 +177,7 @@ impl Vm {
         Ok(StepOutcome::Continue)
     }
 
-    pub(super) fn exec_fast_brfalse(
+    pub(super) fn exec_fast_brz(
         &mut self,
         runtime: &RuntimeInstruction,
     ) -> VmResult<StepOutcome> {

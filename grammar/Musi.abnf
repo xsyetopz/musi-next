@@ -2,86 +2,227 @@
 ;
 ; Canonical tool grammar lives in `grammar/MusiLexer.g4` and
 ; `grammar/MusiParser.g4`. This ABNF records the clean-break small-core syntax.
+ALPHA            = %x41-5A
+                   / %x61-7A
 
-ALPHA      = %x41-5A / %x61-7A
-DIGIT      = %x30-39
-HEXDIG     = DIGIT / %x41-46 / %x61-66
-SP         = %x20
-HTAB       = %x09
-LF         = %x0A
-CR         = %x0D
-WSP        = SP / HTAB / CR / LF
+DIGIT            = %x30-39
 
-ident      = ALPHA *(ALPHA / DIGIT / "_")
-int-lit    = 1*DIGIT
-string-lit = DQUOTE *(%x20-21 / %x23-5B / %x5D-7E) DQUOTE
-rune-lit   = %x27 (%x20-26 / %x28-5B / %x5D-7E) %x27
-literal    = int-lit / string-lit / rune-lit
+HEXDIG           = DIGIT
+                   / %x41-46
+                   / %x61-66
 
-keyword = "and" / "as" / "data" / "defer" / "else" / "erased" /
-          "export" / "hidden" / "if" / "import" / "in" / "known" /
-          "let" / "match" / "mut" / "not" / "or" / "pin" / "shape" /
-          "recur" / "then" / "unsafe" / "where" / "xor" / "yield"
+SP               = %x20
 
-source     = *stmt
-stmt       = expr ";"
+HTAB             = %x09
 
-expr       = let-expr / if-expr / match-expr / defer-expr / yield-expr /
-             pin-expr / unsafe-expr / import-expr / data-expr / shape-expr /
-             lambda-expr / block-expr / primary *(infix-op primary)
+LF               = %x0A
 
-primary    = literal / ident / variant-expr / tuple-expr / array-expr /
-             record-expr / stack-effect / "(" expr ")"
+CR               = %x0D
 
-let-expr   = ["export" ["hidden"]] ["known"] "let" ["recur"] pattern type-params
-             params [type-annot] [where-clause] ":=" expr ["else" expr]
+WSP              = SP
+                   / HTAB
+                   / CR
+                   / LF
 
-type-params = ["[" ident *("," ident) [","] "]"]
-params      = ["(" [param *("," param) [","]] ")"]
-param       = ["known"] ident [type-annot] [":=" expr]
-type-annot  = ":" type-expr
+ident            = ALPHA *(ALPHA / DIGIT / "_")
 
-type-expr   = ["?" / "mut" / "erased" / "hidden"] primary-type
-primary-type = ident ["[" type-expr *("," type-expr) [","] "]"] /
-               "(" [type-expr *("," type-expr)] ")" /
-               stack-effect
+int-lit          = 1*DIGIT
 
-if-expr     = "if" expr "then" expr "else" expr
-match-expr  = "match" expr "(" ["|"] [match-arm *("|" match-arm) ["|"]] ")"
-match-arm   = pattern ["where" expr] "=>" expr
+exp-part         = ("e" / "E") ["+" / "-"] 1*DIGIT
 
-defer-expr  = "defer" expr ["where" expr]
-yield-expr  = "yield" expr
-pin-expr    = "pin" expr "as" ident "in" expr
-unsafe-expr = "unsafe" block-expr
-import-expr = "import" expr
-lambda-expr = "\" params [type-annot] "=>" expr
-block-expr  = "(" [expr *(";" expr) [";"]] ")"
+float-suffix     = "f"
+                   / "f32"
+                   / "f64"
 
-data-expr   = "data" "{" (fields / variants / ";" / "|") "}"
-fields      = [";"] field *(";" field) [";"]
-field       = "let" ident type-annot [":=" expr]
-variants    = ["|"] variant *("|" variant) ["|"]
-variant     = ident ["(" [variant-field *("," variant-field) [","]] ")"] [":=" expr]
-variant-field = ident ":" type-expr / type-expr
+float-lit        = (1*DIGIT "." 1*DIGIT [exp-part] [float-suffix])
+                   / ("." 1*DIGIT [exp-part] [float-suffix])
+                   / (1*DIGIT exp-part [float-suffix])
 
-shape-expr  = "shape" "{" *shape-member "}"
-shape-member = "let" ident params [type-annot] [":=" expr] ";"
+string-lit       = DQUOTE *(%x20-21 / %x23-5B / %x5D-7E) DQUOTE
 
-pattern     = "_" / literal / ident / variant-pattern / tuple-pattern / array-pattern
-variant-pattern = "." ident ["(" [pattern *("," pattern) [","]] ")"]
-tuple-pattern = "(" [pattern *("," pattern) [","]] ")"
-array-pattern = "[" [pattern *("," pattern) [","]] "]"
+rune-lit         = %x27 (%x20-26 / %x28-5B / %x5D-7E) %x27
 
-variant-expr = "." ident ["(" [expr *("," expr) [","]] ")"]
-tuple-expr   = "(" [expr *("," expr) [","]] ")"
-array-expr   = "[" "," "]" / "[" [expr *("," expr) [","]] "]"
-record-expr  = "{" [record-field *("," record-field) [","]] "}"
-record-field = ident [":=" expr]
-stack-effect = "[" [type-expr *("," type-expr)] ";" [type-expr *("," type-expr)] "]"
+literal          = int-lit
+                   / float-lit
+                   / string-lit
+                   / rune-lit
 
-infix-op = ":=" / "|>" / "->" / "??" / ":>" / ":?>" / "or" / "xor" / "and" /
-           "=" / "/=" / "~=" / "<" / ">" / "<=" / ">=" / "..<" / ".." / "in" /
-           "+" / "-" / "*" / "/" / "%"
-where-clause = "where" constraint *("," constraint)
-constraint = ident ("|=" / "~=") type-expr
+keyword          = "and"
+                   / "as"
+                   / "data"
+                   / "defer"
+                   / "else"
+                   / "erased"
+                   / "export"
+                   / "hidden"
+                   / "if"
+                   / "import"
+                   / "in"
+                   / "known"
+                   / "let"
+                   / "match"
+                   / "mut"
+                   / "not"
+                   / "or"
+                   / "pin"
+                   / "shape"
+                   / "recur"
+                   / "then"
+                   / "unsafe"
+                   / "where"
+                   / "xor"
+                   / "yield"
+
+source           = *stmt
+
+stmt             = expr ";"
+
+expr             = let-expr
+                   / if-expr
+                   / match-expr
+                   / defer-expr
+                   / yield-expr
+                   / pin-expr
+                   / unsafe-expr
+                   / import-expr
+                   / data-expr
+                   / shape-expr
+                   / lambda-expr
+                   / block-expr
+                   / primary *(infix-op primary)
+
+primary          = literal
+                   / ident
+                   / variant-expr
+                   / tuple-expr
+                   / array-expr
+                   / record-expr
+                   / stack-effect
+                   / "(" expr ")"
+
+let-expr         = ["export" ["hidden"]] ["known"] "let" ["recur"] pattern
+                   type-params params [type-annot] [where-clause] ":=" expr
+                   ["else" expr]
+
+type-params      = ["[" ident *("," ident) [","] "]"]
+
+params           = ["(" [param *("," param) [","]] ")"]
+
+param            = ["known"] ident [type-annot] [":=" expr]
+
+type-annot       = ":" type-expr
+
+type-expr        = ["?" / "mut" / "erased" / "hidden"] primary-type
+
+primary-type     = ident ["[" type-expr *("," type-expr) [","] "]"]
+                   / "(" [type-expr *("," type-expr)] ")"
+                   / stack-effect
+
+if-expr          = "if" expr "then" expr "else" expr
+
+match-expr       = "match" expr "(" ["|"] [match-arm *("|" match-arm) ["|"]] ")"
+
+match-arm        = pattern ["where" expr] "=>" expr
+
+defer-expr       = "defer" expr ["where" expr]
+
+yield-expr       = "yield" expr
+
+pin-expr         = "pin" expr "as" ident "in" expr
+
+unsafe-expr      = "unsafe" block-expr
+
+import-expr      = "import" expr
+
+lambda-expr      = "\" params [type-annot] "=>" expr
+
+block-expr       = "(" [expr *(";" expr) [";"]] ")"
+
+data-expr        = "data" "{" (fields / variants / ";" / "|") "}"
+
+fields           = [";"] field *(";" field) [";"]
+
+field            = "let" ident type-annot [":=" expr]
+
+variants         = ["|"] variant *("|" variant) ["|"]
+
+variant          = ident ["(" [variant-field *("," variant-field) [","]] ")"]
+                   [":=" expr]
+
+variant-field    = ident ":" type-expr
+                   / type-expr
+
+shape-expr       = "shape" "{" *shape-member "}"
+
+shape-member     = "let" ident params [type-annot] [":=" expr] ";"
+
+pattern          = or-pattern
+
+or-pattern       = as-pattern *("or" as-pattern)
+
+as-pattern       = pattern-primary ["as" ident]
+
+pattern-primary  = "_"
+                   / literal
+                   / ident
+                   / variant-pattern
+                   / record-pattern
+                   / tuple-pattern
+                   / array-pattern
+
+variant-pattern  = "." ident ["(" [variant-pat-arg *("," variant-pat-arg) [","]]
+                   ")"]
+
+variant-pat-arg  = ident ":=" pattern
+                   / pattern
+
+record-pattern   = "{" [record-pat-field *("," record-pat-field) [","]] "}"
+
+record-pat-field = ident [":" pattern]
+
+tuple-pattern    = "(" [pattern *("," pattern) [","]] ")"
+
+array-pattern    = "[" [pattern *("," pattern) [","]] "]"
+
+variant-expr     = "." ident ["(" [expr *("," expr) [","]] ")"]
+
+tuple-expr       = "(" [expr *("," expr) [","]] ")"
+
+array-expr       = "[" "," "]"
+                   / "[" [expr *("," expr) [","]] "]"
+
+record-expr      = "{" [record-field *("," record-field) [","]] "}"
+
+record-field     = ident [":=" expr]
+
+stack-effect     = "[" [type-expr *("," type-expr)] ";" [type-expr *(","
+                   type-expr)] "]"
+
+infix-op         = ":="
+                   / "|>"
+                   / "->"
+                   / "??"
+                   / ":>"
+                   / ":?>"
+                   / "or"
+                   / "xor"
+                   / "and"
+                   / "="
+                   / "/="
+                   / "~="
+                   / "<"
+                   / ">"
+                   / "<="
+                   / ">="
+                   / "..<"
+                   / ".."
+                   / "in"
+                   / "+"
+                   / "-"
+                   / "*"
+                   / "/"
+                   / "%"
+
+where-clause     = "where" constraint *("," constraint)
+
+constraint       = ident ("|=" / "~=") type-expr

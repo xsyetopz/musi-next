@@ -4,65 +4,65 @@ let core := import "musi:core";
 
 let Bits := core.Bits;
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__zero1 () : Bits[1];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__zero8 () : Bits[8];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__zero16 () : Bits[16];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__zero32 () : Bits[32];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__zero64 () : Bits[64];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__ones1 () : Bits[1];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__ones8 () : Bits[8];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__ones16 () : Bits[16];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__ones32 () : Bits[32];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__ones64 () : Bits[64];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__fromNat1 (value : Nat) : Bits[1];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__fromNat8 (value : Nat) : Bits[8];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__fromNat16 (value : Nat) : Bits[16];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__fromNat32 (value : Nat) : Bits[32];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__fromNat64 (value : Nat) : Bits[64];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__fromInt1 (value : Int) : Bits[1];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__fromInt8 (value : Int) : Bits[8];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__fromInt16 (value : Int) : Bits[16];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__fromInt32 (value : Int) : Bits[32];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__fromInt64 (value : Int) : Bits[64];
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__toNat1 (value : Bits[1]) : Nat;
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__toNat8 (value : Bits[8]) : Nat;
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__toNat16 (value : Bits[16]) : Nat;
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__toNat32 (value : Bits[32]) : Nat;
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__toNat64 (value : Bits[64]) : Nat;
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__toInt1 (value : Bits[1]) : Int;
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__toInt8 (value : Bits[8]) : Int;
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__toInt16 (value : Bits[16]) : Int;
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__toInt32 (value : Bits[32]) : Int;
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__toInt64 (value : Bits[64]) : Int;
 
 --- Build zero-valued 1-bit bits.

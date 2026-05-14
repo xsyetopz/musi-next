@@ -1,6 +1,6 @@
 # Musi
 
-> Musi is an expression-first programming language with typed effects, a SEAM bytecode pipeline, package tooling, a first-party standard library, and Rust compiler/runtime/tooling crates. Current version: `0.1.0-alpha.1`; language and stdlib shape are still changing.
+> Musi is an expression-first programming language with typed effects, a SEAM bytecode pipeline, package tooling, a first-party standard library, and Rust compiler/runtime/tooling crates. Current version: `0.1.0`; language contracts are frozen for the 0.1.0 baseline.
 
 Use this file as the concise LLM entry point. Use `llms-full.txt` for a fuller inline repository and language briefing.
 
@@ -21,7 +21,7 @@ Use this file as the concise LLM entry point. Use `llms-full.txt` for a fuller i
 - [Core type model](specs/language/type-core.md): primitive/library types, data shapes, mutability, absence/failure sugar, callables, and ranges.
 - [First-class everything](specs/language/first-class-everything.md): expression-first language design and first-class surfaces.
 - [Items and attributes](specs/language/items-and-attributes.md): builtin metadata, intrinsics, and public attributes.
-- [Module boundaries](specs/language/module-boundaries.md): imports, exports, hidden exports, and `@external`.
+- [Module boundaries](specs/language/module-boundaries.md): imports, exports, hidden exports, and `@foreign`.
 - [Contextual capabilities](specs/language/contextual-capabilities.md): `shape`, `erased`, and explicit capability values.
 - [Yield and capabilities](specs/language/yield-and-capabilities.md): `defer`, `yield`, `pin`, and consequence-bearing forms.
 - [Runtime interop](specs/runtime/interop.md): runtime interoperability model.

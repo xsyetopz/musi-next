@@ -1,10 +1,10 @@
 catalog sema music_sema SemaDiagKind crates/music_sema/src/diag_catalog_gen.rs
 
 diag AttrDuplicateRepr 3000
-  message "`@repr` attribute duplicate"
+  message "`@layout form` attribute duplicate"
 
 diag AttrReprRequiresKindString 3001
-  message "`@repr` needs string `kind` argument"
+  message "`@layout form needs variant value"
 
 diag AttrLayoutArgRequiresName 3002
   message "`@layout` argument needs name"
@@ -91,12 +91,12 @@ diag ForeignSignatureRequired 3021
   message "native binding needs signature"
 
 diag ExternalImportCannotBeExported 3309
-  message "`@external` import cannot be exported"
-  primary "`@external` declaration has no body"
+  message "`@foreign` import cannot be exported"
+  primary "`@foreign` declaration has no body"
 
 diag ExternalBodyRequiresExport 3310
-  message "`@external` body needs `export`"
-  primary "`@external` body must be exported"
+  message "`@foreign` body needs `export`"
+  primary "`@foreign` body must be exported"
 
 diag InvalidPartialModifier 3120
   message "`partial` target invalid"

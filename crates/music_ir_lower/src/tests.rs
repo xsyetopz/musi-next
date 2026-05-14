@@ -513,7 +513,7 @@ mod success {
         let ir = lower(
             r"
         export let id[T] (x : T) : T := x;
-        @external(abi := .musi)
+        @foreign(abi := .musi)
         let readLine () : String;
         export let Eq[T] := shape {
           let (=) (a : T, b : T) : Bit;
@@ -590,7 +590,7 @@ mod success {
         let ir = lower(
             r"
         let Maybe := data { | Some(Int) | None };
-        @external(abi := .c)
+        @foreign(abi := .c)
         let puts (value : CString) : Int;
         export let result () : Int := 42;
     ",
@@ -623,7 +623,7 @@ mod success {
     fn lowers_fixed_width_foreign_type_names() {
         let ir = lower(
             r"
-        @external(abi := .c)
+        @foreign(abi := .c)
         let sample (x : Int32, y : Nat64, z : Float32) : Float64;
     ",
         );
@@ -642,7 +642,7 @@ mod success {
             r"
         let CInt := Int32;
         let CStringAlias := CString;
-        @external(abi := .c)
+        @foreign(abi := .c)
         let strerror (code : CInt) : CStringAlias;
     ",
         );

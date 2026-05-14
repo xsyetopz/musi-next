@@ -1,6 +1,6 @@
 # First-Class Core Values
 
-Status: current small-core draft
+Status: frozen 0.1.0 host-language baseline
 
 Musi keeps compiler-owned syntax small. A concept should be syntax only when
 ordinary values cannot safely express its consequence.
@@ -56,7 +56,7 @@ let Reader := shape {
 };
 ```
 
-## Open Design Check
+## Design Check
 
 Before adding syntax, ask:
 

@@ -142,7 +142,7 @@ export hidden let Maybe [T] := data {
 export hidden let Abort := shape {
 };
 
-@external(abi := .musi)
+@foreign(abi := .musi)
 let Musi__abort () : Empty;
 
 --- Abort current computation.

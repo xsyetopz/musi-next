@@ -91,7 +91,7 @@ mod success {
         let ir = lower_ir(
             r"
         let Option := data { | Some(Int) | None };
-        @external(abi := .c)
+        @foreign(abi := .c)
         let puts (value : CString) : Int;
         export let result : Int := 42;
         export let forty_two () : Int := 42;
@@ -173,7 +173,7 @@ mod success {
         export let bitsNot (value : Bits[4]) : Bits[4] := not value;
     ",
             &[
-                Opcode::BrFalse,
+                Opcode::BrZ,
                 Opcode::And,
                 Opcode::Or,
                 Opcode::Xor,
@@ -242,7 +242,7 @@ mod success {
                 Opcode::StGlob,
                 Opcode::LdElem,
                 Opcode::StElem,
-                Opcode::BrFalse,
+                Opcode::BrZ,
             ],
         );
     }
@@ -366,7 +366,7 @@ mod success {
         let opcodes = emitted_opcodes(&emitted);
         assert!(opcodes.contains(&Opcode::LdElem));
         assert!(opcodes.contains(&Opcode::LdLen));
-        assert!(opcodes.contains(&Opcode::BrFalse));
+        assert!(opcodes.contains(&Opcode::BrZ));
     }
 
     #[test]
@@ -434,7 +434,7 @@ mod success {
     fn emits_foreign_calls() {
         let emitted = emit_module(
             r"
-        @external(abi := .c)
+        @foreign(abi := .c)
         let puts (value : Int) : Int;
         export let result () : Int := unsafe (puts(1));
     ",
@@ -452,7 +452,7 @@ mod success {
     fn emits_root_maps_for_known_call_and_allocation_safe_points() {
         let emitted = emit_module(
             r"
-        @external(abi := .c)
+        @foreign(abi := .c)
         let puts (value : Int) : Int;
         let id (value : Int) : Int := value;
         let apply (f : Int -> Int, x : Int) : Int := f(x);
