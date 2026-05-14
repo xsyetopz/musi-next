@@ -69,17 +69,11 @@ export let notEquals (target : Bytes, other : Bytes) : Bit :=
 
 --- Function for `isEmpty`.
 let bytesIsEmpty (target : Bytes) : Bit :=
-  match bytesToArray(target) (
-  | [] => 0 = 0
-  | _ => 0 = 1
-  );
+  if bytesToArray(target) = [] then 0 = 0 else 0 = 1;
 
 --- Function for `nonEmpty`.
 let bytesNonEmpty (target : Bytes) : Bit :=
-  match bytesToArray(target) (
-  | [] => 0 = 1
-  | _ => 0 = 0
-  );
+  if bytesToArray(target) = [] then 0 = 1 else 0 = 0;
 
 --- Return a copy of raw byte values.
 export let (self : Bytes).toArray () : []Int := bytesToArray(self);

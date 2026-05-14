@@ -10,11 +10,7 @@ export hidden let Version := data {
 --- Parse semantic version text.
 export let parse (source : String) : Version := .VersionText(value := source);
 
-let both (left : Bit, right : Bit) : Bit :=
-  match left (
-  | success where success => right
-  | _ => 0 = 1
-  );
+let both (left : Bit, right : Bit) : Bit := if left then right else 0 = 1;
 
 let isDigit (value : Int) : Bit := both(value >= 48, value <= 57);
 
@@ -32,16 +28,12 @@ export let isValid (source : String) : Bit :=
   );
 
 let byteOrZero (source : String, index : Int) : Int :=
-  match text.byteAt(source, index) (
-  | value where value < 0 => 0
-  | value => value
-  );
+  if text.byteAt(source, index) < 0 then 0 else text.byteAt(source, index);
 
 let compareByte (left : String, right : String, index : Int) : Int :=
-  match byteOrZero(left, index) - byteOrZero(right, index) (
-  | diff where diff < 0 => - 1
-  | diff where diff > 0 => 1
-  | _ => 0
+  (
+    let diff := byteOrZero(left, index) - byteOrZero(right, index);
+    if diff < 0 then - 1 else if diff > 0 then 1 else 0;
   );
 
 --- Compare semantic versions.
@@ -51,17 +43,12 @@ export let compare (left : Version, right : Version) : Int :=
   | .VersionText(value := rightText) =>
   (
     let major := compareByte(leftText, rightText, 0);
-    match major (
-    | expect where expect /= 0 => expect
-    | _ =>
+    if major /= 0 then major
+      else
       (
         let minor := compareByte(leftText, rightText, 2);
-        match minor (
-        | expect where expect /= 0 => expect
-        | _ => compareByte(leftText, rightText, 4)
-        )
+        if minor /= 0 then minor else compareByte(leftText, rightText, 4)
       )
-    )
   )
 )
 );

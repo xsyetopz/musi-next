@@ -23,24 +23,15 @@ export let greater () : Ordering := .Greater;
 
 --- Function for `isLess`.
 let orderingIsLess (target : Ordering) : Bit :=
-  match target (
-  | .Less => 0 = 0
-  | _ => 0 = 1
-  );
+  if target = .Less then 0 = 0 else 0 = 1;
 
 --- Function for `isEqual`.
 let orderingIsEqual (target : Ordering) : Bit :=
-  match target (
-  | .Equal => 0 = 0
-  | _ => 0 = 1
-  );
+  if target = .Equal then 0 = 0 else 0 = 1;
 
 --- Function for `isGreater`.
 let orderingIsGreater (target : Ordering) : Bit :=
-  match target (
-  | .Greater => 0 = 0
-  | _ => 0 = 1
-  );
+  if target = .Greater then 0 = 0 else 0 = 1;
 
 --- Ordering contract.
 export let Ord [T] := shape {
@@ -62,11 +53,10 @@ let Musi__compareFloatTotal (left : Float, right : Float) : Int;
 
 --- Compare two floats with total ordering.
 export let compareFloat (left : Float, right : Float) : Ordering :=
-  match unsafe (Musi__compareFloatTotal(left, right)) (
-| value where value < 0 => less()
-| value where value > 0 => greater()
-| _ => equal()
-);
+  (
+    let value := unsafe(Musi__compareFloatTotal(left, right));
+    if value < 0 then less() else if value > 0 then greater() else equal();
+  );
 
 --- Compare two strings.
 export let compareString (left : String, right : String) : Ordering :=
@@ -74,17 +64,11 @@ export let compareString (left : String, right : String) : Ordering :=
 
 --- Return smaller integer.
 export let minInt (left : Int, right : Int) : Int :=
-  match compareInt(left, right) (
-  | .Greater => right
-  | _ => left
-  );
+  if compareInt(left, right) = .Greater then right else left;
 
 --- Return larger integer.
 export let maxInt (left : Int, right : Int) : Int :=
-  match compareInt(left, right) (
-  | .Less => right
-  | _ => left
-  );
+  if compareInt(left, right) = .Less then right else left;
 
 --- Clamp integer into inclusive bounds.
 export let clampInt (value : Int, lowerBound : Int, upperBound : Int,) : Int :=

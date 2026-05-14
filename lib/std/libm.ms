@@ -57,11 +57,12 @@ export let e : Float := 2.718281828459045;
 let both (left : Bit, right : Bit) : Bit := if left then right else 0 = 1;
 
 --- Returns true when value is NaN.
-export let isNan (value : Float) : Bit := unsafe (Musi__floatIsNan(value));
+export let isNan (value : Float) : Bit := unsafe(Musi__floatIsNan(value));
 --- Returns true when value is positive or negative infinity.
-export let isInfinite (value : Float) : Bit := unsafe (Musi__floatIsInfinite(value));
+export let isInfinite (value : Float) : Bit :=
+  unsafe(Musi__floatIsInfinite(value));
 --- Returns true when value is neither NaN nor infinite.
-export let isFinite (value : Float) : Bit := unsafe (Musi__floatIsFinite(value));
+export let isFinite (value : Float) : Bit := unsafe(Musi__floatIsFinite(value));
 
 let finiteBoth (value : Float, condition : Bit) : Bit :=
   both(isFinite(value), condition);
@@ -72,65 +73,68 @@ let isPositive (value : Float) : Bit := finiteBoth(value, value > 0.0);
 let isFiniteNonZero (value : Float) : Bit := finiteBoth(value, value /= 0.0);
 
 --- Arc cosine.
-export let acos (value : Float) : Float := unsafe (C__acos(value));
+export let acos (value : Float) : Float := unsafe(C__acos(value));
 --- Arc cosine when input is inside [-1, 1].
 export let checkedAcos (value : Float) : Maybe[Float] :=
   if isUnitDomain(value) then maybe.Some[Float](acos(value))
   else maybe.None[Float]();
 --- Arc sine.
-export let asin (value : Float) : Float := unsafe (C__asin(value));
+export let asin (value : Float) : Float := unsafe(C__asin(value));
 --- Arc sine when input is inside [-1, 1].
 export let checkedAsin (value : Float) : Maybe[Float] :=
   if isUnitDomain(value) then maybe.Some[Float](asin(value))
   else maybe.None[Float]();
 --- Arc tangent.
-export let atan (value : Float) : Float := unsafe (C__atan(value));
+export let atan (value : Float) : Float := unsafe(C__atan(value));
 --- Arc tangent from `y` and `x`.
-export let atan2 (y : Float, x : Float) : Float := unsafe (C__atan2(y, x));
+export let atan2 (y : Float, x : Float) : Float := unsafe(C__atan2(y, x));
 --- Smallest integer value not less than input.
-export let ceil (value : Float) : Float := unsafe (C__ceil(value));
+export let ceil (value : Float) : Float := unsafe(C__ceil(value));
 --- Cosine.
-export let cos (value : Float) : Float := unsafe (C__cos(value));
+export let cos (value : Float) : Float := unsafe(C__cos(value));
 --- Natural exponential.
-export let exp (value : Float) : Float := unsafe (C__exp(value));
+export let exp (value : Float) : Float := unsafe(C__exp(value));
 --- Absolute floating-point value.
-export let fabs (value : Float) : Float := unsafe (C__fabs(value));
+export let fabs (value : Float) : Float := unsafe(C__fabs(value));
 --- Largest integer value not greater than input.
-export let floor (value : Float) : Float := unsafe (C__floor(value));
+export let floor (value : Float) : Float := unsafe(C__floor(value));
 --- Floating-point remainder.
-export let fmod (left : Float, right : Float) : Float := unsafe (C__fmod(left, right));
+export let fmod (left : Float, right : Float) : Float :=
+  unsafe(C__fmod(left, right));
 --- Floating-point remainder when divisor is non-zero.
 export let checkedFmod (left : Float, right : Float) : Maybe[Float] :=
   if both(isFinite(left), isFiniteNonZero(right)) then maybe.Some[Float](
     fmod(left, right)
   ) else maybe.None[Float]();
 --- Euclidean hypotenuse.
-export let hypot (left : Float, right : Float) : Float := unsafe (C__hypot(left, right));
+export let hypot (left : Float, right : Float) : Float :=
+  unsafe(C__hypot(left, right));
 --- Natural logarithm.
-export let log (value : Float) : Float := unsafe (C__log(value));
+export let log (value : Float) : Float := unsafe(C__log(value));
 --- Natural logarithm when input is positive.
 export let checkedLog (value : Float) : Maybe[Float] :=
   if isPositive(value) then maybe.Some[Float](log(value))
   else maybe.None[Float]();
 --- Base-10 logarithm.
-export let log10 (value : Float) : Float := unsafe (C__log10(value));
+export let log10 (value : Float) : Float := unsafe(C__log10(value));
 --- Base-10 logarithm when input is positive.
 export let checkedLog10 (value : Float) : Maybe[Float] :=
   if isPositive(value) then maybe.Some[Float](log10(value))
   else maybe.None[Float]();
 --- Base raised to exponent.
-export let pow (base : Float, exponent : Float) : Float := unsafe (C__pow(base, exponent));
+export let pow (base : Float, exponent : Float) : Float :=
+  unsafe(C__pow(base, exponent));
 --- Nearest integer, halfway away from zero.
-export let round (value : Float) : Float := unsafe (C__round(value));
+export let round (value : Float) : Float := unsafe(C__round(value));
 --- Sine.
-export let sin (value : Float) : Float := unsafe (C__sin(value));
+export let sin (value : Float) : Float := unsafe(C__sin(value));
 --- Square root.
-export let sqrt (value : Float) : Float := unsafe (C__sqrt(value));
+export let sqrt (value : Float) : Float := unsafe(C__sqrt(value));
 --- Square root when input is non-negative.
 export let checkedSqrt (value : Float) : Maybe[Float] :=
   if isNonNegative(value) then maybe.Some[Float](sqrt(value))
   else maybe.None[Float]();
 --- Tangent.
-export let tan (value : Float) : Float := unsafe (C__tan(value));
+export let tan (value : Float) : Float := unsafe(C__tan(value));
 --- Integer part, rounded toward zero.
-export let trunc (value : Float) : Float := unsafe (C__trunc(value));
+export let trunc (value : Float) : Float := unsafe(C__trunc(value));

@@ -46,26 +46,20 @@ let textFromByte (value : Int) : String := textHost.fromByte(value);
 export let fromByte (value : Int) : String := textFromByte(value);
 
 let recur trimStartIndex (target : String, index : Int, end : Int) : Int :=
-  match () (
-  | _ where index >= end => end
-  | _ where ascii.isWhitespace(textByteAt(target, index)) => trimStartIndex(
+  if index >= end then end
+  else if ascii.isWhitespace(textByteAt(target, index)) then trimStartIndex(
     target,
     index + 1,
     end,
-  )
-  | _ => index
-  );
+  ) else index;
 
 let recur trimEndIndex (target : String, start : Int, end : Int) : Int :=
-  match () (
-  | _ where end <= start => start
-  | _ where ascii.isWhitespace(textByteAt(target, end - 1)) => trimEndIndex(
+  if end <= start then start
+  else if ascii.isWhitespace(textByteAt(target, end - 1)) then trimEndIndex(
     target,
     start,
     end - 1,
-  )
-  | _ => end
-  );
+  ) else end;
 
 --- Function for `trim`.
 let textTrim (target : String) : String :=
@@ -83,13 +77,10 @@ let recur transformAscii (
   index : Int,
   end : Int,
   mapper : Int -> Int
-) : String :=
-  match () (
-  | _ where index >= end => ""
-  | _ => textConcat(
+) : String := if index >= end then ""
+  else textConcat(
     textFromByte(mapper(textByteAt(target, index))),
     transformAscii(target, index + 1, end, mapper),
-  )
   );
 
 --- Function for `toLowerCase`.
@@ -118,21 +109,16 @@ let recur matchesAt (
   needle : String,
   targetIndex : Int,
   needleIndex : Int
-) : Bit :=
-  match () (
-  | _ where needleIndex >= textLength(needle) => 0 = 0
-  | _ where targetIndex >= textLength(target) => 0 = 1
-  | _ where bytesDifferAt(target, needle, targetIndex, needleIndex) => 0 = 1
-  | _ => matchesAt(target, needle, targetIndex + 1, needleIndex + 1)
-  );
+) : Bit := if needleIndex >= textLength(needle) then 0 = 0
+  else if targetIndex >= textLength(target) then 0 = 1
+  else if bytesDifferAt(target, needle, targetIndex, needleIndex) then 0 = 1
+  else matchesAt(target, needle, targetIndex + 1, needleIndex + 1);
 
 let recur indexOfFrom (target : String, needle : String, index : Int) : Int :=
-  match () (
-  | _ where textLength(needle) = 0 => index
-  | _ where index > textLength(target) - textLength(needle) => - 1
-  | _ where matchesAt(target, needle, index, 0) => index
-  | _ => indexOfFrom(target, needle, index + 1)
-  );
+  if textLength(needle) = 0 then index
+  else if index > textLength(target) - textLength(needle) then - 1
+  else if matchesAt(target, needle, index, 0) then index
+  else indexOfFrom(target, needle, index + 1);
 
 --- Function for `indexOf`.
 let textIndexOf (target : String, needle : String) : Int :=
@@ -160,10 +146,8 @@ export let startsWith (target : String, prefix : String) : Bit :=
 
 --- Function for `endsWith`.
 let textEndsWith (target : String, suffix : String) : Bit :=
-  match () (
-  | _ where textLength(suffix) > textLength(target) => 0 = 1
-  | _ => matchesAt(target, suffix, textLength(target) - textLength(suffix), 0)
-  );
+  if textLength(suffix) > textLength(target) then 0 = 1
+  else matchesAt(target, suffix, textLength(target) - textLength(suffix), 0);
 
 --- Returns true when target ends with suffix.
 export let endsWith (target : String, suffix : String) : Bit :=

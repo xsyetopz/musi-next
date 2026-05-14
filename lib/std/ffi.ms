@@ -55,7 +55,7 @@ let Musi__ptrIsNull (raw : CPtr) : Bit;
 export let cast [T] (raw : CPtr) : Ptr[T] := .RawPtr(raw := raw);
 
 --- Null pointer.
-export let null [T] () : Ptr[T] := .RawPtr(raw := unsafe (Musi__ptrNull()));
+export let null [T] () : Ptr[T] := .RawPtr(raw := unsafe(Musi__ptrNull()));
 
 --- Return raw pointer value.
 export let raw [T] (pointer : Ptr[T]) : CPtr :=
@@ -64,7 +64,8 @@ export let raw [T] (pointer : Ptr[T]) : CPtr :=
   );
 
 --- Returns true when pointer is null.
-export let isNull [T] (pointer : Ptr[T]) : Bit := unsafe (Musi__ptrIsNull(raw[T](pointer)));
+export let isNull [T] (pointer : Ptr[T]) : Bit :=
+  unsafe(Musi__ptrIsNull(raw[T](pointer)));
 
 --- Foreign pointer operations.
 @foreign(abi := .musi)

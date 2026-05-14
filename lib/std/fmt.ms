@@ -12,11 +12,7 @@ export let int (value : Int) : String := fmtHost.int(value);
 export let float (value : Float) : String := fmtHost.float(value);
 
 --- Format boolean value.
-export let bool (value : Bit) : String :=
-  match value (
-  | _ where value => "true"
-  | _ => "false"
-  );
+export let bool (value : Bit) : String := if value then "true" else "false";
 
 --- Format duration as milliseconds.
 export let duration (value : Duration) : String :=

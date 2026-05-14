@@ -69,17 +69,11 @@ export let equalsInt (target : List[Int], other : List[Int]) : Bit :=
 
 --- Function for `isEmpty`.
 let listIsEmpty [T] (target : List[T]) : Bit :=
-  match listToArray[T](target) (
-  | [] => 0 = 0
-  | _ => 0 = 1
-  );
+  if listToArray[T](target) = [] then 0 = 0 else 0 = 1;
 
 --- Function for `nonEmpty`.
 let listNonEmpty [T] (target : List[T]) : Bit :=
-  match listToArray[T](target) (
-  | [] => 0 = 1
-  | _ => 0 = 0
-  );
+  if listToArray[T](target) = [] then 0 = 1 else 0 = 0;
 
 --- Return a copy of list values.
 export let (self : List[T]).toArray [T] () : []T := listToArray[T](self);

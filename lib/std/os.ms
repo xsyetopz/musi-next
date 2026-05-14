@@ -68,10 +68,7 @@ export let familyText (target : Family) : String :=
 
 --- Convert byte-order text into Endian.
 export let endianFromString (value : String) : Endian :=
-  match value (
-  | "big" => .Big
-  | _ => .Little
-  );
+  if value = "big" then .Big else .Little;
 
 --- Return current target facts from system bindings.
 export let current : Target :=

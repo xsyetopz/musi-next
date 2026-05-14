@@ -17,21 +17,22 @@ let C__strerror (code : CInt) : CString;
 let C__strlen (value : CString) : Nat;
 
 --- C `strcmp`.
-export let strcmp (left : CString, right : CString) : Int32 := unsafe (C__strcmp(left, right));
+export let strcmp (left : CString, right : CString) : Int32 :=
+  unsafe(C__strcmp(left, right));
 --- C `strerror`.
-export let strerror (code : CInt) : CString := unsafe (C__strerror(code));
+export let strerror (code : CInt) : CString := unsafe(C__strerror(code));
 --- C `strlen`.
-export let strlen (value : CString) : Nat := unsafe (C__strlen(value));
+export let strlen (value : CString) : Nat := unsafe(C__strlen(value));
 
 --- C string byte length.
 export let length (value : CString) : Nat := strlen(value);
 
 --- C string comparison as ordering.
 export let compare (left : CString, right : CString) : Ordering :=
-  match strcmp(left, right) (
-  | value where value < 0 => cmp.less()
-  | value where value > 0 => cmp.greater()
-  | _ => cmp.equal()
+  (
+    let value := strcmp(left, right);
+    if value < 0 then cmp.less()
+      else if value > 0 then cmp.greater() else cmp.equal();
   );
 
 --- Returns true when C strings compare equal.

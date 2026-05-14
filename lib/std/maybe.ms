@@ -96,10 +96,7 @@ export let mapOrElse [T, U] (
 
 --- Function for `andThen`.
 let maybeAndThen [T, U] (target : Maybe[T], f : T -> Maybe[U]) : Maybe[U] :=
-  match target (
-  | .Some(item) => f(item)
-  | .None => None[U]()
-  );
+  maybeMapOrElse[T, Maybe[U]](target, \() => None[U](), f);
 
 --- Chain an operation that may return None.
 export let andThen [T, U] (target : Maybe[T], f : T -> Maybe[U]) : Maybe[U] :=
@@ -130,10 +127,7 @@ export let filter [T] (target : Maybe[T], predicate : T -> Bit) : Maybe[T] :=
 
 --- Function for `fold`.
 let maybeFold [T, U] (target : Maybe[T], onNone : U, onSome : T -> U) : U :=
-  match target (
-  | .Some(item) => onSome(item)
-  | .None => onNone
-  );
+  maybeMapOrElse[T, U](target, \() => onNone, onSome);
 
 --- Transform Some or None into one value.
 export let fold [T, U] (target : Maybe[T], onNone : U, onSome : T -> U) : U :=

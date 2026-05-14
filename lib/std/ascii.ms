@@ -12,10 +12,7 @@ export let isAscii (value : Int) : Bit := inRange(value, 0, 127);
 
 --- Returns true for ASCII control bytes.
 export let isControl (value : Int) : Bit :=
-  match value (
-  | 127 => 0 = 0
-  | _ => inRange(value, 0, 31)
-  );
+  if value = 127 then 0 = 0 else inRange(value, 0, 31);
 
 --- Returns true for printable ASCII bytes.
 export let isPrintable (value : Int) : Bit := inRange(value, 32, 126);
@@ -59,24 +56,15 @@ export let toUpper (value : Int) : Int :=
 
 --- Returns true for ASCII hexadecimal digits.
 export let isHexDigit (value : Int) : Bit :=
-  match isDigit(value) (
-  | success where success => 0 = 0
-  | _ => inRange(toLower(value), 97, 102)
-  );
+  if isDigit(value) then 0 = 0 else inRange(toLower(value), 97, 102);
 
 --- Decimal digit value.
 export let digitValue (value : Int) : Maybe[Int] :=
-  match isDigit(value) (
-  | success where success => maybe.Some[Int](value - 48)
-  | _ => maybe.None[Int]()
-  );
+  if isDigit(value) then maybe.Some[Int](value - 48) else maybe.None[Int]();
 
 --- Hexadecimal digit value.
 export let hexValue (value : Int) : Maybe[Int] :=
-  match isDigit(value) (
-  | success where success => maybe.Some[Int](value - 48)
-  | _ => match toLower(value) (
-  | lower where inRange(lower, 97, 102) => maybe.Some[Int](lower - 87)
-  | _ => maybe.None[Int]()
-  )
-  );
+  if isDigit(value) then maybe.Some[Int](value - 48)
+  else if inRange(toLower(value), 97, 102) then maybe.Some[Int](
+    toLower(value) - 87
+  ) else maybe.None[Int]();

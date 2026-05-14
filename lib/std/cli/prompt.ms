@@ -21,14 +21,13 @@ export let promptTrimmed (message : String) : String := prompt(message).trim();
 
 --- Read a non-empty trimmed line.
 export let readNonEmptyLine () : Maybe[String] :=
-  match readTrimmedLine() (
-  | value where value.isEmpty() => maybe.None[String]()
-  | value => maybe.Some[String](value)
+  (
+    let value := readTrimmedLine();
+    if value.isEmpty() then maybe.None[String]() else maybe.Some[String](value);
   );
-
 --- Prompt for a non-empty trimmed line.
 export let promptNonEmpty (message : String) : Maybe[String] :=
-  match promptTrimmed(message) (
-  | value where value.isEmpty() => maybe.None[String]()
-  | value => maybe.Some[String](value)
+  (
+    let value := promptTrimmed(message);
+    if value.isEmpty() then maybe.None[String]() else maybe.Some[String](value);
   );

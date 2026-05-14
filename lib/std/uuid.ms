@@ -27,11 +27,9 @@ let isUuidHexAt (source : String, index : Int) : Bit :=
   isHexByte(text.byteAt(source, index));
 
 let recur isUuidHexSpan (source : String, index : Int, end : Int) : Bit :=
-  match () (
-  | _ where index >= end => 0 = 0
-  | _ where isUuidHexAt(source, index) => isUuidHexSpan(source, index + 1, end)
-  | _ => 0 = 1
-  );
+  if index >= end then 0 = 0
+  else if isUuidHexAt(source, index) then isUuidHexSpan(source, index + 1, end)
+  else 0 = 1;
 
 let hasUuidHyphens (source : String) : Bit :=
   (

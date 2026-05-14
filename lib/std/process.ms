@@ -39,9 +39,9 @@ export let argsCount () : Int := processHost.argCount();
 
 --- Process arg by index.
 export let argAt (index : Int) : Maybe[String] :=
-  match processHost.argAt(index) (
-  | value where value = "" => maybe.None[String]()
-  | value => maybe.Some[String](value)
+  (
+    let value := processHost.argAt(index);
+    if value = "" then maybe.None[String]() else maybe.Some[String](value)
   );
 
 --- Current working directory.

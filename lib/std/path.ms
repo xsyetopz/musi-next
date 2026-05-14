@@ -26,17 +26,13 @@ let recur lastByteIndexFrom (
   needle : Int,
   index : Int,
   best : Int
-) : Int :=
-  match () (
-  | _ where index >= source.length() => best
-  | _ where text.byteAt(source, index) = needle => lastByteIndexFrom(
+) : Int := if index >= source.length() then best
+  else if text.byteAt(source, index) = needle then lastByteIndexFrom(
     source,
     needle,
     index + 1,
     index,
-  )
-  | _ => lastByteIndexFrom(source, needle, index + 1, best)
-  );
+  ) else lastByteIndexFrom(source, needle, index + 1, best);
 
 let lastByteIndex (source : String, needle : Int) : Int :=
   lastByteIndexFrom(source, needle, 0, - 1);
@@ -46,16 +42,13 @@ let joinPath (target : Path, other : Path) : Path :=
   (
     let left := pathToString(target);
     let right := pathToString(other);
-    match () (
-    | _ where left = "" => fromString(right)
-    | _ where right = "" => fromString(left)
-    | _ where text.byteAt(right, 0) = 47 => fromString(right)
-    | _ where text.byteAt(left, left.length() - 1) = 47 => fromString(
-      text.concat(left, right)
-    )
-    | _ => fromString(text.concat(text.concat(left, slash), right))
-    )
-  );
+    if left = "" then fromString(right)
+      else if right = "" then fromString(left)
+      else if text.byteAt(right, 0) = 47 then fromString(right)
+      else if text.byteAt(left, left.length() - 1) = 47 then fromString(
+        text.concat(left, right)
+      ) else fromString(text.concat(text.concat(left, slash), right))
+    );
 
 --- Function for `normalize`.
 let normalizePath (target : Path) : Path := target;
@@ -65,33 +58,26 @@ let pathDirName (target : Path) : Path :=
   (
     let source := pathToString(target);
     let index := lastByteIndex(source, 47);
-    match () (
-    | _ where index < 0 => fromString("")
-    | _ where index = 0 => fromString(slash)
-    | _ => fromString(text.slice(source, 0, index))
-    )
-  );
+    if index < 0 then fromString("")
+      else if index = 0 then fromString(slash)
+      else fromString(text.slice(source, 0, index))
+    );
 
 --- Function for `baseName`.
 let pathBaseName (target : Path) : String :=
   (
     let source := pathToString(target);
     let index := lastByteIndex(source, 47);
-    match () (
-    | _ where index < 0 => source
-    | _ => text.slice(source, index + 1, source.length())
-    )
-  );
+    if index < 0 then source
+      else text.slice(source, index + 1, source.length())
+    );
 
 --- Function for `extName`.
 let pathExtName (target : Path) : String :=
   (
     let base := pathBaseName(target);
     let index := lastByteIndex(base, 46);
-    match () (
-    | _ where index <= 0 => ""
-    | _ => text.slice(base, index, base.length())
-    )
+    if index <= 0 then "" else text.slice(base, index, base.length())
   );
 
 --- Function for `isAbsolute`.
