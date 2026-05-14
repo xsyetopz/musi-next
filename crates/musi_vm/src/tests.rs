@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::spawn;
 
 use crate::gc::{HeapOptions, RuntimeHeap};
-use crate::value::SequenceValue;
+use crate::value::{DataValue, SequenceValue};
 use crate::vm::{MvmMode, RuntimeFusedOp, RuntimeKernel};
 use musi_foundation::register_modules;
 use music_module::ModuleKey;
@@ -522,6 +522,48 @@ mod success {
         assert_eq!(
             heap.sequence_get_cloned(sequence_ref, 1)
                 .expect("remembered edge should preserve child"),
+            child
+        );
+        assert_eq!(
+            heap.string(child_ref)
+                .expect("young child should survive minor collection"),
+            "young"
+        );
+    }
+
+    #[test]
+    fn data_field_mutation_marks_mature_data_card() {
+        let ty = TypeId::from_raw(0);
+        let mut heap = RuntimeHeap::default();
+        let options = HeapOptions {
+            max_object_bytes: None,
+        };
+        let data = heap
+            .alloc_data(DataValue::new(ty, 0, vec![Value::Int(1)].into()), &options)
+            .expect("data should allocate");
+        let Value::Data(data_ref) = data else {
+            panic!("value should be data");
+        };
+        for _ in 0..3 {
+            let _ = heap.collect_minor_from_refs([data_ref]);
+        }
+
+        let child = heap
+            .alloc_string("young", &options)
+            .expect("child string should allocate");
+        let Value::String(child_ref) = child.clone() else {
+            panic!("child should be string");
+        };
+        {
+            let data_mut = heap.data_mut(data_ref).expect("data should be mutable");
+            data_mut.fields[0] = child.clone();
+        }
+        let _ = heap.collect_minor_from_refs([data_ref]);
+
+        assert_eq!(
+            heap.data(data_ref)
+                .expect("remembered data should survive")
+                .fields[0],
             child
         );
         assert_eq!(
@@ -1640,8 +1682,8 @@ mod success {
             let puts (value : Int) : Int;
             @external(abi := .musi)
             let readLine (prompt : String) : Int;
-            export let call_puts () : Int := unsafe { puts(1); };
-            export let call_readLine () : Int := unsafe { readLine(">"); };
+            export let call_puts () : Int := unsafe (puts(1));
+            export let call_readLine () : Int := unsafe (readLine(">"));
         "#,
             )],
             "main",
@@ -1945,7 +1987,7 @@ mod failure {
             0,
             Box::new([
                 CodeEntry::Instruction(Instruction::new(Opcode::LdStr, Operand::String(spec))),
-                CodeEntry::Instruction(Instruction::new(Opcode::MdlLoad, Operand::None)),
+                CodeEntry::Instruction(Instruction::new(Opcode::LdModDyn, Operand::None)),
                 CodeEntry::Instruction(Instruction::new(Opcode::Ret, Operand::None)),
             ]),
         ));

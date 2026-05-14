@@ -35,17 +35,20 @@ impl IrTempId {
 pub struct IrParam {
     pub binding: Option<NameBindingId>,
     pub name: Box<str>,
+    pub ty: Box<str>,
 }
 
 impl IrParam {
     #[must_use]
-    pub fn new<Name>(binding: NameBindingId, name: Name) -> Self
+    pub fn new<Name, Ty>(binding: NameBindingId, name: Name, ty: Ty) -> Self
     where
         Name: Into<Box<str>>,
+        Ty: Into<Box<str>>,
     {
         Self {
             binding: Some(binding),
             name: name.into(),
+            ty: ty.into(),
         }
     }
 
@@ -57,6 +60,7 @@ impl IrParam {
         Self {
             binding: None,
             name: name.into(),
+            ty: "Unknown".into(),
         }
     }
 }

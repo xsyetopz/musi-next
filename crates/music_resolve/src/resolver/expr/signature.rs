@@ -77,11 +77,14 @@ where
         let name = self.intern_ident_token_or_placeholder(name_tok, node.span());
         self.record_use(name);
 
-        let kind = if node.child_tokens().any(|t| t.kind() == TokenKind::TildeEq) {
-            HirConstraintKind::TypeEq
-        } else {
-            HirConstraintKind::Implements
-        };
+        let kind = node
+            .child_tokens()
+            .find_map(|token| match token.kind() {
+                TokenKind::TildeEq => Some(HirConstraintKind::TypeEq),
+                TokenKind::PipeEq => Some(HirConstraintKind::Implements),
+                _ => None,
+            })
+            .unwrap_or(HirConstraintKind::Implements);
         let constraint_expr = match node.child_nodes().find(|n| is_expr_or_ty(n.kind())) {
             Some(expr) => self.lower_expr(expr),
             None => self.error_expr(self.origin_node(node)),

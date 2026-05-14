@@ -26,13 +26,6 @@ impl CheckPass<'_, '_, '_> {
     ) -> bool {
         let ctx = self;
         match obligation.kind {
-            ConstraintKind::Subtype => {
-                if ctx.ty_matches(obligation.value, obligation.subject) {
-                    return true;
-                }
-                ctx.diag(origin.span, DiagKind::UnsatisfiedConstraint, "");
-                false
-            }
             ConstraintKind::TypeEq => {
                 if ctx.ty_matches(obligation.subject, obligation.value)
                     && ctx.ty_matches(obligation.value, obligation.subject)
@@ -52,11 +45,12 @@ impl CheckPass<'_, '_, '_> {
         obligation: &ConstraintObligation,
     ) -> Option<ConstraintEvidence> {
         match obligation.kind {
-            ConstraintKind::Subtype | ConstraintKind::TypeEq => self
-                .solve_obligation(origin, obligation)
-                .then_some(ConstraintEvidence::Param {
-                    key: obligation.key(),
-                }),
+            ConstraintKind::TypeEq => {
+                self.solve_obligation(origin, obligation)
+                    .then_some(ConstraintEvidence::Param {
+                        key: obligation.key(),
+                    })
+            }
             ConstraintKind::Implements => self.resolve_implements_evidence(origin, obligation),
         }
     }

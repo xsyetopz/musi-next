@@ -35,6 +35,20 @@ fn meta_records(artifact: &Artifact) -> Vec<(String, String, Vec<String>)> {
         .collect::<Vec<_>>()
 }
 
+fn import_records(artifact: &Artifact) -> Vec<(String, String)> {
+    artifact
+        .imports
+        .as_slice()
+        .iter()
+        .map(|record| {
+            (
+                artifact.string_text(record.spec).to_owned(),
+                artifact.string_text(record.resolved).to_owned(),
+            )
+        })
+        .collect::<Vec<_>>()
+}
+
 fn session() -> Session {
     let mut import_map = ImportMap::default();
     let _ = import_map.imports.insert("dep".into(), "dep".into());
@@ -76,34 +90,12 @@ fn compile_main_module_with_source(source: &str) -> CompiledOutput {
     compile_main_module(&mut session)
 }
 
-fn compile_main_entry_with_source(source: &str) -> CompiledOutput {
-    let mut session = session();
-    set_main_text(&mut session, source);
-    compile_main_entry(&mut session)
-}
-
-#[derive(Default)]
-struct CtfeTestHost;
-
-impl VmHost for CtfeTestHost {
-    fn call_foreign(
-        &mut self,
-        _ctx: VmHostCallContext<'_, '_>,
-        foreign: &ForeignCall,
-        _args: &[Value],
-    ) -> VmResult<Value> {
-        Err(VmError::new(VmErrorKind::ForeignCallRejected {
-            foreign: foreign.name().into(),
-        }))
-    }
-}
-
 fn assert_output_contains(output: &CompiledOutput, needles: &[&str]) {
     for needle in needles {
         assert!(
-            output.text.contains(needle),
+            output.disasm.contains(needle),
             "missing `{needle}` in:\n{}",
-            output.text
+            output.disasm
         );
     }
 }
@@ -192,98 +184,6 @@ mod success {
     use super::*;
 
     #[test]
-    fn compiles_vm_backed_known_function_call() {
-        let output = compile_main_entry_with_source(
-            r"
-        let add (a : Int, b : Int) : Int := a + b;
-        export let result () : Int := known add(20, 22);
-    ",
-        );
-        assert_eq!(run_export(&output, "result"), Value::Int(42));
-    }
-
-    #[test]
-    fn compiles_vm_backed_known_argument_specialization() {
-        let output = compile_main_entry_with_source(
-            r"
-        let add (a : Int, b : Int) : Int := a + b;
-        let scale (known n : Int, x : Int) : Int := x * n;
-        export let result () : Int := scale(add(20, 22), 2);
-    ",
-        );
-        assert_eq!(run_export(&output, "result"), Value::Int(84));
-    }
-
-    #[test]
-    fn compiles_known_data_value_as_runtime_value() {
-        let output = compile_main_entry_with_source(
-            r"
-        let Maybe := data {
-          | Some(Int)
-          | None
-        };
-        let make () : Maybe := .Some(42);
-        export let result () : Int := match known make() (
-          | .Some(value) => value
-          | .None => 0
-        );
-    ",
-        );
-        assert_eq!(run_export(&output, "result"), Value::Int(42));
-    }
-
-    #[test]
-    fn compiles_known_sequence_value_as_runtime_value() {
-        let output = compile_main_entry_with_source(
-            r"
-        export let result () : Int := match known [40, 2] (
-          | [left, right] => left + right
-          | _ => 0
-        );
-    ",
-        );
-        assert_eq!(run_export(&output, "result"), Value::Int(42));
-    }
-
-    #[test]
-    fn compiles_known_closure_value_as_runtime_value() {
-        let output = compile_main_entry_with_source(
-            r"
-        let makeAdder (n : Int) := \(x : Int) => x + n;
-        let add := known makeAdder(40);
-        export let result () : Int := add(2);
-    ",
-        );
-        assert_eq!(run_export(&output, "result"), Value::Int(42));
-    }
-
-    #[test]
-    fn compiles_handled_effect_inside_known() {
-        let output = compile_main_entry_with_source(
-            r"
-        let Clock := { tick := \() : Int => 21 };
-        export let result () : Int := known Clock.tick();
-    ",
-        );
-        assert_eq!(run_export(&output, "result"), Value::Int(21));
-    }
-
-    #[test]
-    fn compiles_known_safe_host_effect_inside_known() {
-        let mut session = session();
-        session.set_ctfe_host(CtfeTestHost);
-        set_main_text(
-            &mut session,
-            r"
-        let Clock := { tick := \() : Int => 42 };
-        export let result () : Int := known Clock.tick();
-    ",
-        );
-        let output = compile_main_entry(&mut session);
-        assert_eq!(run_export(&output, "result"), Value::Int(42));
-    }
-
-    #[test]
     fn compiles_module_to_artifact_bytes_and_text() {
         let output = assert_main_module_compiles_with(
             "export let result : Int := 42;",
@@ -311,6 +211,34 @@ mod success {
             &output,
             &[".global $dep::base export", ".global $main::result export"],
         );
+    }
+
+    #[test]
+    fn compiles_static_imports_into_artifact_import_table() {
+        let output = compile_main_entry_with_dep(
+            "export let base : Int := 41;",
+            r#"let Dep := import "dep"; export let result : Int := Dep.base;"#,
+        );
+        assert!(import_records(&output.artifact).contains(&("dep".into(), "dep".into())));
+    }
+
+    #[test]
+    fn artifact_import_table_preserves_specifier_and_resolved_module() {
+        let mut import_map = ImportMap::default();
+        let _ = import_map.imports.insert("tool".into(), "dep".into());
+        let mut session = Session::new(SessionOptions::new().with_import_map(import_map));
+        session
+            .set_module_text(&ModuleKey::new("dep"), "export let base : Int := 41;")
+            .unwrap();
+        set_main_text(
+            &mut session,
+            r#"let Tool := import "tool"; export let result : Int := Tool.base;"#,
+        );
+
+        let output = compile_main_entry(&mut session);
+
+        assert!(output.artifact.validate().is_ok());
+        assert!(import_records(&output.artifact).contains(&("tool".into(), "dep".into())));
     }
 
     #[test]
@@ -646,7 +574,7 @@ mod success {
         ",
             &["st.fld"],
         );
-        assert!(output.text.contains("st.fld"), "{}", output.text);
+        assert!(output.disasm.contains("st.fld"), "{}", output.disasm);
     }
 
     #[test]
@@ -775,11 +703,11 @@ mod success {
         let output = session.compile_module(&ModuleKey::new("main")).unwrap();
         assert!(output.artifact.validate().is_ok());
         assert!(
-            output.text.contains(
+            output.disasm.contains(
                 ".native $main::sin param $Float result $Float abi \"c\" symbol \"sin\" link \"m\""
             ),
             "{}",
-            output.text
+            output.disasm
         );
     }
 
@@ -803,17 +731,17 @@ mod success {
         assert!(output.artifact.validate().is_ok());
         assert!(
             output
-                .text
+                .disasm
                 .contains(".procedure $main::hotWork params 0 locals 1 export hot"),
             "{}",
-            output.text
+            output.disasm
         );
         assert!(
             output
-                .text
+                .disasm
                 .contains(".procedure $main::coldWork params 0 locals 1 export cold"),
             "{}",
-            output.text
+            output.disasm
         );
     }
 
@@ -838,18 +766,18 @@ mod success {
         let output = session.compile_module(&ModuleKey::new("main")).unwrap();
         assert!(output.artifact.validate().is_ok());
         assert!(
-            output.text.contains(
+            output.disasm.contains(
                 ".native $main::fastClock result $Nat64 abi \"c\" symbol \"fastClock\" hot"
             ),
             "{}",
-            output.text
+            output.disasm
         );
         assert!(
             output
-                .text
+                .disasm
                 .contains(".native $main::slowPath result $Int abi \"c\" symbol \"slowPath\" cold"),
             "{}",
-            output.text
+            output.disasm
         );
     }
 
@@ -874,8 +802,8 @@ mod success {
 
         let output = session.compile_module(&ModuleKey::new("main")).unwrap();
         assert!(output.artifact.validate().is_ok());
-        assert!(output.text.contains("clock_gettime"), "{}", output.text);
-        assert!(!output.text.contains("QueryPerformanceCounter"));
+        assert!(output.disasm.contains("clock_gettime"), "{}", output.disasm);
+        assert!(!output.disasm.contains("QueryPerformanceCounter"));
     }
 
     #[test]
@@ -906,11 +834,11 @@ mod success {
         let output = session.compile_module(&ModuleKey::new("main")).unwrap();
         assert!(output.artifact.validate().is_ok());
         assert!(
-            output.text.contains("mach_absolute_time"),
+            output.disasm.contains("mach_absolute_time"),
             "{}",
-            output.text
+            output.disasm
         );
-        assert!(!output.text.contains("GetLastError"));
+        assert!(!output.disasm.contains("GetLastError"));
     }
 
     #[test]

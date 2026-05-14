@@ -23,22 +23,16 @@ export hidden let Sample [T] := shape {
 let Musi__suiteStart (name : String) : Unit;
 
 --- Start a named test suite.
-export let suiteStart (name : String) : Unit := unsafe {
-  Musi__suiteStart(name);
-};
+export let suiteStart (name : String) : Unit := unsafe (Musi__suiteStart(name));
 
 @external(abi := .musi)
 let Musi__suiteEnd () : Unit;
 
 --- End current test suite.
-export let suiteEnd () : Unit := unsafe {
-  Musi__suiteEnd();
-};
+export let suiteEnd () : Unit := unsafe (Musi__suiteEnd());
 
 @external(abi := .musi)
 let Musi__testCase (name : String, passed : Bit) : Unit;
 
 --- Record one named test case.
-export let testCase (name : String, passed : Bit) : Unit := unsafe {
-  Musi__testCase(name, passed);
-};
+export let testCase (name : String, passed : Bit) : Unit := unsafe (Musi__testCase(name, passed));

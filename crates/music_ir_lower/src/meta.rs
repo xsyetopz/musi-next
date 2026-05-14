@@ -44,7 +44,7 @@ const SIMPLE_SURFACE_TY_NAMES: &[SimpleSurfaceTyName] = &[
     },
     SimpleSurfaceTyName {
         kind: SurfaceTyKind::Bool,
-        display_name: "Bool",
+        display_name: "Bit",
     },
     SimpleSurfaceTyName {
         kind: SurfaceTyKind::Nat,
@@ -429,8 +429,7 @@ pub(crate) fn push_export_sig_meta(
                 .iter()
                 .map(|constraint| {
                     let op = match constraint.kind {
-                        ConstraintKind::Subtype => "<:",
-                        ConstraintKind::Implements => ":",
+                        ConstraintKind::Implements => "|=",
                         ConstraintKind::TypeEq => "~=",
                     };
                     format!(

@@ -1,7 +1,7 @@
 use super::{
     DefinitionKey, Diag, DiagContext, HashMap, HashSet, Interner, IrDataDef, IrDataVariantDef,
-    IrDiagKind, IrDiagList, IrModule, IrModuleParts, IrShapeDef, LowerCtx, SemaModule,
-    TopLevelItems, bindings, meta, render_ty_name, toplevel, validate,
+    IrDiagKind, IrDiagList, IrModule, IrModuleParts, IrShapeDef, IrStaticImport, LowerCtx,
+    SemaModule, TopLevelItems, bindings, meta, render_ty_name, toplevel, validate,
 };
 use std::any::Any;
 use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
@@ -90,6 +90,12 @@ pub(crate) fn lower_module_impl(
     Ok(IrModule::new(
         sema.resolved().module_key.clone(),
         surface.static_imports().to_vec().into_boxed_slice(),
+        sema.resolved()
+            .imports
+            .iter()
+            .map(|import| IrStaticImport::new(import.spec.as_str(), import.to.clone()))
+            .collect::<Vec<_>>()
+            .into_boxed_slice(),
         surface.types().to_vec().into_boxed_slice(),
         IrModuleParts {
             exports: surface

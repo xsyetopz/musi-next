@@ -122,7 +122,7 @@ fn format_terminator(out: &mut String, terminator: &HilTerminator) {
             .expect("write to string");
         }
         HilTerminator::TailCall { callee, args } => {
-            write!(out, "      tail.call {callee}(").expect("write to string");
+            write!(out, "      call.tail {callee}(").expect("write to string");
             format_value_list(out, args);
             out.push_str(")\n");
         }

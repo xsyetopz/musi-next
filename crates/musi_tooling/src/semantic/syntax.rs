@@ -304,7 +304,7 @@ fn is_builtin_type_name(text: &str) -> bool {
             | "Syntax"
             | "Empty"
             | "Unit"
-            | "Bool"
+            | "Bit"
             | "Nat"
             | "Int"
             | "Int8"

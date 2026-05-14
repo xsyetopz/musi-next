@@ -88,7 +88,7 @@ mod success {
         )
         let puts (value : Int) : Int;
 
-        export let result () : Int := unsafe { puts(42); };
+        export let result () : Int := unsafe (puts(42));
         ",
         )
         .expect("registered foreign should succeed");
@@ -147,7 +147,7 @@ mod success {
         )
         let inspect (value : Maybe) : Int;
 
-        export let result () : Int := unsafe { inspect(.Some(1)); };
+        export let result () : Int := unsafe (inspect(.Some(1)));
         ",
         )
         .expect("layout-aware foreign should succeed");
@@ -183,7 +183,7 @@ mod success {
         )
         let puts (value : Int) : Int;
 
-        export let result () : Int := unsafe { puts(42); };
+        export let result () : Int := unsafe (puts(42));
         ",
         )
         .expect("scalar foreign should succeed");
@@ -200,7 +200,7 @@ mod success {
           abi := .c
         )
         let strlen(value : CString) : Nat;
-        export let result () : Nat := unsafe { strlen("musi"); };
+        export let result () : Nat := unsafe (strlen("musi"));
     "#;
         let value = call_export_with_host(NativeHost::default(), source)
             .expect("linked native call should succeed");
@@ -219,7 +219,7 @@ mod success {
           abi := .c
         )
         let pow(base : Float, exponent : Float) : Float;
-        export let result () : Float := unsafe { pow(2.0, 5.0); };
+        export let result () : Float := unsafe (pow(2.0, 5.0));
     "#;
         let value = call_export_with_host(NativeHost::default(), source)
             .expect("linked native float pair call should succeed");
@@ -238,7 +238,7 @@ mod success {
           abi := .c
         )
         let C__pow(base : Float, exponent : Float) : Float;
-        let pow (base : Float, exponent : Float) : Float := unsafe { C__pow(base, exponent); };
+        let pow (base : Float, exponent : Float) : Float := unsafe (C__pow(base, exponent));
         export let result () : Float := pow(2.0, 5.0);
     "#;
         let value = call_export_with_host(NativeHost::default(), source)
@@ -259,7 +259,7 @@ mod success {
         )
         let strcmp(left : CString, right : CString) : Int32;
         export let result () : Int32 :=
-          unsafe { strcmp("musi", "musi"); };
+          unsafe (strcmp("musi", "musi"));
     "#;
         let value = call_export_with_host(NativeHost::default(), source)
             .expect("linked native CString pair call should succeed");
@@ -280,7 +280,7 @@ mod success {
           abi := .c
         )
         let strchr(value : CString, code : Int) : CString;
-        export let result () : CString := unsafe { strchr(musi_native_test_progname(), 0); };
+        export let result () : CString := unsafe (strchr(musi_native_test_progname(), 0));
     "#;
         let program = compile_program(&[("main", source)], "main");
         let mut vm = Vm::new(program, RejectingLoader, NativeHost::default(), VmOptions);
@@ -312,7 +312,7 @@ mod success {
           abi := .musi
         )
         let readLine(value : Int) : Int;
-        export let result () : Int := unsafe { readLine(7); };
+        export let result () : Int := unsafe (readLine(7));
         ",
         )
         .expect("registered foreign should succeed");
@@ -333,7 +333,7 @@ mod success {
         )
         let puts (value : Int) : Int;
 
-        export let result () : Int := unsafe { puts(1); };
+        export let result () : Int := unsafe (puts(1));
         ",
         )
         .expect("registered foreign should win");
@@ -353,7 +353,7 @@ mod success {
         )
         let puts (value : Int) : Int;
 
-        export let result () : Int := unsafe { puts(1); };
+        export let result () : Int := unsafe (puts(1));
         ",
         )
         .expect("fallback should handle foreign");
@@ -375,7 +375,7 @@ mod success {
         )
         let puts (value : Int) : Int;
 
-        export let result () : Int := unsafe { puts(1); };
+        export let result () : Int := unsafe (puts(1));
         ",
         )
         .expect("shared state should be visible");
@@ -452,7 +452,7 @@ mod failure {
         )
         let puts (value : Int) : Int;
 
-        export let result () : Int := unsafe { puts(42); };
+        export let result () : Int := unsafe (puts(42));
         ",
         )
         .expect("non-c foreign should still dispatch through registered host");
@@ -468,7 +468,7 @@ mod failure {
           abi := .c
         )
         let musi_native_test_missing_symbol(value : Int) : Int;
-        export let result () : Int := unsafe { musi_native_test_missing_symbol(1); };
+        export let result () : Int := unsafe (musi_native_test_missing_symbol(1));
     "#;
         let err = call_export_with_host(NativeHost::default(), source)
             .expect_err("missing symbol should fail");
@@ -492,7 +492,7 @@ mod failure {
         )
         let puts (value : Int) : Int;
 
-        export let result () : Int := unsafe { puts(1); };
+        export let result () : Int := unsafe (puts(1));
         ",
         )
         .expect_err("missing host edge should reject");
@@ -531,7 +531,7 @@ mod failure {
           abi := .musi
         )
         let readLine(value : Int) : Int;
-        export let result () : Int := unsafe { readLine(7); };
+        export let result () : Int := unsafe (readLine(7));
         "#,
         )
         .expect_err("unsupported target should reject");

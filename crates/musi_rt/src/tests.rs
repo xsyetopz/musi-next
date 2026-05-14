@@ -273,7 +273,7 @@ mod success {
               abi := .musi
             )
             let puts(value : Int) : Int;
-            export let result () : Int := unsafe { puts(42); };
+            export let result () : Int := unsafe (puts(42));
         "#,
             )
             .unwrap();
@@ -302,7 +302,7 @@ mod success {
               abi := .musi
             )
             let readInt(value : Int) : Int;
-            export let result () : Int := unsafe { readInt(7); };
+            export let result () : Int := unsafe (readInt(7));
         ",
             )
             .unwrap();
@@ -326,7 +326,7 @@ mod success {
               abi := .c
             )
             let puts(value : Int) : Int;
-            export let result () : Int := unsafe { puts(1); };
+            export let result () : Int := unsafe (puts(1));
         ",
             )
             .unwrap();

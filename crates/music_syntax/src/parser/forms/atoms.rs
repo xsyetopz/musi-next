@@ -261,12 +261,8 @@ impl Parser<'_> {
 
     pub(crate) fn parse_unsafe_expr(&mut self) -> ParseResult<SyntaxNodeId> {
         let unsafe_kw = self.expect_token(TokenKind::KwUnsafe)?;
-        let open = self.expect_token(TokenKind::LBrace)?;
-        let mut children = vec![unsafe_kw, open];
-        while !self.at(TokenKind::RBrace) && !self.at(TokenKind::Eof) {
-            children.push(SyntaxElementId::Node(self.parse_stmt()?));
-        }
-        children.push(self.expect_token(TokenKind::RBrace)?);
+        let body = self.parse_paren_expr()?;
+        let children = vec![unsafe_kw, SyntaxElementId::Node(body)];
         Ok(self
             .builder
             .push_node_from_children(SyntaxNodeKind::UnsafeExpr, children))
@@ -276,7 +272,7 @@ impl Parser<'_> {
         let pin_kw = self.expect_token(TokenKind::KwPin)?;
         let pinned_expr = self.parse_expr(0)?;
         let as_kw = self.expect_token(TokenKind::KwAs)?;
-        let name = self.expect_token(TokenKind::Ident)?;
+        let name = self.expect_ident_element()?;
         let in_kw = self.expect_token(TokenKind::KwIn)?;
         let body = self.parse_expr(0)?;
         Ok(self.builder.push_node_from_children(

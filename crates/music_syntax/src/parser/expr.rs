@@ -331,10 +331,14 @@ const fn infix_binding_power(kind: TokenKind) -> Option<(u8, u8, InfixGroup)> {
         TokenKind::KwOr | TokenKind::QuestionQuestion => {
             Some((OR_BP, OR_BP + 1, InfixGroup::Other))
         }
+        TokenKind::ColonGt | TokenKind::ColonQuestionGt => {
+            Some((OR_BP, OR_BP + 1, InfixGroup::Other))
+        }
         TokenKind::KwXor => Some((XOR_BP, XOR_BP + 1, InfixGroup::Other)),
         TokenKind::KwAnd => Some((AND_BP, AND_BP + 1, InfixGroup::Other)),
         TokenKind::Eq
         | TokenKind::SlashEq
+        | TokenKind::TildeEq
         | TokenKind::Lt
         | TokenKind::Gt
         | TokenKind::LtEq

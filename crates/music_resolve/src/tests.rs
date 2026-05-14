@@ -512,7 +512,7 @@ mod success {
     }
 
     #[test]
-    fn static_template_imports_resolve_from_import_env() {
+    fn template_imports_report_invalid_specifier() {
         let src = r"
         let IO := import `std/io`;
     ";
@@ -536,10 +536,8 @@ mod success {
             },
         );
 
-        assert_eq!(resolved.imports.len(), 1);
-        assert_eq!(resolved.imports[0].spec.as_str(), "std/io");
-        assert_eq!(resolved.imports[0].to.as_str(), "std/io");
-        assert!(resolved.diags.is_empty(), "{:?}", resolved.diags);
+        assert!(resolved.imports.is_empty());
+        assert_eq!(resolved.diags.len(), 1);
     }
 
     #[test]

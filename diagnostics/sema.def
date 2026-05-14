@@ -90,6 +90,14 @@ diag AttrWhenRequiresStringList 3020
 diag ForeignSignatureRequired 3021
   message "native binding needs signature"
 
+diag ExternalImportCannotBeExported 3309
+  message "`@external` import cannot be exported"
+  primary "`@external` declaration has no body"
+
+diag ExternalBodyRequiresExport 3310
+  message "`@external` body needs `export`"
+  primary "`@external` body must be exported"
+
 diag InvalidPartialModifier 3120
   message "`partial` target invalid"
 
@@ -255,6 +263,14 @@ diag PinnedValueEscapes 3125
   message "pinned value `{name}` escapes pin scope"
   primary "`{name}` returned from pin body"
 
+diag PinnedValueCapturedByClosure 3312
+  message "pinned value `{name}` captured by closure"
+  primary "`{name}` captured by closure inside pin scope"
+
+diag YieldInsidePinScope 3311
+  message "`yield` inside pin scope"
+  primary "`yield` would suspend active pin scope"
+
 diag InvalidTypeApplication 3070
   message "type application target `{target}` invalid"
 
@@ -316,10 +332,10 @@ diag BinaryOperatorHasNoExecutableLowering 3090
   message "binary operator has no executable lowering"
 
 diag LogicalOperatorDomainMismatch 3127
-  message "operator `{operator}` needs `Bool` or matching `Bits[N]`, found `{left}` and `{right}`"
+  message "operator `{operator}` needs `Bit` or matching `Bits[N]`, found `{left}` and `{right}`"
 
 diag UnaryLogicalOperatorDomainMismatch 3128
-  message "operator `{operator}` needs `Bool` or `Bits[N]`, found `{found}`"
+  message "operator `{operator}` needs `Bit` or `Bits[N]`, found `{found}`"
 
 diag InvalidBitsWidth 3129
   message "bits width `{width}` expected positive natural literal"

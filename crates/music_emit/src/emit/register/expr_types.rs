@@ -103,7 +103,7 @@ fn collect_expr_types_aggregate(
             evidence,
         } => {
             let _ = ensure_type(state, layout, "Any");
-            let _ = ensure_type(state, layout, "Bool");
+            let _ = ensure_type(state, layout, "Bit");
             collect_expr_types(state, layout, value);
             collect_expr_types(state, layout, range);
             collect_expr_types(state, layout, evidence);

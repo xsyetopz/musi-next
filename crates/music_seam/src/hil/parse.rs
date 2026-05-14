@@ -351,7 +351,7 @@ fn parse_terminator(line: &str) -> Result<Option<HilTerminator>, AssemblyError> 
             else_target: else_text.trim().into(),
         }));
     }
-    if let Some(rest) = line.strip_prefix("tail.call ")
+    if let Some(rest) = line.strip_prefix("call.tail ")
         && let Some((callee, args)) = parse_named_call(rest)
     {
         return Ok(Some(HilTerminator::TailCall {

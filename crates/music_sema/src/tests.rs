@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use music_base::diag::{Diag, DiagContext};
 use music_base::{DiagCode, SourceId};
-use music_hir::{HirExprId, HirExprKind, HirTyKind};
+use music_hir::{HirExprId, HirExprKind, HirLitKind, HirTyKind};
 use music_module::{
     ImportEnv, ImportError, ImportErrorKind, ImportResolveResult, ModuleKey, ModuleSpecifier,
 };
@@ -387,6 +387,41 @@ mod success {
                 .map(ModuleKey::as_str),
             Some("std/io")
         );
+    }
+
+    #[test]
+    fn tuple_import_binds_each_import_record_target() {
+        let import_env = TestImportEnv::default()
+            .with_module("@std/cmp", "@@std@0.1.0/cmp.ms")
+            .with_module("@std/word", "@@std@0.1.0/word.ms");
+        let cmp = check_module_src(
+            12,
+            "@@std@0.1.0/cmp.ms",
+            "export let compare : Int := 1;",
+            Some(&import_env),
+            None,
+        );
+        let word = check_module_src(
+            13,
+            "@@std@0.1.0/word.ms",
+            "export let word : Int := 2;",
+            Some(&import_env),
+            None,
+        );
+        let sema_env = TestSemaEnv::default()
+            .with_surface("@@std@0.1.0/cmp.ms", cmp.surface().clone())
+            .with_surface("@@std@0.1.0/word.ms", word.surface().clone());
+        let main = check_module_src(
+            14,
+            "main",
+            r#"
+        let (StdCmp, StdWord) := import ("@std/cmp", "@std/word");
+        StdCmp.compare + StdWord.word;
+    "#,
+            Some(&import_env),
+            Some(&sema_env),
+        );
+        assert!(main.diags().is_empty(), "{:?}", main.diags());
     }
 
     #[test]
@@ -1221,7 +1256,7 @@ mod success {
     fn exported_polymorphic_constrained_callable_reports_diag() {
         let sema = check(
             r"
-        export let requireMark[T] (x : T) : T where T : Missing := x;
+        export let requireMark[T] (x : T) : T where T |= Missing := x;
     ",
         );
         assert!(
@@ -1718,13 +1753,63 @@ mod success {
         let module = check(
             r"
         @external(abi := .c) let clock () : Int;
-        let value := unsafe { clock(); };
+        let value := unsafe (clock());
     ",
         );
         assert!(!has_diag(
             &module,
             SemaDiagKind::UnsafeCallRequiresUnsafeBlock
         ));
+    }
+
+    #[test]
+    fn external_import_cannot_be_exported() {
+        let sema = check(
+            r"
+        @external(abi := .c)
+        export let clock () : Int;
+    ",
+        );
+        assert!(
+            has_diag(&sema, SemaDiagKind::ExternalImportCannotBeExported),
+            "{:?}",
+            sema.diags()
+        );
+    }
+
+    #[test]
+    fn external_body_requires_export() {
+        let sema = check(
+            r"
+        @external(abi := .c)
+        let clock () : Int := 1;
+    ",
+        );
+        assert!(
+            has_diag(&sema, SemaDiagKind::ExternalBodyRequiresExport),
+            "{:?}",
+            sema.diags()
+        );
+    }
+
+    #[test]
+    fn external_export_with_body_sets_direction_by_shape() {
+        let sema = check(
+            r"
+        @external(abi := .c)
+        export let clock () : Int := 1;
+    ",
+        );
+        assert!(
+            !has_diag(&sema, SemaDiagKind::ExternalImportCannotBeExported),
+            "{:?}",
+            sema.diags()
+        );
+        assert!(
+            !has_diag(&sema, SemaDiagKind::ExternalBodyRequiresExport),
+            "{:?}",
+            sema.diags()
+        );
     }
 
     #[test]
@@ -1790,7 +1875,7 @@ mod success {
         let module = check(
             r"
         let xs := [1, 2];
-        let value := unsafe { pin xs as pinned in 1; };
+        let value := unsafe (pin xs as pinned in 1);
     ",
         );
         assert!(!has_diag(&module, SemaDiagKind::UnsupportedPinTarget));
@@ -1812,7 +1897,7 @@ mod success {
     fn pin_inside_unsafe_rejects_scalar_target() {
         let module = check(
             r"
-        let value := unsafe { pin 1 as pinned in 0; };
+        let value := unsafe (pin 1 as pinned in 0);
     ",
         );
         let diag =
@@ -1829,7 +1914,7 @@ mod success {
         let module = check(
             r"
         let xs := [1, 2];
-        let value := unsafe { pin xs as pinned in pinned; };
+        let value := unsafe (pin xs as pinned in pinned);
     ",
         );
         let diag =
@@ -1839,6 +1924,149 @@ mod success {
             SemaDiagKind::PinnedValueEscapes
                 .message_with(&DiagContext::new().with("name", "pinned"))
         );
+    }
+
+    #[test]
+    fn pin_inside_unsafe_rejects_closure_capture_of_pin_handle() {
+        let module = check(
+            r"
+        let xs := [1, 2];
+        let value := unsafe (pin xs as pinned in \() => pinned);
+    ",
+        );
+        let diag = find_diag(&module, SemaDiagKind::PinnedValueCapturedByClosure)
+            .expect("pin closure capture diagnostic");
+        assert_eq!(
+            diag.message(),
+            SemaDiagKind::PinnedValueCapturedByClosure
+                .message_with(&DiagContext::new().with("name", "pinned"))
+        );
+    }
+
+    #[test]
+    fn pin_inside_unsafe_allows_shadowed_name_inside_lambda() {
+        let module = check(
+            r"
+        let xs := [1, 2];
+        let value := unsafe (pin xs as pinned in \(pinned : Int) => pinned);
+    ",
+        );
+        assert!(!has_diag(
+            &module,
+            SemaDiagKind::PinnedValueCapturedByClosure
+        ));
+    }
+
+    #[test]
+    fn pin_inside_unsafe_rejects_yield_in_body() {
+        let module = check(
+            r"
+        let xs := [1, 2];
+        let value := unsafe (pin xs as pinned in yield 1);
+    ",
+        );
+        assert!(has_diag(&module, SemaDiagKind::YieldInsidePinScope));
+    }
+
+    #[test]
+    fn defer_accepts_unit_cleanup_and_bit_guard() {
+        let sema = check(
+            r"
+        let cleanup () : Unit := known ();
+        let value := defer cleanup() where 0 = 0;
+    ",
+        );
+        assert!(sema.diags().is_empty(), "{:?}", sema.diags());
+        let defer_expr =
+            find_expr(&sema, |kind| matches!(kind, HirExprKind::Defer { .. })).expect("defer expr");
+        assert!(
+            matches!(
+                sema.ty(sema
+                    .try_expr_ty(defer_expr)
+                    .expect("defer expr type missing"))
+                    .kind,
+                HirTyKind::Unit
+            ),
+            "{:?}",
+            sema.diags()
+        );
+    }
+
+    #[test]
+    fn defer_guard_requires_bit_type() {
+        let sema = check(
+            r"
+        let cleanup () : Unit := known ();
+        let value := defer cleanup() where 1;
+    ",
+        );
+        let diag = find_diag(&sema, SemaDiagKind::TypeMismatch).expect("type mismatch diagnostic");
+        assert_eq!(diag.message(), "defer guard expected `Bit`, found `Int`");
+    }
+
+    #[test]
+    fn defer_cleanup_requires_unit_type() {
+        let sema = check(
+            r"
+        let value := defer 1 where 0 = 0;
+    ",
+        );
+        let diag = find_diag(&sema, SemaDiagKind::TypeMismatch).expect("type mismatch diagnostic");
+        assert_eq!(diag.message(), "defer cleanup expected `Unit`, found `Int`");
+    }
+
+    #[test]
+    fn defer_cleanup_failure_result_requires_explicit_handling() {
+        let sema = check(
+            r"
+        let CloseResult := data {
+          | Success(Unit)
+          | Failure(Int)
+        };
+        let close () : CloseResult := .Failure(1);
+        let value := defer close();
+    ",
+        );
+        let diag = find_diag(&sema, SemaDiagKind::TypeMismatch).expect("type mismatch diagnostic");
+        assert_eq!(
+            diag.message(),
+            "defer cleanup expected `Unit`, found `CloseResult`"
+        );
+    }
+
+    #[test]
+    fn let_else_allows_refutable_literal_pattern() {
+        let sema = check("let 0 := 1 else 2;");
+        assert!(
+            !has_diag(&sema, SemaDiagKind::PlainLetRequiresIrrefutablePattern),
+            "{:?}",
+            sema.diags()
+        );
+    }
+
+    #[test]
+    fn let_else_preserves_value_and_fallback_in_hir() {
+        let sema = check("let kept := 1 else 2;");
+        let let_expr =
+            find_expr(&sema, |kind| matches!(kind, HirExprKind::Let { .. })).expect("let expr");
+        let HirExprKind::Let { mods, value, .. } = sema.module().store.exprs.get(let_expr).kind
+        else {
+            panic!("expected let expr");
+        };
+
+        let fallback = mods.fallback.expect("let-else fallback missing");
+        let assert_int_lit = |expr_id: HirExprId, expected: &str| {
+            let HirExprKind::Lit { lit } = sema.module().store.exprs.get(expr_id).kind else {
+                panic!("expected literal expression");
+            };
+            let HirLitKind::Int { raw } = &sema.module().store.lits.get(lit).kind else {
+                panic!("expected int literal");
+            };
+            assert_eq!(raw.as_ref(), expected);
+        };
+
+        assert_int_lit(value, "1");
+        assert_int_lit(fallback, "2");
     }
 
     #[test]
@@ -2042,10 +2270,10 @@ mod success {
     }
 
     #[test]
-    fn known_type_annotation_marks_param_compiler_known() {
+    fn known_param_marks_param_compiler_known() {
         let sema = check(
             r"
-        let scale (n : known Int, x : Int) : Int := x * n;
+        let scale (known n : Int, x : Int) : Int := x * n;
         let runtime () : Int := 3;
         let y : Int := scale(runtime(), 2);
     ",

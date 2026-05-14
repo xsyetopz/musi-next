@@ -277,9 +277,11 @@ mod success {
     fn lex_reserved_compound_tokens() {
         let cases = [
             (
-                ":= = ... .[ ?? -> => /= <= >= <: |> ? !",
+                ":= :> :?> = ... .[ ?? -> => /= <= >= |> |= ~= ? !",
                 vec![
                     TokenKind::ColonEq,
+                    TokenKind::ColonGt,
+                    TokenKind::ColonQuestionGt,
                     TokenKind::Eq,
                     TokenKind::DotDotDot,
                     TokenKind::DotLBracket,
@@ -289,9 +291,9 @@ mod success {
                     TokenKind::SlashEq,
                     TokenKind::LtEq,
                     TokenKind::GtEq,
-                    TokenKind::Lt,
-                    TokenKind::Colon,
                     TokenKind::PipeGt,
+                    TokenKind::PipeEq,
+                    TokenKind::TildeEq,
                     TokenKind::Question,
                     TokenKind::Bang,
                     TokenKind::Eof,

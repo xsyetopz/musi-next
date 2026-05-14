@@ -183,15 +183,21 @@ impl Parser<'_> {
 
     pub(crate) fn parse_with_mods_expr(&mut self) -> ParseResult<SyntaxNodeId> {
         let mut children = Vec::new();
+        let mut has_visibility_mod = false;
         while self.at(TokenKind::At) || self.at(TokenKind::KwExport) || self.at(TokenKind::KwHidden)
         {
             if self.at(TokenKind::At) {
                 children.push(SyntaxElementId::Node(self.parse_attr()?));
             } else if self.at(TokenKind::KwHidden) {
+                has_visibility_mod = true;
                 children.push(self.advance_element());
             } else {
+                has_visibility_mod = true;
                 children.push(SyntaxElementId::Node(self.parse_export_mod()?));
             }
+        }
+        if has_visibility_mod && !self.at(TokenKind::KwLet) {
+            return Err(self.expected_token(TokenKind::KwLet));
         }
         let expr = match self.peek_kind() {
             TokenKind::KwLet => self.parse_let_expr(Vec::new())?,

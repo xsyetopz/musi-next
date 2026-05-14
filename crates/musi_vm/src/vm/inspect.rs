@@ -26,7 +26,7 @@ impl Vm {
             Value::Seq(seq) => ValueView::Seq(SeqView::new(&self.heap, *seq)),
             Value::Data(data) => {
                 let inner = self.heap.data(*data).expect("live data");
-                if inner.fields.is_empty() && self.is_named_type(inner.ty, "Bool") {
+                if inner.fields.is_empty() && self.is_named_type(inner.ty, "Bit") {
                     ValueView::Bool(inner.tag != 0)
                 } else if inner.tag == 0 {
                     ValueView::Record(RecordView::new(inner))

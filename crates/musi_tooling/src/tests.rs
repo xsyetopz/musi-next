@@ -1725,7 +1725,7 @@ let bool () : Int;
 @external(abi := .musi)
 let float01Intrinsic () : Float;
 
-export let float01 () : Float := unsafe { float01Intrinsic(); };
+export let float01 () : Float := unsafe (float01Intrinsic());
 ";
         write_file(
             test_dir.path(),

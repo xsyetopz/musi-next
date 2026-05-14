@@ -80,6 +80,14 @@ const ENTRIES: &[CatalogEntry] = &[
         help: None,
     },
     CatalogEntry {
+        kind: SeamDiagKind::SectionLimitExceeded,
+        code: 5410,
+        message: "SEAM `{table}` section exceeds binary encoding limit",
+        primary: "`{table}` section too large",
+        secondary: None,
+        help: None,
+    },
+    CatalogEntry {
         kind: SeamDiagKind::DuplicateLabel,
         code: 5408,
         message: "procedure `{procedure}` label duplicate",
@@ -100,6 +108,22 @@ const ENTRIES: &[CatalogEntry] = &[
         code: 5411,
         message: "opcode `{opcode}` operand shape mismatch",
         primary: "opcode `{opcode}` operand shape mismatch",
+        secondary: None,
+        help: None,
+    },
+    CatalogEntry {
+        kind: SeamDiagKind::InternalOpcodeSerialized,
+        code: 5440,
+        message: "internal opcode `{opcode}` cannot be serialized",
+        primary: "internal opcode `{opcode}` cannot be serialized",
+        secondary: None,
+        help: None,
+    },
+    CatalogEntry {
+        kind: SeamDiagKind::BranchTableTargetStackMismatch,
+        code: 5441,
+        message: "procedure `{procedure}` branch table target stacks differ",
+        primary: "procedure `{procedure}` branch table target stacks differ",
         secondary: None,
         help: None,
     },
@@ -336,9 +360,16 @@ pub const fn assembly_error_kind(source: &crate::AssemblyError) -> SeamDiagKind 
 pub const fn artifact_error_kind(source: &crate::ArtifactError) -> SeamDiagKind {
     match source {
         crate::ArtifactError::InvalidReference { .. } => SeamDiagKind::InvalidReference,
+        crate::ArtifactError::SectionLimitExceeded { .. } => SeamDiagKind::SectionLimitExceeded,
         crate::ArtifactError::DuplicateLabel { .. } => SeamDiagKind::DuplicateLabel,
         crate::ArtifactError::MissingLabel { .. } => SeamDiagKind::MissingLabel,
         crate::ArtifactError::OperandShapeMismatch { .. } => SeamDiagKind::OperandShapeMismatch,
+        crate::ArtifactError::InternalOpcodeSerialized { .. } => {
+            SeamDiagKind::InternalOpcodeSerialized
+        }
+        crate::ArtifactError::BranchTableTargetStackMismatch { .. } => {
+            SeamDiagKind::BranchTableTargetStackMismatch
+        }
     }
 }
 

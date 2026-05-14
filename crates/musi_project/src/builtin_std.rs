@@ -7,7 +7,6 @@ pub const STD_FILES: &[(&str, &str)] = &[
     ("assert.ms", include_str!("../../../lib/std/assert.ms")),
     ("bits.ms", include_str!("../../../lib/std/bits.ms")),
     ("word.ms", include_str!("../../../lib/std/word.ms")),
-    ("bool.ms", include_str!("../../../lib/std/bool.ms")),
     ("bytes.ms", include_str!("../../../lib/std/bytes.ms")),
     ("cli.ms", include_str!("../../../lib/std/cli.ms")),
     (

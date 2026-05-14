@@ -23,7 +23,7 @@ use music_ir::{
     IrDataVariantDef, IrDiagList, IrExpr, IrExprKind, IrForeignDef, IrGlobal, IrIntrinsicKind,
     IrLit, IrMatchArm as IrLoweredMatchArm, IrModule, IrModuleInitPart, IrModuleParts, IrNameRef,
     IrOrigin, IrParam, IrRangeKind, IrRecordField, IrRecordLayoutField, IrSeqPart, IrShapeDef,
-    IrTempId,
+    IrStaticImport, IrTempId,
 };
 
 pub(crate) mod access;

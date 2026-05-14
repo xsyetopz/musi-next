@@ -104,7 +104,7 @@ Rules:
 - capability imports are explicit and verified
 - dynamic loading and lookup are domain features, not ambient VM behavior
 - source-language module semantics are not part of this domain
-- dynamic module bytecode uses `mdl.load` and `mdl.get`; `mod` is not a SEAM mnemonic root because it conflicts with mathematical modulus
+- dynamic module bytecode uses action-first `ld.mod.dyn` and `ld.exp.dyn`
 
 This domain exists so runtime linking is a declared contract instead of a side effect of the host.
 

@@ -119,6 +119,10 @@ fn collect_call_like_exports(
             collect_expr(module, interner, *value, exports, attr_stack);
             collect_expr(module, interner, *body, exports, attr_stack);
         }
+        HirExprKind::Defer { cleanup, guard } => {
+            collect_expr(module, interner, *cleanup, exports, attr_stack);
+            collect_optional_expr(module, interner, *guard, exports, attr_stack);
+        }
         HirExprKind::Call { callee, args } => {
             collect_expr(module, interner, *callee, exports, attr_stack);
             collect_arg_exprs(module, interner, args, exports, attr_stack);
@@ -150,8 +154,9 @@ fn collect_decl_or_control_exports(
     attr_stack: &mut Vec<HirAttr>,
 ) -> bool {
     match kind {
-        HirExprKind::Let { value, .. } => {
+        HirExprKind::Let { mods, value, .. } => {
             collect_expr(module, interner, *value, exports, attr_stack);
+            collect_optional_expr(module, interner, mods.fallback, exports, attr_stack);
         }
         HirExprKind::Match { scrutinee, arms } => {
             collect_match_exports(module, interner, *scrutinee, arms, exports, attr_stack);

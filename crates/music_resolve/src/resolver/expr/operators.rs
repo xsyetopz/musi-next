@@ -66,6 +66,28 @@ where
         if matches!(op_tok.map(SyntaxToken::kind), Some(TokenKind::PipeGt)) {
             return self.alloc_call_expr_with_piped_value(origin, left, right);
         }
+        if matches!(
+            op_tok.map(SyntaxToken::kind),
+            Some(TokenKind::ColonQuestionGt)
+        ) {
+            return self.alloc_expr(
+                origin,
+                HirExprKind::TypeTest {
+                    base: left,
+                    ty: right,
+                    as_name: None,
+                },
+            );
+        }
+        if matches!(op_tok.map(SyntaxToken::kind), Some(TokenKind::ColonGt)) {
+            return self.alloc_expr(
+                origin,
+                HirExprKind::TypeCast {
+                    base: left,
+                    ty: right,
+                },
+            );
+        }
 
         let op = self.lower_binary_op(op_tok);
         self.alloc_expr(origin, HirExprKind::Binary { op, left, right })

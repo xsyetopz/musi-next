@@ -7,7 +7,7 @@ SEAM is Musi's virtual machine. SEAM IL is the umbrella term for code after Musi
 - **SEAM HIL** is high-level, typed SEAM IL. It keeps functions, blocks, values, data construction, calls, external calls, capability parameters, and runtime-boundary facts explicit.
 - **SEAM BC/IL** is lowered canonical transport IL. It is stack-based assembly form that maps one-to-one to bytecode and VM execution.
 
-`music disasm` writes SEAM HIL projection by default. Use `music disasm --level seam` to write lowered `.seam` IL.
+`musi disasm` displays bytecode mnemonics. `musi decomp` displays canonical lowered Musi.
 
 HIL and BC/IL use different textual syntaxes by design:
 
@@ -52,4 +52,4 @@ Full opcode positions and stack effects live in `specs/seam/bytecode.md`.
 - missing branch targets
 - external calls without declared capabilities
 
-HIL is for compiler and tooling views. `.seam` IL remains the runtime transport.
+HIL is for compiler and tooling views. `.seam` remains the runtime transport, and textual bytecode is a disassembly view.

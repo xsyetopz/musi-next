@@ -29,7 +29,6 @@
     "./libc": "./libc.ms",
     "./bits": "./bits.ms",
     "./word": "./word.ms",
-    "./bool": "./bool.ms",
     "./fmt": "./fmt.ms",
     "./errors": "./errors.ms",
     "./datetime": "./datetime.ms",

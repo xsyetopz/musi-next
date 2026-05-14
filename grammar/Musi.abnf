@@ -53,7 +53,7 @@ match-arm   = pattern ["where" expr] "=>" expr
 defer-expr  = "defer" expr ["where" expr]
 yield-expr  = "yield" expr
 pin-expr    = "pin" expr "as" ident "in" expr
-unsafe-expr = "unsafe" "{" *stmt "}"
+unsafe-expr = "unsafe" block-expr
 import-expr = "import" expr
 lambda-expr = "\" params [type-annot] "=>" expr
 block-expr  = "(" [expr *(";" expr) [";"]] ")"
@@ -80,8 +80,8 @@ record-expr  = "{" [record-field *("," record-field) [","]] "}"
 record-field = ident [":=" expr]
 stack-effect = "[" [type-expr *("," type-expr)] ";" [type-expr *("," type-expr)] "]"
 
-infix-op = ":=" / "|>" / "->" / "??" / "or" / "xor" / "and" /
-           "=" / "/=" / "<" / ">" / "<=" / ">=" / "..<" / ".." / "in" /
+infix-op = ":=" / "|>" / "->" / "??" / ":>" / ":?>" / "or" / "xor" / "and" /
+           "=" / "/=" / "~=" / "<" / ">" / "<=" / ">=" / "..<" / ".." / "in" /
            "+" / "-" / "*" / "/" / "%"
 where-clause = "where" constraint *("," constraint)
-constraint = ident (":" / "~=") type-expr
+constraint = ident ("|=" / "~=") type-expr

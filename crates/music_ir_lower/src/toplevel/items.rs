@@ -523,11 +523,13 @@ fn lower_params(ctx: &LowerCtx<'_>, params: SliceRange<HirParam>) -> Box<[IrPara
         .iter()
         .filter(|param| !param.is_comptime)
         .map(|param| {
-            IrParam::new(
-                decl_binding_id(sema, param.name)
-                    .unwrap_or_else(|| lowering_invariant_violation("param binding missing")),
-                interner.resolve(param.name.name),
-            )
+            let binding = decl_binding_id(sema, param.name)
+                .unwrap_or_else(|| lowering_invariant_violation("param binding missing"));
+            let ty = sema
+                .binding_type(binding)
+                .map(|ty| render_ty_name(sema, ty, interner))
+                .unwrap_or_else(|| "Unknown".into());
+            IrParam::new(binding, interner.resolve(param.name.name), ty)
         })
         .collect::<Vec<_>>()
         .into_boxed_slice()

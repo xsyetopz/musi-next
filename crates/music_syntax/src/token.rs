@@ -84,7 +84,10 @@ pub enum TokenKind {
 
     // Compound tokens (grammar/Musi.abnf)
     ColonEq,          // :=
+    ColonGt,          // :>
+    ColonQuestionGt,  // :?>
     MinusGt,          // ->
+    PipeEq,           // |=
     TildeEq,          // ~=
     EqGt,             // =>
     SlashEq,          // /=
@@ -104,7 +107,9 @@ pub enum TokenKind {
 
 // Ordered by longest-to-shortest (maximal munch).
 pub const TOKEN_PATTERNS: &[(&[u8], TokenKind)] = &[
+    (b":?>", TokenKind::ColonQuestionGt),
     (b":=", TokenKind::ColonEq),
+    (b":>", TokenKind::ColonGt),
     (b"...", TokenKind::DotDotDot),
     (b"..<", TokenKind::DotDotLt),
     (b"..", TokenKind::DotDot),
@@ -114,6 +119,7 @@ pub const TOKEN_PATTERNS: &[(&[u8], TokenKind)] = &[
     (b"=>", TokenKind::EqGt),
     (b"->", TokenKind::MinusGt),
     (b"~=", TokenKind::TildeEq),
+    (b"|=", TokenKind::PipeEq),
     (b"/=", TokenKind::SlashEq),
     (b"<=", TokenKind::LtEq),
     (b">=", TokenKind::GtEq),
@@ -173,7 +179,7 @@ const KEYWORD_NAMES: [(&str, TokenKind, &str); 25] = [
     ("yield", TokenKind::KwYield, "`yield`"),
 ];
 
-const PUNCT_DISPLAY: [(TokenKind, &str); 39] = [
+const PUNCT_DISPLAY: [(TokenKind, &str); 42] = [
     (TokenKind::At, "`@`"),
     (TokenKind::Hash, "`#`"),
     (TokenKind::Backslash, "`\\\\`"),
@@ -200,7 +206,10 @@ const PUNCT_DISPLAY: [(TokenKind, &str); 39] = [
     (TokenKind::Lt, "`<`"),
     (TokenKind::Gt, "`>`"),
     (TokenKind::ColonEq, "`:=`"),
+    (TokenKind::ColonGt, "`:>`"),
+    (TokenKind::ColonQuestionGt, "`:?>`"),
     (TokenKind::MinusGt, "`->`"),
+    (TokenKind::PipeEq, "`|=`"),
     (TokenKind::TildeEq, "`~=`"),
     (TokenKind::EqGt, "`=>`"),
     (TokenKind::SlashEq, "`/=`"),

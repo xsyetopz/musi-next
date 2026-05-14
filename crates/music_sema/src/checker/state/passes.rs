@@ -40,6 +40,7 @@ pub struct CheckPass<'ctx, 'interner, 'env> {
     pub evidence_scopes: ConstraintEvidenceScopeList,
     pub module_stmt_depth: u32,
     pub unsafe_depth: u32,
+    pub pin_depth: u32,
 }
 
 impl<'ctx, 'interner, 'env> PassBase<'ctx, 'interner, 'env> {
@@ -131,6 +132,7 @@ impl<'ctx, 'interner, 'env> CheckPass<'ctx, 'interner, 'env> {
             evidence_scopes: Vec::new(),
             module_stmt_depth: 0,
             unsafe_depth: 0,
+            pin_depth: 0,
         }
     }
 
@@ -156,6 +158,18 @@ impl<'ctx, 'interner, 'env> CheckPass<'ctx, 'interner, 'env> {
 
     pub const fn in_unsafe_block(&self) -> bool {
         self.unsafe_depth > 0
+    }
+
+    pub const fn enter_pin_scope(&mut self) {
+        self.pin_depth = self.pin_depth.saturating_add(1);
+    }
+
+    pub const fn exit_pin_scope(&mut self) {
+        self.pin_depth = self.pin_depth.saturating_sub(1);
+    }
+
+    pub const fn in_pin_scope(&self) -> bool {
+        self.pin_depth > 0
     }
 
     pub fn push_evidence_scope(&mut self, scope: ConstraintEvidenceScope) {

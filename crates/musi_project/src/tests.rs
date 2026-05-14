@@ -297,8 +297,8 @@ mod success {
         let output = project.compile_root_entry().expect("root entry compiles");
 
         assert!(output.artifact.validate().is_ok());
-        assert!(output.text.contains("@util@0.1.0/index.ms::base"));
-        assert!(output.text.contains("@app@1.0.0/index.ms::expect"));
+        assert!(output.disasm.contains("@util@0.1.0/index.ms::base"));
+        assert!(output.disasm.contains("@app@1.0.0/index.ms::expect"));
         assert!(project.package("util").is_some());
         assert_eq!(project.workspace().members.len(), 1);
     }

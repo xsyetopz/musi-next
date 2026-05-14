@@ -196,6 +196,13 @@ impl CheckPass<'_, '_, '_> {
             self.expr(expr_id).kind,
             HirExprKind::Let { value, .. } if matches!(self.expr(value).kind, HirExprKind::Error)
         );
+        let origin = self.expr(expr_id).origin;
+        let is_exported = self.expr(expr_id).mods.export.is_some();
+        if is_native_declaration && is_exported {
+            self.diag(origin.span, DiagKind::ExternalImportCannotBeExported, "");
+        } else if !is_native_declaration && !is_exported {
+            self.diag(origin.span, DiagKind::ExternalBodyRequiresExport, "");
+        }
         if let Some((binding, _)) = self.native_binding_from_let(expr_id) {
             if is_native_declaration {
                 self.mark_unsafe_binding(binding);
@@ -205,7 +212,6 @@ impl CheckPass<'_, '_, '_> {
                 self.set_foreign_link(binding, link);
             }
         }
-        let origin = self.expr(expr_id).origin;
         let HirExprKind::Let { params, sig, .. } = self.expr(expr_id).kind else {
             self.diag(origin.span, DiagKind::ForeignSignatureRequired, "");
             return None;

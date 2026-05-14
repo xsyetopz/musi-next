@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use music_arena::SliceRange;
 use music_base::diag::DiagContext;
 use music_hir::{HirExprId, HirExprKind, HirPatId, HirPatKind, HirTyField, HirTyId, HirTyKind};
 use music_module::ModuleKey;
@@ -29,6 +30,12 @@ impl CheckPass<'_, '_, '_> {
         arg: HirExprId,
     ) -> ExprFacts {
         let builtins = self.builtins();
+        match self.expr(arg).kind {
+            HirExprKind::Tuple { items } | HirExprKind::Sequence { exprs: items } => {
+                return self.check_import_tuple_expr(items);
+            }
+            _ => {}
+        }
         let arg_facts = super::super::exprs::check_expr(self, arg);
         let origin = self.expr(arg).origin;
         self.type_mismatch(origin, builtins.string_, arg_facts.ty);
@@ -40,6 +47,30 @@ impl CheckPass<'_, '_, '_> {
             self.runtime_import_result_ty()
         };
         ExprFacts::new(ty)
+    }
+
+    fn check_import_tuple_expr(&mut self, items: SliceRange<HirExprId>) -> ExprFacts {
+        let item_tys = self
+            .expr_ids(items)
+            .into_iter()
+            .map(|item| self.check_import_tuple_item(item))
+            .collect::<Vec<_>>();
+        let items = self.alloc_ty_list(item_tys);
+        let ty = self.alloc_ty(HirTyKind::Tuple { items });
+        ExprFacts::new(ty)
+    }
+
+    fn check_import_tuple_item(&mut self, item: HirExprId) -> HirTyId {
+        let builtins = self.builtins();
+        let item_facts = super::super::exprs::check_expr(self, item);
+        let origin = self.expr(item).origin;
+        self.type_mismatch(origin, builtins.string_, item_facts.ty);
+        if let Some(target) = self.static_import_target(origin.span)
+            && let Some(ty) = self.import_record_ty_for_target(&target)
+        {
+            return ty;
+        }
+        self.runtime_import_result_ty()
     }
 }
 

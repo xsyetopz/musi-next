@@ -234,6 +234,13 @@ pub enum HirExprKind {
     Import {
         arg: HirExprId,
     },
+    Yield {
+        value: HirExprId,
+    },
+    Defer {
+        cleanup: HirExprId,
+        guard: Option<HirExprId>,
+    },
 
     Match {
         scrutinee: HirExprId,
@@ -354,12 +361,13 @@ impl HirParam {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HirLetMods {
     pub is_rec: bool,
+    pub fallback: Option<HirExprId>,
 }
 
 impl HirLetMods {
     #[must_use]
-    pub const fn new(is_rec: bool) -> Self {
-        Self { is_rec }
+    pub const fn new(is_rec: bool, fallback: Option<HirExprId>) -> Self {
+        Self { is_rec, fallback }
     }
 }
 
@@ -476,7 +484,6 @@ impl HirMatchArm {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HirConstraintKind {
-    Subtype,
     Implements,
     TypeEq,
 }

@@ -128,7 +128,7 @@ where
         let expr_id = self.alloc_expr(
             origin,
             HirExprKind::Let {
-                mods: HirLetMods::new(false),
+                mods: HirLetMods::new(false, None),
                 pat,
                 type_params,
                 receiver: None,
@@ -341,7 +341,6 @@ where
 
         self.push_scope();
         let type_params = self.lower_let_type_params(node);
-        let mods = HirLetMods::new(is_rec);
         let has_param_clause = child_of_kind(node, SyntaxNodeKind::ParamList).is_some();
         let params = self.lower_let_params_clause(node);
         let constraints = self.lower_constraints_clause(node);
@@ -349,10 +348,12 @@ where
             .child_nodes()
             .filter(|child| is_expr_or_ty(child.kind()));
         let sig = self.lower_optional_expr_clause(node, TokenKind::Colon, &mut exprs);
-        let value_expr = match exprs.last() {
+        let value_expr = match exprs.next() {
             Some(expr) => self.lower_expr(expr),
             None => self.error_expr(origin),
         };
+        let fallback = self.lower_optional_expr_clause(node, TokenKind::KwElse, &mut exprs);
+        let mods = HirLetMods::new(is_rec, fallback);
         let pat = if let Some(pat_node) = pat_node.filter(|node| node.kind().is_pat()) {
             self.lower_pat(pat_node)
         } else {
@@ -411,10 +412,11 @@ where
             .child_nodes()
             .filter(|child| is_expr_or_ty(child.kind()));
         let sig = self.lower_optional_expr_clause(node, TokenKind::Colon, &mut exprs);
-        let value_expr = match exprs.last() {
+        let value_expr = match exprs.next() {
             Some(expr) => self.lower_expr(expr),
             None => self.error_expr(origin),
         };
+        let fallback = self.lower_optional_expr_clause(node, TokenKind::KwElse, &mut exprs);
         self.pop_scope();
 
         let pat = self
@@ -428,7 +430,7 @@ where
         self.alloc_expr(
             origin,
             HirExprKind::Let {
-                mods: HirLetMods::new(is_rec),
+                mods: HirLetMods::new(is_rec, fallback),
                 pat,
                 type_params,
                 receiver,

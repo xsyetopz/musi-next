@@ -5,16 +5,16 @@ use super::info::{OpcodeInfo, opcode_info};
 
 pub(super) const OPCODES: &[OpcodeInfo] = &[
     opcode_info(
-        Opcode::MdlLoad,
+        Opcode::LdModDyn,
         OpcodeFamily::Module,
-        "mdl.load",
+        "ld.mod.dyn",
         OperandShape::None,
         0xB2,
     ),
     opcode_info(
-        Opcode::MdlGet,
+        Opcode::LdExpDyn,
         OpcodeFamily::Module,
-        "mdl.get",
+        "ld.exp.dyn",
         OperandShape::String,
         0xB3,
     ),

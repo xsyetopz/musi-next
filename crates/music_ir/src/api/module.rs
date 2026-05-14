@@ -8,6 +8,7 @@ use music_sema::{ExportedValue, SurfaceTy};
 pub struct IrModule {
     module_key: ModuleKey,
     static_imports: Box<[ModuleKey]>,
+    static_import_edges: Box<[IrStaticImport]>,
     types: Box<[SurfaceTy]>,
     exports: Box<[ExportedValue]>,
     callables: Box<[IrCallable]>,
@@ -17,6 +18,12 @@ pub struct IrModule {
     foreigns: Box<[IrForeignDef]>,
     shapes: Box<[IrShapeDef]>,
     meta: Box<[IrMetaRecord]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrStaticImport {
+    spec: Box<str>,
+    resolved: ModuleKey,
 }
 
 #[derive(Debug, Clone)]
@@ -36,12 +43,14 @@ impl IrModule {
     pub fn new(
         module_key: ModuleKey,
         static_imports: Box<[ModuleKey]>,
+        static_import_edges: Box<[IrStaticImport]>,
         types: Box<[SurfaceTy]>,
         parts: IrModuleParts,
     ) -> Self {
         Self {
             module_key,
             static_imports,
+            static_import_edges,
             types,
             exports: parts.exports,
             callables: parts.callables,
@@ -62,6 +71,11 @@ impl IrModule {
     #[must_use]
     pub fn static_imports(&self) -> &[ModuleKey] {
         &self.static_imports
+    }
+
+    #[must_use]
+    pub fn static_import_edges(&self) -> &[IrStaticImport] {
+        &self.static_import_edges
     }
 
     #[must_use]
@@ -114,5 +128,25 @@ impl IrModule {
         self.exports
             .iter()
             .find(|value| value.name.as_ref() == name)
+    }
+}
+
+impl IrStaticImport {
+    #[must_use]
+    pub fn new(spec: impl Into<Box<str>>, resolved: ModuleKey) -> Self {
+        Self {
+            spec: spec.into(),
+            resolved,
+        }
+    }
+
+    #[must_use]
+    pub fn spec(&self) -> &str {
+        self.spec.as_ref()
+    }
+
+    #[must_use]
+    pub const fn resolved(&self) -> &ModuleKey {
+        &self.resolved
     }
 }

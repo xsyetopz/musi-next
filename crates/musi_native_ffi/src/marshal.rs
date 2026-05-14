@@ -260,7 +260,7 @@ fn marshal_arg_value(
             strings: Vec::new(),
         }),
         NativeAbiType::Bool { .. } => ctx.bool_flag(value).map_or_else(
-            || invalid_arg_type(foreign, index, "Bool", value),
+            || invalid_arg_type(foreign, index, "Bit", value),
             |flag| Ok(ArgValue::Bool(u8::from(flag))),
         ),
         NativeAbiType::Int { signed, bits } => {
@@ -447,7 +447,7 @@ fn write_field_bytes(
                 Err(native_arg_issue(
                     ctx.foreign,
                     ctx.arg_index,
-                    format!("expected type `Bool`, found `{:?}`", value.kind()),
+                    format!("expected type `Bit`, found `{:?}`", value.kind()),
                 ))
             },
             |flag| write_bytes(ctx.out, offset, &[u8::from(flag)]),

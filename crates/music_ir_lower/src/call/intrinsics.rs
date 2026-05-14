@@ -43,13 +43,9 @@ pub(super) fn lower_std_libm_intrinsic(
         return None;
     };
     let target = match ctx.interner.resolve(name.name) {
-        "Musi__floatIsNan" => (IrIntrinsicKind::FloatIsNan, "float.is_nan", "Bool"),
-        "Musi__floatIsInfinite" => (
-            IrIntrinsicKind::FloatIsInfinite,
-            "float.is_infinite",
-            "Bool",
-        ),
-        "Musi__floatIsFinite" => (IrIntrinsicKind::FloatIsFinite, "float.is_finite", "Bool"),
+        "Musi__floatIsNan" => (IrIntrinsicKind::FloatIsNan, "float.is_nan", "Bit"),
+        "Musi__floatIsInfinite" => (IrIntrinsicKind::FloatIsInfinite, "float.is_infinite", "Bit"),
+        "Musi__floatIsFinite" => (IrIntrinsicKind::FloatIsFinite, "float.is_finite", "Bit"),
         _ => return None,
     };
     let lowered_args = args
@@ -122,7 +118,7 @@ fn pointer_intrinsic_target(
             kind: IrIntrinsicKind::FfiPtrIsNull,
             symbol: "ffi.ptr.is_null".into(),
             param_tys: Box::new(["CPtr".into()]),
-            result_ty: "Bool".into(),
+            result_ty: "Bit".into(),
         }),
         "offset" if is_std_ffi_public_pointer_callee(ctx, callee) => {
             pointer_public_offset_target(ctx, type_arg?)

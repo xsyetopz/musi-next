@@ -33,8 +33,6 @@ export let libc := import "@std/libc";
 export let bits := import "@std/bits";
 --- Machine word tools.
 export let word := import "@std/word";
---- Boolean value tools.
-export let bool := import "@std/bool";
 --- Formatting tools.
 export let fmt := import "@std/fmt";
 --- Error value tools.

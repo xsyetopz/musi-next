@@ -62,9 +62,7 @@ let Musi__compareFloatTotal (left : Float, right : Float) : Int;
 
 --- Compare two floats with total ordering.
 export let compareFloat (left : Float, right : Float) : Ordering :=
-  match unsafe {
-  Musi__compareFloatTotal(left, right);
-} (
+  match unsafe (Musi__compareFloatTotal(left, right)) (
 | value where value < 0 => less()
 | value where value > 0 => greater()
 | _ => equal()

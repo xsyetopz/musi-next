@@ -109,6 +109,12 @@ impl CollectPass<'_, '_, '_> {
                 self.visit_expr(value);
                 self.visit_expr(body);
             }
+            HirExprKind::Defer { cleanup, guard } => {
+                self.visit_expr(cleanup);
+                if let Some(guard) = guard {
+                    self.visit_expr(guard);
+                }
+            }
             HirExprKind::Call { callee, args } => self.visit_call(callee, args),
             HirExprKind::Apply { callee, args } | HirExprKind::Index { base: callee, args } => {
                 self.visit_expr(callee);
@@ -141,6 +147,7 @@ impl CollectPass<'_, '_, '_> {
     fn visit_expr_decls(&mut self, id: HirExprId) -> bool {
         match self.expr(id).kind {
             HirExprKind::Let {
+                mods,
                 pat,
                 value,
                 type_params,
@@ -152,6 +159,9 @@ impl CollectPass<'_, '_, '_> {
                     self.collect_bound_decl(value, name, type_params, outer_attrs.as_ref());
                 }
                 self.visit_expr(value);
+                if let Some(fallback) = mods.fallback {
+                    self.visit_expr(fallback);
+                }
             }
             HirExprKind::Data { variants, fields } => self.visit_data(variants, fields),
             HirExprKind::Shape { members, .. } => {

@@ -11,7 +11,14 @@ Musi builtins use a hidden catalog, not a public raw `Builtin` module.
 - `Bit` is the primitive condition type; `0` is false and `1` is true. There is no truthiness.
 - `Bits[N]` is an exact-width bit pattern type. `N` is a compile-time natural number and may be `0`.
 - `Word` is the target-sized machine word type. `Word8`, `Word16`, `Word32`, and `Word64` are fixed-width machine word types.
-- `Bit` is the primitive boolean value type. `@std/bool` provides lowercase `true` and `false` values.
+- `Bit` is the primitive one-bit scalar. Type context gives `0` false meaning and `1` true meaning.
+- `Unit` has exactly one value, written `()`.
+- `Empty` has no values.
+- `Type` is the type of type-phase type expressions, not a runtime type object.
+- `Unknown` is the opaque top type. Values can be stored or passed as `Unknown`, and useful operations require narrowing.
+- `Any` is the dynamic type. Dynamic operations on `Any` are runtime checked.
+- Shape conformance uses `|=`. The word `fits` is the reserved readable replacement if `|=` changes.
+- Type equivalence uses `~=`. Static casts use `:>`. Runtime type tests use `:?>`.
 - `@std/io` uses `write`, `writeLn`, `writeErr`, and `writeErrLn` for output, following the Ada/Pascal/C# `WriteLine` family.
 - `Pin[T]` is compiler-owned scoped pin capability created only by `pin value as name in expr`.
 - External boundary facts are modeled with `@external` metadata, stack effects, explicit unsafe APIs, and ordinary import/export records.

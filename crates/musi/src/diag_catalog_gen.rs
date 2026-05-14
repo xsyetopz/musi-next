@@ -150,6 +150,8 @@ pub const fn cli_error_kind(source: &crate::MusiError) -> Option<CliDiagKind> {
         | crate::MusiError::SessionCompilationFailed(_)
         | crate::MusiError::RuntimeExecutionFailed(_)
         | crate::MusiError::ToolingIoFailed(_)
+        | crate::MusiError::ArtifactTransportFailed(_)
+        | crate::MusiError::ArchiveTransportFailed(_)
         | crate::MusiError::FormattingFailed(_)
         | crate::MusiError::JsonSerializationFailed(_) => None,
         crate::MusiError::MissingCurrentDirectory => Some(CliDiagKind::MissingCurrentDirectory),

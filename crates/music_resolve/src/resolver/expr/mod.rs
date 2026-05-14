@@ -80,6 +80,8 @@ where
             SyntaxNodeKind::AttributedExpr => self.lower_attributed_expr(node),
             SyntaxNodeKind::UnsafeExpr => self.lower_unsafe_expr(node),
             SyntaxNodeKind::PinExpr => self.lower_pin_expr(node),
+            SyntaxNodeKind::YieldExpr => self.lower_yield_expr(node),
+            SyntaxNodeKind::DeferExpr => self.lower_defer_expr(node),
             SyntaxNodeKind::TupleExpr => self.lower_tuple_expr(node),
             SyntaxNodeKind::ArrayExpr => self.lower_array_expr_or_ty(node),
             SyntaxNodeKind::ArrayTy => self.lower_array_ty_expr(node),

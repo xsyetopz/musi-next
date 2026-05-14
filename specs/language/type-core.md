@@ -7,12 +7,57 @@ Status: current small-core draft
 `Bit` is the primitive condition type. Conditions require `Bit`; there is no
 truthiness for integers, arrays, strings, unit, or data values.
 
-`Bool` is a standard-library item, not a primitive keyword. It binds `.True` to
-bit value `1` and `.False` to bit value `0`, and exports lowercase aliases
-`true` and `false`.
+`Unknown` is the opaque top type. Any value can become `Unknown`, but useful
+operations require narrowing. `Unit` has exactly one value and is written `()`.
+`Empty` is uninhabited.
 
-`Unknown` is an inference or recovery type. `Unit` has exactly one value and is
-written `()`. `Empty` is uninhabited.
+`Type` is the type of type-phase type expressions. It is not a runtime type
+object.
+
+`Any` is the dynamic type. Dynamic operations on `Any` are runtime checked.
+
+## Type Boundaries And Conformance
+
+Conformance uses `|=`:
+
+```musi
+T |= Shape
+```
+
+Read this as "`T` conforms to `Shape`".
+
+The word `fits` is reserved for diagnostics or future tooling, but it is not
+current source syntax.
+
+Type equivalence uses `~=`:
+
+```musi
+A ~= B
+```
+
+Static or guaranteed casts use `:>`:
+
+```musi
+let a : Any := value :> Any;
+```
+
+Runtime type tests use `:?>`:
+
+```musi
+let isInt : Bit := value :?> Int;
+```
+
+Final source boundary forms:
+
+```text
+|=
+~=
+:>
+:?>
+```
+
+Internal compiler prose may write subtype relations mathematically. Musi source
+uses the boundary forms above.
 
 ## Data Shapes
 

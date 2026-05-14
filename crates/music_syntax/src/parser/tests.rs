@@ -174,60 +174,6 @@ mod success {
     }
 
     #[test]
-    fn parses_export_block_as_grouping_sugar() {
-        let parsed = parse(
-            Lexer::new(
-                r"
-            export (
-              let x := 1;
-              let y := 2;
-            );
-        ",
-            )
-            .lex(),
-        );
-        assert!(
-            parsed.errors().is_empty(),
-            "unexpected errors: {:?}",
-            parsed.errors()
-        );
-    }
-
-    #[test]
-    fn parses_import_block_and_bound_tuple_import_block() {
-        let parsed = parse(
-            Lexer::new(
-                r#"
-            import (
-              "std/io";
-              "std/cmp";
-            );
-            let (IO, Cmp) := import (
-              "std/io";
-              "std/cmp";
-            );
-        "#,
-            )
-            .lex(),
-        );
-        assert!(
-            parsed.errors().is_empty(),
-            "unexpected errors: {:?}",
-            parsed.errors()
-        );
-    }
-
-    #[test]
-    fn parses_import_aliasing_through_let_and_of_identifier() {
-        let parsed = parse(Lexer::new(r#"let mod := import "./mod"; let of := 1;"#).lex());
-        assert!(
-            parsed.errors().is_empty(),
-            "unexpected errors: {:?}",
-            parsed.errors()
-        );
-    }
-
-    #[test]
     fn parses_as_for_pattern_and_type_test_aliases() {
         let parsed = parse(
             Lexer::new(
@@ -347,7 +293,7 @@ mod success {
 
     #[test]
     fn parses_new_signature_order_and_array_type_syntax() {
-        let parsed = parse(Lexer::new("let f[T] (xs : []Int) : [2]Int where T : Eq := xs;").lex());
+        let parsed = parse(Lexer::new("let f[T] (xs : []Int) : [2]Int where T |= Eq := xs;").lex());
         assert!(
             parsed.errors().is_empty(),
             "unexpected errors: {:?}",
@@ -362,6 +308,18 @@ mod success {
                 "let pair := (1, 2); let items := [3, 4]; let (a, b) := pair; let [c, d] := items;",
             )
             .lex(),
+        );
+        assert!(
+            parsed.errors().is_empty(),
+            "unexpected errors: {:?}",
+            parsed.errors()
+        );
+    }
+
+    #[test]
+    fn parses_tuple_import_with_destructuring_pattern() {
+        let parsed = parse(
+            Lexer::new(r#"let (StdCmp, StdWord) := import ("@std/cmp", "@std/word");"#).lex(),
         );
         assert!(
             parsed.errors().is_empty(),
@@ -412,12 +370,12 @@ mod success {
     }
 
     #[test]
-    fn parses_unsafe_block_expr() {
+    fn parses_unsafe_expr() {
         let parsed = parse(
             Lexer::new(
                 r"
             let clock() : Int := 1;
-            let value := unsafe { clock(); };
+            let value := unsafe (clock());
         ",
             )
             .lex(),
@@ -430,12 +388,12 @@ mod success {
     }
 
     #[test]
-    fn parses_pin_expr_inside_unsafe_block() {
+    fn parses_pin_expr_inside_unsafe_expr() {
         let parsed = parse(
             Lexer::new(
                 r"
             let xs := [1, 2];
-            let value := unsafe { pin xs as pinned in 1; };
+            let value := unsafe (pin xs as pinned in 1);
         ",
             )
             .lex(),
@@ -484,8 +442,8 @@ mod success {
     }
 
     #[test]
-    fn parses_colon_constraint() {
-        let parsed = parse(Lexer::new("let same[A](value : A) : A where A : Eq := value;").lex());
+    fn parses_conformance_constraint() {
+        let parsed = parse(Lexer::new("let same[A](value : A) : A where A |= Eq := value;").lex());
         assert!(
             parsed.errors().is_empty(),
             "unexpected errors: {:?}",
@@ -497,6 +455,16 @@ mod success {
     fn parses_type_equality_constraint() {
         let parsed =
             parse(Lexer::new("let same[A, B](value : A) : A where A ~= B := value;").lex());
+        assert!(
+            parsed.errors().is_empty(),
+            "unexpected errors: {:?}",
+            parsed.errors()
+        );
+    }
+
+    #[test]
+    fn parses_static_and_checked_type_boundaries() {
+        let parsed = parse(Lexer::new("let n := (value :> Any, value :?> Int, A ~= B);").lex());
         assert!(
             parsed.errors().is_empty(),
             "unexpected errors: {:?}",
@@ -519,6 +487,13 @@ mod failure {
     fn rejects_reserved_keyword_binding_names() {
         assert_has_parse_error("let if := 1;", |kind| {
             matches!(kind, ParseErrorKind::ReservedKeywordIdentifier { .. })
+        });
+    }
+
+    #[test]
+    fn rejects_generated_namespace_binding_names() {
+        assert_has_parse_error("let __name := 1;", |kind| {
+            matches!(kind, ParseErrorKind::ReservedGeneratedIdentifier)
         });
     }
 

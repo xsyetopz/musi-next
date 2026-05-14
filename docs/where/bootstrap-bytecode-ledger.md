@@ -24,19 +24,14 @@ implementation agree:
 - SEAM dotted mnemonic grammar, mnemonic roots, opcode families, numeric opcode
   positions, operand kinds, stack type lists, and branch stack rules.
 - SEAM domain names: `managed`, `native`, `link`, and `introspect`.
-- Lowering rule that source-level constructs break before `.seam` and `.seamil`
+- Lowering rule that source-level constructs break before `.seam`
   emission.
 
 ## Alignment Work
 
-Before freezing bytecode, resolve these remaining naming and status issues:
-
-- The SEAM specs are still marked `Status: proposed`; set-in-stone promotion
-  should update status only after these implementation contracts are reconciled.
-- Mnemonic naming still has inconsistent action/root order. For example,
-  load uses action-first `ld.*`, but dynamic module load is currently
-  `mdl.load`. That means opcode names are not set-in-stone yet and need an
-  explicit naming discussion before promotion.
+Before freezing bytecode, reconcile the remaining format, descriptor, verifier,
+root-map, source-map, and archive contracts from `docs/__smallcore__`.
+Mnemonic display uses action-first order for current public opcodes.
 
 ## Bootstrapping Boundary
 
@@ -119,12 +114,12 @@ Current source operations map to SEAM primitives like this:
 | `let`, reassignment, mutable places                  | `ld.loc`, `st.loc`, `ld.glob`, `st.glob`                         |
 | Integer literals and constant payloads               | `ld.c.i4`, `ld.c`, constant table                                |
 | Arithmetic and strict boolean operators              | `add`, `sub`, `mul`, `div.s`, `rem.s`, `and`, `or`, `xor`, `not` |
-| Equality and ordering                                | `ceq`, `cne`, `clt.s`, `cgt.s`, `cle.s`, `cge.s`                 |
-| `if`, `match`, refutable `let`, guards               | `br`, `br.false`, `br.tbl`, field loads, comparisons             |
+| Equality and ordering                                | `cmp.eq`, `cmp.ne`, `cmp.lt`, `cmp.gt`, `cmp.le`, `cmp.ge`       |
+| `if`, `match`, refutable `let`, guards               | `br`, `br.false`, `br.tbl`, field loads, `cmp.*`                 |
 | Functions, lambdas, closures, calls, pipelines       | `call`, `new.fn`, `call.ind`, locals                             |
 | Records, modules-as-records, tuples, variants        | `new.obj`, `ld.fld`, `st.fld`, type/layout tables                |
 | Arrays, indexing, length                             | `new.arr`, `ld.elem`, `st.elem`, `ld.len`                        |
-| Imports, exports, dynamic module records             | artifact imports/exports, `mdl.load`, `mdl.get`                  |
+| Imports, exports, dynamic module records             | artifact imports/exports, `ld.mod.dyn`, `ld.exp.dyn`             |
 | `@external`, native boundaries, embedding            | foreign descriptors, `ld.ffi`, `call.ffi`, SEAM domains          |
 | Runtime type checks and type values                  | `ld.type`, `is.inst`, `cast`                                     |
 | `known`, templates, syntax services                  | syntax constants, metadata, `musi:syntax` host hooks             |
@@ -139,7 +134,7 @@ These source operations now have candidate lowering contracts in
 `specs/seam/lowering.md`; review them before set-in-stone promotion:
 
 - Modules are record-shaped values plus artifact metadata; dynamic lookup uses
-  `mdl.load` and `mdl.get`.
+  `ld.mod.dyn` and `ld.exp.dyn`.
 - `in`, ranges, and `??` lower to comparisons, variant tests, branches, and
   typed library/runtime helpers.
 - `known` is Musi's compile-time evaluation boundary, analogous to Zig
@@ -157,17 +152,14 @@ These source operations now have candidate lowering contracts in
 
 ## Mnemonic Naming Review
 
-Opcode names are still a discussion surface. Current names mix action-first and
-area-first order:
+Current public display names use action-first order:
 
 - action-first: `ld.loc`, `st.loc`, `ld.fld`, `call.ind`, `ld.ffi`, `new.obj`
 - bare action or predicate: `add`, `sub`, `ret`, `cast`, `is.inst`
-- area-first: `mdl.load`, `mdl.get`
+- action-first: `ld.mod.dyn`, `ld.exp.dyn`
 
-Before freezing mnemonic names, discuss these questions:
+Before freezing numeric opcode values, reconcile these remaining questions:
 
-- Should all data movement use action-first order such as `ld.mdl` or
-  `ld.mdl.member` instead of `mdl.load` or `mdl.get`?
 - Should module operations be ordinary record/object access, declared link
   operations, or dedicated module-area operations?
 - Should mnemonic roots describe CPU/VM primitives first, with domains carried by

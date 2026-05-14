@@ -101,6 +101,8 @@ const fn decl_expr_subject(kind: &HirExprKind) -> &'static str {
     match kind {
         HirExprKind::Let { .. } => "let expression",
         HirExprKind::Import { .. } => "import expression",
+        HirExprKind::Yield { .. } => "yield expression",
+        HirExprKind::Defer { .. } => "defer expression",
         HirExprKind::Match { .. } => "match expression",
         HirExprKind::If { .. } => "if expression",
         HirExprKind::Data { .. } => "data declaration",

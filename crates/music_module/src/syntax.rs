@@ -5,7 +5,7 @@ use music_syntax::{
 };
 
 use crate::ModuleSpecifier;
-use crate::string_lit::{decode_string_lit, decode_template_lit};
+use crate::string_lit::decode_string_lit;
 
 type ExportNameList = Vec<Box<str>>;
 type ExportedGivenSiteList = Vec<ExportedGivenSite>;
@@ -137,21 +137,6 @@ pub fn collect_export_summary(_source_id: SourceId, tree: &SyntaxTree) -> Module
             }
             return;
         }
-
-        if let Some(group) = node
-            .child_nodes()
-            .find(|child| child.kind() == SyntaxNodeKind::MemberList)
-        {
-            collect_foreign_group_exports(group, &mut summary, is_opaque);
-            return;
-        }
-
-        if let Some(sequence) = node
-            .child_nodes()
-            .find(|child| child.kind() == SyntaxNodeKind::SequenceExpr)
-        {
-            collect_exported_sequence(sequence, &mut summary, is_opaque);
-        }
     });
     summary
 }
@@ -169,18 +154,27 @@ fn collect_import_expr_sites(
         ));
         return;
     };
-    if matches!(
-        expr.kind(),
-        SyntaxNodeKind::SequenceExpr | SyntaxNodeKind::TupleExpr
-    ) {
-        for child in expr.child_nodes().filter(|child| child.kind().is_expr()) {
-            let kind = classify_import_arg(child);
-            out.push(ImportSite::new(source_id, child.span(), kind));
+    push_import_sites_from_arg(source_id, node.span(), expr, out);
+}
+
+fn push_import_sites_from_arg(
+    source_id: SourceId,
+    import_span: Span,
+    expr: SyntaxNode<'_, '_>,
+    out: &mut Vec<ImportSite>,
+) {
+    if expr.kind() == SyntaxNodeKind::TupleExpr {
+        let mut pushed = false;
+        for child in expr.child_nodes() {
+            pushed = true;
+            push_import_sites_from_arg(source_id, child.span(), child, out);
         }
-        return;
+        if pushed {
+            return;
+        }
     }
     let kind = classify_import_arg(expr);
-    out.push(ImportSite::new(source_id, node.span(), kind));
+    out.push(ImportSite::new(source_id, import_span, kind));
 }
 
 fn classify_import_arg(expr: SyntaxNode<'_, '_>) -> ImportSiteKind {
@@ -202,29 +196,7 @@ fn classify_import_arg(expr: SyntaxNode<'_, '_>) -> ImportSiteKind {
                 spec: ModuleSpecifier::new(decoded),
             }
         }
-        SyntaxNodeKind::TemplateExpr => classify_static_template_import(expr),
         _ => ImportSiteKind::NonLiteral,
-    }
-}
-
-fn classify_static_template_import(template: SyntaxNode<'_, '_>) -> ImportSiteKind {
-    if template.child_nodes().next().is_some() {
-        return ImportSiteKind::NonLiteral;
-    }
-    let Some(tok) = template.child_tokens().next() else {
-        return ImportSiteKind::NonLiteral;
-    };
-    if tok.kind() != TokenKind::TemplateNoSubst {
-        return ImportSiteKind::NonLiteral;
-    }
-    let Some(raw) = tok.text() else {
-        return ImportSiteKind::InvalidStringLit;
-    };
-    let Ok(decoded) = decode_template_lit(raw) else {
-        return ImportSiteKind::InvalidStringLit;
-    };
-    ImportSiteKind::Static {
-        spec: ModuleSpecifier::new(decoded),
     }
 }
 
@@ -240,54 +212,9 @@ fn walk_nodes<'tree, 'src>(
     }
 }
 
-fn collect_exported_sequence(
-    sequence: SyntaxNode<'_, '_>,
-    out: &mut ModuleExportSummary,
-    is_opaque: bool,
-) {
-    for let_expr in sequence
-        .child_nodes()
-        .filter(|node| node.kind() == SyntaxNodeKind::LetExpr)
-    {
-        let Some(pat) = let_expr.child_nodes().find(|node| node.kind().is_pat()) else {
-            continue;
-        };
-        for token in pattern_binder_tokens(pat) {
-            if let Some(name) = canonical_token_text(token) {
-                out.push_export(name, is_opaque);
-            }
-        }
-    }
-}
-
-fn collect_foreign_group_exports(
-    group: SyntaxNode<'_, '_>,
-    out: &mut ModuleExportSummary,
-    is_opaque: bool,
-) {
-    for member in group
-        .child_nodes()
-        .filter(|n| n.kind() == SyntaxNodeKind::Member)
-    {
-        if let Some(name) = first_name_text(member) {
-            out.push_export(name, is_opaque);
-        }
-    }
-}
-
-fn first_name_text<'src>(node: SyntaxNode<'src, 'src>) -> Option<&'src str> {
-    node.child_tokens()
-        .find(|tok| is_name_token(tok.kind()))
-        .and_then(canonical_token_text)
-}
-
 fn canonical_token_text<'src>(tok: SyntaxToken<'src, 'src>) -> Option<&'src str> {
     let raw = tok.text()?;
     Some(canonical_name_text(tok.kind(), raw))
-}
-
-const fn is_name_token(kind: TokenKind) -> bool {
-    matches!(kind, TokenKind::Ident | TokenKind::OpIdent)
 }
 
 #[cfg(test)]

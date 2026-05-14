@@ -18,9 +18,7 @@ use musi_tooling::{
 use musi_vm::{Program, Value, Vm, VmError, VmOptions, render_value_view};
 use music_base::diag::{CatalogDiagnostic, DiagContext, display_catalog_or_source};
 use music_seam::descriptor::ExportTarget;
-use music_seam::{
-    AssemblyError, BINARY_VERSION, decode_binary, format_hil_projection, format_text,
-};
+use music_seam::{AssemblyError, BINARY_VERSION, decode_binary, format_debug_hil, format_disasm};
 use music_session::{Session, SessionError, SessionOptions};
 
 type MusicResult<T = ()> = Result<T, MusicError>;
@@ -231,8 +229,8 @@ fn disasm(path: &Path, level: DisasmLevelArg) -> MusicResult {
     let bytes = artifact_bytes_for(path)?;
     let artifact = decode_binary(&bytes)?;
     match level {
-        DisasmLevelArg::Hil => print!("{}", format_hil_projection(&artifact)),
-        DisasmLevelArg::Seam => print!("{}", format_text(&artifact)),
+        DisasmLevelArg::Hil => print!("{}", format_debug_hil(&artifact)),
+        DisasmLevelArg::Seam => print!("{}", format_disasm(&artifact)),
     }
     Ok(())
 }

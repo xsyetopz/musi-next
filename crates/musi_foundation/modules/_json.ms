@@ -7,13 +7,9 @@ let String := Core.String;
 @external(abi := .musi)
 let Musi__isValid (source : String) : Int;
 
-export let isValid (source : String) : Int := unsafe {
-  Musi__isValid(source);
-};
+export let isValid (source : String) : Int := unsafe (Musi__isValid(source));
 
 @external(abi := .musi)
 let Musi__normalize (source : String) : String;
 
-export let normalize (source : String) : String := unsafe {
-  Musi__normalize(source);
-};
+export let normalize (source : String) : String := unsafe (Musi__normalize(source));

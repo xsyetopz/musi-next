@@ -116,7 +116,7 @@ impl Vm {
     }
 
     pub(crate) fn bool_value(&mut self, module_slot: usize, value: bool) -> VmResult<Value> {
-        let bool_ty = self.named_type_id(module_slot, "Bool").ok_or_else(|| {
+        let bool_ty = self.named_type_id(module_slot, "Bit").ok_or_else(|| {
             VmError::new(VmErrorKind::InvalidValueKind {
                 expected: VmValueKind::Bool,
                 found: VmValueKind::Unit,
@@ -130,7 +130,7 @@ impl Vm {
             return None;
         };
         let data = self.heap.data(*data).ok()?;
-        (data.fields.is_empty() && self.is_named_type(data.ty, "Bool")).then_some(data.tag != 0)
+        (data.fields.is_empty() && self.is_named_type(data.ty, "Bit")).then_some(data.tag != 0)
     }
 
     pub(crate) fn values_equal(&self, left: &Value, right: &Value) -> bool {

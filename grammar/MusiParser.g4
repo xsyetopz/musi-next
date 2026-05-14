@@ -13,9 +13,10 @@ options {
 // 
 // Surface policy: - `let` names values. Form keywords (`data`, `shape`, `import`, `if`, `match`,
 // `defer`, `yield`, `unsafe`, `pin`) build expressions; they do not name values. - Keywords never
-// become callees. `import("a")` remains keyword syntax (or an error), not a function call on an
-// identifier named `import`. - Structural blocks use `{ ... }`; imperative/sequence blocks use `(
-// ... )`. - Lambdas must start with `\`, so `=>` can remain unambiguous branch-arm syntax too.
+// become callees. `import "a"` and tuple imports like `import ("a", "b")` remain keyword syntax,
+// not calls on an identifier named `import`. - Structural blocks use `{ ... }`;
+// imperative/sequence blocks use `( ... )`. - Lambdas must start with `\`, so `=>` can remain
+// unambiguous branch-arm syntax too.
 
 root: root_stmt* EOF;
 
@@ -34,6 +35,8 @@ infix_expr: prefix_expr (infix_op prefix_expr)*;
 
 infix_op:
 	COLON_EQ
+	| COLON_QUESTION_GT
+	| COLON_GT
 	| PIPE_GT
 	| MINUS_GT
 	| QUESTION_QUESTION
@@ -46,6 +49,7 @@ infix_op:
 	| GT
 	| LT_EQ
 	| GT_EQ
+	| TILDE_EQ
 	| DOT_DOT
 	| DOT_DOT_LT
 	| KW_IN
@@ -168,10 +172,7 @@ defer_expr: KW_DEFER expr (KW_WHERE expr)?;
 
 yield_expr: KW_YIELD expr;
 
-import_expr:
-	KW_IMPORT (LPAREN import_block_items? RPAREN | expr);
-
-import_block_items: expr (SEMICOLON expr)* SEMICOLON?;
+import_expr: KW_IMPORT expr;
 
 let_expr:
 	KW_LET KW_RECUR? let_head bracket_params? params? type_annot? where_clause? COLON_EQ expr (
@@ -211,7 +212,7 @@ rec_def_field: KW_LET ident COLON expr (COLON_EQ expr)?;
 shape_expr:
 	KW_SHAPE (KW_WHERE constraint (COMMA constraint)* COMMA?)? LBRACE structural_members RBRACE;
 
-unsafe_expr: KW_UNSAFE LBRACE stmt* RBRACE;
+unsafe_expr: KW_UNSAFE paren_expr;
 
 pin_expr: KW_PIN expr KW_AS IDENT KW_IN expr;
 
@@ -253,7 +254,7 @@ type_expr: QUESTION type_expr | type_expr BANG type_expr | expr;
 
 where_clause: KW_WHERE constraint (COMMA constraint)* COMMA?;
 
-constraint: ident (COLON | TILDE_EQ) expr;
+constraint: ident (PIPE_EQ | TILDE_EQ) expr;
 
 // --- Patterns ---
 

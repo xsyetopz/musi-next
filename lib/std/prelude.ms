@@ -1,6 +1,5 @@
 --! Default std prelude exports.
 
-let bool := import "@std/bool";
 let bytes := import "@std/bytes";
 let cmp := import "@std/cmp";
 let collections := import "@std/collections";
@@ -84,11 +83,6 @@ export let List := collections.list.List;
 export let Path := path.Path;
 --- Prelude bytes type.
 export let Bytes := bytes.Bytes;
---- Lowercase true value.
-export let true : core.Bit := bool.true;
---- Lowercase false value.
-export let false : core.Bit := bool.false;
-
 /- === Common constructors === -/
 --- Build Some maybe value.
 export let Some [T] (value : T) : Maybe[T] := maybe.Some[T](value);

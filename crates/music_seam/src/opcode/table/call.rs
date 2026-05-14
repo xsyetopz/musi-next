@@ -28,7 +28,7 @@ pub(super) const OPCODES: &[OpcodeInfo] = &[
     opcode_info(
         Opcode::TailCall,
         OpcodeFamily::Call,
-        "tail.call",
+        "call.tail",
         OperandShape::Procedure,
         0x56,
     ),

@@ -246,11 +246,11 @@ mod success {
 
     #[test]
     fn spaces_dot_variants_after_infix_operator() {
-        let source = "let value := bool.true =.True;";
+        let source = "let value := flag.value =.True;";
 
         let formatted_result = format_source(source, &options()).unwrap();
 
-        assert_eq!(formatted_result.text, "let value := bool.true = .True;\n");
+        assert_eq!(formatted_result.text, "let value := flag.value = .True;\n");
         let second = format_source(&formatted_result.text, &options()).unwrap();
         assert_eq!(second.text, formatted_result.text);
     }
@@ -259,13 +259,13 @@ mod success {
     fn wraps_rhs_when_inserted_dot_variant_space_exceeds_width() {
         let mut options = options();
         options.line_width = 29;
-        let source = "let value := bool.true =.True;";
+        let source = "let value := flag.value =.True;";
 
         let formatted_result = format_source(source, &options).unwrap();
 
         assert_eq!(
             formatted_result.text,
-            "let value :=\n  bool.true = .True;\n"
+            "let value :=\n  flag.value = .True;\n"
         );
         let second = format_source(&formatted_result.text, &options).unwrap();
         assert_eq!(second.text, formatted_result.text);
@@ -1873,7 +1873,7 @@ export let test () :=
             "export let command (value : String) : Command := .Command(value := value);",
             "export let values : []Int := [1, 2, 3];",
             "export let cast[T](raw : CPtr) : Ptr[T] := .Ptr(raw := raw);",
-            "@external(abi := .musi)\nexport (\nlet offset[T](pointer : Ptr[T], count : Int) : Ptr[T];\nlet read[T](pointer : Ptr[T]) : T;\n);",
+            "@external(abi := .musi)\nexport let offset[T](pointer : Ptr[T], count : Int) : Ptr[T];\n@external(abi := .musi)\nexport let read[T](pointer : Ptr[T]) : T;",
             "--- Documented value.\nexport let x : Int := 1;",
             "let x := 1; -- trailing\nlet y := /- inline -/ 2;",
         ];

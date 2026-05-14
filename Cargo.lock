@@ -747,6 +747,7 @@ dependencies = [
  "musi_vm",
  "music_base",
  "music_module",
+ "music_seam",
  "music_sema",
  "music_session",
  "serde_json",

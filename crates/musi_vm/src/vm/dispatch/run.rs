@@ -118,7 +118,7 @@ impl Vm {
             }
             Opcode::NewObj | Opcode::LdFld | Opcode::StFld => self.exec_data(instruction),
             Opcode::LdType | Opcode::IsInst | Opcode::Cast => self.exec_type(instruction),
-            Opcode::CallFfi | Opcode::LdFfi | Opcode::MdlLoad | Opcode::MdlGet => {
+            Opcode::CallFfi | Opcode::LdFfi | Opcode::LdModDyn | Opcode::LdExpDyn => {
                 self.exec_host_edge(instruction)
             }
         }

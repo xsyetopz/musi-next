@@ -8,6 +8,11 @@ pub struct ForeignDescriptor {
     pub abi: StringId,
     pub symbol: StringId,
     pub link: Option<StringId>,
+    pub domain: Option<StringId>,
+    pub pinned_params: Box<[u16]>,
+    pub nullable_params: Box<[u16]>,
+    pub nullable_result: bool,
+    pub lifetime: Option<StringId>,
     pub export: bool,
     pub hot: bool,
     pub cold: bool,
@@ -15,7 +20,7 @@ pub struct ForeignDescriptor {
 
 impl ForeignDescriptor {
     #[must_use]
-    pub const fn new(
+    pub fn new(
         name: StringId,
         param_tys: Box<[TypeId]>,
         result_ty: TypeId,
@@ -29,6 +34,11 @@ impl ForeignDescriptor {
             abi,
             symbol,
             link: None,
+            domain: None,
+            pinned_params: Box::new([]),
+            nullable_params: Box::new([]),
+            nullable_result: false,
+            lifetime: None,
             export: false,
             hot: false,
             cold: false,
@@ -38,6 +48,36 @@ impl ForeignDescriptor {
     #[must_use]
     pub const fn with_link(mut self, link: StringId) -> Self {
         self.link = Some(link);
+        self
+    }
+
+    #[must_use]
+    pub const fn with_domain(mut self, domain: StringId) -> Self {
+        self.domain = Some(domain);
+        self
+    }
+
+    #[must_use]
+    pub fn with_pinned_params(mut self, pinned_params: Box<[u16]>) -> Self {
+        self.pinned_params = pinned_params;
+        self
+    }
+
+    #[must_use]
+    pub fn with_nullable_params(mut self, nullable_params: Box<[u16]>) -> Self {
+        self.nullable_params = nullable_params;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_nullable_result(mut self, nullable_result: bool) -> Self {
+        self.nullable_result = nullable_result;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_lifetime(mut self, lifetime: StringId) -> Self {
+        self.lifetime = Some(lifetime);
         self
     }
 

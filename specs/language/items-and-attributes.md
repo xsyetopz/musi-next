@@ -18,7 +18,7 @@ Rules:
 
 - `@musi.builtin` is valid only on exported foundation bindings.
 - The source name is tied to the internal builtin registry by `name`.
-- Library items such as `Bool`, `Maybe`, `Expect`, and helpers remain ordinary
+- Library items such as `Maybe`, `Expect`, and helpers remain ordinary
   library values unless the compiler registry owns them.
 
 ## Intrinsics

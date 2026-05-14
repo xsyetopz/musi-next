@@ -8,13 +8,9 @@ let String := Core.String;
 @external(abi := .musi)
 let Musi__int (value : Int) : String;
 
-export let int (value : Int) : String := unsafe {
-  Musi__int(value);
-};
+export let int (value : Int) : String := unsafe (Musi__int(value));
 
 @external(abi := .musi)
 let Musi__float (value : Float) : String;
 
-export let float (value : Float) : String := unsafe {
-  Musi__float(value);
-};
+export let float (value : Float) : String := unsafe (Musi__float(value));

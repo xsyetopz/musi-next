@@ -301,11 +301,14 @@ fn lower_runtime_params(ctx: &LowerCtx<'_>, params: &[HirParam]) -> Vec<IrParam>
         .iter()
         .filter(|param| !param.is_comptime)
         .map(|param| {
-            IrParam::new(
-                super::decl_binding_id(ctx.sema, param.name)
-                    .unwrap_or_else(|| lowering_invariant_violation("param binding missing")),
-                ctx.interner.resolve(param.name.name),
-            )
+            let binding = super::decl_binding_id(ctx.sema, param.name)
+                .unwrap_or_else(|| lowering_invariant_violation("param binding missing"));
+            let ty = ctx
+                .sema
+                .binding_type(binding)
+                .map(|ty| super::render_ty_name(ctx.sema, ty, ctx.interner))
+                .unwrap_or_else(|| "Unknown".into());
+            IrParam::new(binding, ctx.interner.resolve(param.name.name), ty)
         })
         .collect()
 }

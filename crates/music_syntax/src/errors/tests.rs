@@ -90,4 +90,24 @@ mod failure {
             SyntaxDiagKind::ReservedKeywordIdentifier.hint()
         );
     }
+
+    #[test]
+    fn parse_diag_reports_reserved_generated_identifier() {
+        let text = "let __name := 1;";
+        let diag = ParseError::new(
+            ParseErrorKind::ReservedGeneratedIdentifier,
+            Span::new(4, 10),
+        )
+        .to_diag(source_id(text), text);
+
+        assert_eq!(
+            diag.message(),
+            SyntaxDiagKind::ReservedGeneratedIdentifier.message()
+        );
+        assert!(diag.labels()[0].message().contains("`__`"));
+        assert_eq!(
+            diag.hint(),
+            SyntaxDiagKind::ReservedGeneratedIdentifier.hint()
+        );
+    }
 }

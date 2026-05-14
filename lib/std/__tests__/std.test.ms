@@ -56,7 +56,6 @@ export let test () :=
       "root exports 'word' family",
       assert.toBe(std.word.toInt32(std.word.fromInt32(3)), 3),
     );
-    testing.it("root exports 'bool' family", std.bool.true = (0 = 0));
     testing.it("root exports 'fmt' family", std.fmt.int(42) = "42");
     testing.it(
       "root exports 'errors' family",

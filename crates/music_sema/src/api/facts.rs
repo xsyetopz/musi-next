@@ -276,7 +276,6 @@ impl PatFacts {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ConstraintKind {
-    Subtype,
     Implements,
     TypeEq,
 }

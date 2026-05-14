@@ -8,7 +8,7 @@ lexer grammar MusiLexer;
 // ----------------------------------------------------------------------------- Lexer
 
 // Keywords. Form keywords construct syntax forms; they are never callable identifiers. For example,
-// `import("a")` is an import form, not a call to a value named `import`.
+// `import "a"` and `import ("a", "b")` are import forms, not calls to a value named `import`.
 KW_AND: 'and';
 KW_AS: 'as';
 KW_MATCH: 'match';
@@ -44,9 +44,12 @@ DOT_LBRACKET: '.[';
 // `.(` selects first-class operator members such as `Eq.(=)`.
 DOT_LPAREN: '.(';
 QUESTION_QUESTION: '??';
+COLON_QUESTION_GT: ':?>';
+COLON_GT: ':>';
 EQ_GT: '=>';
 MINUS_GT: '->';
 TILDE_EQ: '~=';
+PIPE_EQ: '|=';
 SLASH_EQ: '/=';
 LT_EQ: '<=';
 GT_EQ: '>=';
@@ -178,6 +181,8 @@ I_KW_XOR: 'xor' -> type(KW_XOR);
 I_KW_YIELD: 'yield' -> type(KW_YIELD);
 
 // Fixed tokens (maximal munch).
+I_COLON_QUESTION_GT: ':?>' -> type(COLON_QUESTION_GT);
+I_COLON_GT: ':>' -> type(COLON_GT);
 I_COLON_EQ: ':=' -> type(COLON_EQ);
 I_DOT_DOT_DOT: '...' -> type(DOT_DOT_DOT);
 I_DOT_DOT_LT: '..<' -> type(DOT_DOT_LT);
@@ -191,6 +196,7 @@ I_TILDE_EQ: '~=' -> type(TILDE_EQ);
 I_SLASH_EQ: '/=' -> type(SLASH_EQ);
 I_LT_EQ: '<=' -> type(LT_EQ);
 I_GT_EQ: '>=' -> type(GT_EQ);
+I_PIPE_EQ: '|=' -> type(PIPE_EQ);
 I_PIPE_GT: '|>' -> type(PIPE_GT);
 
 // Prefixes.
@@ -314,6 +320,8 @@ N_KW_XOR: 'xor' -> type(KW_XOR);
 N_KW_YIELD: 'yield' -> type(KW_YIELD);
 
 // Fixed tokens (maximal munch).
+N_COLON_QUESTION_GT: ':?>' -> type(COLON_QUESTION_GT);
+N_COLON_GT: ':>' -> type(COLON_GT);
 N_COLON_EQ: ':=' -> type(COLON_EQ);
 N_DOT_DOT_DOT: '...' -> type(DOT_DOT_DOT);
 N_DOT_DOT_LT: '..<' -> type(DOT_DOT_LT);
@@ -327,6 +335,7 @@ N_TILDE_EQ: '~=' -> type(TILDE_EQ);
 N_SLASH_EQ: '/=' -> type(SLASH_EQ);
 N_LT_EQ: '<=' -> type(LT_EQ);
 N_GT_EQ: '>=' -> type(GT_EQ);
+N_PIPE_EQ: '|=' -> type(PIPE_EQ);
 N_PIPE_GT: '|>' -> type(PIPE_GT);
 
 // Prefixes.

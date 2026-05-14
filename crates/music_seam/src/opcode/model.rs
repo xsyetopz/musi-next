@@ -11,6 +11,12 @@ pub enum OpcodeFamily {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum OpcodeVisibility {
+    Public,
+    Internal,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Opcode {
     LdC,
     LdCI4,
@@ -54,8 +60,8 @@ pub enum Opcode {
     LdType,
     IsInst,
     Cast,
-    MdlLoad,
-    MdlGet,
+    LdModDyn,
+    LdExpDyn,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

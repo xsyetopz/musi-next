@@ -37,7 +37,7 @@ impl Parser<'_> {
     }
 
     fn expect_attr_name_element(&mut self) -> ParseResult<SyntaxElementId> {
-        if matches!(self.peek_kind(), TokenKind::Ident | TokenKind::KwKnown) {
+        if self.peek_kind() == TokenKind::KwKnown {
             Ok(self.advance_element())
         } else {
             self.expect_ident_element()
@@ -47,7 +47,7 @@ impl Parser<'_> {
     fn parse_attr_arg(&mut self) -> ParseResult<SyntaxNodeId> {
         let mut children = Vec::new();
         if matches!(self.peek_kind(), TokenKind::Ident) && self.nth_kind(1) == TokenKind::ColonEq {
-            children.push(self.advance_element());
+            children.push(self.expect_ident_element()?);
             children.push(self.advance_element());
         }
         children.push(SyntaxElementId::Node(self.parse_attr_value()?));
@@ -154,7 +154,7 @@ impl Parser<'_> {
 
     fn parse_constraint(&mut self) -> ParseResult<SyntaxNodeId> {
         let ident = self.expect_ident_element()?;
-        let op = if self.at_any(&[TokenKind::Colon, TokenKind::TildeEq]) {
+        let op = if self.at_any(&[TokenKind::PipeEq, TokenKind::TildeEq]) {
             self.advance_element()
         } else {
             return Err(self.expected_constraint_operator());
@@ -168,7 +168,7 @@ impl Parser<'_> {
 
     pub(crate) fn parse_op_or_ident_name(&mut self) -> ParseResult<SyntaxElementList> {
         match self.peek_kind() {
-            TokenKind::Ident | TokenKind::OpIdent => Ok(vec![self.advance_element()]),
+            TokenKind::Ident | TokenKind::OpIdent => Ok(vec![self.expect_name_element()?]),
             _ => Err(self.expected_operator_member_name()),
         }
     }

@@ -60,7 +60,7 @@ impl Vm {
                 self.push_value(Value::foreign(module_slot, foreign))?;
                 Ok(StepOutcome::Continue)
             }
-            Opcode::MdlLoad => {
+            Opcode::LdModDyn => {
                 let spec_value = self.pop_value()?;
                 let spec = self.expect_string_value(spec_value)?;
                 let slot = self.load_dynamic_module(spec.as_ref())?;
@@ -68,7 +68,7 @@ impl Vm {
                 self.push_value(value)?;
                 Ok(StepOutcome::Continue)
             }
-            Opcode::MdlGet => {
+            Opcode::LdExpDyn => {
                 let Operand::String(name) = instruction.operand else {
                     return Err(Self::invalid_operand(instruction));
                 };

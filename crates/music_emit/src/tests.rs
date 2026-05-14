@@ -7,7 +7,7 @@ use music_ir_lower::lower_module;
 use music_module::ModuleKey;
 use music_names::Interner;
 use music_resolve::{ResolveOptions, resolve_module};
-use music_seam::descriptor::ConstantValue;
+use music_seam::descriptor::{ConstantValue, SafePointKind};
 use music_seam::{CodeEntry, Opcode};
 use music_sema::{SemaOptions, check_module};
 use music_syntax::{Lexer, parse};
@@ -73,6 +73,16 @@ fn assert_module_opcodes(src: &str, expected: &[Opcode]) {
     }
 }
 
+fn safe_point_kind_for_opcode(opcode: Opcode) -> Option<SafePointKind> {
+    match opcode {
+        Opcode::Call | Opcode::TailCall => Some(SafePointKind::Call),
+        Opcode::CallInd => Some(SafePointKind::CallIndirect),
+        Opcode::CallFfi => Some(SafePointKind::CallForeign),
+        Opcode::NewFn | Opcode::NewObj | Opcode::NewArr => Some(SafePointKind::Allocation),
+        _ => None,
+    }
+}
+
 mod success {
     use super::*;
 
@@ -94,6 +104,34 @@ mod success {
         assert_eq!(emitted.exports.len(), 2);
         assert!(!emitted.artifact.types.is_empty());
         assert_eq!(emitted.artifact.foreigns.len(), 1);
+    }
+
+    #[test]
+    fn emits_procedure_param_type_metadata() {
+        let emitted = emit_module(
+            r"
+        export let add (left : Int, right : Int) : Int := left + right;
+    ",
+        )
+        .expect("emit should succeed");
+        let procedure = emitted
+            .artifact
+            .procedures
+            .iter()
+            .find_map(|(_, procedure)| {
+                emitted
+                    .artifact
+                    .string_text(procedure.name)
+                    .ends_with("::add")
+                    .then_some(procedure)
+            })
+            .expect("add procedure should exist");
+        let param_tys = procedure
+            .param_tys
+            .iter()
+            .map(|ty| emitted.artifact.type_name(*ty))
+            .collect::<Vec<_>>();
+        assert_eq!(param_tys, vec!["Int", "Int"]);
     }
 
     #[test]
@@ -306,7 +344,7 @@ mod success {
           loaded
         );
     ",
-            &[Opcode::MdlLoad],
+            &[Opcode::LdModDyn],
         );
     }
 
@@ -398,7 +436,7 @@ mod success {
             r"
         @external(abi := .c)
         let puts (value : Int) : Int;
-        export let result () : Int := unsafe { puts(1); };
+        export let result () : Int := unsafe (puts(1));
     ",
         )
         .expect("emit should succeed");
@@ -408,6 +446,91 @@ mod success {
                 .into_iter()
                 .any(|opcode| opcode == Opcode::CallFfi)
         );
+    }
+
+    #[test]
+    fn emits_root_maps_for_known_call_and_allocation_safe_points() {
+        let emitted = emit_module(
+            r"
+        @external(abi := .c)
+        let puts (value : Int) : Int;
+        let id (value : Int) : Int := value;
+        let apply (f : Int -> Int, x : Int) : Int := f(x);
+        export let result (x : Int) : Int := (
+          let pair := { left := x, right := x + 1 };
+          let items := [x, x + 1];
+          let closure := id;
+          let called := apply(closure, x);
+          unsafe (puts(called))
+        );
+    ",
+        )
+        .expect("emit should succeed");
+        assert!(emitted.artifact.validate().is_ok());
+
+        let mut saw_call = false;
+        let mut saw_call_indirect = false;
+        let mut saw_call_foreign = false;
+        let mut saw_allocation = false;
+
+        for (procedure_id, procedure) in emitted.artifact.procedures.iter() {
+            let expected_safe_points = procedure
+                .code
+                .iter()
+                .filter_map(|entry| {
+                    let CodeEntry::Instruction(instruction) = entry else {
+                        return None;
+                    };
+                    safe_point_kind_for_opcode(instruction.opcode)
+                })
+                .collect::<Vec<_>>();
+
+            let procedure_root_maps = emitted
+                .artifact
+                .root_maps
+                .iter()
+                .filter_map(|(root_map_id, descriptor)| {
+                    (descriptor.procedure == Some(procedure_id))
+                        .then_some((root_map_id, descriptor))
+                })
+                .collect::<Vec<_>>();
+
+            if expected_safe_points.is_empty() {
+                assert!(procedure.root_map_table.is_none());
+                continue;
+            }
+
+            let first_root_map = procedure_root_maps
+                .first()
+                .map(|(root_map_id, _)| *root_map_id);
+            assert_eq!(first_root_map, procedure.root_map_table);
+            assert_eq!(procedure_root_maps.len(), expected_safe_points.len());
+
+            let procedure_name = emitted.artifact.string_text(procedure.name);
+            for ((_, descriptor), expected_kind) in
+                procedure_root_maps.iter().zip(expected_safe_points.iter())
+            {
+                let safe_point_name = emitted.artifact.string_text(descriptor.safe_point);
+                assert!(safe_point_name.starts_with(procedure_name));
+                assert_eq!(descriptor.kind, *expected_kind);
+                match descriptor.kind {
+                    SafePointKind::Call => saw_call = true,
+                    SafePointKind::CallIndirect => saw_call_indirect = true,
+                    SafePointKind::CallForeign => saw_call_foreign = true,
+                    SafePointKind::Allocation => saw_allocation = true,
+                    SafePointKind::Collection
+                    | SafePointKind::PinEnter
+                    | SafePointKind::PinExit
+                    | SafePointKind::Yield
+                    | SafePointKind::Trap => {}
+                }
+            }
+        }
+
+        assert!(saw_call);
+        assert!(saw_call_indirect);
+        assert!(saw_call_foreign);
+        assert!(saw_allocation);
     }
 
     #[test]

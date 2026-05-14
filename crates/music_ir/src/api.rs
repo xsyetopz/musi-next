@@ -14,5 +14,5 @@ pub use expr::{
     IrIntrinsicKind, IrLit, IrMatchArm, IrNameRef, IrOrigin, IrParam, IrRangeEndpoint, IrRangeKind,
     IrRecordField, IrRecordLayoutField, IrSeqPart, IrTempId,
 };
-pub use module::{IrModule, IrModuleParts};
+pub use module::{IrModule, IrModuleParts, IrStaticImport};
 pub use surface_type_terms::lower_surface_type_term;

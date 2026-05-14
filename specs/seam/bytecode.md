@@ -2,7 +2,7 @@
 
 Status: proposed
 
-This spec defines SEAM BC/IL: the canonical stack-based bytecode transported by `.seam` and mirrored by `.seamil` text.
+This spec defines SEAM BC/IL: the canonical stack-based bytecode transported by `.seam` and displayed as textual bytecode by `disasm`.
 
 SEAM BC/IL is a portable VM substrate. It is not hard-wired to Musi source syntax. Musi, or any other frontend, targets SEAM by lowering source concepts to stack operations, metadata tables, descriptors, and runtime calls.
 
@@ -36,7 +36,7 @@ SEAM normalizes these into dotted text mnemonics.
 
 ## Text Mnemonics
 
-`.seamil` uses dotted mnemonics. Binary `.seam` stores numeric opcodes; dots are text only.
+Textual bytecode uses dotted mnemonics. Binary `.seam` stores numeric opcodes; dots are text only.
 
 Mnemonic grammar:
 
@@ -64,7 +64,7 @@ br      branch
 call    call
 tail    tail-call qualifier
 is      test/predicate
-cast    checked cast
+cast    cast
 loc     local
 glob    global
 fld     field
@@ -89,8 +89,8 @@ Meaning distinctions:
 
 Method signatures and block signatures are stack type lists.
 
-```seamil
-.method $pair (%x : Int, %y : Bool) -> [Int, Bool] locals [] {
+```text
+.method $pair (%x : Int, %y : Bit) -> [Int, Bit] locals [] {
 entry stack []:
   ld.loc 0
   ld.loc 1
@@ -113,7 +113,7 @@ Branches transfer the whole current stack.
 
 Verifier rule:
 
-1. `br.false` pops one `Bool`; `br.tbl` pops one integer index.
+1. `br.false` pops one `Bit`; `br.tbl` pops one integer index.
 2. The remaining current stack must exactly match the target block `stack [...]` signature.
 3. The target receives that whole stack.
 
@@ -121,7 +121,7 @@ There is no partial branch payload convention.
 
 Example:
 
-```seamil
+```text
 left stack []:
   ld.loc 0
   br join
@@ -200,39 +200,39 @@ Numeric opcode positions are canonical for this design. Gaps are reserved.
 
 ### `0x20..0x4F` Arithmetic, Comparison, Control Flow
 
-|       Hex | Mnemonic   | Operand | Stack effect          | Meaning              |
-| --------: | ---------- | ------- | --------------------- | -------------------- |
-|      `21` | `add`      | none    | `N, N -> N`           | arithmetic add       |
-|      `22` | `sub`      | none    | `N, N -> N`           | arithmetic subtract  |
-|      `23` | `mul`      | none    | `N, N -> N`           | arithmetic multiply  |
-|      `27` | `div.s`    | none    | `Int, Int -> Int`     | signed division      |
-|      `29` | `rem.s`    | none    | `Int, Int -> Int`     | signed remainder     |
-|      `2B` | `and`      | none    | `A, A -> A`           | bitwise/boolean and  |
-|      `2C` | `or`       | none    | `A, A -> A`           | bitwise/boolean or   |
-|      `2D` | `xor`      | none    | `A, A -> A`           | bitwise/boolean xor  |
-|      `2E` | `not`      | none    | `A -> A`              | bitwise/boolean not  |
-|      `37` | `ceq`      | none    | `A, A -> Bool`        | equality compare     |
-|      `38` | `cne`      | none    | `A, A -> Bool`        | inequality compare   |
-|      `39` | `clt.s`    | none    | `A, A -> Bool`        | signed less-than     |
-|      `3B` | `cgt.s`    | none    | `A, A -> Bool`        | signed greater-than  |
-|      `3D` | `cle.s`    | none    | `A, A -> Bool`        | signed less/equal    |
-|      `40` | `cge.s`    | none    | `A, A -> Bool`        | signed greater/equal |
-|      `42` | `br`       | block   | `S -> target.S`       | unconditional branch |
-|      `44` | `br.false` | block   | `S, Bool -> target.S` | branch if false      |
-|      `45` | `br.tbl`   | btbl    | `S, Int -> target.S`  | table branch         |
-|      `47` | `ret`      | none    | `results ->`          | return result stack  |
-| `20`-`20` | reserved   |         |                       | reserved             |
-| `24`-`26` | reserved   |         |                       | reserved             |
-| `28`-`28` | reserved   |         |                       | reserved             |
-| `2A`-`2A` | reserved   |         |                       | reserved             |
-| `2F`-`36` | reserved   |         |                       | reserved             |
-| `3A`-`3A` | reserved   |         |                       | reserved             |
-| `3C`-`3C` | reserved   |         |                       | reserved             |
-| `3E`-`3F` | reserved   |         |                       | reserved             |
-| `41`-`41` | reserved   |         |                       | reserved             |
-| `43`-`43` | reserved   |         |                       | reserved             |
-| `46`-`46` | reserved   |         |                       | reserved             |
-| `48`-`4F` | reserved   |         |                       | reserved             |
+|       Hex | Mnemonic   | Operand | Stack effect         | Meaning              |
+| --------: | ---------- | ------- | -------------------- | -------------------- |
+|      `21` | `add`      | none    | `N, N -> N`          | arithmetic add       |
+|      `22` | `sub`      | none    | `N, N -> N`          | arithmetic subtract  |
+|      `23` | `mul`      | none    | `N, N -> N`          | arithmetic multiply  |
+|      `27` | `div.s`    | none    | `Int, Int -> Int`    | signed division      |
+|      `29` | `rem.s`    | none    | `Int, Int -> Int`    | signed remainder     |
+|      `2B` | `and`      | none    | `A, A -> A`          | bitwise/boolean and  |
+|      `2C` | `or`       | none    | `A, A -> A`          | bitwise/boolean or   |
+|      `2D` | `xor`      | none    | `A, A -> A`          | bitwise/boolean xor  |
+|      `2E` | `not`      | none    | `A -> A`             | bitwise/boolean not  |
+|      `37` | `cmp.eq`   | none    | `A, A -> Bit`        | equality compare     |
+|      `38` | `cmp.ne`   | none    | `A, A -> Bit`        | inequality compare   |
+|      `39` | `cmp.lt`   | none    | `A, A -> Bit`        | signed less-than     |
+|      `3B` | `cmp.gt`   | none    | `A, A -> Bit`        | signed greater-than  |
+|      `3D` | `cmp.le`   | none    | `A, A -> Bit`        | signed less/equal    |
+|      `40` | `cmp.ge`   | none    | `A, A -> Bit`        | signed greater/equal |
+|      `42` | `br`       | block   | `S -> target.S`      | unconditional branch |
+|      `44` | `br.false` | block   | `S, Bit -> target.S` | branch if false      |
+|      `45` | `br.tbl`   | btbl    | `S, Int -> target.S` | table branch         |
+|      `47` | `ret`      | none    | `results ->`         | return result stack  |
+| `20`-`20` | reserved   |         |                      | reserved             |
+| `24`-`26` | reserved   |         |                      | reserved             |
+| `28`-`28` | reserved   |         |                      | reserved             |
+| `2A`-`2A` | reserved   |         |                      | reserved             |
+| `2F`-`36` | reserved   |         |                      | reserved             |
+| `3A`-`3A` | reserved   |         |                      | reserved             |
+| `3C`-`3C` | reserved   |         |                      | reserved             |
+| `3E`-`3F` | reserved   |         |                      | reserved             |
+| `41`-`41` | reserved   |         |                      | reserved             |
+| `43`-`43` | reserved   |         |                      | reserved             |
+| `46`-`46` | reserved   |         |                      | reserved             |
+| `48`-`4F` | reserved   |         |                      | reserved             |
 
 ### `0x50..0x6F` Calls And Function Values
 
@@ -241,7 +241,7 @@ Numeric opcode positions are canonical for this design. Gaps are reserved.
 |      `50` | `call`      | method    | `args -> results`     | direct managed call                |
 |      `51` | `call.ind`  | none      | `Fn, args -> results` | indirect first-class callable call |
 |      `55` | `call.ffi`  | foreign   | `args -> results`     | foreign ABI call                   |
-|      `56` | `tail.call` | method    | `args -> results`     | direct tail call                   |
+|      `56` | `call.tail` | method    | `args -> results`     | direct tail call                   |
 |      `5D` | `new.fn`    | method,u8 | `captures -> Fn`      | create closure/function value      |
 |      `61` | `ld.ffi`    | foreign   | `-> FfiFn`            | load foreign symbol handle         |
 | `52`-`54` | reserved    |           |                       | reserved                           |
@@ -267,8 +267,8 @@ Numeric opcode positions are canonical for this design. Gaps are reserved.
 |       Hex | Mnemonic  | Operand | Stack effect | Meaning                          |
 | --------: | --------- | ------- | ------------ | -------------------------------- |
 |      `80` | `ld.type` | type    | `-> Type`    | load type value/token            |
-|      `82` | `is.inst` | type    | `A -> Bool`  | runtime instance/refinement test |
-|      `83` | `cast`    | type    | `A -> B`     | checked cast                     |
+|      `82` | `is.inst` | type    | `A -> Bit`   | runtime instance/refinement test |
+|      `83` | `cast`    | type    | `A -> B`     | cast                             |
 | `81`-`81` | reserved  |         |              | reserved                         |
 | `84`-`8F` | reserved  |         |              | reserved                         |
 
@@ -280,12 +280,12 @@ Numeric opcode positions are canonical for this design. Gaps are reserved.
 
 ### `0xB0..0xBF` Link And Module
 
-|       Hex | Mnemonic   | Operand | Stack effect  | Meaning                      |
-| --------: | ---------- | ------- | ------------- | ---------------------------- |
-|      `B2` | `mdl.load` | none    | `-> Module`   | dynamic module load          |
-|      `B3` | `mdl.get`  | str     | `Module -> T` | dynamic module export lookup |
-| `B0`-`B1` | reserved   |         |               | reserved                     |
-| `B4`-`BF` | reserved   |         |               | reserved                     |
+|       Hex | Mnemonic     | Operand | Stack effect       | Meaning                      |
+| --------: | ------------ | ------- | ------------------ | ---------------------------- |
+|      `B2` | `ld.mod.dyn` | none    | `String -> Module` | dynamic module load          |
+|      `B3` | `ld.exp.dyn` | str     | `Module -> T`      | dynamic module export lookup |
+| `B0`-`B1` | reserved     |         |                    | reserved                     |
+| `B4`-`BF` | reserved     |         |                    | reserved                     |
 
 ### `0xC0..0xFE` Standard Domain Extension Space
 
@@ -305,7 +305,7 @@ Extended opcode mnemonics still use the same dotted mnemonic rules.
 
 ### Tuple/Product
 
-```seamil
+```text
 ld.loc 0
 ld.loc 1
 new.obj $Tuple2 2
@@ -313,25 +313,25 @@ new.obj $Tuple2 2
 
 Access:
 
-```seamil
+```text
 ld.loc 2
 ld.fld 0
 ```
 
 ### Sum Variant / Option / Result
 
-```seamil
+```text
 ld.loc payload
 new.obj $Option.Some 1
 ```
 
 Tag test:
 
-```seamil
+```text
 ld.loc opt
 ld.fld 0
 ld.c.i4 1
-ceq
+cmp.eq
 br.false none
 ```
 
@@ -339,7 +339,7 @@ br.false none
 
 Dictionary lowering:
 
-```seamil
+```text
 ld.loc dict
 ld.fld 0
 ld.loc a
@@ -349,7 +349,7 @@ call.ind
 
 ### Native Runtime Call
 
-```seamil
+```text
 ld.loc message
 call.ffi $musi_console_writeLine
 ```

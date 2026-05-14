@@ -161,7 +161,7 @@ impl Parser<'_> {
     fn parse_variant_expr_payload_item(&mut self) -> ParseResult<SyntaxNodeId> {
         let mut children = Vec::new();
         if self.peek_kind() == TokenKind::Ident && self.nth_kind(1) == TokenKind::ColonEq {
-            children.push(self.advance_element());
+            children.push(self.expect_ident_element()?);
             children.push(self.advance_element());
         }
         children.push(SyntaxElementId::Node(self.parse_expr(0)?));
@@ -173,7 +173,7 @@ impl Parser<'_> {
     fn parse_variant_pat_payload_item(&mut self) -> ParseResult<SyntaxNodeId> {
         let mut children = Vec::new();
         if self.peek_kind() == TokenKind::Ident && self.nth_kind(1) == TokenKind::ColonEq {
-            children.push(self.advance_element());
+            children.push(self.expect_ident_element()?);
             children.push(self.advance_element());
         }
         children.push(SyntaxElementId::Node(self.parse_pattern()?));

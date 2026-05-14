@@ -10,7 +10,7 @@ Musi and any other frontend target SEAM by emitting explicit runtime machinery, 
 
 SEAM receives lowered, manual boilerplate.
 
-That means the frontend must perform the abstraction break before `.seam` or `.seamil` emission.
+That means the frontend must perform the abstraction break before `.seam` emission.
 
 SEAM is not where source-language constructs stay pretty.
 
@@ -57,7 +57,7 @@ block result.
 
 Modules lower as record-shaped values plus artifact import/export metadata.
 Static package imports are resolved before SEAM emission. Dynamic module records
-use `mdl.load` and `mdl.get` when runtime lookup is required.
+use action-first `ld.mod.dyn` and `ld.exp.dyn` when runtime lookup is required.
 
 ### Pattern Matching
 
@@ -180,15 +180,15 @@ Source languages choose numeric opcodes that match their safety contract.
 
 ## Public Targeting Rule
 
-Third-party frontends may target `.seam` or `.seamil` directly if they obey this lowering contract.
+Third-party frontends may target `.seam` directly if they obey this lowering contract.
 
 That means a frontend does not need to mimic Musi syntax, but it must emit code that is already lowered to SEAM’s runtime contract.
 
 ## Text And Binary Equivalence
 
-`.seamil` is not a richer target than `.seam`.
+Textual bytecode is not a richer target than `.seam`.
 
-It is the readable textual twin of the same lowered contract.
+It is the readable `disasm`/assembler view of the same lowered contract.
 
 If something cannot round-trip to `.seam`, it is not part of SEAM’s public target contract.
 

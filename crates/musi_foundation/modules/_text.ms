@@ -7,34 +7,24 @@ let String := Core.String;
 @external(abi := .musi)
 let Musi__length (value : String) : Int;
 
-export let length (value : String) : Int := unsafe {
-  Musi__length(value);
-};
+export let length (value : String) : Int := unsafe (Musi__length(value));
 
 @external(abi := .musi)
 let Musi__concat (left : String, right : String) : String;
 
-export let concat (left : String, right : String) : String := unsafe {
-  Musi__concat(left, right);
-};
+export let concat (left : String, right : String) : String := unsafe (Musi__concat(left, right));
 
 @external(abi := .musi)
 let Musi__slice (value : String, start : Int, end : Int) : String;
 
-export let slice (value : String, start : Int, end : Int) : String := unsafe {
-  Musi__slice(value, start, end);
-};
+export let slice (value : String, start : Int, end : Int) : String := unsafe (Musi__slice(value, start, end));
 
 @external(abi := .musi)
 let Musi__byteAt (value : String, index : Int) : Int;
 
-export let byteAt (value : String, index : Int) : Int := unsafe {
-  Musi__byteAt(value, index);
-};
+export let byteAt (value : String, index : Int) : Int := unsafe (Musi__byteAt(value, index));
 
 @external(abi := .musi)
 let Musi__fromByte (value : Int) : String;
 
-export let fromByte (value : Int) : String := unsafe {
-  Musi__fromByte(value);
-};
+export let fromByte (value : Int) : String := unsafe (Musi__fromByte(value));

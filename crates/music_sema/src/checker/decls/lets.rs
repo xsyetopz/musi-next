@@ -133,10 +133,11 @@ impl CheckPass<'_, '_, '_> {
         &mut self,
         origin: HirOrigin,
         pat: HirPatId,
+        has_fallback: bool,
         _value: HirExprId,
         value_ty: HirTyId,
     ) {
-        if !pat_is_irrefutable(self, pat) {
+        if !has_fallback && !pat_is_irrefutable(self, pat) {
             self.diag(
                 origin.span,
                 DiagKind::PlainLetRequiresIrrefutablePattern,
@@ -394,7 +395,13 @@ impl CheckPass<'_, '_, '_> {
             declared_ty,
             value,
         );
-        self.validate_non_callable_let_pattern(origin, pat, value, value_facts.ty);
+        self.validate_non_callable_let_pattern(
+            origin,
+            pat,
+            mods.fallback.is_some(),
+            value,
+            value_facts.ty,
+        );
         let ty = declared_ty.unwrap_or(value_facts.ty);
         self.type_mismatch(origin, ty, value_facts.ty);
         if let Some(binding) = binding {
@@ -479,6 +486,9 @@ impl CheckPass<'_, '_, '_> {
             declared_ty,
             is_module_stmt,
         });
+        if let Some(fallback) = mods.fallback {
+            let _ = check_expr(self, fallback);
+        }
 
         self.pop_type_param_kinds();
         self.finish_let_expr(pat, value, final_ty, binding, bound_name);
@@ -559,7 +569,17 @@ impl CheckPass<'_, '_, '_> {
         let HirPatKind::Tuple { items: pat_items } = self.pat(pat).kind else {
             return;
         };
-        let HirExprKind::Tuple { items: value_items } = self.expr(value).kind else {
+        let value_items = match self.expr(value).kind {
+            HirExprKind::Tuple { items } => Some(items),
+            HirExprKind::Import { arg } => match self.expr(arg).kind {
+                HirExprKind::Tuple { items } | HirExprKind::Sequence { exprs: items } => {
+                    Some(items)
+                }
+                _ => None,
+            },
+            _ => None,
+        };
+        let Some(value_items) = value_items else {
             return;
         };
         let pat_items = self.pat_ids(pat_items);
@@ -574,7 +594,9 @@ impl CheckPass<'_, '_, '_> {
             let Some(binding) = self.binding_id_for_decl(name) else {
                 continue;
             };
-            if let Some(target) = import_record_target_for_expr(self, value_item) {
+            if let Some(target) = import_record_target_for_expr(self, value_item)
+                .or_else(|| self.static_import_target(self.expr(value_item).origin.span))
+            {
                 self.insert_binding_import_record_target(binding, target);
             }
         }

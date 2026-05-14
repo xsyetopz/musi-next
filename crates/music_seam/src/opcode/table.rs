@@ -39,6 +39,18 @@ impl Opcode {
         self.info().family
     }
     #[must_use]
+    pub fn visibility(self) -> OpcodeVisibility {
+        self.info().visibility
+    }
+    #[must_use]
+    pub fn is_public(self) -> bool {
+        matches!(self.visibility(), OpcodeVisibility::Public)
+    }
+    #[must_use]
+    pub fn is_internal(self) -> bool {
+        matches!(self.visibility(), OpcodeVisibility::Internal)
+    }
+    #[must_use]
     pub fn mnemonic(self) -> &'static str {
         self.info().mnemonic
     }
@@ -70,6 +82,7 @@ impl Opcode {
     #[must_use]
     pub fn from_wire_code(code: u16) -> Option<Self> {
         opcode_infos()
+            .filter(|opcode_spec| matches!(opcode_spec.visibility, OpcodeVisibility::Public))
             .find(|opcode_spec| match opcode_spec.wire {
                 OpcodeWire::Core(core_wire) => u16::from(core_wire) == code,
                 OpcodeWire::Extended(extended) => extended == code,

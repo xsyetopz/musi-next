@@ -140,6 +140,12 @@ pub(super) fn register_callables(
     for callable in module.callables() {
         let name = qualified_name(module.module_key(), &callable.name);
         let params = u16::try_from(callable.params.len()).unwrap_or(u16::MAX);
+        let param_tys = callable
+            .params
+            .iter()
+            .map(|param| ensure_type(state, layout, param.ty.as_ref()))
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
         let procedure_id = alloc_procedure(
             &mut state.artifact,
             name.as_ref(),
@@ -147,6 +153,7 @@ pub(super) fn register_callables(
             callable.hot,
             callable.cold,
             params,
+            param_tys,
         );
         let _ = layout
             .callables_by_name
@@ -165,8 +172,15 @@ pub(super) fn register_globals(
     for global in module.globals() {
         let name = qualified_name(module.module_key(), &global.name);
         let init_name = format!("{name}::init");
-        let init_procedure =
-            alloc_procedure(&mut state.artifact, &init_name, false, false, false, 0);
+        let init_procedure = alloc_procedure(
+            &mut state.artifact,
+            &init_name,
+            false,
+            false,
+            false,
+            0,
+            Box::new([]),
+        );
         let name_id = state.artifact.intern_string(name.as_ref());
         let global_id = state.artifact.globals.alloc(
             GlobalDescriptor::new(name_id)

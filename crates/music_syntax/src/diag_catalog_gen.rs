@@ -242,7 +242,7 @@ const ENTRIES: &[CatalogEntry] = &[
     CatalogEntry {
         kind: SyntaxDiagKind::ExpectedConstraintOperator,
         code: 1308,
-        message: "constraint operator `<:` or `:` expected, found {found}",
+        message: "constraint operator `|=` or `~=` expected, found {found}",
         primary: "found {found} here",
         secondary: None,
         help: None,
@@ -278,6 +278,14 @@ const ENTRIES: &[CatalogEntry] = &[
         primary: "{keyword} found where identifier required",
         secondary: None,
         help: Some("choose non-keyword identifier"),
+    },
+    CatalogEntry {
+        kind: SyntaxDiagKind::ReservedGeneratedIdentifier,
+        code: 1313,
+        message: "generated identifier namespace reserved",
+        primary: "identifier begins with `__`",
+        secondary: None,
+        help: Some("choose identifier without `__` prefix"),
     },
 ];
 
@@ -381,6 +389,9 @@ pub const fn parse_error_kind(source: super::ParseErrorKind) -> SyntaxDiagKind {
         super::ParseErrorKind::ExpectedIdentifier { .. } => SyntaxDiagKind::ExpectedIdentifier,
         super::ParseErrorKind::ReservedKeywordIdentifier { .. } => {
             SyntaxDiagKind::ReservedKeywordIdentifier
+        }
+        super::ParseErrorKind::ReservedGeneratedIdentifier => {
+            SyntaxDiagKind::ReservedGeneratedIdentifier
         }
         super::ParseErrorKind::ExpectedSpliceTarget { .. } => SyntaxDiagKind::ExpectedSpliceTarget,
         super::ParseErrorKind::ExpectedOperatorMemberName { .. } => {

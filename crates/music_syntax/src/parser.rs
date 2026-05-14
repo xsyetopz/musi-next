@@ -141,6 +141,7 @@ impl SyntaxTreeBuilder {
 }
 
 struct Parser<'a> {
+    source_text: &'a str,
     tokens: &'a [Token],
     pos: usize,
     builder: &'a mut SyntaxTreeBuilder,
@@ -157,6 +158,7 @@ impl<'a> Parser<'a> {
     ) -> Self {
         let tokens = lexed.tokens();
         Self {
+            source_text: lexed.text(),
             tokens,
             pos: 0,
             builder,

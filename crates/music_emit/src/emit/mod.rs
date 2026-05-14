@@ -16,11 +16,12 @@ use music_module::ModuleKey;
 use music_names::NameBindingId;
 use music_seam::descriptor::{
     ConstantDescriptor, ConstantValue, DataDescriptor, ExportDescriptor, ExportTarget,
-    ForeignDescriptor, GlobalDescriptor, MetaDescriptor, ProcedureDescriptor, TypeDescriptor,
+    ForeignDescriptor, GlobalDescriptor, ImportDescriptor, ManifestDescriptor, MetaDescriptor,
+    ProcedureDescriptor, ProcedureVisibility, RootMapDescriptor, SafePointKind, TypeDescriptor,
 };
 use music_seam::{
     Artifact, CodeEntry, ForeignId, GlobalId, Instruction, Label, Opcode, Operand, ProcedureId,
-    ShapeId, StringId, TypeId,
+    RootMapId, ShapeId, StringId, TypeId,
 };
 
 use crate::api::{EmitDiagList, EmitOptions, EmittedBinding, EmittedModule, EmittedProgram};
@@ -136,6 +137,7 @@ fn lower_ir_module_impl(
     let modules = [module];
     let mut state = ProgramState::default();
     let layout = register::register_module(&mut state, module, options);
+    register_imports(&mut state, module);
     build_unique_maps(&mut state, &modules, from_ref(&layout));
     compile_module(&mut state, module, &layout);
     if !state.diags.is_empty() {
@@ -143,6 +145,7 @@ fn lower_ir_module_impl(
     }
 
     let entry_procedure = build_module_entry(&mut state, module, &layout);
+    register_manifest(&mut state, module.module_key(), entry_procedure);
     Ok(EmittedModule::new(
         module.module_key().clone(),
         state.artifact,
@@ -209,6 +212,9 @@ fn lower_ir_program_impl(
         .iter()
         .map(|module| register::register_module(&mut state, module, options))
         .collect::<Vec<_>>();
+    for module in modules {
+        register_imports(&mut state, module);
+    }
     let module_refs = modules.iter().collect::<Vec<_>>();
     build_unique_maps(&mut state, &module_refs, &layouts);
     for (module, layout) in modules.iter().zip(layouts.iter()) {
@@ -221,6 +227,7 @@ fn lower_ir_program_impl(
         .collect::<Vec<_>>();
     let entry_procedure =
         build_program_entry(&mut state.artifact, entry_module, &module_entry_procedures);
+    register_manifest(&mut state, entry_module, Some(entry_procedure));
     if !state.diags.is_empty() {
         return Err(state.diags);
     }
@@ -311,6 +318,43 @@ fn unique_candidate<T: Copy>((name, ids): (Box<str>, Vec<T>)) -> Option<(Box<str
 fn compile_module(state: &mut ProgramState, module: &IrModule, layout: &ModuleLayout) {
     compile_callables(state, module, layout);
     compile_globals(state, module, layout);
+}
+
+fn register_imports(state: &mut ProgramState, module: &IrModule) {
+    for import in module.static_import_edges() {
+        let spec = state.artifact.intern_string(import.spec());
+        let resolved = state.artifact.intern_string(import.resolved().as_str());
+        let _ = state
+            .artifact
+            .imports
+            .alloc(ImportDescriptor::new(spec, resolved));
+    }
+}
+
+fn register_manifest(
+    state: &mut ProgramState,
+    entry_module: &ModuleKey,
+    entry_procedure: Option<ProcedureId>,
+) {
+    let (package, version) = package_manifest_parts(entry_module);
+    let package = state.artifact.intern_string(&package);
+    let version = state.artifact.intern_string(&version);
+    let profile = state.artifact.intern_string("debug");
+    let mut descriptor = ManifestDescriptor::new(package, version, profile);
+    if let Some(entry_procedure) = entry_procedure {
+        descriptor = descriptor.with_entry(state.artifact.procedures.get(entry_procedure).name);
+    }
+    let _ = state.artifact.manifest.alloc(descriptor);
+}
+
+fn package_manifest_parts(module_key: &ModuleKey) -> (String, String) {
+    let raw = module_key.as_str();
+    let package_part = raw.split_once('/').map_or(raw, |(head, _)| head);
+    let Some((name, version)) = package_part.rsplit_once('@') else {
+        return (package_part.to_owned(), String::new());
+    };
+    let name = name.trim_start_matches('@');
+    (name.to_owned(), version.to_owned())
 }
 
 fn compile_callables(state: &mut ProgramState, module: &IrModule, layout: &ModuleLayout) {
@@ -503,7 +547,7 @@ fn build_call_only_entry_procedure(
     name: &str,
     init_procedures: &[ProcedureId],
 ) -> ProcedureId {
-    let procedure_id = alloc_procedure(artifact, name, false, false, false, 0);
+    let procedure_id = alloc_procedure(artifact, name, false, false, false, 0, Box::new([]));
     let labels = initial_labels(artifact);
     finalize_procedure(
         artifact,
@@ -522,7 +566,15 @@ fn build_entry_procedure(
     layout: &ModuleLayout,
     init_parts: &[IrModuleInitPart],
 ) -> ProcedureId {
-    let procedure_id = alloc_procedure(&mut state.artifact, name, false, false, false, 0);
+    let procedure_id = alloc_procedure(
+        &mut state.artifact,
+        name,
+        false,
+        false,
+        false,
+        0,
+        Box::new([]),
+    );
     let tables = EmitterTables {
         unique: &state.unique,
         qualified: &state.qualified,
@@ -608,10 +660,18 @@ fn alloc_procedure(
     hot: bool,
     cold: bool,
     params: u16,
+    param_tys: Box<[TypeId]>,
 ) -> ProcedureId {
     let name_id = artifact.intern_string(name);
+    let visibility = if export {
+        ProcedureVisibility::ModuleExport
+    } else {
+        ProcedureVisibility::Private
+    };
     artifact.procedures.alloc(
         ProcedureDescriptor::new(name_id, params, 0, Box::new([]))
+            .with_param_tys(param_tys)
+            .with_visibility(visibility)
             .with_export(export)
             .with_hot(hot)
             .with_cold(cold),
@@ -625,12 +685,54 @@ fn finalize_procedure(
     labels: Vec<StringId>,
     code: CodeBuffer,
 ) {
+    let root_map_table = emit_procedure_root_maps(artifact, procedure_id, &code);
     let procedure = artifact.procedures.get_mut(procedure_id);
     procedure.locals = locals;
     procedure.labels = labels.into_boxed_slice();
     procedure.code = code.into_boxed_slice();
+    procedure.root_map_table = root_map_table;
 }
 
 fn qualified_name(module: &ModuleKey, local: &str) -> Box<str> {
     format!("{}::{local}", module.as_str()).into()
+}
+
+fn emit_procedure_root_maps(
+    artifact: &mut Artifact,
+    procedure_id: ProcedureId,
+    code: &[CodeEntry],
+) -> Option<RootMapId> {
+    let procedure_name = {
+        let procedure = artifact.procedures.get(procedure_id);
+        artifact.string_text(procedure.name).to_owned()
+    };
+    let mut first_root_map = None;
+    for (instruction_index, entry) in code.iter().enumerate() {
+        let CodeEntry::Instruction(instruction) = entry else {
+            continue;
+        };
+        let Some(kind) = safe_point_kind_for_opcode(instruction.opcode) else {
+            continue;
+        };
+        let safe_point_name = format!("{procedure_name}:sp{instruction_index}");
+        let safe_point = artifact.intern_string(&safe_point_name);
+        let descriptor = RootMapDescriptor::new(safe_point, Box::new([]), Box::new([]))
+            .with_kind(kind)
+            .with_procedure(procedure_id);
+        let root_map_id = artifact.root_maps.alloc(descriptor);
+        if first_root_map.is_none() {
+            first_root_map = Some(root_map_id);
+        }
+    }
+    first_root_map
+}
+
+fn safe_point_kind_for_opcode(opcode: Opcode) -> Option<SafePointKind> {
+    match opcode {
+        Opcode::Call | Opcode::TailCall => Some(SafePointKind::Call),
+        Opcode::CallInd => Some(SafePointKind::CallIndirect),
+        Opcode::CallFfi => Some(SafePointKind::CallForeign),
+        Opcode::NewFn | Opcode::NewObj | Opcode::NewArr => Some(SafePointKind::Allocation),
+        _ => None,
+    }
 }

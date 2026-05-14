@@ -17,17 +17,11 @@ let C__strerror (code : CInt) : CString;
 let C__strlen (value : CString) : Nat;
 
 --- C `strcmp`.
-export let strcmp (left : CString, right : CString) : Int32 := unsafe {
-  C__strcmp(left, right);
-};
+export let strcmp (left : CString, right : CString) : Int32 := unsafe (C__strcmp(left, right));
 --- C `strerror`.
-export let strerror (code : CInt) : CString := unsafe {
-  C__strerror(code);
-};
+export let strerror (code : CInt) : CString := unsafe (C__strerror(code));
 --- C `strlen`.
-export let strlen (value : CString) : Nat := unsafe {
-  C__strlen(value);
-};
+export let strlen (value : CString) : Nat := unsafe (C__strlen(value));
 
 --- C string byte length.
 export let length (value : CString) : Nat := strlen(value);

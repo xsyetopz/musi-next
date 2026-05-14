@@ -197,7 +197,7 @@ impl ProcedureEmitter<'_, '_> {
             IrExprKind::ModuleLoad { spec } => {
                 self.compile_expr(spec, true, diags);
                 self.code.push(CodeEntry::Instruction(Instruction::new(
-                    Opcode::MdlLoad,
+                    Opcode::LdModDyn,
                     Operand::None,
                 )));
                 true
@@ -206,7 +206,7 @@ impl ProcedureEmitter<'_, '_> {
                 self.compile_expr(base, true, diags);
                 let name = self.artifact.intern_string(name);
                 self.code.push(CodeEntry::Instruction(Instruction::new(
-                    Opcode::MdlGet,
+                    Opcode::LdExpDyn,
                     Operand::String(name),
                 )));
                 true
@@ -354,7 +354,7 @@ impl ProcedureEmitter<'_, '_> {
                     base,
                     ty_name,
                     Opcode::IsInst,
-                    ":?",
+                    ":?>",
                     diags,
                 );
                 true
@@ -365,7 +365,7 @@ impl ProcedureEmitter<'_, '_> {
                     base,
                     ty_name,
                     Opcode::Cast,
-                    ":?>",
+                    ":>",
                     diags,
                 );
                 true
