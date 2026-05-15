@@ -112,7 +112,7 @@ let recur matchesAt (
 
 let recur indexOfFrom (target : String, needle : String, index : Int) : Int :=
   if textLength(needle) = 0 then index
-  else if index > textLength(target) - textLength(needle) then - 1
+  else if index > textLength(target) - textLength(needle) then -1
   else if matchesAt(target, needle, index, 0) then index
   else indexOfFrom(target, needle, index + 1);
 

@@ -33,7 +33,7 @@ let byteOrZero (source : String, index : Int) :=
 let compareByte (left : String, right : String, index : Int) :=
   (
     let diff := byteOrZero(left, index) - byteOrZero(right, index);
-    if diff < 0 then - 1 else if diff > 0 then 1 else 0;
+    if diff < 0 then -1 else if diff > 0 then 1 else 0;
   );
 
 --- Compare semantic versions.

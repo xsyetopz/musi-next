@@ -5,7 +5,7 @@ export let abs (value : Int) := if value >= 0 then value else - value;
 
 --- Integer sign value.
 export let signInt (value : Int) :=
-  if value < 0 then - 1 else if value > 0 then 1 else 0;
+  if value < 0 then -1 else if value > 0 then 1 else 0;
 
 --- Maximum integer value.
 export let max (left : Int, right : Int) :=

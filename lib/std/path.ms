@@ -35,7 +35,7 @@ let recur lastByteIndexFrom (
   ) else lastByteIndexFrom(source, needle, index + 1, best);
 
 let lastByteIndex (source : String, needle : Int) :=
-  lastByteIndexFrom(source, needle, 0, - 1);
+  lastByteIndexFrom(source, needle, 0, -1);
 
 --- Function for `join`.
 let joinPath (target : Path, other : Path) :=

@@ -1,3 +1,4 @@
+let io := import "@std/io";
 let math := import "@std/math";
 
 export hidden let GuessResult := data {
@@ -21,4 +22,6 @@ export let hint (guess : Int) :=
   );
 
 export let demo () := (hint(12), hint(42), hint(80));
+
 demo();
+io.writeLn("game: guesses produced raise/win/lower hints");

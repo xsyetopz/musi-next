@@ -314,6 +314,62 @@ mod success {
     }
 
     #[test]
+    fn keeps_unsafe_sequence_opening_with_unsafe_keyword() {
+        let source = "let value := unsafe(let x := ffi(); x);";
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "let value := unsafe (\n  let x := ffi();\n  x\n);\n"
+        );
+        let second = format_source(&formatted_result.text, &options()).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
+    fn indents_unsafe_sequence_after_multiline_bind_rhs() {
+        let source = "export let value () :=\n  unsafe(let x := ffi(); x);";
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "export let value () := unsafe (\n  let x := ffi();\n  x\n);\n"
+        );
+        let second = format_source(&formatted_result.text, &options()).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
+    fn keeps_unary_minus_attached_to_numeric_literal() {
+        let source = "let value := -1; let next := if value < 0 then -2.5 else value - 1; let matched := match value (| _ => -1);";
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "let value := -1;\nlet next := if value < 0 then -2.5 else value - 1;\nlet matched := match value (\n| _ => -1\n);\n"
+        );
+        let second = format_source(&formatted_result.text, &options()).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
+    fn keeps_space_before_unit_sequence_after_then_else() {
+        let source = "let value := if done then() else();";
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "let value := if done then () else ();\n"
+        );
+        let second = format_source(&formatted_result.text, &options()).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
     fn spaces_let_else_dot_variant() {
         let source = "let .Some(value):=maybe else.None;";
 

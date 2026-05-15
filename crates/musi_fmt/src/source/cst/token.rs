@@ -161,6 +161,7 @@ impl CstFormatter<'_> {
             self.newline();
         }
         self.update_state(kind);
+        self.before_previous = self.previous;
         self.previous = Some(kind);
         self.update_pending_attachment(role);
         self.set_last_token_end(span);
@@ -443,6 +444,9 @@ impl CstFormatter<'_> {
 
     fn write_open_paren(&mut self, text: &str, role: CstLeafRole, break_after_open: bool) {
         let paren = match role {
+            CstLeafRole::SequenceParen if self.previous == Some(TokenKind::KwUnsafe) => {
+                Some(ParenKind::UnsafeSequence)
+            }
             CstLeafRole::SequenceParen => Some(ParenKind::Sequence),
             CstLeafRole::MatchParen
                 if self.options.match_arm_indent == MatchArmIndent::PipeAligned =>
@@ -454,12 +458,16 @@ impl CstFormatter<'_> {
             _ => None,
         };
         if let Some(paren) = paren {
-            if matches!(paren, ParenKind::Sequence) {
+            if matches!(paren, ParenKind::Sequence | ParenKind::UnsafeSequence) {
                 self.continuation_indent = 0;
-                if !self.at_line_start {
+                if matches!(paren, ParenKind::UnsafeSequence) {
+                    self.push_space();
+                } else if !self.at_line_start {
                     self.newline();
                 }
-                self.indent = self.indent.saturating_add(1);
+                if matches!(paren, ParenKind::Sequence) {
+                    self.indent = self.indent.saturating_add(1);
+                }
             } else if !self.at_line_start {
                 self.push_space();
             }

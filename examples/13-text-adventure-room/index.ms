@@ -1,3 +1,5 @@
+let io := import "@std/io";
+
 export hidden let Room := data {
   | Room(name : String, north : String, item : String)
 };
@@ -17,4 +19,6 @@ export let describe (room : Room) :=
   );
 
 export let demo () := (describe(start), describe(gallery));
+
 demo();
+io.writeLn("text adventure: room descriptions generated");

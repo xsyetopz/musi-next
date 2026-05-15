@@ -39,6 +39,9 @@ impl CstFormatter<'_> {
         if matches!(previous, TokenKind::LParen | TokenKind::LBracket) {
             return false;
         }
+        if self.spacing_forbidden_after_unary_minus(previous, current) {
+            return false;
+        }
         if previous == TokenKind::Colon || current == TokenKind::Colon {
             return true;
         }
@@ -96,8 +99,34 @@ impl CstFormatter<'_> {
     fn requires_space_before_lparen(previous: TokenKind) -> bool {
         matches!(
             previous,
-            TokenKind::KwMatch | TokenKind::KwUnsafe | TokenKind::Colon
+            TokenKind::KwElse
+                | TokenKind::KwMatch
+                | TokenKind::KwThen
+                | TokenKind::KwUnsafe
+                | TokenKind::Colon
         ) || is_operator(previous)
+    }
+
+    fn spacing_forbidden_after_unary_minus(&self, previous: TokenKind, current: TokenKind) -> bool {
+        previous == TokenKind::Minus
+            && matches!(current, TokenKind::Int | TokenKind::Float)
+            && self
+                .before_previous
+                .is_none_or(Self::token_allows_unary_expression)
+    }
+
+    const fn token_allows_unary_expression(token: TokenKind) -> bool {
+        matches!(
+            token,
+            TokenKind::ColonEq
+                | TokenKind::Comma
+                | TokenKind::EqGt
+                | TokenKind::LParen
+                | TokenKind::LBracket
+                | TokenKind::KwElse
+                | TokenKind::KwThen
+                | TokenKind::Semicolon
+        )
     }
 }
 

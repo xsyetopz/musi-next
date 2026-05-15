@@ -1,3 +1,5 @@
+let io := import "@std/io";
+
 export hidden let Color := data {
   | Rgb(r : Int, g : Int, b : Int)
   | Gray(v : Int)
@@ -14,4 +16,6 @@ export let luminance (color : Color) :=
   );
 
 export let demo () := (luminance(red), luminance(midGray));
+
 demo();
+io.writeLn("match: RGB and grayscale variants were destructured");

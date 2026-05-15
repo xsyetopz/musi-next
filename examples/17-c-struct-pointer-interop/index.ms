@@ -1,3 +1,4 @@
+let io := import "@std/io";
 let core := import "musi:core";
 let CPtr := core.CPtr;
 let CInt := core.Int32;
@@ -12,4 +13,6 @@ let demoPointFree (point : CPtr) : Unit;
 export let pointShape := (10, 20);
 
 export let demo () := (demoPointNew, demoPointX, demoPointFree, pointShape);
+
 demo();
+io.writeLn("C interop: struct pointer API declarations loaded");

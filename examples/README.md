@@ -2,6 +2,8 @@
 
 These examples are ordered as a beginner-to-intermediate playground for people coming from Python, JavaScript, or TypeScript.
 
+For a 25-row concept map with standard-library source references, see [`LEARNING_MAP.md`](./LEARNING_MAP.md). For tooling and agents, use [`learning-map.json`](./learning-map.json).
+
 Each numbered directory is:
 
 - runnable as a package with `cargo run -p musi -- run examples/<name>`
@@ -13,6 +15,18 @@ Run every example:
 
 ```sh
 scripts/run-examples.sh
+```
+
+The GLFW example opens a native window and waits until you close it:
+
+```sh
+MUSI_RUN_INTERACTIVE_EXAMPLES=1 scripts/run-examples.sh
+```
+
+Fetch the OBJ asset for the rasterizer playground:
+
+```sh
+examples/24-software-rasterizer/fetch-assets.sh
 ```
 
 Run one example:
@@ -57,10 +71,10 @@ scripts/examples-native-deps.sh --install
 
 - `16-sqlite3-interop` — SQLite foreign declarations
 - `17-c-struct-pointer-interop` — C pointer API shape
-- `18-c-host-invokes-musi` — C program invoking Musi examples
-- `19-glfw-window` — GLFW window lifecycle declarations
+- `18-process-command` — child process launch from Musi
+- `19-glfw-window` — GLFW window lifecycle, `let recur` event loop, and `let ... else` init handling
 - `20-sdl2-input-window` — SDL2 input/window declarations
 - `21-opengl-triangle` — OpenGL draw declarations and triangle data
 - `22-opengl-cube-data` — cube vertex data and buffer declarations
 - `23-shader-pipeline` — shader/program declarations
-- `24-software-rasterizer` — rasterizer-style framebuffer bounds using `@std/math`
+- `24-software-rasterizer` — GLFW/OpenGL monkey OBJ playground with camera controls

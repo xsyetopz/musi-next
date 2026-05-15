@@ -19,6 +19,7 @@ pub(super) struct CstFormatter<'a> {
     pub(super) indent: usize,
     pub(super) line_len: usize,
     pub(super) at_line_start: bool,
+    pub(super) before_previous: Option<TokenKind>,
     pub(super) previous: Option<TokenKind>,
     pub(super) ignore_next: bool,
     pub(super) declaration_state: DeclarationState,
@@ -139,6 +140,7 @@ pub(super) enum ParenKind {
     Regular,
     Bracket,
     Sequence,
+    UnsafeSequence,
     Match,
     MatchAligned,
     ForeignGroup,
@@ -152,7 +154,11 @@ impl ParenKind {
     pub(super) const fn is_multiline(self) -> bool {
         matches!(
             self,
-            Self::Sequence | Self::Match | Self::MatchAligned | Self::ForeignGroup
+            Self::Sequence
+                | Self::UnsafeSequence
+                | Self::Match
+                | Self::MatchAligned
+                | Self::ForeignGroup
         )
     }
 
@@ -250,6 +256,7 @@ impl<'a> CstFormatter<'a> {
             indent: 0,
             line_len: 0,
             at_line_start: true,
+            before_previous: None,
             previous: None,
             ignore_next: false,
             declaration_state: DeclarationState::None,
@@ -345,6 +352,7 @@ impl<'a> CstFormatter<'a> {
         }
         self.at_line_start = true;
         self.line_len = 0;
+        self.before_previous = None;
         self.previous = None;
         self.last_token_end = end;
         self.line_start_paren_depth = self.parens.len();

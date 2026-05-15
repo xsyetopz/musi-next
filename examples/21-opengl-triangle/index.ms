@@ -1,3 +1,4 @@
+let io := import "@std/io";
 let core := import "musi:core";
 let CUInt := core.Nat32;
 
@@ -12,15 +13,17 @@ export let triangles : CUInt := 4n32;
 
 export let colorBufferBit : CUInt := 16384n32;
 
-export let triangleVertices := [0.0, 0.8, - 0.8, - 0.8, 0.8, - 0.8];
+export let triangleVertices := [0.0, 0.8, -0.8, -0.8, 0.8, -0.8];
 
 export let demo () :=
-    (
-        glClearColor,
-        glClear,
-        glDrawArrays,
-        triangles,
-        colorBufferBit,
-        triangleVertices,
-    );
+  (
+    glClearColor,
+    glClear,
+    glDrawArrays,
+    triangles,
+    colorBufferBit,
+    triangleVertices,
+  );
+
 demo();
+io.writeLn("OpenGL: triangle draw declarations and vertices loaded");

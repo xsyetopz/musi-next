@@ -1,3 +1,5 @@
+let io := import "@std/io";
+
 export hidden let MaybeInt := data {
   | None()
   | Some(value : Int)
@@ -17,4 +19,6 @@ export let unwrapOr (value : MaybeInt, fallback : Int) :=
 
 export let demo () :=
   (unwrapOr(plusOne(.Some(value := 41)), 0), unwrapOr(plusOne(.None()), 99));
+
 demo();
+io.writeLn("maybe: Some and None paths evaluated");

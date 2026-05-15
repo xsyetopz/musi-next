@@ -1,3 +1,5 @@
+let io := import "@std/io";
+
 export hidden let Todo := data {
   | Todo(title : String, done : Bit)
 };
@@ -17,4 +19,6 @@ export let demo () :=
     label(.Todo(title := "learn values", done := 1 = 0)),
     label(markDone(.Todo(title := "run examples", done := 1 = 0))),
   );
+
 demo();
+io.writeLn("todo model: item state changed to done");

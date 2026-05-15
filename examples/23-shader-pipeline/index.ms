@@ -1,3 +1,4 @@
+let io := import "@std/io";
 let core := import "musi:core";
 let CString := core.CString;
 let CUInt := core.Nat32;
@@ -31,4 +32,6 @@ export let demo () :=
         vertexSource,
         fragmentSource,
     );
+
 demo();
+io.writeLn("shader pipeline: shader/program declarations loaded");

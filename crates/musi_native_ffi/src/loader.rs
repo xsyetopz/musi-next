@@ -90,12 +90,48 @@ pub fn library_candidates(link: &str) -> Vec<String> {
     if link == "m" {
         return math_library_candidates();
     }
+    if matches!(link, "opengl" | "OpenGL") {
+        return opengl_library_candidates();
+    }
     let mut out = vec![link.to_owned()];
     if !link.contains('/') {
         out.push(format!("lib{link}.dylib"));
         out.push(format!("lib{link}.so"));
+        #[cfg(target_os = "windows")]
+        {
+            out.push(format!("{link}.dll"));
+        }
+        #[cfg(target_os = "macos")]
+        {
+            out.push(format!("/opt/homebrew/lib/lib{link}.dylib"));
+            out.push(format!("/usr/local/lib/lib{link}.dylib"));
+        }
     }
     out
+}
+
+#[cfg(target_os = "macos")]
+fn opengl_library_candidates() -> Vec<String> {
+    vec![
+        "/System/Library/Frameworks/OpenGL.framework/OpenGL".to_owned(),
+        "OpenGL.framework/OpenGL".to_owned(),
+        "libOpenGL.dylib".to_owned(),
+    ]
+}
+
+#[cfg(target_os = "linux")]
+fn opengl_library_candidates() -> Vec<String> {
+    vec!["libGL.so.1".to_owned(), "libGL.so".to_owned()]
+}
+
+#[cfg(target_os = "windows")]
+fn opengl_library_candidates() -> Vec<String> {
+    vec!["opengl32.dll".to_owned()]
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+fn opengl_library_candidates() -> Vec<String> {
+    vec!["opengl".to_owned(), "OpenGL".to_owned()]
 }
 
 #[cfg(target_os = "macos")]

@@ -229,7 +229,7 @@ fn pointer_storage_name(ctx: &LowerCtx<'_>, type_arg: HirExprId) -> Option<Box<s
 
 fn is_std_ffi_module(module_key: &ModuleKey) -> bool {
     let key = module_key.as_str();
-    key == "@std/ffi" || key.ends_with("ffi.ms")
+    key == "musi:ffi" || key == "@std/ffi" || key.ends_with("ffi.ms")
 }
 
 fn is_std_cmp_module(module_key: &ModuleKey) -> bool {

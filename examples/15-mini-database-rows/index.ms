@@ -1,3 +1,5 @@
+let io := import "@std/io";
+
 export hidden let User := data {
   | User(id : Int, name : String, admin : Bit)
 };
@@ -12,4 +14,6 @@ export let canEdit (user : User) :=
   );
 
 export let demo () := (canEdit(ada), canEdit(grace));
+
 demo();
+io.writeLn("data model: typed user rows evaluated");
