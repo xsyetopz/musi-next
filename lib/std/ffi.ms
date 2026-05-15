@@ -69,11 +69,13 @@ export let isNull [T] (pointer : Ptr[T]) : Bit :=
 
 --- Foreign pointer operations.
 @foreign(abi := .musi)
---- Foreign pointer external functions.
+--- Offset pointer by element count.
 export let offset [T] (pointer : Ptr[T], count : Int) : Ptr[T];
 @foreign(abi := .musi)
+--- Read value from pointer target.
 export let read [T] (pointer : Ptr[T]) : T;
 @foreign(abi := .musi)
+--- Write value into mutable pointer target.
 export let write [T] (pointer : Ptr[mut T], value : T) : Unit;
 
 --- Pointer tools.
