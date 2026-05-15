@@ -398,6 +398,41 @@ mod success {
     }
 
     #[test]
+    fn parses_unsafe_expr_with_sequence_body() {
+        let parsed = parse(
+            Lexer::new(
+                r"
+            let value := unsafe (1; 2; 3);
+        ",
+            )
+            .lex(),
+        );
+        assert!(
+            parsed.errors().is_empty(),
+            "unexpected errors: {:?}",
+            parsed.errors()
+        );
+    }
+
+    #[test]
+    fn parses_export_let_with_sequence_body_initializer() {
+        let parsed = parse(
+            Lexer::new(
+                r"
+            export let demo () := (1; 2; 3);
+            demo();
+        ",
+            )
+            .lex(),
+        );
+        assert!(
+            parsed.errors().is_empty(),
+            "unexpected errors: {:?}",
+            parsed.errors()
+        );
+    }
+
+    #[test]
     fn parses_pin_expr_inside_unsafe_expr() {
         let parsed = parse(
             Lexer::new(
