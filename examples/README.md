@@ -1,34 +1,66 @@
-# Musi examples
+# How to Musi examples
 
-Every example is a numbered directory with:
+These examples are ordered as a beginner-to-intermediate playground for people coming from Python, JavaScript, or TypeScript.
 
-- `musi.json`
-- `index.ms`
+Each numbered directory is:
 
-Examples in this folder:
+- runnable as a package with `cargo run -p musi -- run examples/<name>`
+- small enough to edit directly
+- focused on one concept or demo shape
+- written with Musi top-level execution: the bottom call runs the example
 
-- `01-values`
-- `02-functions`
-- `03-sequences`
-- `04-closures`
-- `05-maybe`
-- `06-records-variants`
-- `07-glfw`
-- `08-opengl`
-- `09-sdl2`
-- `10-sqlite3-interop`
-- `11-c-calls-musi` (includes `c-calls-musi.c` and `c-calls-musi.sh`)
-- `12-opengl-cube`
-- `13-glfw-opengl-loop`
-- `14-sdl2-input-loop`
-- `15-sqlite3-mini-repo`
-- `16-opengl-shader-pipeline`
-- `17-c-struct-pointer-interop`
-
-Quick checks:
+Run every example:
 
 ```sh
-cargo run -p music -- check examples/01-values/index.ms
-cargo run -p music -- disasm examples/12-opengl-cube/index.ms --level hil
-examples/11-c-calls-musi/c-calls-musi.sh
+scripts/run-examples.sh
 ```
+
+Run one example:
+
+```sh
+cargo run -p musi -- run examples/00-hello-musi
+```
+
+Native library setup for windowing, graphics, SQLite, and FFI examples:
+
+```sh
+scripts/examples-native-deps.sh --print
+scripts/examples-native-deps.sh --install
+```
+
+## Start here
+
+- `00-hello-musi` — one exported value and one bottom call
+- `01-values-and-types` — integers, strings, fixed-width naturals, tuples
+- `02-arithmetic-and-booleans` — arithmetic and comparisons
+- `03-functions-and-calls` — named functions and nested calls
+- `04-if-expressions` — expression-style branching
+- `05-sequences-and-tuples` — list-like sequences and tuple values
+- `06-blocks-and-bottom-calls` — local lets and final expression blocks
+
+## Build programs
+
+- `07-data-variants-and-match` — data variants and pattern matching
+- `08-maybe-style-results` — optional result shape
+- `09-closures-and-callback-shapes` — closures and callback-style parameters
+- `10-stdlib-math` — `@std/math` helpers
+- `11-stdlib-text` — `@std/text` helpers
+
+## Small app models
+
+- `12-number-guess-game` — basic game scoring and hints
+- `13-text-adventure-room` — room data for a text adventure
+- `14-todo-list-model` — editable app state shape
+- `15-mini-database-rows` — typed rows for data-backed apps
+
+## Native, windows, and graphics
+
+- `16-sqlite3-interop` — SQLite foreign declarations
+- `17-c-struct-pointer-interop` — C pointer API shape
+- `18-c-host-invokes-musi` — C program invoking Musi examples
+- `19-glfw-window` — GLFW window lifecycle declarations
+- `20-sdl2-input-window` — SDL2 input/window declarations
+- `21-opengl-triangle` — OpenGL draw declarations and triangle data
+- `22-opengl-cube-data` — cube vertex data and buffer declarations
+- `23-shader-pipeline` — shader/program declarations
+- `24-software-rasterizer` — rasterizer-style framebuffer bounds using `@std/math`

@@ -1,27 +1,15 @@
 let core := import "musi:core";
-let CString := core.CString;
 let CPtr := core.CPtr;
+let CInt := core.Int32;
 
-@foreign(abi := .c, symbol := "sqlite3_open")
-let sqlite3Open (filename : CString, db : CPtr) : Int32;
-@foreign(abi := .c, symbol := "sqlite3_close")
-let sqlite3Close (db : CPtr) : Int32;
-@foreign(abi := .musi)
-let ptrNull () : CPtr;
+@foreign(abi := .c, symbol := "demo_point_new")
+let demoPointNew (x : CInt, y : CInt) : CPtr;
+@foreign(abi := .c, symbol := "demo_point_x")
+let demoPointX (point : CPtr) : CInt;
+@foreign(abi := .c, symbol := "demo_point_free")
+let demoPointFree (point : CPtr) : Unit;
 
-export let openMemoryDb () := unsafe (sqlite3Open(":memory:", ptrNull()));
+export let pointShape := (10, 20);
 
-export let closeNullDb () := unsafe (sqlite3Close(ptrNull()));
-
-export hidden let Vec3 := data {
-  | Vec3(x : Float, y : Float, z : Float)
-};
-
-@foreign(abi := .c, symbol := "musi_vec3_normalize")
-let cNormalizeVec3 (input : CPtr, output : CPtr) : Unit;
-
-export let normalizeVec3Raw (input : CPtr, output : CPtr) :=
-  unsafe (cNormalizeVec3(input, output));
-
-export let demo () := (normalizeVec3Raw, openMemoryDb, closeNullDb);
+export let demo () := (demoPointNew, demoPointX, demoPointFree, pointShape);
 demo();
