@@ -206,10 +206,7 @@ impl ParenFrame {
         }
     }
 
-    pub(super) const fn with_trailing_commas(
-        kind: ParenKind,
-        allows_trailing_comma: bool,
-    ) -> Self {
+    pub(super) const fn with_trailing_commas(kind: ParenKind, allows_trailing_comma: bool) -> Self {
         Self {
             kind,
             broke: false,

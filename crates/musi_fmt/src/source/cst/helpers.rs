@@ -10,7 +10,10 @@ pub(super) fn starts_with_module_doc_block_comment(text: &str) -> bool {
     matches!(bytes, [b'/', b'-', b'!', ..])
 }
 
-pub(super) fn next_non_comma_token_kind(lexed: &LexedSource, start_index: usize) -> Option<TokenKind> {
+pub(super) fn next_non_comma_token_kind(
+    lexed: &LexedSource,
+    start_index: usize,
+) -> Option<TokenKind> {
     lexed
         .tokens()
         .iter()

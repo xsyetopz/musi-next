@@ -9,8 +9,8 @@ impl Vm {
     /// # Errors
     ///
     /// Returns [`VmError`] if initialization is missing or value is not callable.
-    pub fn call_value(&mut self, value: Value, args: &[Value]) -> VmResult<Value> {
-        self.call_value_ref(&value, args)
+    pub fn call_value(&mut self, value: &Value, args: &[Value]) -> VmResult<Value> {
+        self.call_value_ref(value, args)
     }
 
     /// Calls one borrowed runtime value if it is callable.
@@ -29,9 +29,7 @@ impl Vm {
         }
         let base_depth = self.frames.len();
         let result = match value {
-            Value::Procedure(procedure) => {
-                self.call_procedure_value(*procedure, args, base_depth)
-            }
+            Value::Procedure(procedure) => self.call_procedure_value(*procedure, args, base_depth),
             Value::Closure(closure) => {
                 let (module_slot, procedure, params, locals, captures) = {
                     let closure = self.heap.closure(*closure)?;

@@ -116,7 +116,7 @@ impl Vm {
             }
         }
         let value = self.lookup_export(name)?;
-        self.call_value(value, args)
+        self.call_value(&value, args)
     }
 
     /// Calls one export from one loaded module handle.
@@ -142,7 +142,7 @@ impl Vm {
             }
         }
         let value = self.lookup_module_export(module, name)?;
-        self.call_value(value, args)
+        self.call_value(&value, args)
     }
 
     /// Loads one loaded module through host boundary and returns one initialized module handle.

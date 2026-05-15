@@ -5,15 +5,19 @@ use crate::{
     token_class::{is_operator, is_word_like},
 };
 
-use super::{CstFormatter, CstLeafRole, ParenKind};
 use super::helpers::is_closing;
+use super::{CstFormatter, CstLeafRole, ParenKind};
 
 impl CstFormatter<'_> {
     pub(super) fn needs_space_before(&self, current: TokenKind) -> bool {
         self.needs_space_before_with_role(current, CstLeafRole::Regular)
     }
 
-    pub(super) fn needs_space_before_with_role(&self, current: TokenKind, role: CstLeafRole) -> bool {
+    pub(super) fn needs_space_before_with_role(
+        &self,
+        current: TokenKind,
+        role: CstLeafRole,
+    ) -> bool {
         let Some(previous) = self.previous else {
             return false;
         };
@@ -102,7 +106,12 @@ impl CstFormatter<'_> {
         false
     }
 
-    pub(super) fn maybe_break_before_token(&mut self, kind: TokenKind, text: &str, role: CstLeafRole) {
+    pub(super) fn maybe_break_before_token(
+        &mut self,
+        kind: TokenKind,
+        text: &str,
+        role: CstLeafRole,
+    ) {
         if self.options.line_width == 0
             || self.at_line_start
             || !self.can_break_before_token(kind)

@@ -1564,7 +1564,7 @@ mod success {
             .lookup_export("result")
             .expect("result export should resolve");
         let value = vm
-            .call_value(result, &[])
+            .call_value(&result, &[])
             .expect("constant call should run");
 
         assert_eq!(value, Value::Int(42));

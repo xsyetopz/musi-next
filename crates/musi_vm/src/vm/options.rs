@@ -315,19 +315,43 @@ fn parse_mvm_option(
     };
     if let Some(flag) = raw.strip_prefix('+') {
         return match flag {
-            "UseQuickening" => Ok(parsed.feature_overrides.quickening = Some(true)),
-            "UseKernels" => Ok(parsed.feature_overrides.runtime_kernels = Some(true)),
-            "UseFusedDispatch" => Ok(parsed.feature_overrides.fused_dispatch = Some(true)),
-            "UseInlineCaches" => Ok(parsed.feature_overrides.inline_caches = Some(true)),
+            "UseQuickening" => {
+                parsed.feature_overrides.quickening = Some(true);
+                Ok(())
+            }
+            "UseKernels" => {
+                parsed.feature_overrides.runtime_kernels = Some(true);
+                Ok(())
+            }
+            "UseFusedDispatch" => {
+                parsed.feature_overrides.fused_dispatch = Some(true);
+                Ok(())
+            }
+            "UseInlineCaches" => {
+                parsed.feature_overrides.inline_caches = Some(true);
+                Ok(())
+            }
             _ => Err(parse_error(format!("unknown MVM option `{option}`"))),
         };
     }
     if let Some(flag) = raw.strip_prefix('-') {
         return match flag {
-            "UseQuickening" => Ok(parsed.feature_overrides.quickening = Some(false)),
-            "UseKernels" => Ok(parsed.feature_overrides.runtime_kernels = Some(false)),
-            "UseFusedDispatch" => Ok(parsed.feature_overrides.fused_dispatch = Some(false)),
-            "UseInlineCaches" => Ok(parsed.feature_overrides.inline_caches = Some(false)),
+            "UseQuickening" => {
+                parsed.feature_overrides.quickening = Some(false);
+                Ok(())
+            }
+            "UseKernels" => {
+                parsed.feature_overrides.runtime_kernels = Some(false);
+                Ok(())
+            }
+            "UseFusedDispatch" => {
+                parsed.feature_overrides.fused_dispatch = Some(false);
+                Ok(())
+            }
+            "UseInlineCaches" => {
+                parsed.feature_overrides.inline_caches = Some(false);
+                Ok(())
+            }
             _ => Err(parse_error(format!("unknown MVM option `{option}`"))),
         };
     }
@@ -361,8 +385,14 @@ fn parse_mvm_option(
             Ok(())
         }
         "GC" => match value {
-            "Auto" => Ok(parsed.options.gc_stress = false),
-            "Stress" => Ok(parsed.options.gc_stress = true),
+            "Auto" => {
+                parsed.options.gc_stress = false;
+                Ok(())
+            }
+            "Stress" => {
+                parsed.options.gc_stress = true;
+                Ok(())
+            }
             _ => Err(parse_error(format!("unknown MVM GC mode `{value}`"))),
         },
         _ => Err(parse_error(format!("unknown MVM option `{option}`"))),
@@ -399,7 +429,7 @@ impl Default for ParsedMvmOptions {
 }
 
 impl ParsedMvmOptions {
-    fn finish(self) -> VmOptions {
+    const fn finish(self) -> VmOptions {
         self.feature_overrides
             .apply(self.options.with_mode_bundle(self.mode_bundle))
     }
