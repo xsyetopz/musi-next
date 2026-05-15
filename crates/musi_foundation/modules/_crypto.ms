@@ -12,4 +12,4 @@ export let sha256Hex (source : String) := unsafe (Musi__sha256Hex(source));
 let Musi__sha256Base64 (source : String) : String;
 
 export let sha256Base64 (source : String) :=
-    unsafe (Musi__sha256Base64(source));
+  unsafe (Musi__sha256Base64(source));

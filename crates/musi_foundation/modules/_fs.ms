@@ -14,7 +14,7 @@ export let readText (path : String) := unsafe (Musi__readText(path));
 let Musi__writeText (path : String, text : String) : Unit;
 
 export let writeText (path : String, text : String) :=
-    unsafe (Musi__writeText(path, text));
+  unsafe (Musi__writeText(path, text));
 
 @foreign(abi := .musi)
 let Musi__exists (path : String) : Int;
@@ -25,7 +25,7 @@ export let exists (path : String) := unsafe (Musi__exists(path));
 let Musi__appendText (path : String, text : String) : Int;
 
 export let appendText (path : String, text : String) :=
-    unsafe (Musi__appendText(path, text));
+  unsafe (Musi__appendText(path, text));
 
 @foreign(abi := .musi)
 let Musi__remove (path : String) : Int;

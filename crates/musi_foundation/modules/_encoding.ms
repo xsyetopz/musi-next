@@ -8,19 +8,19 @@ let String := Core.String;
 let Musi__base64Encode (source : String) : String;
 
 export let base64Encode (source : String) :=
-    unsafe (Musi__base64Encode(source));
+  unsafe (Musi__base64Encode(source));
 
 @foreign(abi := .musi)
 let Musi__base64Decode (source : String) : String;
 
 export let base64Decode (source : String) :=
-    unsafe (Musi__base64Decode(source));
+  unsafe (Musi__base64Decode(source));
 
 @foreign(abi := .musi)
 let Musi__base64IsValid (source : String) : Int;
 
 export let base64IsValid (source : String) :=
-    unsafe (Musi__base64IsValid(source));
+  unsafe (Musi__base64IsValid(source));
 
 @foreign(abi := .musi)
 let Musi__utf8Encode (source : String) : String;

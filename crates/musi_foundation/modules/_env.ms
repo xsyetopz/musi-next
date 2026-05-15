@@ -18,7 +18,7 @@ export let has (name : String) := unsafe (Musi__has(name));
 let Musi__set (name : String, value : String) : Int;
 
 export let set (name : String, value : String) := unsafe (
-    Musi__set(name, value)
+  Musi__set(name, value)
 );
 
 @foreign(abi := .musi)

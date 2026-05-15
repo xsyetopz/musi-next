@@ -14,7 +14,7 @@ export let int () := unsafe (Musi__int());
 let Musi__intInRange (lowerBound : Int, upperBound : Int) : Int;
 
 export let intInRange (lowerBound : Int, upperBound : Int) :=
-    unsafe (Musi__intInRange(lowerBound, upperBound));
+  unsafe (Musi__intInRange(lowerBound, upperBound));
 
 @foreign(abi := .musi)
 let Musi__bool () : Int;

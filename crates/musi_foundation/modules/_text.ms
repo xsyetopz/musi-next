@@ -13,19 +13,19 @@ export let length (value : String) := unsafe (Musi__length(value));
 let Musi__concat (left : String, right : String) : String;
 
 export let concat (left : String, right : String) :=
-    unsafe (Musi__concat(left, right));
+  unsafe (Musi__concat(left, right));
 
 @foreign(abi := .musi)
 let Musi__slice (value : String, start : Int, end : Int) : String;
 
 export let slice (value : String, start : Int, end : Int) :=
-    unsafe (Musi__slice(value, start, end));
+  unsafe (Musi__slice(value, start, end));
 
 @foreign(abi := .musi)
 let Musi__byteAt (value : String, index : Int) : Int;
 
 export let byteAt (value : String, index : Int) :=
-    unsafe (Musi__byteAt(value, index));
+  unsafe (Musi__byteAt(value, index));
 
 @foreign(abi := .musi)
 let Musi__fromByte (value : Int) : String;
