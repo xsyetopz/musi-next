@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use music_arena::SliceRange;
 use music_base::{Span, diag::DiagContext};
@@ -7,7 +7,7 @@ use music_names::{Ident, Symbol};
 
 use crate::api::ExprFacts;
 
-use super::super::state::DataDef;
+use super::super::state::{DataDef, DataVariantDef};
 use super::super::{CheckPass, DiagKind};
 use super::{check_expr, peel_mut_ty};
 
@@ -48,12 +48,22 @@ impl CheckPass<'_, '_, '_> {
             );
             return ExprFacts::new(expected_ty);
         };
+        let data_def = data_def.clone();
+        let variant = variant.clone();
 
-        let expected_args = variant.field_tys().to_vec();
+        let expected_args = self.variant_expected_arg_tys(expected_ty, &data_def, &variant);
         let field_names = variant.field_names().to_vec();
-        self.typecheck_variant_args(tag.span, &expected_args, &field_names, args);
+        let arg_nodes = self.args(args);
+        self.typecheck_variant_args(tag.span, &expected_args, &field_names, &arg_nodes);
+        let result_ty = self.infer_variant_result_ty(
+            expected_ty,
+            &data_def,
+            &variant,
+            &field_names,
+            &arg_nodes,
+        );
 
-        ExprFacts::new(expected_ty)
+        ExprFacts::new(result_ty)
     }
 
     fn check_sum_constructor_variant(
@@ -99,9 +109,8 @@ impl CheckPass<'_, '_, '_> {
         diag_span: Span,
         expected_args: &[HirTyId],
         field_names: &VariantFieldNames,
-        args: SliceRange<HirArg>,
+        arg_nodes: &[HirArg],
     ) {
-        let arg_nodes = self.args(args);
         let named_variant = field_names.iter().any(Option::is_some);
         let named_args = arg_nodes.iter().any(|arg| arg.name.is_some());
         if named_variant {
@@ -122,7 +131,7 @@ impl CheckPass<'_, '_, '_> {
         diag_span: Span,
         expected_args: &[HirTyId],
         field_names: &VariantFieldNames,
-        arg_nodes: Vec<HirArg>,
+        arg_nodes: &[HirArg],
         named_args: bool,
     ) {
         if !named_args {
@@ -131,7 +140,7 @@ impl CheckPass<'_, '_, '_> {
             return;
         }
         let mut seen = HashSet::<Symbol>::new();
-        for arg in &arg_nodes {
+        for arg in arg_nodes {
             self.typecheck_named_variant_arg(diag_span, expected_args, field_names, arg, &mut seen);
         }
         self.report_missing_variant_fields(diag_span, field_names, &seen);
@@ -215,7 +224,7 @@ impl CheckPass<'_, '_, '_> {
         &mut self,
         diag_span: Span,
         expected_args: &[HirTyId],
-        arg_nodes: Vec<HirArg>,
+        arg_nodes: &[HirArg],
         named_args: bool,
     ) {
         if named_args {
@@ -228,12 +237,12 @@ impl CheckPass<'_, '_, '_> {
         &mut self,
         diag_span: Span,
         expected_args: &[HirTyId],
-        arg_nodes: Vec<HirArg>,
+        arg_nodes: &[HirArg],
     ) {
         self.typecheck_positional_args(
             diag_span,
             expected_args,
-            arg_nodes.into_iter().map(|arg| arg.expr).collect(),
+            arg_nodes.iter().map(|arg| arg.expr).collect(),
             DiagKind::VariantConstructorArityMismatch,
         );
     }
@@ -278,6 +287,132 @@ impl CheckPass<'_, '_, '_> {
             HirTyKind::Named { name, .. } => self.data_def(self.resolve_symbol(name)),
             _ => None,
         }
+    }
+
+    fn variant_expected_arg_tys(
+        &mut self,
+        expected_ty: HirTyId,
+        data_def: &DataDef,
+        variant: &DataVariantDef,
+    ) -> TyIdList {
+        let mut subst = self.variant_type_subst_from_expected_ty(expected_ty, data_def);
+        for param in data_def.type_params().iter().copied() {
+            let default_ty = self.default_variant_type_arg(param);
+            let _ = subst.entry(param).or_insert(default_ty);
+        }
+        variant
+            .field_tys()
+            .iter()
+            .copied()
+            .map(|field_ty| self.substitute_ty(field_ty, &subst))
+            .collect()
+    }
+
+    fn infer_variant_result_ty(
+        &mut self,
+        expected_ty: HirTyId,
+        data_def: &DataDef,
+        variant: &DataVariantDef,
+        field_names: &VariantFieldNames,
+        arg_nodes: &[HirArg],
+    ) -> HirTyId {
+        let type_params = data_def.type_params();
+        if type_params.is_empty() {
+            return expected_ty;
+        }
+        let HirTyKind::Named { name, .. } = self.ty(expected_ty).kind else {
+            return expected_ty;
+        };
+        let mut subst = self.variant_type_subst_from_expected_ty(expected_ty, data_def);
+        self.augment_variant_subst_from_args(data_def, variant, field_names, arg_nodes, &mut subst);
+        let inferred_args = type_params
+            .iter()
+            .copied()
+            .map(|param| {
+                subst
+                    .get(&param)
+                    .copied()
+                    .unwrap_or_else(|| self.default_variant_type_arg(param))
+            })
+            .collect::<Vec<_>>();
+        let args = self.alloc_ty_list(inferred_args);
+        self.alloc_ty(HirTyKind::Named { name, args })
+    }
+
+    fn augment_variant_subst_from_args(
+        &mut self,
+        data_def: &DataDef,
+        variant: &DataVariantDef,
+        field_names: &VariantFieldNames,
+        arg_nodes: &[HirArg],
+        subst: &mut HashMap<Symbol, HirTyId>,
+    ) {
+        let type_params = data_def.type_params();
+        for (field_index, arg_ty) in self.variant_arg_matches(field_names, arg_nodes) {
+            let Some(pattern) = variant.field_tys().get(field_index).copied() else {
+                continue;
+            };
+            let _ = self.unify_ty_for_type_params(type_params, pattern, arg_ty, subst);
+        }
+    }
+
+    fn variant_arg_matches(
+        &self,
+        field_names: &VariantFieldNames,
+        arg_nodes: &[HirArg],
+    ) -> Vec<(usize, HirTyId)> {
+        let named_variant = field_names.iter().any(Option::is_some);
+        if named_variant {
+            arg_nodes
+                .iter()
+                .filter_map(|arg| {
+                    let name = arg.name?;
+                    let index = self.variant_arg_index(field_names, name)?;
+                    Some((index, self.expr_facts(arg.expr).ty))
+                })
+                .collect()
+        } else {
+            arg_nodes
+                .iter()
+                .enumerate()
+                .filter_map(|(index, arg)| {
+                    (index < field_names.len()).then_some((index, self.expr_facts(arg.expr).ty))
+                })
+                .collect()
+        }
+    }
+
+    fn variant_arg_index(&self, field_names: &VariantFieldNames, name: Ident) -> Option<usize> {
+        let field_name = self.resolve_symbol(name.name);
+        field_names
+            .iter()
+            .position(|field| field.as_deref() == Some(field_name))
+    }
+
+    fn variant_type_subst_from_expected_ty(
+        &self,
+        expected_ty: HirTyId,
+        data_def: &DataDef,
+    ) -> HashMap<Symbol, HirTyId> {
+        let HirTyKind::Named { args, .. } = self.ty(expected_ty).kind else {
+            return HashMap::new();
+        };
+        data_def
+            .type_params()
+            .iter()
+            .copied()
+            .zip(self.ty_ids(args))
+            .collect()
+    }
+
+    fn default_variant_type_arg(&mut self, name: Symbol) -> HirTyId {
+        if self.type_param_kind(name).is_some() {
+            return self.alloc_ty(HirTyKind::Named {
+                name,
+                args: SliceRange::EMPTY,
+            });
+        }
+        self.builtins().unknown
     }
 
     fn infer_variant_context_ty(&mut self, tag: Ident) -> Option<HirTyId> {

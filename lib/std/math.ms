@@ -4,9 +4,9 @@ let floatMath := import "./math/_float.ms";
 let intMath := import "./math/_integer.ms";
 
 --- Archimedes constant.
-export let PI : Float := 3.141592653589793;
+export let PI := 3.141592653589793;
 --- Euler constant.
-export let E : Float := 2.718281828459045;
+export let E := 2.718281828459045;
 
 --- Absolute integer value.
 export let abs := intMath.abs;

@@ -8,9 +8,9 @@ let String := Core.String;
 @foreign(abi := .musi)
 let Musi__int (value : Int) : String;
 
-export let int (value : Int) : String := unsafe (Musi__int(value));
+export let int (value : Int) := unsafe (Musi__int(value));
 
 @foreign(abi := .musi)
 let Musi__float (value : Float) : String;
 
-export let float (value : Float) : String := unsafe (Musi__float(value));
+export let float (value : Float) := unsafe (Musi__float(value));

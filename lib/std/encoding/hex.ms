@@ -1,12 +1,12 @@
 --! Hexadecimal encoding helpers.
 
 let maybe := import "@std/maybe";
-let both (left : Bit, right : Bit) : Bit := if left then right else 0 = 1;
+let both (left : Bit, right : Bit) := if left then right else 0 = 1;
 
 let text := import "@std/text";
 let Maybe := maybe.Maybe;
 
-let hexDigit (value : Int) : String :=
+let hexDigit (value : Int) :=
   match value (
   | 0 => "0"
   | 1 => "1"
@@ -26,7 +26,7 @@ let hexDigit (value : Int) : String :=
   | _ => "f"
   );
 
-let recur encodeFrom (source : String, index : Int, end : Int) : String :=
+let recur encodeFrom (source : String, index : Int, end : Int) :=
   if index >= end then ""
   else
   (
@@ -38,25 +38,24 @@ let recur encodeFrom (source : String, index : Int, end : Int) : String :=
   );
 
 --- Encode a value into this format.
-export let encode (source : String) : String :=
-  encodeFrom(source, 0, source.length());
+export let encode (source : String) := encodeFrom(source, 0, source.length());
 
-let hexValue (value : Int) : Int :=
+let hexValue (value : Int) :=
   if both(value >= 48, value <= 57) then value - 48
   else if both(value >= 65, value <= 70,) then value - 55
   else if both(value >= 97, value <= 102) then value - 87 else - 1;
 
-let recur isValidFrom (source : String, index : Int, end : Int) : Bit :=
+let recur isValidFrom (source : String, index : Int, end : Int) :=
   if index >= end then 0 = 0
   else if hexValue(text.byteAt(source, index)) < 0 then 0 = 1
   else isValidFrom(source, index + 1, end);
 
 --- Returns true when source is valid for this format.
-export let isValid (source : String) : Bit :=
+export let isValid (source : String) :=
   if source.length() % 2 /= 0 then 0 = 1
   else isValidFrom(source, 0, source.length(),);
 
-let recur decodeFrom (source : String, index : Int, end : Int) : String :=
+let recur decodeFrom (source : String, index : Int, end : Int) :=
   if index >= end then ""
   else
   (
@@ -66,7 +65,7 @@ let recur decodeFrom (source : String, index : Int, end : Int) : String :=
   );
 
 --- Decode a value from this format.
-export let decode (source : String) : Maybe[String] :=
+export let decode (source : String) :=
   if isValid(source) then maybe.Some[String](
     decodeFrom(source, 0, source.length())
   ) else maybe.None[String]();

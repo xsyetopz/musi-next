@@ -376,6 +376,46 @@ span.lower
     }
 
     #[test]
+    fn definition_resolves_std_list_from_array_member_from_list_tests() {
+        let test_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../lib/std/__tests__/collections/list.test.ms");
+
+        let location = definition_for_project_file_with_overlay(&test_path, None, 7, 24)
+            .expect("fromArray definition should resolve");
+
+        assert_eq!(
+            location.path,
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../lib/std/collections/list.ms")
+                .canonicalize()
+                .expect("list path should canonicalize")
+        );
+        assert_eq!(location.range.start_line, 19);
+        assert_eq!(location.range.start_col, 12);
+        assert_eq!(location.range.end_col, 21);
+    }
+
+    #[test]
+    fn definition_resolves_std_ffi_ptr_member_from_ffi_tests() {
+        let test_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../lib/std/__tests__/ffi.test.ms");
+
+        let location = definition_for_project_file_with_overlay(&test_path, None, 8, 36)
+            .expect("ptr definition should resolve");
+
+        assert_eq!(
+            location.path,
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../lib/std/ffi.ms")
+                .canonicalize()
+                .expect("ffi path should canonicalize")
+        );
+        assert_eq!(location.range.start_line, 82);
+        assert_eq!(location.range.start_col, 12);
+        assert_eq!(location.range.end_col, 15);
+    }
+
+    #[test]
     fn definition_resolves_local_variant_from_variant_value() {
         let test_dir = TempDir::new();
         write_file(test_dir.path(), "musi.json", APP_MANIFEST);
@@ -2003,6 +2043,64 @@ let float01Intrinsic () : Float;
             hints.iter().any(|hint| {
                 hint.kind == ToolInlayHintKind::Parameter && hint.label == "right:"
             })
+        );
+    }
+
+    #[test]
+    fn inlay_hints_place_inferred_function_types_after_parameter_clause() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "let add (left : Int, right : Int) := left + right;\n";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let hints = inlay_hints_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+        );
+        let hint = hints
+            .iter()
+            .find(|hint| hint.kind == ToolInlayHintKind::Type)
+            .expect("function should expose inferred type inlay hint");
+        let close_paren_col0 = source.find(") :=").expect("parameter clause close");
+        let bind_col0 = source.rfind(":=").expect("bind operator");
+        let hint_col0 = hint.position.col.saturating_sub(1);
+
+        assert_eq!(hint.position.line, 1);
+        assert!(
+            hint_col0 >= close_paren_col0.saturating_add(1) && hint_col0 <= bind_col0,
+            "hint col={} should be between parameter close and := ({}..={})",
+            hint_col0,
+            close_paren_col0.saturating_add(1),
+            bind_col0
+        );
+    }
+
+    #[test]
+    fn inlay_hints_include_receiver_prefix_functions() {
+        let test_dir = TempDir::new();
+        write_file(test_dir.path(), "musi.json", APP_MANIFEST);
+        let source = "let(self : String).byteSize () := 1;\n";
+        write_file(test_dir.path(), "index.ms", source);
+
+        let hints = inlay_hints_for_project_file_with_overlay(
+            &test_dir.path().join("index.ms"),
+            Some(source),
+        );
+        let hint = hints
+            .iter()
+            .find(|hint| hint.kind == ToolInlayHintKind::Type)
+            .expect("receiver-prefix function should expose inferred type inlay hint");
+        let close_paren_col0 = source.rfind(") :=").expect("parameter clause close");
+        let bind_col0 = source.rfind(":=").expect("bind operator");
+        let hint_col0 = hint.position.col.saturating_sub(1);
+
+        assert_eq!(hint.position.line, 1);
+        assert!(
+            hint_col0 >= close_paren_col0.saturating_add(1) && hint_col0 <= bind_col0,
+            "hint col={} should be between parameter close and := ({}..={})",
+            hint_col0,
+            close_paren_col0.saturating_add(1),
+            bind_col0
         );
     }
 

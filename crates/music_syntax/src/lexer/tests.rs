@@ -274,6 +274,21 @@ mod success {
     }
 
     #[test]
+    fn numeric_suffixes_are_part_of_number_tokens() {
+        assert_no_errors(
+            "1_z 2_n16 3.5_f64 4f32 5z32",
+            &[
+                TokenKind::Int,
+                TokenKind::Int,
+                TokenKind::Float,
+                TokenKind::Int,
+                TokenKind::Int,
+                TokenKind::Eof,
+            ],
+        );
+    }
+
+    #[test]
     fn lex_reserved_compound_tokens() {
         let cases = [
             (

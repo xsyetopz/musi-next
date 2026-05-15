@@ -593,19 +593,44 @@ impl CstFormatter<'_> {
         let Some(previous) = self.previous else {
             return false;
         };
-        if self.at_line_start {
+        if self.at_line_start || Self::spacing_forbidden_before(previous, current) {
             return false;
         }
-        if is_closing(current) || matches!(current, TokenKind::Comma | TokenKind::Semicolon) {
+        if Self::requires_space_before_dot(previous, current) || Self::is_keyword_spacing(current) {
+            return true;
+        }
+        if Self::requires_space_before_group(previous, current, role) {
+            return true;
+        }
+        if Self::spacing_forbidden_for_member_or_apply(current) {
             return false;
         }
-        if matches!(
-            previous,
-            TokenKind::Dot | TokenKind::At | TokenKind::Hash | TokenKind::Backslash
-        ) {
+        if current == TokenKind::LParen {
+            return Self::requires_space_before_lparen(previous);
+        }
+        if matches!(previous, TokenKind::LParen | TokenKind::LBracket) {
             return false;
         }
-        if current == TokenKind::Dot
+        if previous == TokenKind::Colon || current == TokenKind::Colon {
+            return true;
+        }
+        if is_operator(previous) || is_operator(current) {
+            return true;
+        }
+        is_word_like(previous) && is_word_like(current)
+    }
+
+    const fn spacing_forbidden_before(previous: TokenKind, current: TokenKind) -> bool {
+        is_closing(current)
+            || matches!(current, TokenKind::Comma | TokenKind::Semicolon)
+            || matches!(
+                previous,
+                TokenKind::Dot | TokenKind::At | TokenKind::Hash | TokenKind::Backslash
+            )
+    }
+
+    fn requires_space_before_dot(previous: TokenKind, current: TokenKind) -> bool {
+        current == TokenKind::Dot
             && (matches!(
                 previous,
                 TokenKind::ColonEq
@@ -614,54 +639,37 @@ impl CstFormatter<'_> {
                     | TokenKind::KwThen
                     | TokenKind::Pipe
             ) || is_operator(previous))
-        {
-            return true;
-        }
-        if matches!(current, TokenKind::KwElse | TokenKind::KwThen) {
-            return true;
-        }
-        if current == TokenKind::LBrace
+    }
+
+    const fn is_keyword_spacing(current: TokenKind) -> bool {
+        matches!(current, TokenKind::KwElse | TokenKind::KwThen)
+    }
+
+    fn requires_space_before_group(
+        previous: TokenKind,
+        current: TokenKind,
+        role: CstLeafRole,
+    ) -> bool {
+        (current == TokenKind::LBrace
             && (is_word_like(previous)
-                || matches!(previous, TokenKind::RBracket | TokenKind::RParen))
-        {
-            return true;
-        }
-        if current == TokenKind::LBracket
-            && matches!(
-                role,
-                CstLeafRole::TypeParamBracket | CstLeafRole::ArrayTypeBracket
-            )
-        {
-            return true;
-        }
-        if current == TokenKind::LBracket && previous == TokenKind::Pipe {
-            return true;
-        }
-        if matches!(current, TokenKind::Dot | TokenKind::LBracket) {
-            return false;
-        }
-        if current == TokenKind::LParen && previous == TokenKind::KwMatch {
-            return true;
-        }
-        if current == TokenKind::LParen && is_operator(previous) {
-            return true;
-        }
-        if current == TokenKind::LParen && previous != TokenKind::Colon {
-            return false;
-        }
-        if matches!(previous, TokenKind::LParen | TokenKind::LBracket) {
-            return false;
-        }
-        if matches!(previous, TokenKind::Colon) {
-            return true;
-        }
-        if matches!(current, TokenKind::Colon) {
-            return true;
-        }
-        if is_operator(previous) || is_operator(current) {
-            return true;
-        }
-        is_word_like(previous) && is_word_like(current)
+                || matches!(previous, TokenKind::RBracket | TokenKind::RParen)))
+            || (current == TokenKind::LBracket
+                && matches!(
+                    role,
+                    CstLeafRole::TypeParamBracket | CstLeafRole::ArrayTypeBracket
+                ))
+            || (current == TokenKind::LBracket && previous == TokenKind::Pipe)
+    }
+
+    const fn spacing_forbidden_for_member_or_apply(current: TokenKind) -> bool {
+        matches!(current, TokenKind::Dot | TokenKind::LBracket)
+    }
+
+    fn requires_space_before_lparen(previous: TokenKind) -> bool {
+        matches!(
+            previous,
+            TokenKind::KwMatch | TokenKind::KwUnsafe | TokenKind::Colon
+        ) || is_operator(previous)
     }
 }
 

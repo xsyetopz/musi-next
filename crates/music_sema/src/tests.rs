@@ -813,6 +813,39 @@ mod success {
     }
 
     #[test]
+    fn numeric_suffix_selects_nat_width_type() {
+        let sema = check("1_n16;");
+        let root = sema.module().root;
+        assert!(matches!(
+            sema.ty(sema.try_expr_ty(root).expect("root expr type missing"))
+                .kind,
+            HirTyKind::Nat16
+        ));
+    }
+
+    #[test]
+    fn numeric_suffix_selects_int_width_type_without_separator() {
+        let sema = check("1z32;");
+        let root = sema.module().root;
+        assert!(matches!(
+            sema.ty(sema.try_expr_ty(root).expect("root expr type missing"))
+                .kind,
+            HirTyKind::Int32
+        ));
+    }
+
+    #[test]
+    fn numeric_suffix_selects_float_width_type() {
+        let sema = check("1_f64;");
+        let root = sema.module().root;
+        assert!(matches!(
+            sema.ty(sema.try_expr_ty(root).expect("root expr type missing"))
+                .kind,
+            HirTyKind::Float64
+        ));
+    }
+
+    #[test]
     fn type_params_allow_whitespace_before_brackets() {
         let sema = check("export let identity [T] (value : T) : T := value;");
         assert!(sema.diags().is_empty(), "{:?}", sema.diags());
@@ -2119,6 +2152,20 @@ mod success {
         let keep[T] (value : T) : T := value;
         keep[Pair](.Pair("x", 1));
     "#,
+        );
+        assert!(sema.diags().is_empty(), "{:?}", sema.diags());
+    }
+
+    #[test]
+    fn inferred_callable_return_keeps_data_type_arguments() {
+        let sema = check(
+            r"
+        let List[T] := data {
+          | ListValues(values : []T)
+        };
+        let of[T] (value : T) := .ListValues(values := [value]);
+        let value : List[Int] := of[Int](4);
+    ",
         );
         assert!(sema.diags().is_empty(), "{:?}", sema.diags());
     }

@@ -8,6 +8,20 @@ Freeze-exception RFC process: `docs/__smallcore__/freeze-exception-rfc.md`
 
 ## Entries
 
+### 2026-05-15 — Freeze Manifest Fingerprint Sync
+
+- Scope: synchronize frozen canonical-file hashes with current parser, ABNF, and SEAM bytecode sources.
+- Outcome: complete.
+- Blockers: none.
+- Freeze policy: `docs/__smallcore__/freeze-policy.md`.
+- Freeze manifest: `docs/__smallcore__/freeze-manifest.toml`.
+- Freeze-exception RFC process: `docs/__smallcore__/freeze-exception-rfc.md` (`not required` for this sync pass).
+- Validation commands:
+  - `rtk proxy -- shasum -a 256 grammar/MusiParser.g4 grammar/Musi.abnf specs/seam/bytecode.md`
+  - `rtk cargo test -p musi --test freeze_contract` -> pass (`1 passed`, exit `0`)
+- Command evidence path:
+  - `/private/tmp/musi-freeze-gate-20260515.log`
+
 ### 2026-05-14 — Pattern Alias Canon And `br.z` Bytecode Alignment
 
 - Scope: enforce explicit `as`/destructure pattern canon and switch branch mnemonic surface to `br.z` for Bit-native branch semantics.

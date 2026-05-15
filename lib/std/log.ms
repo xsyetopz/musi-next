@@ -12,19 +12,19 @@ export hidden let Level := data {
 };
 
 --- Debug log level.
-export let debugLevel : Level := .Debug;
+export let debugLevel := .Debug;
 
 --- Informational log level.
-export let infoLevel : Level := .Info;
+export let infoLevel := .Info;
 
 --- Warning log level.
-export let warnLevel : Level := .Warn;
+export let warnLevel := .Warn;
 
 --- Error log level.
-export let errorLevel : Level := .Error;
+export let errorLevel := .Error;
 
 --- Numeric level value.
-export let (self : Level).value () : Int :=
+export let (self : Level).value () :=
   match self (
   | .Debug => 10
   | .Info => 20
@@ -33,7 +33,7 @@ export let (self : Level).value () : Int :=
   );
 
 --- Lower-case level name.
-export let (self : Level).name () : String :=
+export let (self : Level).name () :=
   match self (
   | .Debug => "debug"
   | .Info => "info"
@@ -42,19 +42,19 @@ export let (self : Level).name () : String :=
   );
 
 --- Write a log message.
-export let write (level : Level, message : String) : Unit :=
+export let write (level : Level, message : String) :=
   io.writeErrLn(
     text.concat(text.concat("[", level.name()), text.concat("] ", message))
   );
 
 --- Write a debug message.
-export let debug (message : String) : Unit := write(debugLevel, message);
+export let debug (message : String) := write(debugLevel, message);
 
 --- Write an informational message.
-export let info (message : String) : Unit := write(infoLevel, message);
+export let info (message : String) := write(infoLevel, message);
 
 --- Write a warning message.
-export let warn (message : String) : Unit := write(warnLevel, message);
+export let warn (message : String) := write(warnLevel, message);
 
 --- Write an error message.
-export let error (message : String) : Unit := write(errorLevel, message);
+export let error (message : String) := write(errorLevel, message);

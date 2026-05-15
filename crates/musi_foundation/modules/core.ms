@@ -146,7 +146,7 @@ export hidden let Abort := shape {
 let Musi__abort () : Empty;
 
 --- Abort current computation.
-export let abort () : Empty := unsafe (Musi__abort());
+export let abort () := unsafe (Musi__abort());
 
 --- Type that can step through ranges.
 export hidden let Rangeable [T] := shape {

@@ -25,72 +25,71 @@ export hidden let Instant := data {
 };
 
 --- Duration from milliseconds.
-export let millis (value : Int) : Duration := .DurationMillis(millis := value);
+export let millis (value : Int) := .DurationMillis(millis := value);
 
 --- Duration from seconds.
-export let seconds (value : Int) : Duration := millis(value * millisPerSecond);
+export let seconds (value : Int) := millis(value * millisPerSecond);
 
 --- Duration from minutes.
-export let minutes (value : Int) : Duration := millis(value * millisPerMinute);
+export let minutes (value : Int) := millis(value * millisPerMinute);
 
 --- Duration from hours.
-export let hours (value : Int) : Duration := millis(value * millisPerHour);
+export let hours (value : Int) := millis(value * millisPerHour);
 
 --- Return duration as milliseconds.
-export let durationMillis (target : Duration) : Int :=
+export let durationMillis (target : Duration) :=
   match target (
   | .DurationMillis(millis := value) => value
   );
 
 --- Return duration as whole seconds.
-export let durationSeconds (target : Duration) : Int :=
+export let durationSeconds (target : Duration) :=
   durationMillis(target) / millisPerSecond;
 
 --- Return duration as whole minutes.
-export let durationMinutes (target : Duration) : Int :=
+export let durationMinutes (target : Duration) :=
   durationMillis(target) / millisPerMinute;
 
 --- Unix wall time now.
-export let nowUnix () : UnixTime := .UnixMillis(millis := timeHost.nowUnixMs());
+export let nowUnix () := .UnixMillis(millis := timeHost.nowUnixMs());
 
 --- Return Unix wall time as milliseconds.
-export let unixTimeMillis (target : UnixTime) : Int :=
+export let unixTimeMillis (target : UnixTime) :=
   match target (
   | .UnixMillis(millis := value) => value
   );
 
 --- Return Unix wall time as whole seconds.
-export let unixTimeSeconds (target : UnixTime) : Int :=
+export let unixTimeSeconds (target : UnixTime) :=
   unixTimeMillis(target) / millisPerSecond;
 
 --- Monotonic instant now.
-export let monotonic () : Instant :=
-  .InstantMillis(millis := timeHost.monotonicMs());
+export let monotonic () := .InstantMillis(millis := timeHost.monotonicMs());
 
 --- Return monotonic instant as milliseconds.
-export let instantMillis (target : Instant) : Int :=
+export let instantMillis (target : Instant) :=
   match target (
   | .InstantMillis(millis := value) => value
   );
 
 --- Sleep for a duration.
-export let sleep (target : Duration) : Unit :=
+export let sleep (target : Duration) :=
   timeHost.sleepMs(durationMillis(target));
 
 --- Duration as milliseconds.
-export let (self : Duration).toMillis () : Int := durationMillis(self);
+export let (self : Duration).toMillis () := durationMillis(self);
 
 --- Duration as whole seconds.
-export let (self : Duration).toSeconds () : Int := durationSeconds(self);
+export let (self : Duration).toSeconds () := durationSeconds(self);
 
 --- Duration as whole minutes.
-export let (self : Duration).toMinutes () : Int := durationMinutes(self);
+export let (self : Duration).toMinutes () := durationMinutes(self);
 
 --- Unix wall time as milliseconds.
-export let (self : UnixTime).toMillis () : Int := unixTimeMillis(self);
+export let (self : UnixTime).toMillis () := unixTimeMillis(self);
 
 --- Unix wall time as whole seconds.
-export let (self : UnixTime).toSeconds () : Int := unixTimeSeconds(self);
+export let (self : UnixTime).toSeconds () := unixTimeSeconds(self);
 
 --- Monotonic instant as milliseconds.
-export let (self : Instant).toMillis () : Int := instantMillis(self);
+export let (self : Instant).toMillis () := instantMillis(self);

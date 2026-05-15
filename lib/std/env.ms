@@ -15,40 +15,38 @@ export hidden let Var := data {
 };
 
 --- Build an environment key.
-export let key (value : String) : Key := .EnvKey(value := value);
+export let key (value : String) := .EnvKey(value := value);
 
 --- Build an environment value.
-export let var (value : String) : Var := .EnvVar(value := value);
+export let var (value : String) := .EnvVar(value := value);
 
 --- Return raw key text.
-let keyText (target : Key) : String :=
-  match target (
-  | .EnvKey(value := value) => value
-  );
+let keyText (target : Key) := match target (
+| .EnvKey(value := value) => value
+);
 
 --- Convert value to string.
-export let (self : Key).toString () : String := keyText(self);
+export let (self : Key).toString () := keyText(self);
 
 --- Return raw variable text.
-let varText (target : Var) : String :=
-  match target (
-  | .EnvVar(value := value) => value
-  );
+let varText (target : Var) := match target (
+| .EnvVar(value := value) => value
+);
 
 --- Convert value to string.
-export let (self : Var).toString () : String := varText(self);
+export let (self : Var).toString () := varText(self);
 
 --- Returns true when variable exists.
-export let has (target : Key) : Bit := envHost.has(keyText(target)) > 0;
+export let has (target : Key) := envHost.has(keyText(target)) > 0;
 
 --- Read an environment variable.
-export let get (target : Key) : Maybe[Var] :=
+export let get (target : Key) :=
   if has(target) then maybe.Some[Var](var(envHost.get(keyText(target))))
   else maybe.None[Var]();
 
 --- Set an environment variable.
-export let set (target : Key, value : Var) : Bit :=
+export let set (target : Key, value : Var) :=
   envHost.set(keyText(target), varText(value)) > 0;
 
 --- Remove an environment variable.
-export let remove (target : Key) : Bit := envHost.remove(keyText(target)) > 0;
+export let remove (target : Key) := envHost.remove(keyText(target)) > 0;

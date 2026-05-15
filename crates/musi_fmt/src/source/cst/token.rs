@@ -32,8 +32,10 @@ impl CstFormatter<'_> {
         {
             frame.broke = true;
         }
-        if options.break_before_operator() || options.break_before_else() {
+        if options.break_before_operator() {
             self.continuation_indent = self.continuation_indent.max(1);
+            self.newline();
+        } else if options.break_before_else() {
             self.newline();
         }
         self.write_token_body(kind, text, role, options);

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use music_base::{Source, Span};
-use music_hir::{HirArg, HirExprId, HirExprKind, HirPatId, HirPatKind};
+use music_hir::{HirArg, HirExprId, HirExprKind, HirPatId, HirPatKind, HirReceiverDecl};
 use music_module::ModuleKey;
 use music_names::{NameBindingKind, NameResolution, Symbol};
 use music_sema::{ExprMemberKind, SemaModule};
@@ -66,20 +66,20 @@ fn variable_type_hints(context: &AnalysisContext<'_>) -> Vec<ToolInlayHint> {
         .filter_map(|(binding_id, binding)| {
             if !matches!(
                 binding.kind,
-                NameBindingKind::Let | NameBindingKind::PatternBind
+                NameBindingKind::Let
+                    | NameBindingKind::PatternBind
+                    | NameBindingKind::AttachedMethod
             ) {
                 return None;
             }
-            if !binding_needs_type_hint(sema, binding.site.span) {
-                return None;
-            }
+            let hint_offset = binding_type_hint_offset(context, sema, binding.site.span)?;
+            let (line, col) = context.source.line_col(hint_offset);
             let ty = sema
                 .binding_type(binding_id)
                 .map(|ty| render_hir_ty(sema, context.session, ty))?;
             if ty.is_empty() || ty == "Unknown" {
                 return None;
             }
-            let (line, col) = context.source.line_col(binding.site.span.end);
             Some(ToolInlayHint::new(
                 ToolPosition::new(line, col),
                 format!(": {ty}"),
@@ -89,13 +89,78 @@ fn variable_type_hints(context: &AnalysisContext<'_>) -> Vec<ToolInlayHint> {
         .collect()
 }
 
-fn binding_needs_type_hint(sema: &SemaModule, binding_span: Span) -> bool {
-    sema.module().store.exprs.iter().any(|(_, expr)| {
-        let HirExprKind::Let { pat, sig, .. } = expr.kind else {
-            return false;
+fn binding_type_hint_offset(
+    context: &AnalysisContext<'_>,
+    sema: &SemaModule,
+    binding_span: Span,
+) -> Option<u32> {
+    sema.module().store.exprs.iter().find_map(|(_, expr)| {
+        let HirExprKind::Let {
+            pat,
+            sig,
+            has_param_clause,
+            receiver,
+            value,
+            ..
+        } = &expr.kind
+        else {
+            return None;
         };
-        sig.is_none() && pat_contains_span(sema, pat, binding_span)
+        if sig.is_some() || !let_binds_span(sema, *pat, receiver.as_ref(), binding_span) {
+            return None;
+        }
+        if !has_param_clause {
+            return Some(binding_span.end);
+        }
+        let head_end = receiver.as_ref().map_or_else(
+            || sema.module().store.pats.get(*pat).origin.span.end,
+            |receiver| receiver.method.span.end,
+        );
+        let value_start = sema.module().store.exprs.get(*value).origin.span.start;
+        find_param_clause_end(context.source, head_end, value_start).or(Some(binding_span.end))
     })
+}
+
+fn let_binds_span(
+    sema: &SemaModule,
+    pat: HirPatId,
+    receiver: Option<&HirReceiverDecl>,
+    binding_span: Span,
+) -> bool {
+    pat_contains_span(sema, pat, binding_span)
+        || receiver_method_matches_span(receiver, binding_span)
+}
+
+fn receiver_method_matches_span(receiver: Option<&HirReceiverDecl>, binding_span: Span) -> bool {
+    receiver.is_some_and(|receiver| receiver.method.span == binding_span)
+}
+
+fn find_param_clause_end(source: &Source, search_start: u32, search_end: u32) -> Option<u32> {
+    if search_end <= search_start {
+        return None;
+    }
+    let start = usize::try_from(search_start).ok()?;
+    let end = usize::try_from(search_end).ok()?;
+    let text = source.text().get(start..end)?;
+    let open = text.find('(')?;
+    let mut depth = 0usize;
+    let suffix = text.get(open..)?;
+    for (offset, ch) in suffix.char_indices() {
+        if ch == '(' {
+            depth = depth.saturating_add(1);
+        } else if ch == ')' {
+            if depth == 0 {
+                return None;
+            }
+            depth = depth.saturating_sub(1);
+            if depth == 0 {
+                let end_offset = open.saturating_add(offset).saturating_add(ch.len_utf8());
+                let absolute = start.saturating_add(end_offset);
+                return u32::try_from(absolute).ok();
+            }
+        }
+    }
+    None
 }
 
 fn pat_contains_span(sema: &SemaModule, pat: HirPatId, span: Span) -> bool {

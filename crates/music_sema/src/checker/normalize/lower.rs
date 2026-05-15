@@ -1,5 +1,5 @@
 use music_arena::SliceRange;
-use music_base::diag::DiagContext;
+use music_base::{diag::DiagContext, parse_u64_literal};
 use music_hir::{
     HirBinaryOp, HirDim, HirExprId, HirExprKind, HirLitKind, HirOrigin, HirPrefixOp, HirRecordItem,
     HirTyField, HirTyId, HirTyKind,
@@ -36,10 +36,11 @@ impl PassBase<'_, '_, '_> {
                 self.lower_import_field_type_expr(base, name)?
             }
             HirExprKind::Lit { lit } => match self.lit_kind(lit) {
-                HirLitKind::Int { raw } => match raw.parse::<u64>() {
-                    Ok(value) => self.alloc_ty(HirTyKind::NatLit(value)),
-                    Err(_) => self.builtins().error,
-                },
+                HirLitKind::Int { raw } => {
+                    let error_ty = self.builtins().error;
+                    parse_u64_literal(raw.as_ref())
+                        .map_or(error_ty, |value| self.alloc_ty(HirTyKind::NatLit(value)))
+                }
                 _ => return None,
             },
             _ => return None,

@@ -7,6 +7,14 @@ use crate::api::{ComptimeValue, ConstraintEvidence, ExprFacts, ExprMemberFact, P
 use crate::checker::state::PassBase;
 
 impl PassBase<'_, '_, '_> {
+    pub fn expr_facts(&self, id: HirExprId) -> ExprFacts {
+        self.facts
+            .expr_facts
+            .get(idx_to_usize(id))
+            .cloned()
+            .expect("expr facts slot missing")
+    }
+
     pub fn set_expr_facts(&mut self, id: HirExprId, facts: ExprFacts) {
         let slot = self
             .facts

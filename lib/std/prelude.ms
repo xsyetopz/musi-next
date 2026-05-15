@@ -85,17 +85,15 @@ export let Path := path.Path;
 export let Bytes := bytes.Bytes;
 /- === Common constructors === -/
 --- Build Some maybe value.
-export let Some [T] (value : T) : Maybe[T] := maybe.Some[T](value);
+export let Some [T] (value : T) := maybe.Some[T](value);
 --- Build None maybe value.
-export let None [T] () : Maybe[T] := maybe.None[T]();
+export let None [T] () := maybe.None[T]();
 --- Build successful expected value.
-export let Success [T, E] (value : T) : Expect[T, E] :=
-  expect.Success[T, E](value);
+export let Success [T, E] (value : T) := expect.Success[T, E](value);
 --- Build failed expected value.
-export let Failure [T, E] (error : E) : Expect[T, E] :=
-  expect.Failure[T, E](error);
+export let Failure [T, E] (error : E) := expect.Failure[T, E](error);
 --- Abort current computation.
-export let abort () : Empty := core.abort();
+export let abort () := core.abort();
 
 --- Prelude abort capability contract.
 export hidden let Abort := core.Abort;

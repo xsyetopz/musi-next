@@ -2,7 +2,7 @@ manifest_version = 1
 
 [[files]]
 path = "grammar/MusiParser.g4"
-sha256 = "d237f50787b2288d6da2c86e7cb9b3c71ded0e6aae738402615c4f83a8651f65"
+sha256 = "6c5ccb6bcdafdff4ee442d671b930f6171614be691ccec52ea7107534c6198c9"
 
 [[files]]
 path = "grammar/MusiLexer.g4"
@@ -10,7 +10,7 @@ sha256 = "fbd2027b836cc3c5b46232415f0a8f17a35d16a02ef9e253c4a9407a90b0d2a0"
 
 [[files]]
 path = "grammar/Musi.abnf"
-sha256 = "15ed7d74d7addeb5f16ca7df29afe92b7972c14219ed6c4acfc44526f9cd4a86"
+sha256 = "2b16fe1df451a359e0605ca49207da437d9c3deae1021523bb4a4ca6fe31bd10"
 
 [[files]]
 path = "specs/language/first-class-everything.md"
@@ -42,7 +42,7 @@ sha256 = "594ebf86efca86b71df13229b16dc6eccb329106624569a8293e2b19e6b1cf29"
 
 [[files]]
 path = "specs/seam/bytecode.md"
-sha256 = "0315330ff5900204e048e9ebb1a976769c84acbe4c4e83e2c9e81c170a32ac7b"
+sha256 = "f65911e09c0c954ddce327b7227a8966c91f8f71d9436c7d5aa7b0de9c5197df"
 
 [[files]]
 path = "specs/seam/lowering.md"

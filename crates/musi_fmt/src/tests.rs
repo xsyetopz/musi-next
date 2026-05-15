@@ -300,6 +300,20 @@ mod success {
     }
 
     #[test]
+    fn keeps_space_between_unsafe_keyword_and_paren_expr() {
+        let source = "let value := unsafe(Musi__floatIsFinite(value));";
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "let value := unsafe (Musi__floatIsFinite(value));\n"
+        );
+        let second = format_source(&formatted_result.text, &options()).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
     fn spaces_let_else_dot_variant() {
         let source = "let .Some(value):=maybe else.None;";
 
@@ -360,6 +374,28 @@ mod success {
             "let .Some(value) :=\n  maybeResultWithLongName(target)\n  else fallbackWhenMissingWithLongName(target);\n"
         );
         let second = format_source(&formatted_result.text, &options).unwrap();
+        assert_eq!(second.text, formatted_result.text);
+    }
+
+    #[test]
+    fn aligns_else_with_if_inside_sequence_expression() {
+        let source = "let value := (
+  let major := compareByte(leftText, rightText, 0);
+  if major /= 0 then major
+    else
+    (
+      let minor := compareByte(leftText, rightText, 2);
+      if minor /= 0 then minor else compareByte(leftText, rightText, 4)
+    )
+);";
+
+        let formatted_result = format_source(source, &options()).unwrap();
+
+        assert_eq!(
+            formatted_result.text,
+            "let value :=\n  (\n    let major := compareByte(leftText, rightText, 0);\n    if major /= 0 then major\n    else\n      (\n        let minor := compareByte(leftText, rightText, 2);\n        if minor /= 0 then minor else compareByte(leftText, rightText, 4)\n      )\n  );\n"
+        );
+        let second = format_source(&formatted_result.text, &options()).unwrap();
         assert_eq!(second.text, formatted_result.text);
     }
 

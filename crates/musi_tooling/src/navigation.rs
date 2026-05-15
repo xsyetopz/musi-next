@@ -607,7 +607,8 @@ impl SymbolAnalysis {
         let source = self.source()?;
         let offset = source.offset(line, character)?;
         if let Some(sema) = self.sema()
-            && let Some((binding_id, site)) = member_binding_site_at_offset(sema, offset)
+            && let Some((binding_id, site)) =
+                member_binding_site_at_offset(sema, self.source_id, offset)
         {
             return Some((binding_id, site));
         }
@@ -651,7 +652,8 @@ impl SymbolAnalysis {
         let target = self.import_record_member_target_at_offset(offset)?;
         let target_path = self.path_map.get(target.target.as_str())?;
         let mut target_analysis = Self::new(target_path, None)?;
-        let binding_id = target_analysis.export_binding_id(target.name)?;
+        let export_name = self.session.resolve_symbol(target.name).to_owned();
+        let binding_id = target_analysis.export_binding_id(&export_name)?;
         Some(target_analysis.references(binding_id, include_declaration))
     }
 
@@ -749,15 +751,13 @@ impl SymbolAnalysis {
             .map(|(_, target)| target)
     }
 
-    fn export_binding_id(&self, name: Symbol) -> Option<NameBindingId> {
+    fn export_binding_id(&self, name: &str) -> Option<NameBindingId> {
         let sema = self.sema()?;
-        let _export = sema
-            .surface()
-            .exported_value(self.session.resolve_symbol(name))?;
+        let _export = sema.surface().exported_value(name)?;
         self.resolved()?
             .bindings
             .iter()
-            .filter(|(_, binding)| binding.name == name)
+            .filter(|(_, binding)| self.session.resolve_symbol(binding.name) == name)
             .filter(|(_, binding)| !matches!(binding.kind, NameBindingKind::Prelude))
             .min_by_key(|(_, binding)| binding.site.span.start)
             .map(|(binding_id, _)| binding_id)
@@ -770,7 +770,8 @@ impl SymbolAnalysis {
     ) -> Option<ToolLocation> {
         let target_path = self.path_map.get(target.as_str())?;
         let target_analysis = Self::new(target_path, None)?;
-        let binding_id = target_analysis.export_binding_id(name)?;
+        let export_name = self.session.resolve_symbol(name).to_owned();
+        let binding_id = target_analysis.export_binding_id(&export_name)?;
         target_analysis.binding_location(binding_id)
     }
 
@@ -1536,22 +1537,28 @@ fn ty_named_symbol(sema: &SemaModule, ty: HirTyId) -> Option<Symbol> {
 
 fn member_binding_site_at_offset(
     sema: &SemaModule,
+    source_id: SourceId,
     offset: u32,
 ) -> Option<(NameBindingId, NameSite)> {
     sema.module()
         .store
         .exprs
         .iter()
-        .find_map(|(expr_id, expr)| {
+        .filter_map(|(expr_id, expr)| {
             let HirExprKind::Field { name, .. } = expr.kind else {
                 return None;
             };
-            if !name.span.contains(offset) {
+            if expr.origin.source_id != source_id || !name.span.contains(offset) {
                 return None;
             }
             let binding_id = sema.expr_member_fact(expr_id)?.binding?;
-            Some((binding_id, NameSite::new(expr.origin.source_id, name.span)))
+            Some((
+                name.span.end.saturating_sub(name.span.start),
+                (binding_id, NameSite::new(expr.origin.source_id, name.span)),
+            ))
         })
+        .min_by_key(|(span_len, _)| *span_len)
+        .map(|(_, site)| site)
 }
 
 fn module_path_map(path: &Path) -> HashMap<String, PathBuf> {

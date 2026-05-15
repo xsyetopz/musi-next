@@ -6,18 +6,17 @@ let fmtHost := import "musi:fmt";
 let Duration := datetime.Duration;
 
 --- Format integer value.
-export let int (value : Int) : String := fmtHost.int(value);
+export let int (value : Int) := fmtHost.int(value);
 
 --- Format floating-point value.
-export let float (value : Float) : String := fmtHost.float(value);
+export let float (value : Float) := fmtHost.float(value);
 
 --- Format boolean value.
-export let bool (value : Bit) : String := if value then "true" else "false";
+export let bool (value : Bit) := if value then "true" else "false";
 
 --- Format duration as milliseconds.
-export let duration (value : Duration) : String :=
+export let duration (value : Duration) :=
   text.concat(fmtHost.int(datetime.durationMillis(value)), "ms");
 
 --- Format byte count as decimal bytes.
-export let bytesCount (value : Int) : String :=
-  text.concat(fmtHost.int(value), " B");
+export let bytesCount (value : Int) := text.concat(fmtHost.int(value), " B");
