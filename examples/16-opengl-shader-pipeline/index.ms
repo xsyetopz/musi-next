@@ -13,10 +13,11 @@ let glViewportNative (
 export let colorBufferBit := 16384n32;
 
 export let beginFrame (width : Int32, height : Int32) :=
+  unsafe
   (
-    unsafe (glViewportNative(0, 0, width, height));
-    unsafe (glClearColorNative(0.1, 0.1, 0.15, 1.0));
-    unsafe (glClearNative(colorBufferBit))
+    glViewportNative(0, 0, width, height);
+    glClearColorNative(0.1, 0.1, 0.15, 1.0);
+    glClearNative(colorBufferBit)
   );
 
 @foreign(abi := .c, symbol := "glCreateShader")
@@ -27,9 +28,9 @@ export let vertexShaderKind := 35633n32;
 export let fragmentShaderKind := 35632n32;
 
 export let createShaderPair () :=
-  (
-    unsafe (glCreateShaderNative(vertexShaderKind)),
-    unsafe (glCreateShaderNative(fragmentShaderKind)),
+  unsafe (
+    glCreateShaderNative(vertexShaderKind),
+    glCreateShaderNative(fragmentShaderKind),
   );
 
 export let demo () :=
