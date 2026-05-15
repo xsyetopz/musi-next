@@ -131,9 +131,9 @@ impl Vm {
                     .heap
                     .fast_seq2_mutation_2x2_kernel(*grid, *init_value, *update_add)
                     .map(Value::Int),
-                _ => self.call_value(call.value().clone(), args),
+                _ => self.call_value_ref(call.value(), args),
             },
-            _ => self.call_value(call.value().clone(), args),
+            _ => self.call_value_ref(call.value(), args),
         }
     }
 

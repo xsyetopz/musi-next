@@ -44,7 +44,9 @@ mod runtime;
 pub use bound::{
     BoundExportCall, BoundI64Call, BoundInitCall, BoundSeq2x2Arg, BoundSeq2x2Call, BoundSeq8Call,
 };
-pub use options::{MvmFeatures, MvmMode, MvmOptionsParseError, VmOptimizationLevel, VmOptions};
+pub use options::{
+    MvmFeatures, MvmMode, MvmModeBundle, MvmOptionsParseError, VmOptimizationLevel, VmOptions,
+};
 pub use runtime::VmRuntime;
 
 use self::boundary::{HostState, LoaderState};

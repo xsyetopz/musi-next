@@ -1,6 +1,5 @@
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
-use std::fmt;
 use std::path::{Path, PathBuf};
 
 use musi_project::{PackageSource, Project, ProjectOptions, load_project, load_project_ancestor};
@@ -11,170 +10,13 @@ use music_names::{NameBinding, NameBindingId, NameBindingKind, NameResolution, N
 use music_sema::{ExprMemberKind, SemaModule};
 use music_session::Session;
 
+use super::types::{
+    ToolCallHierarchyItem, ToolDocumentHighlight, ToolDocumentHighlightKind, ToolDocumentSymbol,
+    ToolLocation, ToolMoniker, ToolMonikerKind, ToolOutgoingCall, ToolReferenceLens, ToolTextEdit,
+    ToolWorkspaceEdit, ToolWorkspaceSymbol,
+};
 use crate::analysis::{ToolRange, ToolSymbolKind, binding_symbol_kind, tool_range};
 use crate::analysis_support::analysis_session;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ToolLocation {
-    pub path: PathBuf,
-    pub range: ToolRange,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ToolTextEdit {
-    pub range: ToolRange,
-    pub new_text: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ToolWorkspaceEdit {
-    pub changes: HashMap<PathBuf, Vec<ToolTextEdit>>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ToolDocumentSymbol {
-    pub name: String,
-    pub kind: ToolSymbolKind,
-    pub range: ToolRange,
-    pub selection_range: ToolRange,
-    pub children: Vec<Self>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ToolReferenceLens {
-    pub range: ToolRange,
-    pub reference_count: usize,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ToolDocumentHighlightKind {
-    Read,
-    Text,
-    Write,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ToolDocumentHighlight {
-    pub location: ToolLocation,
-    pub kind: ToolDocumentHighlightKind,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ToolWorkspaceSymbol {
-    pub name: String,
-    pub kind: ToolSymbolKind,
-    pub location: ToolLocation,
-}
-
-#[derive(Default)]
-pub struct NavigationWorkspace {
-    analyses: HashMap<PathBuf, SymbolAnalysis>,
-}
-
-impl fmt::Debug for NavigationWorkspace {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("NavigationWorkspace")
-            .field("cached_paths", &self.analyses.len())
-            .finish()
-    }
-}
-
-impl NavigationWorkspace {
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn clear(&mut self) {
-        self.analyses.clear();
-    }
-
-    pub fn invalidate_path(&mut self, _path: &Path) {
-        self.analyses.clear();
-    }
-
-    #[cfg(test)]
-    pub(crate) fn cached_paths_len(&self) -> usize {
-        self.analyses.len()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn cached_reference_data_len(&self, path: &Path) -> Option<(usize, usize, bool)> {
-        let key = navigation_cache_key(path);
-        self.analyses
-            .get(&key)
-            .map(SymbolAnalysis::cached_reference_data_len)
-    }
-
-    #[must_use]
-    pub fn references_for_project_file_with_overlay(
-        &mut self,
-        path: &Path,
-        overlay_text: Option<&str>,
-        line: usize,
-        character: usize,
-        include_declaration: bool,
-    ) -> Vec<ToolLocation> {
-        let Some(context) = self.analysis(path, overlay_text) else {
-            return Vec::new();
-        };
-        let Some(binding_id) = context.binding_at(line, character) else {
-            return Vec::new();
-        };
-        context.references(binding_id, include_declaration)
-    }
-
-    #[must_use]
-    pub fn reference_lenses_for_project_file_with_overlay(
-        &mut self,
-        path: &Path,
-        overlay_text: Option<&str>,
-    ) -> Vec<ToolReferenceLens> {
-        let Some(context) = self.analysis(path, overlay_text) else {
-            return Vec::new();
-        };
-        context.reference_lenses()
-    }
-
-    fn analysis(&mut self, path: &Path, overlay_text: Option<&str>) -> Option<&mut SymbolAnalysis> {
-        let key = navigation_cache_key(path);
-        if self
-            .analyses
-            .get(&key)
-            .is_none_or(|analysis| !analysis.overlay_matches(overlay_text))
-        {
-            let analysis = SymbolAnalysis::new(path, overlay_text)?;
-            let _ = self.analyses.insert(key.clone(), analysis);
-        }
-        self.analyses.get_mut(&key)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ToolMonikerKind {
-    Import,
-    Local,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ToolMoniker {
-    pub location: ToolLocation,
-    pub kind: ToolMonikerKind,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ToolCallHierarchyItem {
-    pub name: String,
-    pub kind: ToolSymbolKind,
-    pub location: ToolLocation,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ToolOutgoingCall {
-    pub to: ToolCallHierarchyItem,
-    pub from_ranges: Vec<ToolRange>,
-}
 
 #[must_use]
 pub fn definition_for_project_file_with_overlay(
@@ -519,7 +361,7 @@ pub fn rename_for_project_file_with_overlay(
     Some(ToolWorkspaceEdit { changes })
 }
 
-struct SymbolAnalysis {
+pub(super) struct SymbolAnalysis {
     session: Session,
     module_key: ModuleKey,
     source_id: SourceId,
@@ -545,7 +387,7 @@ struct VariantTarget {
 }
 
 impl SymbolAnalysis {
-    fn new(path: &Path, overlay_text: Option<&str>) -> Option<Self> {
+    pub(super) fn new(path: &Path, overlay_text: Option<&str>) -> Option<Self> {
         let (session, module_key) = analysis_session(path, overlay_text)?;
         let parsed = session.parsed_module_cached(&module_key).ok().flatten()?;
         let source_id = parsed.source_id;
@@ -564,7 +406,7 @@ impl SymbolAnalysis {
     }
 
     #[cfg(test)]
-    fn cached_reference_data_len(&self) -> (usize, usize, bool) {
+    pub(super) fn cached_reference_data_len(&self) -> (usize, usize, bool) {
         (
             self.binding_references.len(),
             self.workspace_import_record_member_references.len(),
@@ -572,7 +414,7 @@ impl SymbolAnalysis {
         )
     }
 
-    fn overlay_matches(&self, overlay_text: Option<&str>) -> bool {
+    pub(super) fn overlay_matches(&self, overlay_text: Option<&str>) -> bool {
         self.overlay_text.as_deref() == overlay_text
     }
 
@@ -598,7 +440,7 @@ impl SymbolAnalysis {
             .flatten()
     }
 
-    fn binding_at(&self, line: usize, character: usize) -> Option<NameBindingId> {
+    pub(super) fn binding_at(&self, line: usize, character: usize) -> Option<NameBindingId> {
         self.binding_site_at(line, character)
             .map(|(binding_id, _)| binding_id)
     }
@@ -1012,7 +854,7 @@ impl SymbolAnalysis {
             .collect()
     }
 
-    fn references(
+    pub(super) fn references(
         &mut self,
         binding_id: NameBindingId,
         include_declaration: bool,
@@ -1268,7 +1110,7 @@ impl SymbolAnalysis {
         nest_document_symbols(symbols)
     }
 
-    fn reference_lenses(&mut self) -> Vec<ToolReferenceLens> {
+    pub(super) fn reference_lenses(&mut self) -> Vec<ToolReferenceLens> {
         if let Some(cached) = &self.reference_lenses {
             return cached.clone();
         }
@@ -1594,10 +1436,6 @@ fn workspace_modules(path: &Path) -> Vec<(ModuleKey, PathBuf)> {
                 .collect()
         })
         .unwrap_or_default()
-}
-
-fn navigation_cache_key(path: &Path) -> PathBuf {
-    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
 fn is_valid_rename_name(name: &str) -> bool {

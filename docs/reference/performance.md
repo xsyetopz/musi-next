@@ -73,6 +73,12 @@ Musi Criterion output uses `bench_vm_<mode>_<workload>` or grouped `bench_vm_seq
 
 Musi accepts Java/.NET-style VM options from both `MVM_OPTIONS` and CLI `-Xmvm:` flags. CLI flags override defaults after environment flags are applied.
 
+`Tier` mode bundles are the primary surface:
+
+- `Tier=Normal`, `Tier=Interp`, `Tier=Hot` start from full feature set.
+- `Tier=Debug` starts with runtime kernels and fused dispatch disabled.
+- `+Use*` / `-Use*` flags override bundle defaults after tier selection.
+
 Examples:
 
 ```sh
@@ -84,10 +90,10 @@ Supported options:
 
 | Option                                                | Meaning                                                                   |
 | ----------------------------------------------------- | ------------------------------------------------------------------------- |
-| `-Xmvm:Tier=Normal`                                   | Default tiered VM mode.                                                   |
-| `-Xmvm:Tier=Interp`                                   | Interpreter lane; quickening, fused dispatch, and kernels may run.        |
-| `-Xmvm:Tier=Debug`                                    | Diagnostic interpreter lane with kernels and fused dispatch disabled.     |
-| `-Xmvm:Tier=Hot`                                      | Embedder-oriented hot mode.                                               |
+| `-Xmvm:Tier=Normal`                                   | Canonical normal bundle (default tiered VM mode).                         |
+| `-Xmvm:Tier=Interp`                                   | Canonical interpreter bundle.                                              |
+| `-Xmvm:Tier=Debug`                                    | Canonical debug bundle (kernels and fused dispatch off by default).       |
+| `-Xmvm:Tier=Hot`                                      | Canonical hot bundle for embedder-oriented hot path.                      |
 | `-Xmvm:+UseQuickening` / `-Xmvm:-UseQuickening`       | Enable or disable quickening flag.                                        |
 | `-Xmvm:+UseKernels` / `-Xmvm:-UseKernels`             | Enable or disable runtime kernels.                                        |
 | `-Xmvm:+UseFusedDispatch` / `-Xmvm:-UseFusedDispatch` | Enable or disable fused dispatch.                                         |

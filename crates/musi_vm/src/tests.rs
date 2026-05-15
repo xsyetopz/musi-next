@@ -8,7 +8,7 @@ use std::thread::spawn;
 
 use crate::gc::{HeapOptions, RuntimeHeap};
 use crate::value::{DataValue, SequenceValue};
-use crate::vm::{MvmMode, RuntimeFusedOp, RuntimeKernel};
+use crate::vm::{MvmMode, MvmModeBundle, RuntimeFusedOp, RuntimeKernel};
 use musi_foundation::register_modules;
 use music_module::ModuleKey;
 use music_seam::descriptor::{
@@ -1051,7 +1051,25 @@ mod success {
         assert_eq!(options.mode, MvmMode::DebugInterpreter);
         assert_eq!(options.heap_limit_bytes, Some(4096));
         assert!(options.features.has_runtime_kernels());
+        assert!(!options.features.has_fused_dispatch());
+    }
+
+    #[test]
+    fn applies_mode_bundle_before_feature_overrides() {
+        let options = VmOptions::parse_mvm_options(
+            Some("-Xmvm:+UseKernels -Xmvm:+UseFusedDispatch -Xmvm:Tier=Debug"),
+            &[],
+        )
+        .expect("MVM options should parse");
+
+        assert_eq!(options.mode, MvmMode::DebugInterpreter);
+        assert!(options.features.has_runtime_kernels());
         assert!(options.features.has_fused_dispatch());
+
+        let debug = VmOptions::from_mode_bundle(MvmModeBundle::DEBUG);
+        assert_eq!(debug.mode, MvmMode::DebugInterpreter);
+        assert!(!debug.features.has_runtime_kernels());
+        assert!(!debug.features.has_fused_dispatch());
     }
 
     #[test]
