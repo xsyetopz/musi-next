@@ -242,6 +242,126 @@ There is no separate `struct`, `enum`, `union`, `class`, or `impl` form.
 
 A `data` body must not mix product `let` entries and sum `case` entries unless a later locked rule explicitly permits it.
 
+
+## Fixed Storage
+
+`fixed` is a type/storage-space modifier.
+
+`fixed T` means storage-qualified `T` whose address is stable for the value's lifetime and cannot be moved by the collector/runtime during that lifetime.
+
+`fixed` is the chosen spelling. `stable` is rejected because it is too broad and can mean API stability, value immutability, deterministic behavior, ABI stability, numeric stability, or sorting stability. `fixed` names the required storage guarantee directly: the value is fixed in memory.
+
+`fixed` does not mean:
+- static/global
+- immutable
+- compile-time
+- type-associated
+- permanent
+- thread-safe by itself
+
+`fixed` is orthogonal to `mut`:
+
+```musi
+fixed T
+mut T
+fixed mut T
+```
+
+Meanings:
+- `fixed T` has stable address and is not necessarily mutable
+- `mut T` has mutable access and is not necessarily stable-address storage
+- `fixed mut T` has stable address and mutable access
+
+Examples:
+
+```musi
+let packet: fixed Packet := readPacket();
+```
+
+```musi
+let update(packet: fixed mut Packet) := (
+  packet.length := packet.length + 1;
+  packet
+);
+```
+
+```musi
+let ptr := address(packet);
+```
+
+Address-taking requires fixed storage. Movable values cannot expose stable raw addresses.
+
+Rejected:
+
+```musi
+let packet: Packet := readPacket();
+let ptr := address(packet);
+```
+
+`fixed` can make a separate `pin` keyword unnecessary. If scoped temporary non-moving access is needed later, it must be justified against `fixed` instead of added by default.
+
+## Opaque And Erased Types
+
+`opaque` and `erased` are type-space modifiers, not attributes.
+
+They affect type identity, representation, dispatch, checking, ABI/SEIL metadata, and decompilation. They are not declaration decoration.
+
+`hidden` is removed. It is too broad and does not identify a precise type-system operation. Use exact concepts instead:
+- `opaque` for existential type hiding
+- `erased` for opaque-result/static-hidden concrete type
+- `export` or non-export for module visibility
+- metadata/attributes for representation, ABI, or interop details
+
+### `opaque`
+
+`opaque T` is closest to Swift's `any T`.
+
+It means an existential/capability value whose concrete type is hidden behind the `T` shape/type boundary. Operations may go through existential, witness, or capability representation.
+
+Example:
+
+```musi
+let sink: opaque Writer := fileWriter;
+```
+
+The consumer knows `sink` fits `Writer`, but does not know the concrete stored type.
+
+### `erased`
+
+`erased T` is closest to Swift's `some T`.
+
+It means the exposed type hides the concrete type name, while the defining expression still has one compiler-known concrete underlying type. Static specialization may remain possible.
+
+Example:
+
+```musi
+let makeSink(): erased Writer := FileWriter(path);
+```
+
+The caller knows the result fits `Writer`, but the concrete result type is erased from the exposed signature.
+
+### Attributes Versus Type Modifiers
+
+Attributes fit representation and interop metadata, not core type-space operations.
+
+Examples of attribute-shaped concepts, if retained:
+
+```musi
+@packed data {
+  let version: Bits[4];
+}
+```
+
+```musi
+let read := @foreign(language := "c", symbol := "read") import "libc";
+```
+
+`foreign`/`extern` interop metadata belongs in attributes with parameters and remains a later FFI design topic.
+
+Rule:
+- type identity/storage/checking concept: type-space modifier
+- representation/ABI/interop annotation: attribute
+
 ## Packed Data
 
 Packed/bit-structured data is still `data`.
@@ -324,12 +444,117 @@ Short-circuiting is control flow, not algebra. Use `when ... else ...` or `match
 
 ## Shape Naming
 
-The concept currently called `shape` remains semantically open for naming.
+`shape` is the locked spelling for structural contracts.
 
-Naming rule:
-- use `shape` if conformance is structural
-- use `trait` only if conformance is nominal or witness/implementation-based
-- do not have both `shape` and `trait` as separate core forms for the same concept
+`shape` means an observable structure/capability contract: a value or type fits a shape when it provides the required members and operations according to Musi's conformance rules.
+
+`trait` is rejected as the core spelling because it carries Rust, Scala, PHP, and C++ baggage around nominal implementations, mixins, coherence rules, code reuse, or type-level metadata conventions.
+
+`data` defines what a thing is. `shape` defines what a thing must look like.
+
+Examples:
+
+```musi
+let Writer := shape {
+  let write(self : Self, text : Text) : Unit;
+  let flush(self : Self) : Unit;
+};
+```
+
+```musi
+let sink : opaque Writer := fileWriter;
+let makeSink() : erased Writer := FileWriter(path);
+```
+
+There is no separate `trait` keyword.
+
+
+## Shape Conformance
+
+Default `shape` conformance is structural.
+
+A type or value fits a structural shape when it provides the required observable members and operations with compatible types and stack effects. No conformance declaration is required for structural shapes.
+
+`@witness shape` defines a witness-required shape.
+
+Witness-required shapes are for semantic, lawful, marker, or capability contracts where members alone are not enough to prove correct conformance. Empty marker shapes must use `@witness shape` to avoid every type fitting them accidentally.
+
+`|=` is the locked conformance/fits relation operator.
+
+Roles:
+- `T |= Shape` states or constrains that `T` fits `Shape`
+- `let T |= Shape := witnessValue;` binds an explicit witness for witness-required conformance
+
+There is no `impl`, `implements`, `extends`, or `trait` keyword. Receiver methods and witness bindings use universal `let`.
+
+Structural example:
+
+```musi
+let Named := shape {
+  let name(self : Self) : Text;
+};
+
+let Person := data {
+  let name : Text;
+};
+
+let ada : opaque Named := Person(name := "Ada");
+```
+
+Witness-required example:
+
+```musi
+let Hashable := @witness shape {
+  let hash(self : Self) : Word64;
+};
+
+let UserId := data {
+  let raw : Word64;
+};
+
+let UserId |= Hashable := #{
+  hash := \(self : UserId) => self.raw.hash()
+};
+```
+
+`|=` should not become a general-purpose ordinary Boolean test by default. Runtime fit checks for dynamic or opaque values remain an open design topic.
+
+## Confirmed Attributes
+
+The following attributes are confirmed surface attributes:
+
+```musi
+@packed
+@align(...)
+@witness
+```
+
+Meanings:
+- `@packed` marks packed/bit-structured representation metadata
+- `@align(...)` marks representation alignment metadata
+- `@witness` marks a `shape` as requiring explicit witness conformance
+
+These are attributes because they refine representation or contract mode without introducing a new grammar category.
+
+Examples:
+
+```musi
+let Header := @packed data {
+  let version : Bits[4];
+  let flags : Bits[4];
+};
+```
+
+```musi
+let Page := @align(4096) data {
+  let bytes : fixed Bytes;
+};
+```
+
+```musi
+let Send := @witness shape {
+};
+```
 
 ## Open Question Checklist
 
@@ -338,20 +563,20 @@ These questions are intentionally open and are not locked by this document.
 ### Keyword Set
 
 - [ ] Final hard-reserved keyword list
-- [ ] Whether modifier-like words such as `known`, `mut`, `unsafe`, and visibility words are hard keywords or contextual introducers
+- [ ] Whether modifier-like words such as `known`, `mut`, and visibility words are hard keywords or contextual introducers
 - [ ] Whether `import` is a keyword or a compiler-owned function/form with special lowering
 - [ ] Whether `export` is a keyword, metadata, or a structural member rule
-- [ ] Whether `hidden` remains a surface concept
-- [ ] Whether `erased` remains a surface concept
-- [ ] Whether `fixed`, `stable`, or another word is needed for fixed storage/lifetime
+- [x] Whether `hidden` remains a surface concept
+- [x] Whether `erased` remains a surface concept
+- [x] Whether `fixed`, `stable`, or another word is needed for fixed storage/lifetime
 
 ### Shape, Trait, And Conformance
 
-- [ ] Final spelling: `shape`, `trait`, or another word
-- [ ] Structural conformance rules
-- [ ] Nominal/witness conformance rules, if any
-- [ ] Whether shape/trait conformance uses `|=`, a word operator, or a different form
-- [ ] Whether erased shape values are surface syntax, metadata, or compiler-owned lowering
+- [x] Final spelling: `shape`, `trait`, or another word
+- [x] Structural conformance rules
+- [x] Nominal/witness conformance rules, if any
+- [x] Whether shape/trait conformance uses `|=`, a word operator, or a different form
+- [x] Whether erased shape values are surface syntax, metadata, or compiler-owned lowering
 
 ### Type System
 
@@ -384,8 +609,8 @@ These questions are intentionally open and are not locked by this document.
 
 ### Representation And Metadata
 
-- [ ] Attribute syntax
-- [ ] Whether `@packed` is the final packed-data spelling
+- [x] Attribute syntax
+- [x] Whether `@packed` is the final packed-data spelling
 - [ ] Representation controls such as alignment, endian, tags, padding, and ABI layout
 - [ ] Whether representation metadata appears before `data`, after `data`, or inside the structural body
 - [ ] Whether metadata is preserved in SEIL for decompilation
