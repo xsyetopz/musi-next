@@ -6,7 +6,7 @@ Musi is a small systems language with a small core.
 
 Musi is expression-first:
 - statements are not a separate semantic category
-- a top-level expression terminated by `;` is a valid top-level item
+- a top-level expression terminated by `;` is an accepted top-level item
 - `;` may discard a value or sequence expressions
 - definitions are expressions
 - control flow is expression-based
@@ -23,7 +23,28 @@ Musi syntax must preserve:
 - no syntax that requires speculative parsing beyond one token
 - no syntax retained only because existing or conventional languages use it
 
-If a form needs more than one token of lookahead, the design is rejected and redesigned.
+If a form needs more than one token of lookahead, the design is not accepted and must be redesigned.
+
+## EBNF Notation
+
+The grammar snippets in this document use the W3C XML 1.0 EBNF notation for locked surface shapes.
+
+```ebnf
+[1]  A       ::= B C
+[2]  A       ::= B | C
+[3]  A       ::= B?
+[4]  A       ::= B*
+[5]  A       ::= B+
+[6]  A       ::= "token"
+[7]  A       ::= B /* comment */
+[8]  IDENT   ::= /* lexical identifier token */
+[9]  EXPR    ::= /* expression production defined by final grammar */
+[10] TYPE    ::= /* type-expression production defined by final grammar */
+[11] PATTERN ::= /* pattern production defined by final grammar */
+[12] ATTR    ::= /* attribute production defined by final grammar */
+```
+
+These productions define accepted shapes. Omitted forms are not accepted by this locked syntax unless another locked section adds them. The snippets are documentation grammar, not the generated parser grammar.
 
 ## Keyword Rule
 
@@ -33,37 +54,129 @@ A word is not a keyword merely because it is built in, compiler-owned, common, o
 
 Operators, compiler intrinsics, methods, traits/shapes, sum types, product types, and built-in types are not keywords unless they are hard-reserved grammar introducers.
 
+## Comments
+
+Comment spellings are locked.
+
+```ebnf
+[13] line-comment       ::= "--" line-comment-text
+[14] line-doc-comment   ::= "---" line-comment-text
+[15] line-module-doc    ::= "--!" line-comment-text
+[16] block-comment      ::= "/-" block-comment-body "-/"
+[17] block-doc-comment  ::= "/--" block-comment-body "-/"
+[18] block-module-doc   ::= "/-!" block-comment-body "-/"
+[19] block-comment-body ::= (block-comment | block-doc-comment | block-module-doc | block-comment-char)*
+```
+
+The longer opener wins by maximal munch:
+- `--!` is a module doc comment, not a line comment followed by `!`
+- `---` is a doc comment, not a line comment followed by `-`
+- `/--` is a block doc comment, not a block comment followed by `-`
+- `/-!` is a block module doc comment, not a block comment followed by `!`
+
+Block comments, block documentation comments, and block module documentation comments participate in the same nesting system.
+
+```musi
+/-
+outer
+  /- inner -/
+outer continues
+-/
+```
+
+Rules:
+- line comments inside block comments are comment text
+- nested block comments are implemented with a linear depth counter
+- unterminated nested block comments are diagnostic errors
+- module docs are supported separately from item docs
+
 ## Universal Binding
 
 `let` is the universal binding form.
 
 It binds values, functions, data definitions, shape definitions, module/import results, compile-time values, runtime values, and attached receiver methods.
 
-Examples:
-
-```musi
-let x := value;
-let Name := data { };
-let Contract := shape { };
-let imported := import "path";
-let (self : Parent).method() := expr;
+```ebnf
+[20] let-expr        ::= "let" bind-head type-annot? param-list? result-type? ":=" EXPR
+                       | "let" receiver-head "." IDENT param-list result-type? ":=" EXPR
+[21] bind-head       ::= IDENT | operator-name | PATTERN
+[22] receiver-head   ::= "(" IDENT type-annot ")"
+[23] param-list      ::= "(" param-list-body? ")"
+[24] param-list-body ::= required-param ("," required-param)* ("," default-param)* ","?
+                       | default-param ("," default-param)* ","?
+[25] required-param  ::= IDENT type-annot
+                       | IDENT type-annot?
+[26] default-param   ::= IDENT type-annot? ":=" EXPR
+[27] result-type     ::= type-annot
+[28] type-annot      ::= ":" TYPE
 ```
 
 There is no separate `fn`, `type`, `struct`, `enum`, `class`, `impl`, `const`, or `static` keyword.
+
+Defaults must be trailing in every parameter list, including function parameters, method parameters, constructor-like parameters, and variant payload parameters.
+
+## Binding Qualifiers
+
+Binding syntax is plain. `known`, `fixed`, and `mut` do not appear before `let` and do not appear between `let` and the binding name.
+
+```ebnf
+[29] let-binding       ::= "let" bind-head type-annot? ":=" EXPR
+[30] qualified-binding ::= "let" bind-head ":" qualified-type ":=" EXPR
+[31] qualified-rhs-bind ::= "let" bind-head ":=" qualified-expr
+[32] qualified-type    ::= known-mod? fixed-mod? mut-mod? TYPE
+[33] known-mod         ::= "known"
+[34] fixed-mod         ::= "fixed"
+[35] mut-mod           ::= "mut"
+[36] qualified-expr    ::= "known" EXPR | EXPR
+```
+
+Canonical type qualifier order is:
+
+```ebnf
+[37] qualified-type ::= "known"? "fixed"? "mut"? TYPE
+```
+
+Other orders are absent from the accepted grammar and may be canonicalized by diagnostics/formatting according to the final parser and formatter design.
+
+If a binding has no annotation, inference preserves the qualified type of the right-hand side. It does not invent qualifiers and does not strip qualifiers.
+
+```musi
+let Natural /- : Nat -/ := 0;
+let Natural /- : known Nat -/ := known 0;
+```
+
+No modifier means no qualifier unless the expression already has that qualifier.
 
 ## Expression Sequencing
 
 Parentheses delimit computation regions.
 
+```ebnf
+[38] computation-region ::= "(" computation-body? ")"
+[39] computation-body   ::= EXPR (";" EXPR)* ";"?
+```
+
+Semicolon inside a computation region is sequencing/discard.
+
 ```musi
 (
-  first();
-  second();
-  third()
+  step1();
+  step2()
 )
 ```
 
-Semicolon separates sequential computation steps.
+produces the value/effect of `step2()`.
+
+```musi
+(
+  step1();
+  step2();
+)
+```
+
+discards `step2()` and produces `Unit` or the corresponding empty stack effect according to the final stack-effect rules.
+
+Leading semicolon in a computation region is not part of the grammar because it would imply an empty computation step.
 
 ## Structural Regions
 
@@ -71,153 +184,102 @@ Curly braces delimit structural regions.
 
 Structural regions define members, fields, variants, cases, or rule tables. They are not sequential computation bodies.
 
-Examples:
-
-```musi
-let Person := data {
-  let name : Text;
-  let age : Word8 := 0;
-};
+```ebnf
+[40] structural-region ::= "{" structural-body? "}"
+[41] structural-body   ::= structural-member (";" structural-member)* ";"?
+[42] structural-member ::= data-field | data-case | shape-member | match-case
 ```
 
-```musi
-let myValue := match value {
-case .Some(x) => x;
-case .None => 0;
-};
+Structural semicolon is a member/rule terminator, not a discard operator.
+
+## Trailing Separators
+
+Trailing separators are allowed where the separator follows an item. Leading separators are not allowed.
+
+```ebnf
+[43] comma-items     ::= EXPR ("," EXPR)* ","?
+[44] semicolon-items ::= structural-member (";" structural-member)* ";"?
 ```
 
-## Datum Literals
+No production begins with `,` or `;` for these list shapes.
 
-Datum literals use `#` plus a delimiter as a compound lexical category.
+Comma-list positions use the same `X ("," X)* ","?` shape in datum, argument, parameter, generic, and array/list type parameter positions, with `X` replaced by the production used by that position.
 
-```musi
-#(a, b)
-#{ name := "Ada", age := 36 }
-#[1, 2, 3]
-```
+Structural regions use the same `X (";" X)* ";"?` shape for members and rules, with `X` replaced by the member or rule production used by that region.
 
-Meaning:
-- `#(` begins a tuple datum literal
-- `#{` begins a record/product datum literal
-- `#[` begins an array/list datum literal
-
-Plain `{ ... }` never means a value record literal.
-Plain `( ... )` never means a tuple datum literal unless introduced by `#`.
-
-Value datum syntax and type syntax are separate:
-- value datum uses `#`
-- type syntax does not use `#`
-
-## Separators
-
-`,` separates sibling items in datum, argument, parameter, and type-argument lists.
-
-`;` separates computation steps and structural members/rules.
-
-Examples:
-
-```musi
-foo(a, b, c)
-#(x, y)
-#[1, 2, 3]
-#{ x := 1, y := 2 }
-```
-
-```musi
-let Point := data {
-  let x : Int;
-  let y : Int;
-};
-```
-
-```musi
-let Choice := match value {
-case .A => 1;
-case .B => 2;
-};
-```
+Computation regions use `;` as sequencing/discard, not as a generic list separator.
 
 ## Conditional Expressions
 
 `when` is the conditional guard operator.
 
-Total conditional expression:
-
-```musi
-value when condition else fallback
+```ebnf
+[45] total-conditional ::= EXPR "when" EXPR "else" EXPR
+[46] guarded-emission  ::= EXPR "when" EXPR
 ```
 
 Rules:
-- `condition` must be `Bit`
-- true and false branches must have compatible type/stack effect
+- the condition must be `Bit`
+- total conditional branches must have compatible type/stack effect
 - `else` provides the fallback branch explicitly
+- guarded emission is accepted only in contexts where emitting nothing is meaningful
 - no hidden `Maybe`, `Unit`, bottom, or union is synthesized
-
-Guarded emission expression:
-
-```musi
-value when condition
-```
-
-Rules:
-- valid only in contexts where emitting nothing is meaningful
-- invalid in ordinary required-value positions
-- no hidden value is synthesized on false
 
 ## Match And Case
 
-Pattern matching uses `match`.
+Pattern matching uses `match`. Each match arm starts with `case` and ends with semicolon.
 
-Each match arm starts with `case`.
+```ebnf
+[47] match-expr ::= "match" EXPR "{" match-case+ "}"
+[48] match-case ::= "case" PATTERN case-guard? "=>" EXPR ";"
+[49] case-guard ::= "when" EXPR
+```
+
+The semicolon after a `case` arm terminates the structural case rule. It does not discard the selected arm value and does not make the match produce `Unit`.
 
 ```musi
 match value {
-case pattern when guard => expr;
-case pattern => expr;
+  case .A => 1;
+  case .B => 2;
 }
 ```
 
-Rules:
-- `match` introduces a pattern decision expression
-- `case` introduces one pattern alternative
-- `when` guards a case
-- `=>` separates the pattern/guard from the result expression
-- match arms are separated by `;`
-- the match body uses `{}` because it is a structural decision table, not a computation sequence
+produces `Int`.
+
+To discard inside an arm, use a computation region whose own final semicolon performs the discard.
+
+```musi
+match value {
+  case .A => (log("A"); 1);
+  case .B => (log("B"); 2;);
+}
+```
+
+Pattern alternatives are not locked as syntax. Repeated `case` arms are the core spelling for multiple alternatives that produce the same expression unless a later rule changes this.
 
 ## Data
 
 `data` is the single data-definition form.
 
-The body determines whether the data is product-shaped or sum-shaped.
+The body determines whether the data is product-shaped or sum-shaped. A `data` body must not mix product `let` entries and sum `case` entries.
 
-Product-shaped data uses `let` entries:
-
-```musi
-let Person := data {
-  let name : Text;
-  let age : Word8 := 0;
-};
-```
-
-Sum-shaped data uses `case` entries:
-
-```musi
-let Maybe := data {
-  case Some(value : T);
-  case None;
-};
-```
-
-Variant cases may have explicit known tag/discriminant values:
-
-```musi
-let TokenKind := data {
-  case Eof := 0;
-  case Ident(text : Text) := 1;
-  case Int(value : Word64) := 2;
-};
+```ebnf
+[50] data-expr              ::= attr-list? "data" data-body
+[51] data-body              ::= product-data-body | sum-data-body | empty-data-body
+[52] product-data-body      ::= "{" data-field (";" data-field)* ";"? "}"
+[53] sum-data-body          ::= "{" data-case (";" data-case)* ";"? "}"
+[54] empty-data-body        ::= "{" "}"
+[55] data-field             ::= "let" IDENT type-annot field-default?
+                             | "let" IDENT ":=" EXPR
+[56] field-default          ::= ":=" EXPR
+[57] data-case              ::= "case" IDENT variant-payload? case-tag?
+[58] variant-payload        ::= "(" variant-param-list? ")"
+[59] variant-param-list     ::= required-variant-param ("," required-variant-param)* ("," default-variant-param)* ","?
+                             | default-variant-param ("," default-variant-param)* ","?
+[60] required-variant-param ::= IDENT type-annot | type-annot | TYPE
+[61] default-variant-param  ::= IDENT type-annot? ":=" EXPR
+[62] case-tag               ::= ":=" known-expr
+[63] known-expr             ::= EXPR /* context requires known value */
 ```
 
 `:= value` on the `case` itself initializes or defines the variant identity.
@@ -228,45 +290,7 @@ Rules:
 - if omitted, tags are assigned by the compiler in declaration order
 - payload defaults stay inside payload parameters
 
-Payload defaults use their own local `:=`:
-
-```musi
-let TokenKind := data {
-  case Int(value : Word64 := 0);
-};
-```
-
-Rationale:
-- `:=` on the case itself initializes/defines the variant identity
-- payload defaults already have their own local `:=`
-- this avoids confusing constructor implementation with tag assignment
-- this fits `@packed` and FFI/ABI layout later
-
-A `data` body may also bind data-valued fields or associated data through `let`:
-
-```musi
-let Packet := data {
-  let header := Header;
-  let Payload := data {
-    case Text(message : Text);
-    case Binary(bytes : Bytes);
-  };
-};
-```
-
-Receiver methods are defined outside the `data` body:
-
-```musi
-let (self : Parent).method() := expr;
-```
-
-There is no separate `struct`, `enum`, `union`, `class`, or `impl` form.
-
-A `data` body must not mix product `let` entries and sum `case` entries. This is locked.
-
 Product and sum data stay separate. If both are needed, pass one around as a field of the other. This follows the same useful shape as Rust's `enum TokenKind` plus `struct Token`, without adding separate `enum` or `struct` keywords.
-
-Example:
 
 ```musi
 let TokenKind := data {
@@ -281,73 +305,36 @@ let Token := data {
 };
 ```
 
-Invalid:
+A `data` body may bind data-valued fields or associated data through `let`.
 
 ```musi
-let BadToken := data {
-  let span : SourceSpan;
-  case Ident(text : Text);
-  case Eof;
+let Packet := data {
+  let header := Header;
+  let Payload := data {
+    case Text(message : Text);
+    case Binary(bytes : Bytes);
+  };
 };
 ```
 
+Receiver methods are defined outside the `data` or `shape` body.
 
+```musi
+let (self : Parent).method() := expr;
+```
 
+There is no separate `struct`, `enum`, `union`, `class`, or `impl` form.
 
 ## Datum Literal Grammar
 
 Datum literals use `#` plus delimiter as a compound lexical category so value literals do not get confused with type syntax or computation delimiters.
 
-Tuple datum literal:
-
-```musi
-#(a, b)
-```
-
-Record/product datum literal:
-
-```musi
-#{ name := value, other := value }
-```
-
-Array/list datum literal:
-
-```musi
-#[a, b, c]
-```
-
-Rules:
-- datum literals use comma separators
-- trailing comma is allowed
-- record datum fields use `:=`, not `:`
-- record datum keys are names, not arbitrary expressions
-- product construction uses `Type#{ ... }`
-- inferred product construction uses `#{ ... }`
-
-Examples:
-
-```musi
-let point := #(x, y);
-```
-
-```musi
-let person := Person#{ name := "Ada", age := 36 };
-```
-
-```musi
-let person : Person := #{ name := "Ada", age := 36 };
-```
-
-```musi
-let bytes := #[1, 2, 3, 4];
-```
-
-Empty forms are valid:
-
-```musi
-#()
-#{}
-#[]
+```ebnf
+[64] datum-literal      ::= tuple-datum | record-datum | array-datum
+[65] tuple-datum        ::= "#(" (EXPR ("," EXPR)* ","?)? ")"
+[66] record-datum       ::= "#{" (record-datum-field ("," record-datum-field)* ","?)? "}"
+[67] array-datum        ::= "#[" (EXPR ("," EXPR)* ","?)? "]"
+[68] record-datum-field ::= IDENT ":=" EXPR
 ```
 
 Meanings:
@@ -355,29 +342,9 @@ Meanings:
 - `#{}` is empty record datum
 - `#[]` is empty array/list datum and requires type context
 
+Plain `{ ... }` never means a value record literal. Plain `( ... )` never means a tuple datum literal unless introduced by `#`.
 
 ## Type Delimiters And Indexing
-
-Plain tuple types use ordinary type-position parentheses.
-
-```musi
-(A, B)
-()
-```
-
-Tuple values use datum syntax.
-
-```musi
-#(a, b)
-#()
-```
-
-Examples:
-
-```musi
-let pair : (Text, Nat) := #("Ada", 36);
-let unit : () := #();
-```
 
 Datums exist to separate value construction from type syntax:
 - record/product values use `#{ ... }`
@@ -388,6 +355,14 @@ Datums exist to separate value construction from type syntax:
 - tuple types use `( ... )` in type position
 - array/list values use `#[ ... ]`
 - array/list types use prefix bracket syntax
+
+```ebnf
+[69] tuple-type          ::= "(" (TYPE ("," TYPE)* ","?)? ")"
+[70] array-list-type     ::= "[" (TYPE ("," TYPE)* ","?)? "]" TYPE
+[71] generic-application ::= TYPE "[" (TYPE ("," TYPE)* ","?)? "]"
+[72] tuple-field-access  ::= EXPR "." INT
+[73] array-index-access  ::= EXPR ".[" EXPR "]"
+```
 
 Array/list types are prefixed on the element type.
 
@@ -403,20 +378,10 @@ Generic/type application uses postfix brackets on the type constructor.
 T[A, B]
 ```
 
-This separates array/list type construction from generic application.
-
-Indexing rules:
-- tuple fields index by numeric field access
-- array/list values index by compound `.[` access
-
-Examples:
+Tuple fields index by numeric field access. Array/list values index by compound `.[` access.
 
 ```musi
 let first := pair.0;
-let second := pair.1;
-```
-
-```musi
 let item := list.[0];
 ```
 
@@ -424,37 +389,21 @@ let item := list.[0];
 
 Product data construction uses named or unnamed record datum literals.
 
-Named product construction applies a record datum literal to the product type/name:
-
-```musi
-let ada : opaque Named := Person#{ name := "Ada" };
-```
-
-Context-inferred product construction can use an unnamed record datum literal:
-
-```musi
-let ada : opaque Named := #{ name := "Ada" };
+```ebnf
+[74] product-construction ::= TYPE record-datum
+[75] inferred-product     ::= record-datum
+[76] sum-construction     ::= unqualified-variant | qualified-variant
+[77] unqualified-variant  ::= "." IDENT variant-args?
+[78] qualified-variant    ::= TYPE "." IDENT variant-args?
+[79] variant-args         ::= "(" (EXPR ("," EXPR)* ","?)? ")"
 ```
 
 Product data is not constructed with function-call syntax.
 
-Rejected:
-
 ```musi
-let ada : opaque Named := Person(name := "Ada");
-```
-
-Sum data construction uses dot variant syntax.
-
-Unqualified variant construction:
-
-```musi
+let ada : opaque Named := Person#{ name := "Ada" };
+let ada : opaque Named := #{ name := "Ada" };
 let optionalType := .Some(Type);
-```
-
-Qualified variant construction:
-
-```musi
 let optionalType := Maybe.Some(Type);
 ```
 
@@ -467,9 +416,15 @@ Rationale:
 
 `fixed` is a type/storage-space modifier.
 
+```ebnf
+[80] fixed-type     ::= "fixed" TYPE
+[81] fixed-mut-type ::= "fixed" "mut" TYPE
+[82] qualified-type ::= "known"? "fixed"? "mut"? TYPE
+```
+
 `fixed T` means storage-qualified `T` whose address is stable for the value's lifetime and cannot be moved by the collector/runtime during that lifetime.
 
-`fixed` is the chosen spelling. `stable` is rejected because it is too broad and can mean API stability, value immutability, deterministic behavior, ABI stability, numeric stability, or sorting stability. `fixed` names the required storage guarantee directly: the value is fixed in memory.
+`fixed` is the chosen spelling. `stable` is not accepted because it is too broad and can mean API stability, value immutability, deterministic behavior, ABI stability, numeric stability, or sorting stability. `fixed` names the required storage guarantee directly: the value is fixed in memory.
 
 `fixed` does not mean:
 - static/global
@@ -480,49 +435,22 @@ Rationale:
 - thread-safe by itself
 
 `fixed` is orthogonal to `mut`:
-
-```musi
-fixed T
-mut T
-fixed mut T
-```
-
-Meanings:
 - `fixed T` has stable address and is not necessarily mutable
 - `mut T` has mutable access and is not necessarily stable-address storage
 - `fixed mut T` has stable address and mutable access
 
-Examples:
-
-```musi
-let packet: fixed Packet := readPacket();
-```
-
-```musi
-let update(packet: fixed mut Packet) := (
-  packet.length := packet.length + 1;
-  packet
-);
-```
-
-```musi
-let ptr := address(packet);
-```
-
 Address-taking requires fixed storage. Movable values cannot expose stable raw addresses.
-
-Rejected:
-
-```musi
-let packet: Packet := readPacket();
-let ptr := address(packet);
-```
 
 `fixed` can make a separate `pin` keyword unnecessary. If scoped temporary non-moving access is needed later, it must be justified against `fixed` instead of added by default.
 
 ## Opaque And Erased Types
 
 `opaque` and `erased` are type-space modifiers, not attributes.
+
+```ebnf
+[83] opaque-type ::= "opaque" TYPE
+[84] erased-type ::= "erased" TYPE
+```
 
 They affect type identity, representation, dispatch, checking, ABI/SEIL metadata, and decompilation. They are not declaration decoration.
 
@@ -532,49 +460,33 @@ They affect type identity, representation, dispatch, checking, ABI/SEIL metadata
 - `export` or non-export for module visibility
 - metadata/attributes for representation, ABI, or interop details
 
-### `opaque`
+`opaque T` is closest to Swift's `any T`. It means an existential/capability value whose concrete type is hidden behind the `T` shape/type boundary. Operations may go through existential, witness, or capability representation.
 
-`opaque T` is closest to Swift's `any T`.
+`erased T` is closest to Swift's `some T`. It means the exposed type hides the concrete type name, while the defining expression still has one compiler-known concrete underlying type. Static specialization may remain possible.
 
-It means an existential/capability value whose concrete type is hidden behind the `T` shape/type boundary. Operations may go through existential, witness, or capability representation.
-
-Example:
-
-```musi
-let sink: opaque Writer := fileWriter;
-```
-
-The consumer knows `sink` fits `Writer`, but does not know the concrete stored type.
-
-### `erased`
-
-`erased T` is closest to Swift's `some T`.
-
-It means the exposed type hides the concrete type name, while the defining expression still has one compiler-known concrete underlying type. Static specialization may remain possible.
-
-Example:
-
-```musi
-let makeSink(): erased Writer := FileWriter(path);
-```
-
-The caller knows the result fits `Writer`, but the concrete result type is erased from the exposed signature.
-
-### Attributes Versus Type Modifiers
+## Attributes And Packed Data
 
 Attributes fit representation and interop metadata, not core type-space operations.
 
-Examples of attribute-shaped concepts, if retained:
-
-```musi
-@packed data {
-  let version: Bits[4];
-}
+```ebnf
+[85] attr-list          ::= ATTR+
+[86] confirmed-attr     ::= "@packed" | "@align" "(" EXPR ")" | "@witness"
+[87] packed-data-expr   ::= "@packed" "data" data-body
+[88] aligned-data-expr  ::= "@align" "(" EXPR ")" "data" data-body
+[89] witness-shape-expr ::= "@witness" "shape" shape-body
 ```
 
-```musi
-let read := @foreign(language := "c", symbol := "read") import "libc";
-```
+Confirmed surface attributes:
+- `@packed`
+- `@align(...)`
+- `@witness`
+
+Meanings:
+- `@packed` marks packed/bit-structured representation metadata
+- `@align(...)` marks representation alignment metadata
+- `@witness` marks a `shape` as requiring explicit witness conformance
+
+Packed/bit-structured data is still `data`. It does not get a new keyword such as `bitstruct`.
 
 `foreign`/`extern` interop metadata belongs in attributes with parameters and remains a later FFI design topic.
 
@@ -582,55 +494,12 @@ Rule:
 - type identity/storage/checking concept: type-space modifier
 - representation/ABI/interop annotation: attribute
 
-## Packed Data
-
-Packed/bit-structured data is still `data`.
-
-It does not get a new keyword such as `bitstruct`.
-
-Packed representation should be expressed as metadata, with `@packed` as the preferred spelling if attributes are retained.
-
-Example direction:
-
-```musi
-let Header := @packed data {
-  let version : Bits[4];
-  let flags : Bits[4];
-  let length : Bits[16];
-};
-```
-
-Representation metadata is not fully locked here; only the decision that packed data remains `data` is locked.
-
-## Parameters And Defaults
-
-Parameters may have defaults.
-
-Defaults must be trailing.
-
-Valid:
-
-```musi
-let f(a : A, b : B, c : C := default) := expr;
-```
-
-Invalid:
-
-```musi
-let f(a : A := default, b : B) := expr;
-```
-
-This rule applies uniformly to function parameters, method parameters, constructor-like parameters, and variant payload parameters.
-
 ## Algebraic Operators
 
 Core Boolean/bit algebra operators are:
 
-```musi
-&
-|
-^
-~
+```ebnf
+[90] algebra-op ::= "&" | "|" | "^" | "~"
 ```
 
 Meanings:
@@ -641,7 +510,7 @@ Meanings:
 
 There is no separate logical/bitwise operator split.
 
-There is no:
+The following are not core Boolean/bit algebra syntax:
 
 ```musi
 and
@@ -656,234 +525,37 @@ not
 ~?
 ```
 
-`Bit`, `Word`, `Word8`, `Word16`, `Word32`, `Word64`, and `Bits[N]` use the same symbolic algebra where valid.
+`Bit`, `Word`, `Word8`, `Word16`, `Word32`, `Word64`, and `Bits[N]` use the same symbolic algebra where accepted by type checking.
 
 Guard contexts require `Bit`. There is no truthiness.
 
 Short-circuiting is control flow, not algebra. Use `when ... else ...` or `match`.
 
-
-## Binding Qualifiers
-
-Binding syntax is plain.
-
-```musi
-let Name := expr;
-let Name : Type := expr;
-```
-
-`known`, `fixed`, and `mut` do not appear before `let` and do not appear between `let` and the binding name.
-
-Invalid:
-
-```musi
-known let Name := expr;
-fixed let Name := expr;
-mut let Name := expr;
-let known Name := expr;
-let fixed Name := expr;
-let mut Name := expr;
-```
-
-Qualifiers belong to type positions or expression positions.
-
-Valid:
-
-```musi
-let Name : known Nat := 0;
-let Name := known 0;
-let Name : fixed mut Buffer := makeBuffer();
-let Name : mut Item := item;
-```
-
-If a binding has no annotation, inference preserves the qualified type of the right-hand side. It does not invent qualifiers and does not strip qualifiers.
-
-Examples with inlay hints:
-
-```musi
-let Natural /- : Nat -/ := 0;
-let Natural /- : known Nat -/ := known 0;
-```
-
-If the right-hand side has type `fixed mut Buffer`, the inferred binding type is `fixed mut Buffer`. If the right-hand side has type `Buffer`, the inferred binding type is `Buffer`.
-
-No modifier means no qualifier unless the expression already has that qualifier.
-
-Canonical type qualifier order is:
-
-```musi
-known fixed mut T
-```
-
-Other orders are rejected or canonicalized by diagnostics/formatting according to the final parser and formatter design.
-
-
-## Comments
-
-Comment spellings are locked.
-
-Line comment:
-
-```musi
--- line comment
-```
-
-Line documentation comment:
-
-```musi
---- line doc comment
-```
-
-Block comment:
-
-```musi
-/- block comment -/
-```
-
-Block documentation comment:
-
-```musi
-/-- block doc comment -/
-```
-
-Line module documentation comment:
-
-```musi
---! module line doc comment
-```
-
-Block module documentation comment:
-
-```musi
-/-! module block doc comment -/
-```
-
-The longer opener wins by maximal munch, so `--!` is a module doc comment rather than a line comment followed by `!`, `---` is a doc comment rather than a line comment followed by `-`, `/--` is a block doc comment rather than a block comment followed by `-`, and `/-!` is a block module doc comment rather than a block comment followed by `!`.
-
-Block comments nest.
-
-```musi
-/-
-outer
-  /- inner -/
-outer continues
--/
-```
-
-Block documentation comments and block module documentation comments participate in the same nesting system.
-
-```musi
-/--
-outer doc
-  /- ordinary nested block comment -/
-outer doc continues
--/
-```
-
-Rules:
-- `/- ... -/`, `/-- ... -/`, and `/-! ... -/` may contain nested block comment openers
-- all nested block comment forms close with `-/`
-- line comments inside block comments are comment text
-- nested block comments are implemented with a linear depth counter
-- unterminated nested block comments are diagnostic errors
-
-Rationale:
-- nested comments allow temporarily commenting out code that already contains block comments
-- nesting avoids accidental early close on inner `-/`
-- the delimiter pair is explicit enough to keep lexing deterministic and linear
-- module docs are supported separately from item docs
-
-## Shape Naming
-
-`shape` is the locked spelling for structural contracts.
-
-`shape` means an observable structure/capability contract: a value or type fits a shape when it provides the required members and operations according to Musi's conformance rules.
-
-`trait` is rejected as the core spelling because it carries Rust, Scala, PHP, and C++ baggage around nominal implementations, mixins, coherence rules, code reuse, or type-level metadata conventions.
-
-`data` defines what a thing is. `shape` defines what a thing must look like.
-
-Examples:
-
-```musi
-let Writer := shape {
-  let write(self : Self, text : Text) : Unit;
-  let flush(self : Self) : Unit;
-};
-```
-
-```musi
-let sink : opaque Writer := fileWriter;
-let makeSink() : erased Writer := FileWriter(path);
-```
-
-There is no separate `trait` keyword.
-
-
-
-
 ## Optional Type And Operators
 
 `?T` is the optional type sugar for `Maybe[T]`.
 
-```musi
-?T
-Maybe[T]
-```
-
-`?` in type position names optionality/maybe-ness. It does not name `Expect`.
-
-`??` is the Maybe fallback operator.
-
-```musi
-value ?? fallback
+```ebnf
+[91] optional-type   ::= "?" TYPE
+[92] maybe-fallback  ::= EXPR "??" EXPR
+[93] optional-access ::= EXPR "?." IDENT
+                       | EXPR "?." IDENT call-args
+                       | EXPR "?.[" EXPR "]"
+[94] call-args       ::= "(" (EXPR ("," EXPR)* ","?)? ")"
 ```
 
 Rules:
-- `value` must have type `?T` / `Maybe[T]`
-- `fallback` must produce `T`
-- result type is `T`
-- fallback is lazy and is evaluated only when `value` is absent
-- `??` does not operate on `Expect`
-
-Examples:
-
-```musi
-let name : Text := maybeName ?? "unknown";
-```
-
-```musi
-let user : User := findUser(id) ?? defaultUser();
-```
-
-`?.` is optional access.
-
-```musi
-value?.member
-value?.method(args)
-value?.[index]
-```
-
-Rules:
+- `?` in type position names optionality/maybe-ness
+- `?` does not name `Expect`
+- `??` works only on `?T` / `Maybe[T]`
+- `??` fallback produces `T`
+- `??` result type is `T`
+- `??` fallback is lazy and is evaluated only when `value` is absent
 - `?.` operates only on `?T` / `Maybe[T]`
-- access, call, or index happens only when the value is present
+- `?.` access, call, or index happens only when the value is present
 - absent stays absent
 - `?.` does not invent null
 - `?.` composes with `??`
-
-Examples:
-
-```musi
-let city : ?Text := user?.address?.city;
-```
-
-```musi
-let city : Text := user?.address?.city ?? "unknown";
-```
-
-```musi
-let first := maybeList?.[0];
-```
 
 Distinctions:
 - `when ... else ...` branches on `Bit`
@@ -895,62 +567,34 @@ Distinctions:
 
 `:` is the universal type annotation marker.
 
-Type annotations always use:
-
-```musi
-a : B
+```ebnf
+[95] type-annot        ::= ":" TYPE
+[96] annotated-name    ::= IDENT type-annot
+[97] annotated-result  ::= param-list type-annot
+[98] annotated-receiver ::= "(" IDENT type-annot ")"
+[99] annotated-pattern ::= PATTERN type-annot
 ```
 
 This applies in value, parameter, field, result, receiver, pattern, and shape-member positions.
 
-Examples:
-
-```musi
-let x : Int := 1;
-let name : Text;
-let packet : fixed Packet := readPacket();
-let sink : opaque Writer := fileWriter;
-let makeSink() : erased Writer := FileWriter(path);
-```
-
-```musi
-let add(a : Int, b : Int) : Int := a + b;
-```
-
-```musi
-let (self : User).name() : Text := self.name;
-```
-
-```musi
-let Writer := shape {
-  let write(self : Self, text : Text) : Unit;
-};
-```
-
-```musi
-match value {
-case id : UserId => id.raw;
-}
-```
-
 `:` is not overloaded for casts, subtyping, runtime type tests, type equivalence, or conformance. Those use their own operators.
-
-Reserved type-related operator roles:
-- `<:` subtype relation
-- `:?` runtime type test returning `Bit`
-- `:>` explicit static conversion/cast
-- `:?>` checked runtime cast returning an explicit failure-capable result
-- `~=` type equivalence relation
-- `|=` conformance/fits relation
 
 `:=` remains binding/definition/initialization.
 
-`=` remains equality.
-`/=` remains inequality.
+`=` remains equality. `/=` remains inequality.
 
 ## Type Operator Family
 
 Musi uses a coherent `:`-led family for type-related operators.
+
+```ebnf
+[100] type-test            ::= EXPR ":?" TYPE
+[101] static-cast          ::= EXPR ":>" TYPE
+[102] checked-cast         ::= EXPR ":?>" TYPE
+[103] subtype-relation     ::= TYPE "<:" TYPE
+[104] type-equivalence     ::= TYPE "~=" TYPE
+[105] conformance-relation ::= TYPE "|=" TYPE
+```
 
 Meanings:
 - `:` annotates
@@ -961,77 +605,29 @@ Meanings:
 - `~=` states type equivalence relation
 - `|=` states shape conformance/fits relation
 
-Examples:
-
-```musi
-let isUser : Bit := value :? User;
-```
-
-```musi
-let label := "user" when value :? User else "other";
-```
-
-```musi
-let widened : Word64 := small :> Word64;
-```
-
-```musi
-let checked := value :?> User;
-```
-
-```musi
-match value :?> User {
-case .Ok(user) => user.name;
-case .Err(error) => "not user";
-};
-```
-
 Rules:
 - `:?` never returns the narrowed value
 - `:?>` never returns `Bit`
-- `:>` is not runtime checked; it is an explicit static or known-valid conversion request
-- `:` is only annotation
-- `:=` is only binding, definition, or initialization
-- `=` is equality
-
-`?=` is rejected. It has no strong Musi rationale and does not belong to the coherent `:` type-operator family.
-
+- `:>` is not runtime checked; it is an explicit static or known-correct conversion request
+- `?=` is not accepted; it has no strong Musi rationale and does not belong to the coherent `:` type-operator family
 
 ## Expect And Checked Casts
 
 `Expect` remains explicit.
 
-```musi
-Expect[T, E]
+```ebnf
+[106] expect-type         ::= "Expect" "[" TYPE "," TYPE "]"
+[107] checked-cast-result ::= "Expect" "[" TYPE "," "CastError" "]"
 ```
 
 There is no locked error/failure sugar for `Expect`. Possible sugar such as `E!T`, a keyword, or another operator is left to future/community design unless a strong rationale appears.
 
 `?T`, `??`, and `?.` are Maybe-only and do not apply to `Expect`.
 
-`:?>` returns an explicit `Expect` value.
-
-```musi
-value :?> T
-```
-
-Result type:
-
-```musi
-Expect[T, CastError]
-```
-
-Examples:
+`:?>` returns an explicit `Expect` value:
 
 ```musi
 let checked : Expect[User, CastError] := value :?> User;
-```
-
-```musi
-match value :?> User {
-  case .Ok(user) => user.name;
-  case .Err(error) => "not user";
-};
 ```
 
 Rationale:
@@ -1039,6 +635,24 @@ Rationale:
 - failed casts carry error information instead of only `Bit` or `Maybe` absence
 - no hidden exceptions are introduced
 - `Expect` sugar is not locked prematurely
+
+## Shape Naming
+
+`shape` is the locked spelling for structural contracts.
+
+```ebnf
+[108] shape-expr   ::= "shape" shape-body
+[109] shape-body   ::= "{" shape-member (";" shape-member)* ";"? "}"
+[110] shape-member ::= "let" IDENT param-list? type-annot
+```
+
+`shape` means an observable structure/capability contract: a value or type fits a shape when it provides the required members and operations according to Musi's conformance rules.
+
+`trait` is not accepted as the core spelling because it carries Rust, Scala, PHP, and C++ baggage around nominal implementations, mixins, coherence rules, code reuse, or type-level metadata conventions.
+
+`data` defines what a thing is. `shape` defines what a thing must look like.
+
+There is no separate `trait` keyword.
 
 ## Shape Conformance
 
@@ -1052,80 +666,18 @@ Witness-required shapes are for semantic, lawful, marker, or capability contract
 
 `|=` is the locked conformance/fits relation operator.
 
+```ebnf
+[111] conformance-relation ::= TYPE "|=" TYPE
+[112] witness-binding      ::= "let" TYPE "|=" TYPE ":=" record-datum
+```
+
 Roles:
 - `T |= Shape` states or constrains that `T` fits `Shape`
 - `let T |= Shape := witnessValue;` binds an explicit witness for witness-required conformance
 
 There is no `impl`, `implements`, `extends`, or `trait` keyword. Receiver methods and witness bindings use universal `let`.
 
-Structural example:
-
-```musi
-let Named := shape {
-  let name(self : Self) : Text;
-};
-
-let Person := data {
-  let name : Text;
-};
-
-let ada : opaque Named := Person#{ name := "Ada" };
-```
-
-Witness-required example:
-
-```musi
-let Hashable := @witness shape {
-  let hash(self : Self) : Word64;
-};
-
-let UserId := data {
-  let raw : Word64;
-};
-
-let UserId |= Hashable := #{
-  hash := \(self : UserId) => self.raw.hash()
-};
-```
-
 `|=` should not become a general-purpose ordinary Boolean test by default. Runtime fit checks for dynamic or opaque values remain an open design topic.
-
-## Confirmed Attributes
-
-The following attributes are confirmed surface attributes:
-
-```musi
-@packed
-@align(...)
-@witness
-```
-
-Meanings:
-- `@packed` marks packed/bit-structured representation metadata
-- `@align(...)` marks representation alignment metadata
-- `@witness` marks a `shape` as requiring explicit witness conformance
-
-These are attributes because they refine representation or contract mode without introducing a new grammar category.
-
-Examples:
-
-```musi
-let Header := @packed data {
-  let version : Bits[4];
-  let flags : Bits[4];
-};
-```
-
-```musi
-let Page := @align(4096) data {
-  let bytes : fixed Bytes;
-};
-```
-
-```musi
-let Send := @witness shape {
-};
-```
 
 ## Open Question Checklist
 
@@ -1203,7 +755,7 @@ These questions are intentionally open and are not locked by this document.
 - [x] Exact grammar for `#[` array/list datum literals
 - [x] Whether plain tuple types use `(A, B)` or another form
 - [x] Whether `[]` is used for generics, indexing, stack effects, type application, or a reduced subset
-- [ ] Trailing separator rules for `,` and `;`
+- [x] Trailing separator rules for `,` and `;`
 - [x] Empty tuple, empty record, and empty array syntax
 
 ### Control Flow
@@ -1220,7 +772,7 @@ These questions are intentionally open and are not locked by this document.
 - [ ] Exact pattern grammar
 - [ ] Whether pattern alternatives exist
 - [ ] Whether pattern alternatives use `|`, repeated `case`, or another form
-- [ ] Whether match cases require semicolons in all positions
+- [x] Whether match cases require semicolons in all positions
 - [ ] Exhaustiveness rules
 - [ ] Guard evaluation order
 - [ ] Pattern binding syntax
