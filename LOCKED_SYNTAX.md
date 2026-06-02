@@ -210,15 +210,37 @@ let Maybe := data {
 };
 ```
 
-Variant cases may have defaults:
+Variant cases may have explicit known tag/discriminant values:
 
 ```musi
-let Token := data {
-  case Ident(text : Text);
-  case Int(value : Word64 := 0);
-  case Eof := eofTokenValue;
+let TokenKind := data {
+  case Eof := 0;
+  case Ident(text : Text) := 1;
+  case Int(value : Word64) := 2;
 };
 ```
+
+`:= value` on the `case` itself initializes or defines the variant identity.
+
+Rules:
+- the tag/discriminant value must be `known`
+- tags must be unique within the sum
+- if omitted, tags are assigned by the compiler in declaration order
+- payload defaults stay inside payload parameters
+
+Payload defaults use their own local `:=`:
+
+```musi
+let TokenKind := data {
+  case Int(value : Word64 := 0);
+};
+```
+
+Rationale:
+- `:=` on the case itself initializes/defines the variant identity
+- payload defaults already have their own local `:=`
+- this avoids confusing constructor implementation with tag assignment
+- this fits `@packed` and FFI/ABI layout later
 
 A `data` body may also bind data-valued fields or associated data through `let`:
 
@@ -240,8 +262,206 @@ let (self : Parent).method() := expr;
 
 There is no separate `struct`, `enum`, `union`, `class`, or `impl` form.
 
-A `data` body must not mix product `let` entries and sum `case` entries unless a later locked rule explicitly permits it.
+A `data` body must not mix product `let` entries and sum `case` entries. This is locked.
 
+Product and sum data stay separate. If both are needed, pass one around as a field of the other. This follows the same useful shape as Rust's `enum TokenKind` plus `struct Token`, without adding separate `enum` or `struct` keywords.
+
+Example:
+
+```musi
+let TokenKind := data {
+  case Ident(text : Text);
+  case Int(value : Word64);
+  case Eof;
+};
+
+let Token := data {
+  let kind : TokenKind;
+  let span : SourceSpan;
+};
+```
+
+Invalid:
+
+```musi
+let BadToken := data {
+  let span : SourceSpan;
+  case Ident(text : Text);
+  case Eof;
+};
+```
+
+
+
+
+## Datum Literal Grammar
+
+Datum literals use `#` plus delimiter as a compound lexical category so value literals do not get confused with type syntax or computation delimiters.
+
+Tuple datum literal:
+
+```musi
+#(a, b)
+```
+
+Record/product datum literal:
+
+```musi
+#{ name := value, other := value }
+```
+
+Array/list datum literal:
+
+```musi
+#[a, b, c]
+```
+
+Rules:
+- datum literals use comma separators
+- trailing comma is allowed
+- record datum fields use `:=`, not `:`
+- record datum keys are names, not arbitrary expressions
+- product construction uses `Type#{ ... }`
+- inferred product construction uses `#{ ... }`
+
+Examples:
+
+```musi
+let point := #(x, y);
+```
+
+```musi
+let person := Person#{ name := "Ada", age := 36 };
+```
+
+```musi
+let person : Person := #{ name := "Ada", age := 36 };
+```
+
+```musi
+let bytes := #[1, 2, 3, 4];
+```
+
+Empty forms are valid:
+
+```musi
+#()
+#{}
+#[]
+```
+
+Meanings:
+- `#()` is unit datum / empty tuple
+- `#{}` is empty record datum
+- `#[]` is empty array/list datum and requires type context
+
+
+## Type Delimiters And Indexing
+
+Plain tuple types use ordinary type-position parentheses.
+
+```musi
+(A, B)
+()
+```
+
+Tuple values use datum syntax.
+
+```musi
+#(a, b)
+#()
+```
+
+Examples:
+
+```musi
+let pair : (Text, Nat) := #("Ada", 36);
+let unit : () := #();
+```
+
+Datums exist to separate value construction from type syntax:
+- record/product values use `#{ ... }`
+- record/product types use `data { ... }` or named product data
+- sum values use dot variant syntax
+- sum types use `data { case ...; }` or named sum data
+- tuple values use `#( ... )`
+- tuple types use `( ... )` in type position
+- array/list values use `#[ ... ]`
+- array/list types use prefix bracket syntax
+
+Array/list types are prefixed on the element type.
+
+```musi
+[A, B]T
+```
+
+The bracket prefix carries array/list type parameters such as size, bounds, shape, or other locked array/list metadata. Exact array/list parameter meanings remain open.
+
+Generic/type application uses postfix brackets on the type constructor.
+
+```musi
+T[A, B]
+```
+
+This separates array/list type construction from generic application.
+
+Indexing rules:
+- tuple fields index by numeric field access
+- array/list values index by compound `.[` access
+
+Examples:
+
+```musi
+let first := pair.0;
+let second := pair.1;
+```
+
+```musi
+let item := list.[0];
+```
+
+## Product And Sum Construction
+
+Product data construction uses named or unnamed record datum literals.
+
+Named product construction applies a record datum literal to the product type/name:
+
+```musi
+let ada : opaque Named := Person#{ name := "Ada" };
+```
+
+Context-inferred product construction can use an unnamed record datum literal:
+
+```musi
+let ada : opaque Named := #{ name := "Ada" };
+```
+
+Product data is not constructed with function-call syntax.
+
+Rejected:
+
+```musi
+let ada : opaque Named := Person(name := "Ada");
+```
+
+Sum data construction uses dot variant syntax.
+
+Unqualified variant construction:
+
+```musi
+let optionalType := .Some(Type);
+```
+
+Qualified variant construction:
+
+```musi
+let optionalType := Maybe.Some(Type);
+```
+
+Rationale:
+- product construction is datum construction, so it uses `#` datum syntax
+- sum construction selects a variant, so it uses dot variant syntax
+- dot variant syntax follows the same useful rationale as Swift and Zig while remaining part of Musi's own product/sum distinction
 
 ## Fixed Storage
 
@@ -442,6 +662,137 @@ Guard contexts require `Bit`. There is no truthiness.
 
 Short-circuiting is control flow, not algebra. Use `when ... else ...` or `match`.
 
+
+## Binding Qualifiers
+
+Binding syntax is plain.
+
+```musi
+let Name := expr;
+let Name : Type := expr;
+```
+
+`known`, `fixed`, and `mut` do not appear before `let` and do not appear between `let` and the binding name.
+
+Invalid:
+
+```musi
+known let Name := expr;
+fixed let Name := expr;
+mut let Name := expr;
+let known Name := expr;
+let fixed Name := expr;
+let mut Name := expr;
+```
+
+Qualifiers belong to type positions or expression positions.
+
+Valid:
+
+```musi
+let Name : known Nat := 0;
+let Name := known 0;
+let Name : fixed mut Buffer := makeBuffer();
+let Name : mut Item := item;
+```
+
+If a binding has no annotation, inference preserves the qualified type of the right-hand side. It does not invent qualifiers and does not strip qualifiers.
+
+Examples with inlay hints:
+
+```musi
+let Natural /- : Nat -/ := 0;
+let Natural /- : known Nat -/ := known 0;
+```
+
+If the right-hand side has type `fixed mut Buffer`, the inferred binding type is `fixed mut Buffer`. If the right-hand side has type `Buffer`, the inferred binding type is `Buffer`.
+
+No modifier means no qualifier unless the expression already has that qualifier.
+
+Canonical type qualifier order is:
+
+```musi
+known fixed mut T
+```
+
+Other orders are rejected or canonicalized by diagnostics/formatting according to the final parser and formatter design.
+
+
+## Comments
+
+Comment spellings are locked.
+
+Line comment:
+
+```musi
+-- line comment
+```
+
+Line documentation comment:
+
+```musi
+--- line doc comment
+```
+
+Block comment:
+
+```musi
+/- block comment -/
+```
+
+Block documentation comment:
+
+```musi
+/-- block doc comment -/
+```
+
+Line module documentation comment:
+
+```musi
+--! module line doc comment
+```
+
+Block module documentation comment:
+
+```musi
+/-! module block doc comment -/
+```
+
+The longer opener wins by maximal munch, so `--!` is a module doc comment rather than a line comment followed by `!`, `---` is a doc comment rather than a line comment followed by `-`, `/--` is a block doc comment rather than a block comment followed by `-`, and `/-!` is a block module doc comment rather than a block comment followed by `!`.
+
+Block comments nest.
+
+```musi
+/-
+outer
+  /- inner -/
+outer continues
+-/
+```
+
+Block documentation comments and block module documentation comments participate in the same nesting system.
+
+```musi
+/--
+outer doc
+  /- ordinary nested block comment -/
+outer doc continues
+-/
+```
+
+Rules:
+- `/- ... -/`, `/-- ... -/`, and `/-! ... -/` may contain nested block comment openers
+- all nested block comment forms close with `-/`
+- line comments inside block comments are comment text
+- nested block comments are implemented with a linear depth counter
+- unterminated nested block comments are diagnostic errors
+
+Rationale:
+- nested comments allow temporarily commenting out code that already contains block comments
+- nesting avoids accidental early close on inner `-/`
+- the delimiter pair is explicit enough to keep lexing deterministic and linear
+- module docs are supported separately from item docs
+
 ## Shape Naming
 
 `shape` is the locked spelling for structural contracts.
@@ -468,6 +819,226 @@ let makeSink() : erased Writer := FileWriter(path);
 
 There is no separate `trait` keyword.
 
+
+
+
+## Optional Type And Operators
+
+`?T` is the optional type sugar for `Maybe[T]`.
+
+```musi
+?T
+Maybe[T]
+```
+
+`?` in type position names optionality/maybe-ness. It does not name `Expect`.
+
+`??` is the Maybe fallback operator.
+
+```musi
+value ?? fallback
+```
+
+Rules:
+- `value` must have type `?T` / `Maybe[T]`
+- `fallback` must produce `T`
+- result type is `T`
+- fallback is lazy and is evaluated only when `value` is absent
+- `??` does not operate on `Expect`
+
+Examples:
+
+```musi
+let name : Text := maybeName ?? "unknown";
+```
+
+```musi
+let user : User := findUser(id) ?? defaultUser();
+```
+
+`?.` is optional access.
+
+```musi
+value?.member
+value?.method(args)
+value?.[index]
+```
+
+Rules:
+- `?.` operates only on `?T` / `Maybe[T]`
+- access, call, or index happens only when the value is present
+- absent stays absent
+- `?.` does not invent null
+- `?.` composes with `??`
+
+Examples:
+
+```musi
+let city : ?Text := user?.address?.city;
+```
+
+```musi
+let city : Text := user?.address?.city ?? "unknown";
+```
+
+```musi
+let first := maybeList?.[0];
+```
+
+Distinctions:
+- `when ... else ...` branches on `Bit`
+- `??` branches on optional presence
+- `?.` propagates absence through access
+- `Expect` remains explicit unless a separate error/failure sugar is locked later
+
+## Type Annotation Marker
+
+`:` is the universal type annotation marker.
+
+Type annotations always use:
+
+```musi
+a : B
+```
+
+This applies in value, parameter, field, result, receiver, pattern, and shape-member positions.
+
+Examples:
+
+```musi
+let x : Int := 1;
+let name : Text;
+let packet : fixed Packet := readPacket();
+let sink : opaque Writer := fileWriter;
+let makeSink() : erased Writer := FileWriter(path);
+```
+
+```musi
+let add(a : Int, b : Int) : Int := a + b;
+```
+
+```musi
+let (self : User).name() : Text := self.name;
+```
+
+```musi
+let Writer := shape {
+  let write(self : Self, text : Text) : Unit;
+};
+```
+
+```musi
+match value {
+case id : UserId => id.raw;
+}
+```
+
+`:` is not overloaded for casts, subtyping, runtime type tests, type equivalence, or conformance. Those use their own operators.
+
+Reserved type-related operator roles:
+- `<:` subtype relation
+- `:?` runtime type test returning `Bit`
+- `:>` explicit static conversion/cast
+- `:?>` checked runtime cast returning an explicit failure-capable result
+- `~=` type equivalence relation
+- `|=` conformance/fits relation
+
+`:=` remains binding/definition/initialization.
+
+`=` remains equality.
+`/=` remains inequality.
+
+## Type Operator Family
+
+Musi uses a coherent `:`-led family for type-related operators.
+
+Meanings:
+- `:` annotates
+- `:?` tests runtime type and returns `Bit`
+- `:>` requests explicit static conversion/cast
+- `:?>` performs a checked runtime cast and returns an explicit failure-capable result
+- `<:` states subtype relation
+- `~=` states type equivalence relation
+- `|=` states shape conformance/fits relation
+
+Examples:
+
+```musi
+let isUser : Bit := value :? User;
+```
+
+```musi
+let label := "user" when value :? User else "other";
+```
+
+```musi
+let widened : Word64 := small :> Word64;
+```
+
+```musi
+let checked := value :?> User;
+```
+
+```musi
+match value :?> User {
+case .Ok(user) => user.name;
+case .Err(error) => "not user";
+};
+```
+
+Rules:
+- `:?` never returns the narrowed value
+- `:?>` never returns `Bit`
+- `:>` is not runtime checked; it is an explicit static or known-valid conversion request
+- `:` is only annotation
+- `:=` is only binding, definition, or initialization
+- `=` is equality
+
+`?=` is rejected. It has no strong Musi rationale and does not belong to the coherent `:` type-operator family.
+
+
+## Expect And Checked Casts
+
+`Expect` remains explicit.
+
+```musi
+Expect[T, E]
+```
+
+There is no locked error/failure sugar for `Expect`. Possible sugar such as `E!T`, a keyword, or another operator is left to future/community design unless a strong rationale appears.
+
+`?T`, `??`, and `?.` are Maybe-only and do not apply to `Expect`.
+
+`:?>` returns an explicit `Expect` value.
+
+```musi
+value :?> T
+```
+
+Result type:
+
+```musi
+Expect[T, CastError]
+```
+
+Examples:
+
+```musi
+let checked : Expect[User, CastError] := value :?> User;
+```
+
+```musi
+match value :?> User {
+  case .Ok(user) => user.name;
+  case .Err(error) => "not user";
+};
+```
+
+Rationale:
+- failure stays distinct from absence
+- failed casts carry error information instead of only `Bit` or `Maybe` absence
+- no hidden exceptions are introduced
+- `Expect` sugar is not locked prematurely
 
 ## Shape Conformance
 
@@ -498,7 +1069,7 @@ let Person := data {
   let name : Text;
 };
 
-let ada : opaque Named := Person(name := "Ada");
+let ada : opaque Named := Person#{ name := "Ada" };
 ```
 
 Witness-required example:
@@ -563,7 +1134,7 @@ These questions are intentionally open and are not locked by this document.
 ### Keyword Set
 
 - [ ] Final hard-reserved keyword list
-- [ ] Whether modifier-like words such as `known`, `mut`, and visibility words are hard keywords or contextual introducers
+- [ ] Whether visibility words are hard keywords or contextual introducers
 - [ ] Whether `import` is a keyword or a compiler-owned function/form with special lowering
 - [ ] Whether `export` is a keyword, metadata, or a structural member rule
 - [x] Whether `hidden` remains a surface concept
@@ -583,10 +1154,10 @@ These questions are intentionally open and are not locked by this document.
 - [ ] Bidirectional gradual type-system model
 - [ ] Type-phase algebra for `|`, `&`, `^`, and `~`
 - [ ] Union/intersection representation and normalization rules
-- [ ] Optional/error type surface forms
+- [x] Optional/error type surface forms
 - [ ] Whether callable types use stack-effect syntax directly
-- [ ] Whether type annotations use `:` in every context
-- [ ] Whether casts/tests use symbolic operators such as `:>` and `:?>`
+- [x] Whether type annotations use `:` in every context
+- [x] Whether casts/tests use symbolic operators such as `:>` and `:?>`
 
 ### Stack Effect
 
@@ -600,12 +1171,12 @@ These questions are intentionally open and are not locked by this document.
 
 - [ ] Product field grammar inside `data`
 - [ ] Sum variant grammar inside `data`
-- [ ] Exact meaning of `case Variant(...) := value`
-- [ ] Whether product `let` entries and sum `case` entries can ever mix
+- [x] Exact meaning of `case Variant(...) := value`
+- [x] Whether product `let` entries and sum `case` entries can ever mix
 - [ ] Associated data/value binding rules inside `data`
-- [ ] Constructor generation rules
+- [x] Constructor generation rules
 - [ ] Destructuring and pattern syntax for product data
-- [ ] Variant tag/discriminant rules
+- [x] Variant tag/discriminant rules
 
 ### Representation And Metadata
 
@@ -615,15 +1186,25 @@ These questions are intentionally open and are not locked by this document.
 - [ ] Whether representation metadata appears before `data`, after `data`, or inside the structural body
 - [ ] Whether metadata is preserved in SEIL for decompilation
 
+### Comments
+
+- [x] Line comment spelling
+- [x] Line doc comment spelling
+- [x] Line module doc comment spelling
+- [x] Block comment spelling
+- [x] Block doc comment spelling
+- [x] Block module doc comment spelling
+- [x] Nested block comment support
+
 ### Delimiters And Separators
 
-- [ ] Exact grammar for `#(` tuple datum literals
-- [ ] Exact grammar for `#{` record/product datum literals
-- [ ] Exact grammar for `#[` array/list datum literals
-- [ ] Whether plain tuple types use `(A, B)` or another form
-- [ ] Whether `[]` is used for generics, indexing, stack effects, type application, or a reduced subset
+- [x] Exact grammar for `#(` tuple datum literals
+- [x] Exact grammar for `#{` record/product datum literals
+- [x] Exact grammar for `#[` array/list datum literals
+- [x] Whether plain tuple types use `(A, B)` or another form
+- [x] Whether `[]` is used for generics, indexing, stack effects, type application, or a reduced subset
 - [ ] Trailing separator rules for `,` and `;`
-- [ ] Empty tuple, empty record, and empty array syntax
+- [x] Empty tuple, empty record, and empty array syntax
 
 ### Control Flow
 
@@ -674,8 +1255,8 @@ These questions are intentionally open and are not locked by this document.
 
 ### Known Phase
 
-- [ ] Exact meaning of `known`
-- [ ] Whether `known` applies to expressions, bindings, parameters, types, or all of them
+- [x] Exact meaning of `known`
+- [x] Whether `known` applies to expressions, bindings, parameters, types, or all of them
 - [ ] Known-phase evaluation limits
 - [ ] Known/runtime boundary rules
 - [ ] Whether known values can construct `#` datum literals
