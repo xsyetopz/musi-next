@@ -439,16 +439,20 @@ Rules:
 - total conditional branches must have compatible type/stack effect
 - `else` provides the fallback branch explicitly
 - no `then` keyword exists
-- guarded emission is accepted only in contexts where emitting nothing is meaningful
+- guarded emission has zero-or-one emission shape
+- guarded emission is accepted only in contexts that can consume zero-or-one emission
 - no hidden `Maybe`, `Unit`, bottom, or union is synthesized
 - unparenthesized nested `when` is not accepted in the guarded value or condition position
 - parentheses are required for nested conditional expressions
 
-`VALUE when CONDITION else FALLBACK` is total value selection. `VALUE when CONDITION` is guarded emission only in contexts that explicitly accept zero-or-one emission.
+`VALUE when CONDITION else FALLBACK` is total value selection. `VALUE when CONDITION` is guarded zero-or-one emission.
 
 ```musi
 value when ready else fallback
+value when ready
 ```
+
+The bare form does not produce `Maybe[T]`, `Unit`, bottom, or an implicit union. It produces a verifier-visible guarded emission shape: zero-or-one `T`. Ordinary total value positions require `else`; contexts that accept optional emission may consume the bare form.
 
 Nested conditionals are grouped explicitly.
 
@@ -757,7 +761,7 @@ Datum literals use `#` plus delimiter as a compound lexical category so value li
 ```
 
 Meanings:
-- `#()` is unit datum / empty tuple
+- `#()` is the empty tuple datum and canonicalizes to `Unit`
 - `#{}` is empty record datum
 - `#[]` is empty array/list datum and requires type context
 
@@ -774,6 +778,7 @@ Datums exist to separate value construction from type syntax:
 - tuple types use `( ... )` in type position
 - array/list values use `#[ ... ]`
 - array/list types use prefix bracket syntax
+- `()` is the empty tuple type shape and canonicalizes to `Unit`
 
 ```ebnf
 [69] tuple-type          ::= "(" (TYPE ("," TYPE)* ","?)? ")"
@@ -1321,6 +1326,8 @@ Int -> Text
 
 `->` is a type-space callable arrow. It is not a curry operator in expression space.
 
+`Unit` is the only canonical zero-information result type. `()` is the empty tuple type shape and canonicalizes to `Unit`.
+
 Chained callable arrows require explicit design before they are accepted as implicit currying. Until that design is locked, parentheses spell intent.
 
 ```musi
@@ -1328,7 +1335,20 @@ A -> (B -> C)
 (A, B) -> C
 ```
 
-Musi source does not use old stack-effect syntax as the callable surface. Callable types use `->`.
+## Musi Source And SEIL Callable Surface
+
+Musi source and SEIL metadata use the same callable type surface.
+
+```ebnf
+[199] source-callable-type ::= callable-type
+[200] seil-callable-type   ::= callable-type
+```
+
+Musi source does not use old stack-effect bracket syntax as the callable surface. Callable types use `->`.
+
+SEIL is not a separate source language with a different stack-effect signature syntax. It is the lowered verifier form of Musi, similar in role to CIL. SEIL metadata preserves callable types in Musi syntax for near-identical decompilation.
+
+Stack-effect facts are verified by SEIL/runtime rules, but SEIL instruction forms are not locked here.
 
 ## Type Operator Family
 
@@ -1576,11 +1596,11 @@ These questions are intentionally open and are not locked by this document.
 
 ### Stack Effect
 
-- [ ] Exact source syntax for stack effects
-- [ ] Whether stack effects are first-class type values
+- [x] Exact source syntax for stack effects
+- [x] Whether stack effects are first-class type values
 - [x] Whether ordinary functions expose stack-effect types or parameter/result sugar
 - [ ] Stack-effect compatibility for `when`, `match`, `defer`, `yield`, and receiver methods
-- [ ] Whether guarded emission requires a special effect kind or row-polymorphic stack effect
+- [x] Whether guarded emission requires a special effect kind or row-polymorphic stack effect
 
 #
 ### Data
