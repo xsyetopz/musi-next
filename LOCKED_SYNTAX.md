@@ -54,6 +54,66 @@ A word is not a keyword merely because it is built in, compiler-owned, common, o
 
 Operators, compiler intrinsics, methods, traits/shapes, sum types, product types, and built-in types are not keywords unless they are hard-reserved grammar introducers.
 
+
+## Hard Keyword Set
+
+Hard/form keywords locked so far:
+
+```text
+case
+cycle
+data
+defer
+else
+erased
+export
+fixed
+import
+known
+leave
+let
+match
+mut
+opaque
+shape
+when
+while
+```
+
+Count: 18.
+
+`in` is a contextual word operator, not a form keyword.
+
+`import` and `export` are hard keywords. `import` takes in. `export` puts out. Module boundary forms affect source shape and SEIL/decompilation metadata. `known import` is compile-time acquisition/import.
+
+Not core keywords:
+
+```text
+unsafe
+pin
+yield
+recur
+for
+break
+continue
+next
+trait
+hidden
+static
+const
+fn
+type
+struct
+enum
+class
+impl
+and
+or
+xor
+not
+is
+```
+
 ## Comments
 
 Comment spellings are locked.
@@ -99,7 +159,7 @@ It binds values, functions, data definitions, shape definitions, module/import r
 ```ebnf
 [20] let-expr        ::= "let" bind-head type-annot? param-list? result-type? ":=" EXPR
                        | "let" receiver-head "." IDENT param-list result-type? ":=" EXPR
-[21] bind-head       ::= IDENT | operator-name | PATTERN
+[21] bind-head       ::= IDENT | "_" | operator-name | PATTERN
 [22] receiver-head   ::= "(" IDENT type-annot ")"
 [23] param-list      ::= "(" param-list-body? ")"
 [24] param-list-body ::= required-param ("," required-param)* ("," default-param)* ","?
@@ -208,6 +268,79 @@ Comma-list positions use the same `X ("," X)* ","?` shape in datum, argument, pa
 Structural regions use the same `X (";" X)* ";"?` shape for members and rules, with `X` replaced by the member or rule production used by that region.
 
 Computation regions use `;` as sequencing/discard, not as a generic list separator.
+
+
+## Repetition And Loop Keywords
+
+`while` is the only source loop form.
+
+```ebnf
+[143] while-expr ::= "while" EXPR computation-region
+[144] loop-control ::= "leave" | "cycle"
+[145] recur-keyword ::= /* no production */
+[146] for-keyword ::= /* no production */
+```
+
+`while` is a zero-or-more conditional repetition expression. The condition must be `Bit`. The body is a computation region. `while` produces `Unit`.
+
+```musi
+while keepGoing (
+  cycle when shouldSkip;
+  leave when done;
+  step();
+  update();
+)
+```
+
+Loop control uses `leave` and `cycle`. `leave` exits the nearest enclosing `while`. `cycle` skips the remaining body and proceeds to the next condition check.
+
+There is no `for`, `break`, `continue`, `next`, or `recur` keyword in core.
+
+Iterable loops are expressed through ordinary functions, methods, and shapes over iterable/container abstractions. Postcondition repetition can be expressed by sequencing an initial body with a `while` loop or by named library helpers.
+
+`recur` does not earn a keyword slot because it would create a one-off postfix binding modifier such as `let recur N := ...`, violating the locked binding qualifier rule and duplicating ordinary recursion.
+
+`pin` is not a core keyword. Stable-address semantics are handled by `fixed`; scoped temporary non-moving access must be justified against `fixed` rather than added by default.
+
+
+
+## Unsafe
+
+There is no `unsafe` keyword or unsafe expression/block form.
+
+```ebnf
+[149] unsafe-keyword ::= /* no production */
+```
+
+Unsafe-ness is represented by operation metadata, capabilities, types, and diagnostics rather than a magical lexical region.
+
+Rationale:
+- avoids lexical unsafe blocks that can hide too much
+- unsafe is a property of operations, boundaries, and capabilities
+- keeps keyword count down
+- does not lock foreign/extern attribute syntax here
+
+## Defer And Yield
+
+`defer` is a core keyword/expression for deterministic cleanup.
+
+```ebnf
+[147] defer-expr ::= "defer" EXPR ("when" EXPR)?
+[148] yield-keyword ::= /* no production */
+```
+
+`defer` registers an expression to run when the current computation region/scope exits. It produces `Unit`.
+
+`defer` cleanup runs on normal exit and on loop-control exits such as `leave` and `cycle` that leave or restart the region. Exact cleanup ordering remains part of the runtime/control-flow design.
+
+Guarded cleanup uses existing `when` syntax.
+
+```musi
+defer file.close();
+defer lock.release() when locked;
+```
+
+`yield` is not a core keyword. Generator/coroutine suspension requires a larger design around shapes such as `Resumable` or `Generator[T]`, callable compatibility, SEIL behavior, and cleanup interaction.
 
 ## Conditional Expressions
 
@@ -413,6 +546,127 @@ Rationale:
 - sum construction selects a variant, so it uses dot variant syntax
 - dot variant syntax follows the same useful rationale as Swift and Zig while remaining part of Musi's own product/sum distinction
 
+
+
+
+
+## Fixed Operator Vocabulary
+
+Musi core has no user-defined symbolic operators.
+
+Only locked operator tokens have operator syntax. Domain-specific operations use named functions or methods rather than new symbolic operators.
+
+Rationale:
+- user-defined symbolic operators create precedence, associativity, formatting, decompilation, and readability problems
+- SEIL-to-Musi decompilation needs a stable operator vocabulary
+- the core already has a broad fixed operator set
+- named functions and methods preserve clarity without syntax expansion
+
+Fixed core operator tokens include:
+
+```text
+.
+?.
+.[
+?.[
+#(
+#{
+#[
+:
+:=
+:?
+:>
+:?>
+<:
+~=
+|=
+=
+/=
+<
+<=
+>
+>=
+in
++
+-
+*
+/
+%
+|<
+>|
+>+
+@<
+@>
+&
+^
+|
+~
+??
+..
+..<
+=>
+->
+```
+
+## Word Operators
+
+`in` is the only core word operator.
+
+```ebnf
+[142] word-op ::= "in"
+```
+
+Rules:
+- `in` is contextual in operator position
+- no `and`, `or`, `xor`, `not`, `is`, `lsh`, `rsh`, or similar word operators exist in core
+- negated membership uses `~(x in y)`
+
+## Equality, Ordering, Equivalence, And Membership
+
+Core relation operators are locked as follows.
+
+```ebnf
+[138] equality-op    ::= "=" | "/="
+[139] ordering-op    ::= "<" | "<=" | ">" | ">="
+[140] equivalence-op ::= "~="
+[141] membership-op  ::= "in"
+```
+
+Meanings:
+- `=` is value equality
+- `/=` is value inequality
+- `<`, `<=`, `>`, and `>=` are ordering comparisons
+- `~=` is type/equivalence relation, not approximate numeric equality
+- `in` is contextual word operator for membership
+
+`in` is an operator word, not a form-introducing keyword. It is recognized in operator position.
+
+```musi
+let ok := item in collection;
+let notOk := ~(item in collection);
+```
+
+There is no approximate-equality operator in core. Approximation depends on tolerance, units, absolute vs relative error, domain, and numeric type, so it belongs in named functions or methods.
+
+## Binding And Update Operator
+
+`:=` is the binding/definition/initialization/update operator. `=` is equality only and never assignment.
+
+```ebnf
+[135] binding-expr ::= "let" bind-head type-annot? ":=" EXPR
+[136] update-expr  ::= place-expr ":=" EXPR
+[137] place-expr   ::= IDENT | EXPR "." IDENT | EXPR "." INT | EXPR ".[" EXPR "]"
+```
+
+Meanings:
+- `let name := expr` creates or binds
+- `place := expr` updates an existing place
+- record/product datum fields use `:=` because they initialize named fields
+
+Update requires mutable access or an equivalent capability.
+
+`:=` has the lowest precedence. Chained updates are not accepted unless a later rule explicitly defines them.
+
 ## Fixed Storage
 
 `fixed` is a type/storage-space modifier.
@@ -533,6 +787,20 @@ Guard contexts require `Bit`. There is no truthiness.
 Short-circuiting is control flow, not algebra. Use `when ... else ...` or `match`.
 
 
+
+## Expression Parser Strategy
+
+Musi does not parse all infix expressions as one flat semantic chain.
+
+Locked core operators parse with the locked precedence table. The precedence table is syntax, not a later semantic guess.
+
+Rationale:
+- precedence is part of long-term syntax
+- fixed operator vocabulary makes parser tiers stable
+- relation chains can be rejected early
+- formatter and SEIL-to-Musi decompiler get stable expression structure
+- one-token lookahead remains compatible with Pratt, precedence-climbing, or recursive-descent parser strategies
+
 ## Operator Precedence And Associativity
 
 Musi uses mathematical/common algebra precedence where it does not create silent semantic traps. Parentheses are required where chaining or precedence would otherwise create misleading expressions.
@@ -547,7 +815,7 @@ Musi uses mathematical/common algebra precedence where it does not create silent
 [120] shift-op          ::= "|<" | ">|" | ">+"
 [121] rotate-op         ::= "@<" | "@>"
 [122] range-op          ::= ".." | "..<"
-[123] relation-op       ::= "<" | "<=" | ">" | ">=" | "=" | "/=" | "~=" | ":?" | ":>" | ":?>" | "<:" | "|="
+[123] relation-op       ::= "<" | "<=" | ">" | ">=" | "=" | "/=" | "~=" | ":?" | ":>" | ":?>" | "<:" | "|=" | "in"
 [124] algebra-and-op    ::= "&"
 [125] algebra-xor-op    ::= "^"
 [126] algebra-or-op     ::= "|"
@@ -566,7 +834,7 @@ Precedence, highest to lowest:
 5. additive: + -
 6. shift/rotate: |< >| >+ @< @>
 7. range: .. ..<
-8. relational/type/equality: < <= > >= = /= ~= :? :> :?> <: |=
+8. relational/type/equality/membership: < <= > >= = /= ~= :? :> :?> <: |= in
 9. algebra AND: &
 10. algebra XOR: ^
 11. algebra OR: |
@@ -808,16 +1076,115 @@ There is no `impl`, `implements`, `extends`, or `trait` keyword. Receiver method
 
 `|=` should not become a general-purpose ordinary Boolean test by default. Runtime fit checks for dynamic or opaque values remain an open design topic.
 
+## Modules, Import, And Export
+
+`import` and `export` are hard keywords with ESM-like directionality. `import` takes in. `export` puts out.
+
+```ebnf
+[150] import-expr   ::= "import" import-source
+[151] import-source ::= STRING | record-datum | tuple-datum
+[152] export-expr   ::= "export" let-expr | "export" export-block
+[153] export-block  ::= "{" export-item (";" export-item)* ";"? "}"
+[154] export-item   ::= let-expr
+```
+
+`import` is an expression that takes in a module, resource, or package according to module-system rules.
+
+`known import` is compile-time import/acquisition.
+
+Import can use datum literals for multiple import inputs.
+
+```musi
+let text := import "std/text";
+let grammar := known import "grammar/musi";
+let std := import #{
+  text := "std/text",
+  io := "std/io",
+};
+```
+
+`export` marks a `let` binding for the current module surface. There is no other standalone form that `export` applies to. Standalone `match`, `while`, or arbitrary expressions are not export targets.
+
+```musi
+export let parse(input : Text) : Ast := parseText(input);
+```
+
+`export { ... }` is a structural export block. It is sugar over separate `export let ...;` forms.
+
+```musi
+export {
+  let parse := parseText;
+  let format := formatAst;
+}
+```
+
+Musi modules are top-to-bottom strict. Export block items are processed in top-to-bottom order.
+
+Module boundary forms affect source shape and SEIL/decompilation metadata.
+
+
+## Module Values
+
+Modules are records. Imports bring in records.
+
+```ebnf
+[155] module-value       ::= record-datum | named-record-value
+[156] named-import-bind  ::= "let" IDENT ":=" import-expr
+[157] anonymous-import   ::= "let" "_" ":=" import-expr
+```
+
+A named import binds the imported module record to a name.
+
+```musi
+let text := import "std/text";
+```
+
+An anonymous import brings the imported record into scope without binding the record itself to a name. This is equivalent to wildcard-style import in other languages, but expressed through universal `let`.
+
+```musi
+let _ := import "std/prelude";
+```
+
+Multi-import datum forms produce record-shaped imports.
+
+```musi
+let std := import #{
+  text := "std/text",
+  io := "std/io",
+};
+```
+
+
+## Module SEIL Round-Trip
+
+SEIL module metadata must preserve import/export information needed for semantic decompilation.
+
+Import metadata must preserve:
+- import binding mode: named or anonymous
+- import source shape: string, tuple datum, or record datum
+- known/runtime phase of the import
+
+Named import and anonymous import are different source/module-scope operations.
+
+```musi
+let text := import "std/text";
+let _ := import "std/text";
+```
+
+The first binds the imported record as `text`. The second brings the imported record contents into scope without binding the record itself to a name.
+
+Export metadata must preserve exported binding names. Export block grouping may be preserved as source metadata for near-identical decompilation. If grouping metadata is absent, the decompiler may emit canonical separate `export let` forms while preserving semantics.
+
 ## Open Question Checklist
 
 These questions are intentionally open and are not locked by this document.
 
 ### Keyword Set
 
-- [ ] Final hard-reserved keyword list
+- [x] Final hard-reserved keyword list
 - [ ] Whether visibility words are hard keywords or contextual introducers
-- [ ] Whether `import` is a keyword or a compiler-owned function/form with special lowering
-- [ ] Whether `export` is a keyword, metadata, or a structural member rule
+- [x] Whether `import` is a keyword or a compiler-owned function/form with special lowering
+- [x] Whether `export` is a keyword, metadata, or a structural member rule
 - [x] Whether `hidden` remains a surface concept
 - [x] Whether `erased` remains a surface concept
 - [x] Whether `fixed`, `stable`, or another word is needed for fixed storage/lifetime
@@ -893,8 +1260,8 @@ These questions are intentionally open and are not locked by this document.
 - [ ] Dangling-else prevention rule
 - [ ] Whether `when` condition may contain unparenthesized `when`
 - [ ] Whether guarded emission is allowed in specific structural contexts
-- [ ] Whether loops exist as syntax or are expressed through recursion/recur forms
-- [ ] Whether `defer`, `yield`, and `pin` earn hard keyword status
+- [x] Whether loops exist as syntax or are expressed through recursion/recur forms
+- [x] Whether `defer`, `yield`, and `pin` earn hard keyword status
 
 ### Match And Patterns
 
@@ -908,24 +1275,24 @@ These questions are intentionally open and are not locked by this document.
 
 ### Operators
 
-- [ ] Full symbolic operator set
+- [x] Full symbolic operator set
 - [x] Operator precedence table or precedence-avoidance strategy
-- [ ] Whether all infix expressions parse flat and precedence is semantic
-- [ ] Whether user-defined symbolic operators exist
-- [ ] Whether word operators exist at all
-- [ ] Whether assignment/binding/update operators are distinct from equality
-- [ ] Equality, equivalence, ordering, approximation, membership, and remainder operators
+- [x] Whether all infix expressions parse flat and precedence is semantic
+- [x] Whether user-defined symbolic operators exist
+- [x] Whether word operators exist at all
+- [x] Whether assignment/binding/update operators are distinct from equality
+- [x] Equality, equivalence, ordering, approximation, membership, and remainder operators
 
 ### Modules And Imports
 
-- [ ] Whether modules are ordinary record-like values
-- [ ] Import expression syntax
-- [ ] Export surface syntax
-- [ ] Visibility rules
-- [ ] Whether package/module paths are strings, symbols, datums, or dedicated syntax
-- [ ] How imports/exports round-trip through SEIL
+- [x] Whether modules are ordinary record-like values
+- [x] Import expression syntax
+- [x] Export surface syntax
+- [x] Visibility rules
+- [x] Whether package/module paths are strings, symbols, datums, or dedicated syntax
+- [x] How imports/exports round-trip through SEIL
 
-### Runtime And SEIL
+## Runtime And SEIL
 
 - [ ] SEIL instruction model
 - [ ] SEIL metadata required for near-identical decompilation
@@ -945,8 +1312,8 @@ These questions are intentionally open and are not locked by this document.
 
 ### Safety
 
-- [ ] Exact meaning of `unsafe`
-- [ ] Whether unsafe is an expression wrapper, attribute, capability, or all of these
+- [x] Exact meaning of `unsafe`
+- [x] Whether unsafe is an expression wrapper, attribute, capability, or all of these
 - [ ] Pointer types and pointer operations
 - [ ] Pinning syntax and semantics
 - [ ] Foreign boundary rules
