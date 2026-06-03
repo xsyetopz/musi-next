@@ -712,6 +712,20 @@ Meanings:
 
 There is no separate logical/bitwise operator split. `Bit`, `Word`, `Word8`, `Word16`, `Word32`, `Word64`, and `Bits[N]` use the same symbolic algebra where accepted by type checking.
 
+`Bit` is a sum type with known discriminants.
+
+```musi
+export let Bit := data {
+  case False := 0;
+  case True := 1;
+};
+
+export let true : Bit := Bit.True;
+export let false : Bit := Bit.False;
+```
+
+`true` and `false` are ordinary predefined/core bindings, not keywords. Canonical variant names are `Bit.True` and `Bit.False`. Variant shorthand `.True` and `.False` may be used when the expected type is `Bit`.
+
 Guard contexts require `Bit`. There is no truthiness.
 
 Short-circuiting is control flow, not algebra. Use `when ... else ...` or `match`.
@@ -868,6 +882,7 @@ Core lattice roles:
 - unresolved `_` holes are diagnostics
 - `Unit` is the canonical zero-information inhabited type
 - `Empty` is the uninhabited bottom type
+- `Error` is the top error type
 
 ```ebnf
 universe-type    ::= "Type" "[" EXPR "]"
@@ -877,6 +892,7 @@ type-hole        ::= "_"
 any-type         ::= "Any"
 unit-type        ::= "Unit" | "()"
 empty-type       ::= "Empty"
+error-type       ::= "Error"
 structural-type  ::= record-type | row-type | capability-type
 ```
 
@@ -895,6 +911,13 @@ export let Type := Type[0];
 `()` canonicalizes to `Unit`. `Empty` is not the empty tuple; it is a type with no values. An expression with type `Empty` may fit any required result position because it never produces a value.
 
 `Any` does not mean null, absence, failure, callable-anything, or permission to ignore effects/capabilities. Dynamic-to-static use requires `:?>` or another explicit checked operation. Static-to-dynamic use is explicit through annotation, conversion, or a dynamic boundary.
+
+`Error` is a built-in non-keyword top error type. Specific error types are subtypes of `Error`.
+
+```musi
+AnyError <: Error
+CastError <: Error
+```
 
 Unannotated code may infer anonymous structural record/row types.
 
@@ -1110,7 +1133,34 @@ Rules:
 - no locked error/failure sugar for `Expect`
 - `?T`, `??`, and `?.` are Maybe-only
 - failed casts carry error information
+- `CastError` is a subtype of `Error`
 - no hidden exceptions are introduced
+
+### Dynamic Any Capabilities
+
+`Any` does not imply implicit dot, call, or index lookup. Dynamic operations are explicit capabilities expressed with ordinary witness-required shapes.
+
+```musi
+let AnyMember := @witness shape {
+  let (self : Self).member(name : Text) : Expect[Any, AnyError];
+};
+
+let AnyIndex := @witness shape {
+  let (self : Self).index(key : Any) : Expect[Any, AnyError];
+};
+
+let AnyCall := @witness shape {
+  let (self : Self).call(name : Text, args : []Any) : Expect[Any, AnyError];
+};
+```
+
+Rules:
+- `AnyMember`, `AnyIndex`, `AnyCall`, `AnyError`, and `Error` are ordinary built-in/library/runtime names, not keywords
+- `AnyError` is the dynamic-value error subtype and fits `Error`
+- dynamic lookup returns explicit failure-capable results such as `Expect[Any, AnyError]`
+- APIs may widen dynamic failures to `Expect[Any, Error]`
+- a value of type `Any` does not automatically provide `AnyMember`, `AnyIndex`, or `AnyCall`
+- APIs decide whether a given dynamic value carries or provides those capabilities
 
 ### Fixed Storage
 
@@ -1138,6 +1188,12 @@ qualified-type ::= "known"? "fixed"? "mut"? TYPE
 - `fixed mut T`: stable address and mutable access
 
 Address-taking requires fixed storage. Movable values cannot expose stable raw addresses.
+
+There is no separate `pin` keyword, pin expression, or pin block. Pinning semantics are represented by `fixed`.
+
+Temporary non-moving access is expressed through APIs/capabilities over `fixed`, not syntax. GC/runtime pinning implementation is hidden behind `fixed` lowering/runtime behavior.
+
+Invalid attempts to take a stable address of non-`fixed` storage are errors. FFI APIs that require stable pointers require `fixed` storage or explicit copy/borrow APIs.
 
 ### Opaque And Erased Types
 
@@ -1214,11 +1270,110 @@ unsafe-keyword ::= /* no production */
 
 Unsafe-ness is represented by operation metadata, capabilities, types, and diagnostics rather than a lexical region.
 
+Dangerous behavior is an error, not a warning. Memory unsafety, capability violation, invalid pointer use, invalid FFI boundary use, invalid representation layout, runtime-to-known phase violation, and unchecked dynamic failure are diagnostics/errors.
+
+Warnings are for portability, deprecation, performance, unused bindings/imports, suspicious-but-defined code, or style/tooling. Dangerous-but-allowed operations require explicit type, capability, API, or metadata representation.
+
+Pointer types are built-in/library types, not keywords.
+
+```ebnf
+unsafe-ptr        ::= "UnsafePtr" "[" TYPE "]"
+unsafe-mut-ptr    ::= "UnsafeMutPtr" "[" TYPE "]"
+unsafe-opaque-ptr ::= "UnsafeOpaquePtr"
+```
+
+Rules:
+- `UnsafePtr[T]` is a readable pointer to `T`
+- `UnsafeMutPtr[T]` is a readable/writable pointer to `T`
+- `UnsafeOpaquePtr` is an opaque FFI/handle pointer without typed pointee access
+- pointer creation is explicit and capability checked
+- stable address creation requires `fixed`
+- mutable pointer creation requires `fixed mut`
+- no `&x` address-of syntax exists
+- no `*p` dereference syntax exists
+- no pointer arithmetic exists in core operators
+- pointer operations are explicit methods, fields, intrinsics, or capabilities
+- typed pointee access uses UDNS through `.pointee`
+- `UnsafePtr[T].pointee` reads `T`
+- `UnsafeMutPtr[T].pointee` reads or writes `T`
+- invalid pointer use is an error, not a warning
+- `UnsafeOpaquePtr` must be explicitly cast/converted through an API/capability before typed pointee access
+
 Rationale:
 - avoids lexical unsafe blocks that can hide too much
 - unsafe is a property of operations, boundaries, and capabilities
 - keeps keyword count down
-- does not lock foreign/extern attribute syntax here
+
+### Foreign Boundary Rules
+
+FFI uses attributes and ordinary `let` bindings, not keywords.
+
+```ebnf
+extern-attr       ::= "@extern" "(" extern-arg-list ")"
+extern-arg-list   ::= attr-arg-list
+extern-import     ::= extern-attr let-decl
+extern-export     ::= extern-attr "export" let-expr
+repr-attr         ::= "@repr" "(" attr-arg-list ")"
+let-decl          ::= "let" bind-head generic-param-list? type-annot? param-list? result-type? ";"
+```
+
+Rust-to-Musi naming analogy:
+- Rust `use` maps to Musi `import`
+- Rust `pub` maps to Musi `export`
+- Rust `extern` maps to Musi `@extern`
+
+`@extern` is the only FFI boundary attribute. Direction is determined by body presence and `export`.
+
+```musi
+@extern(.c, "puts", link := "c")
+let puts(text : UnsafePtr[CChar]) : CInt;
+
+@extern(.c, "musi_add")
+export let add(a : CInt, b : CInt) : CInt := a + b;
+```
+
+Rules:
+- `@extern let ...;` without a body imports an external implementation into Musi
+- `@extern export let ... := ...;` exposes a Musi implementation outward
+- `@extern` with a body but without `export` is a diagnostic
+- `export` remains module visibility only
+- there is no `foreign` keyword
+- there is no `extern` keyword
+- there is no `@export`, `@abi`, or `@expose` attribute
+- `@repr(...)` controls data representation/layout
+- FFI boundary types must be representable
+- anonymous structural/row types are not FFI boundary types
+- `Any`, `opaque`, `erased`, closures, shapes, `Maybe`, `Expect`, and GC references are not FFI-safe unless a profile explicitly defines representation
+- strings are not silently C strings
+- pointers use `UnsafePtr`, `UnsafeMutPtr`, and `UnsafeOpaquePtr`
+- FFI failure is explicit through return values or wrappers; no hidden exceptions are introduced
+- unsupported profile, calling convention, layout, or type combination is a diagnostic
+
+`@extern` arguments follow UALO. The first positional argument is the external profile. The second positional argument is the symbol.
+
+```musi
+@extern(.c, "printf", link := "c", variadic := .c)
+let printf(format : UnsafePtr[CChar]) : CInt;
+```
+
+Attribute fields:
+- `profile` names the external profile when passed by name, such as `profile := .c`
+- `symbol` names the linker/import/export symbol when passed by name
+- `link` names the library/framework/module to link or load
+- `calling` names the calling convention and defaults to `.cdecl` for outward `.c`
+- `variadic` names an ABI-specific variadic profile when present, such as `variadic := .c`
+
+C ABI types are ordinary predefined/core or library `let` bindings, not keywords.
+
+```musi
+let CVoid := ...;
+let CChar := ...;
+let CInt := ...;
+let CLongLong := ...;
+let CSize := ...;
+```
+
+The exact representation of C ABI aliases is defined by the implementation/profile, but their source names are ordinary bindings.
 
 ## 14. Attributes And Representation Metadata
 
@@ -1518,7 +1673,7 @@ If grouping metadata is absent, the decompiler may emit canonical separate `expo
 
 - [x] Exact meaning of `unsafe`
 - [x] Whether unsafe is an expression wrapper, attribute, capability, or all of these
-- [ ] Pointer types and pointer operations
-- [ ] Pinning syntax and semantics
-- [ ] Foreign boundary rules
-- [ ] Whether dangerous behavior can ever be a warning instead of an error
+- [x] Pointer types and pointer operations
+- [x] Pinning syntax and semantics
+- [x] Foreign boundary rules
+- [x] Whether dangerous behavior can ever be a warning instead of an error
