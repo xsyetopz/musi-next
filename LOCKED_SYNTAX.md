@@ -66,6 +66,87 @@ block-comment-body ::= (block-comment | block-doc-comment | block-module-doc | b
 
 Maximal munch: `--!` module doc; `---` doc; `/--` block doc; `/-!` block module doc. Block, block-doc, and block-module-doc comments share one nesting system. Line comments inside block comments are text. Nested block comments use a linear depth counter. Unterminated nested block comments are diagnostics. Module docs are distinct from item docs.
 
+## 3.1 Lexical literals and escaped identifiers
+
+Numeric literal grammar:
+
+```ebnf
+digit-sep        ::= "_"
+bin-prefix       ::= "0b" | "0B"
+oct-prefix       ::= "0o" | "0O"
+hex-prefix       ::= "0x" | "0X"
+nat-suffix       ::= ("n" | "N") DIGITS
+int-suffix       ::= ("i" | "I") DIGITS
+float-suffix     ::= ("f" | "F") DIGITS
+numeric-literal  ::= /* digits with optional `_` separators, base prefix, and numeric suffix */
+multiline-string ::= "\"\"\"" multiline-string-body "\"\"\""
+escaped-ident    ::= "`" escaped-ident-body "`"
+```
+
+Numeric rules:
+- `_` separates digits inside numeric literals.
+- `_` separators do not affect numeric value.
+- `0x`/`0X`, `0o`/`0O`, and `0b`/`0B` are accepted base prefixes.
+- numeric suffixes are case-insensitive: `n64` = `N64`, `i32` = `I32`, `f64` = `F64`.
+- canonical formatting uses lowercase suffixes.
+- `nX` suffix means natural/unsigned width.
+- `iX` suffix means signed integer width.
+- `fX` suffix means floating width.
+- unsuffixed non-negative integer literals are `Nat`.
+- negative integer expressions are `Int`.
+- a decimal point or `fX`/`FX` suffix makes the literal `Float`.
+- unsupported literal width for the target/profile is a diagnostic.
+
+```musi
+1_000n32
+0xff_n8
+0XFFN8
+0b1010_0110n8
+0o755n16
+1i64
+-1
+1.0f64
+1F32
+```
+
+Multi-line strings use triple quotes.
+
+```musi
+"""
+plain text
+multiple lines
+"""
+```
+
+Rules:
+- triple-quoted strings are strings, not template literals.
+- no interpolation exists inside string literals.
+- JS-like template literals are not core Musi.
+- formatting/interpolation is explicit API/library behavior, not syntax.
+- backticks are not string delimiters.
+- `$` and `${` are reserved in string-literal design space for possible future interpolation discussion.
+- C#-style `$"..."` and `$"""..."""` string modes are not core Musi.
+- Swift-style `\(...)` interpolation is not core Musi.
+- `{name}` is not core interpolation grammar.
+- if interpolation is ever added, `$name` / `${EXPR}` is the reserved direction.
+
+Backticks are Swift-like escaped identifiers.
+
+```musi
+let `when` := 1;
+let `Type` := Type;
+let `weird-name` := 2;
+```
+
+Rules:
+- escaped identifiers are identifiers, not strings.
+- escaped identifiers may spell reserved keywords.
+- escaped identifiers may contain characters not accepted in ordinary identifiers when the lexer permits them.
+- escaped identifiers do not create new operators.
+- no interpolation exists inside escaped identifiers.
+- escaped identifiers are single-line.
+- canonical/decompiler output prefers ordinary identifiers when possible and backticks only when required.
+
 ## 4. Universal binding and generics
 
 `let` is the universal binding form for values, functions, data definitions, shape definitions, modules/imports, compile-time values, runtime values, and attached receiver methods. No `fn`, `type`, `struct`, `enum`, `class`, `impl`, `const`, or `static` keyword exists.

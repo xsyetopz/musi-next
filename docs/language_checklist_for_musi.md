@@ -129,8 +129,8 @@ This file keeps the original checklist shape and answers it for Musi using locke
   - Fixed operator set and precedence are locked.
 - [x] nested comments
   - Nested block comments/doc comments/module doc comments are locked with linear depth counter.
-- [~] multi-line strings
-  - Not locked in this design pass.
+- [x] multi-line strings
+  - Triple-quoted multi-line strings are locked. JS-like template literals are rejected; interpolation is explicit API/library behavior.
 - [-] regexes
   - No regex syntax is locked.
 - [x] call-by-value
