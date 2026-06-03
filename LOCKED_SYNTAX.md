@@ -176,7 +176,19 @@ Generic call arguments use the same bracket-before-call shape:
 ```musi
 name[Int, 4](value)
 point.Point.make[Int]()
+name[N := 4](value)
+name[_, 4](value)
 ```
+
+Rules:
+- omitting the bracket list asks the compiler to infer all generic parameters
+- explicit generic call arguments may be positional
+- explicit generic call arguments may be named with `:=`
+- `_` in a generic call argument is an explicit inference hole
+- required generic parameters without an explicit, defaulted, or inferred value are diagnostics
+- unresolved generic inference holes are diagnostics
+- generic parameter defaults must be trailing
+- generic call arguments follow the universal argument-list rule
 
 ### Binding Qualifiers
 
@@ -717,6 +729,7 @@ not
 &?
 |?
 ~?
+|>
 ```
 
 ### Parser Strategy, Precedence, And Associativity
@@ -726,7 +739,7 @@ Musi does not parse all infix expressions as one flat semantic chain. Locked cor
 ```ebnf
 postfix-expr      ::= EXPR postfix-op+
 postfix-op        ::= "." IDENT | "." INT | ".[" EXPR "]" | "?." IDENT | "?.[" EXPR "]" | generic-call-args | call-args
-generic-call-args ::= "[" (EXPR ("," EXPR)* ","?)? "]"
+generic-call-args ::= "[" arg-list? "]"
 prefix-expr       ::= prefix-op EXPR
 prefix-op         ::= "known" | "fixed" | "mut" | "?" | "~" | "-"
 multiplicative-op ::= "*" | "/" | "%"
@@ -742,6 +755,61 @@ nil-coalesce-op   ::= "??"
 conditional-op    ::= "when"
 binding-op        ::= ":="
 ```
+
+### UDNS: Universal Dot Notation Syntax
+
+UDNS means Universal Dot Notation Syntax.
+
+Dot notation is the universal syntax for member access, receiver-method access, tuple field access, namespace/module access, variant qualification, optional access, and indexed access compounds.
+
+```ebnf
+dot-postfix ::= "." IDENT
+              | "." INT
+              | ".[" EXPR "]"
+              | "?." IDENT
+              | "?." IDENT call-args
+              | "?.[" EXPR "]"
+```
+
+UDNS owns these shapes:
+
+```musi
+value.member
+value.method(args)
+tuple.0
+module.item
+Type.Variant(args)
+.Some(args)
+value?.member
+value?.method(args)
+value.[index]
+value?.[index]
+```
+
+UFCS is a semantic resolution rule over UDNS: receiver methods defined by `let (self : T).method(...) := ...;` are accessed through the same dot/call surface as ordinary members.
+
+`|>` is not a core operator. Pipeline syntax is absent from core Musi. UDNS and UFCS are the fluent composition mechanism.
+
+UDNS resolution order for `x.foo` and `x.foo(args)`:
+
+1. direct member, field, variant, or module-record member
+2. shape member required by the known static type or constraint
+3. attached receiver method defined by `let (self : T).foo(...) := ...`
+4. explicit dynamic/capability member operation only when the type is `Any`, `opaque`, or otherwise capability-gated
+
+If multiple candidates remain at the same priority, resolution is a diagnostic. If a higher-priority candidate exists but is unusable for the requested operation, resolution is a diagnostic and does not fall through to lower-priority candidates.
+
+Direct structure owns dot names. Receiver methods do not silently shadow fields or shape members.
+
+```musi
+x.foo()
+```
+
+If `x.foo` is a non-callable direct field and a receiver method named `foo` also exists, the expression is diagnosed as a call to a non-callable member. It does not fall through to the receiver method.
+
+`Any` does not get implicit duck-dot lookup. Dynamic member lookup must be an explicit operation or capability, not a magic UDNS fallback.
+
+There is no special receiver-method escape syntax. Receiver qualification uses ordinary UDNS/module/type paths.
 
 Precedence, highest to lowest:
 1. postfix access/call/index
@@ -934,6 +1002,39 @@ Type algebra is Musi type space. ABI/FFI representability is checked separately.
 
 No `iff`, `<=>`, `<->`, `=>`, or `==` operator is introduced for type logic. Type equivalence remains `~=`. Subtyping remains `<:`.
 
+### UALO: Universal Argument-List Ordering
+
+UALO means Universal Argument-List Ordering.
+
+All argument-list-shaped syntax follows one ordering rule: positional arguments first, then named arguments. Once named arguments begin, positional arguments cannot resume.
+
+```ebnf
+arg-list        ::= positional-arg ("," positional-arg)* ("," named-arg)* ","?
+                  | named-arg ("," named-arg)* ","?
+positional-arg  ::= "_" | EXPR
+named-arg       ::= IDENT ":=" EXPR
+call-args       ::= "(" arg-list? ")"
+```
+
+Rules:
+- positional arguments come first
+- named arguments come after positional arguments
+- once a named argument appears, positional arguments cannot resume
+- defaults must be trailing in definitions
+- duplicate named arguments are diagnostics
+- unknown named arguments are diagnostics
+- positional and named arguments cannot bind the same parameter twice
+- the rule applies to ordinary call arguments, generic call arguments, attribute arguments, parameter/default definitions, variant payload arguments if named payload calls are locked later, and future argument-list-shaped syntax
+
+```musi
+f(a, b, c := d)
+f(x := a, y := b)
+Matrix[Float32, rows := 4]
+@repr(.c, align := 4)
+```
+
+UALO is a surface-design invariant like UFCS: receiver-style callable access uses ordinary binding/call semantics, and argument-list ordering is universal across all argument-list-shaped forms.
+
 ### Type Operator Family
 
 Musi uses a coherent `:`-led family for type-related operators.
@@ -972,7 +1073,6 @@ maybe-fallback  ::= EXPR "??" EXPR
 optional-access ::= EXPR "?." IDENT
                   | EXPR "?." IDENT call-args
                   | EXPR "?.[" EXPR "]"
-call-args       ::= "(" (EXPR ("," EXPR)* ","?)? ")"
 ```
 
 Rules:
@@ -1129,8 +1229,10 @@ attr-list          ::= attr+
 attr               ::= "@" attr-name attr-args?
 attr-name          ::= IDENT ("." IDENT)*
 attr-args          ::= "(" attr-arg-list? ")"
-attr-arg-list      ::= attr-arg ("," attr-arg)* ","?
-attr-arg           ::= IDENT ":=" attr-value | attr-value
+attr-arg-list      ::= attr-positional-arg ("," attr-positional-arg)* ("," attr-named-arg)* ","?
+                     | attr-named-arg ("," attr-named-arg)* ","?
+attr-positional-arg ::= attr-value
+attr-named-arg     ::= IDENT ":=" attr-value
 attr-value         ::= literal | tuple-datum | record-datum | array-datum | variant-value | known-expr
 attributed-let     ::= attr-list let-expr
 attributed-data    ::= attr-list data-expr
@@ -1162,6 +1264,7 @@ Rules:
 - attribute arguments are compile-time metadata values.
 - positional and named arguments are accepted.
 - named arguments use `:=`.
+- attribute arguments follow the universal argument-list rule.
 - datum literals and sum-type values are accepted attribute values.
 - conditional attributes are not a separate grammar form.
 - conditionality belongs in the attribute payload, usually `when := ...`.
