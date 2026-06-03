@@ -829,7 +829,175 @@ Visibility: `export` only. Exported binding visible from module; non-export priv
 
 SEIL round-trip metadata preserves import binding mode (named/anonymous), import source shape (string/tuple datum/record datum), known/runtime phase, exported binding names, and optionally export-block grouping. If grouping absent, decompiler may emit canonical separate `export let` forms preserving semantics.
 
-## 16. Open-question checklist
+
+## 16. SEIL artifact and module structure before opcode definition
+
+SEIL means Stack Effect Intermediate Language. `Intermediate` means shared executable VM language for SEAM, comparable in role to CIL for CLR, not a disposable compiler-internal IR. SEAM means Stack Effect Abstract Machine. Musi is the primary/reference source language targeting SEIL; other future languages may target SEIL. Informal `Musi bytecode` means SEIL emitted from Musi source, not Musi-only bytecode.
+
+Artifact extensions:
+
+```text
+.ms        Musi source
+.seil      binary executable SEIL module
+.seil.txt  textual hand-authorable SEIL
+```
+
+Textual `.seil.txt` is an assembly-like DSL for SEAM's typed, stack-effect-verified executable language. Binary `.seil` is the compact executable encoding. Both represent the same SEIL semantic model. `.seil.txt` assembles to `.seil`; `.seil` can be dumped to canonical `.seil.txt` text. No file-magic guessing is required for ordinary tooling.
+
+Architecture graph:
+
+```dot
+digraph seil_architecture {
+  rankdir=LR;
+  Musi [label="Musi .ms"];
+  Other [label="future frontend"];
+  Text [label="text SEIL .seil.txt"];
+  Binary [label="binary SEIL .seil"];
+  SEAM [label="SEAM verifier/loader/executor"];
+
+  Musi -> Binary [label="lower"];
+  Musi -> Text [label="emit/dump when requested"];
+  Other -> Binary [label="lower"];
+  Text -> Binary [label="assemble"];
+  Binary -> Text [label="dump"];
+  Binary -> SEAM [label="verify + execute"];
+}
+```
+
+A SEIL module is sectioned. The executable semantics live in required VM sections and metadata. Producer/source-shape metadata is optional and affects tooling/decompilation only.
+
+Module graph:
+
+```dot
+digraph seil_module {
+  rankdir=TB;
+  Module [label="SEIL module"];
+  Header [label="40-byte binary header"];
+  Directory [label="section directory"];
+  Core [label="required VM sections"];
+  Bodies [label="executable bodies"];
+  Producer [label="optional producer/source metadata"];
+
+  Module -> Header;
+  Header -> Directory [label="points to"];
+  Directory -> Core;
+  Directory -> Bodies;
+  Directory -> Producer;
+
+  Core -> Names [label="strings/names"];
+  Core -> Types [label="types/signatures"];
+  Core -> Constants [label="constants"];
+  Core -> Imports [label="imports"];
+  Core -> Exports [label="exports"];
+  Core -> Decls [label="declarations/layouts"];
+  Core -> Meta [label="required VM metadata"];
+}
+```
+
+Binary `.seil` fixed header is exactly 40 bytes. The header is loader-probe data, not module metadata. All semantic module data lives in sections.
+
+```text
+Header := (
+  magic     : Magic,
+  format    : Format,
+  sections  : SectionDirectoryRef,
+  file_size : u64,
+)
+
+Magic := u32              -- ASCII "SEIL"
+
+Format := (
+  major       : u8,
+  minor       : u8,
+  header_size : u8,       -- always 40
+  flags       : u8,
+)
+
+SectionDirectoryRef := (
+  count    : u32,
+  reserved : u32,         -- always 0 unless future format version defines it
+  offset   : u64,
+  size     : u64,
+)
+```
+
+Concrete 40-byte layout:
+
+```text
+offset  size  field
+0       4     magic                  "SEIL"
+4       4     format                 (major: u8, minor: u8, header_size: u8, flags: u8)
+8       24    sections               (count: u32, reserved: u32, offset: u64, size: u64)
+32      8     file_size              u64
+```
+
+The section directory names every section by kind, offset, size, count, and encoding flags. Section payloads are independently skippable so loaders can avoid cold producer/source metadata.
+
+Required section families:
+
+```text
+names          strings, identifiers, module paths, symbols, field/case names
+modules        module identity, dependencies, native/compiler module references
+types          primitive/composite/generic/qualified SEIL types
+signatures     callable signatures, phase/capability requirements
+constants      typed constants and known-evaluated values
+imports        module/native/foreign imports
+exports        public module surface
+declarations  functions, values, data, fields, cases, shapes, witnesses, native/foreign bindings
+layouts        representation, packing, alignment, endian, tags, padding, ABI layout
+bodies         executable stack-effect bodies
+vm-metadata    metadata required for loading, linking, verification, execution
+producer-meta  optional source maps, source-shape, comments/docs, decompilation hints
+```
+
+Executable body graph:
+
+```dot
+digraph seil_body {
+  rankdir=LR;
+  Body [label="body"];
+  Locals [label="locals/captures"];
+  Blocks [label="basic blocks"];
+  Verify [label="typed stack-effect verification"];
+
+  Body -> Locals;
+  Body -> Blocks;
+  Blocks -> B0 [label="entry block"];
+  Blocks -> Bn [label="block n"];
+  B0 -> Term0 [label="instructions then terminator"];
+  Bn -> Termn [label="instructions then terminator"];
+  Blocks -> Verify;
+}
+```
+
+Pre-opcode body rules:
+
+- A body has a signature, locals/captures, basic blocks, instruction sequences, and terminators.
+- Every instruction has verifier-known typed stack effect.
+- Every block has a checked entry stack shape and exit/terminator edge shape.
+- Branches, loops, `leave`, `cycle`, `defer`, `yield`, calls, and returns must preserve compatible stack shapes on every edge.
+- Verifier computes stack bounds; no authored `.maxstack` equivalent exists.
+- Known-phase execution runs verified SEIL under deterministic known-phase limits and capability/import rules.
+
+Metadata graph:
+
+```dot
+digraph seil_metadata {
+  rankdir=LR;
+  VM [label="required VM metadata"];
+  Producer [label="optional producer metadata"];
+  Execute [label="execution/verifiability"];
+  Tools [label="source maps/decompilation/tools"];
+
+  VM -> Execute [label="required"];
+  Producer -> Tools [label="optional"];
+  Producer -> Execute [label="no dependency", style=dashed];
+}
+```
+
+Required VM metadata affects verification, loading, linking, representation, capabilities, target availability, native/foreign linkage, and execution. Optional producer metadata preserves Musi source shape, original grouping, source spans, comments/docs when emitted, datum/operator/pattern spelling, and high-fidelity decompilation hints. Executable SEIL must run without optional producer metadata.
+
+## 17. Open-question checklist
 
 Checked/locked:
 
@@ -845,17 +1013,17 @@ Checked/locked:
 - [x] Match/patterns: exact pattern grammar; alternatives; comma alternatives not `|`; semicolon cases; exhaustiveness; guard order; binding syntax.
 - [x] Operators: full symbolic set; precedence; not-flat parsing; no user-defined symbolic ops; word ops; assignment/binding/update vs equality; equality/equivalence/ordering/approximation/membership/remainder.
 - [x] Modules/imports: modules as record-like values; import syntax; export syntax; visibility; path/source shape; SEIL round-trip.
-- [x] Known phase: meaning; applies to expressions/bindings/parameters/types where meaningful; limits; boundary; datum literals; functions compile to SEIL/no separate interpreter.
+- [x] Known phase: meaning; applies to expressions/bindings/parameters/types where meaningful; limits; boundary; datum literals; functions compile to SEIL/no separate interpreter; known execution runs verified SEIL.
 - [x] Safety: no unsafe wrapper; capabilities/metadata/types; pointer types/ops; pinning via `fixed`; FFI rules; dangerous behavior errors not warnings.
 - [x] Lexical literals: numeric separators; base prefixes; literal suffixes; triple-quoted strings; escaped identifiers; reserved interpolation direction; no automatic multiline-string indentation trimming.
 - [x] Attributes: universal attribute call model; UALO payloads; `@target`; tooling namespace rule; compiler-affecting unknown attribute diagnostics.
 - [x] Native modules: `musi:` import prefix; native/compiler-provided modules; optional `.ms` interface surfaces.
+- [x] SEIL identity: Stack Effect Intermediate Language; SEAM executable language; not Musi-only and not disposable compiler IR.
+- [x] SEIL artifacts: `.seil` binary executable module; `.seil.txt` textual hand-authorable form; same semantic model.
+- [x] SEIL binary header: exactly 40 bytes; magic, format tuple, section-directory tuple, file size; semantic data lives in sections.
+- [x] SEIL module structure: sectioned module; required VM sections; executable bodies; required VM metadata; optional producer/source metadata.
+- [x] SEIL verification placement: basic-block stack-effect bodies; typed edge verification; verifier-computed stack bounds; no authored `.maxstack`.
 
 Still open:
 
-- [ ] SEIL instruction model
-- [ ] SEIL metadata required for near-identical decompilation
-- [ ] Source-to-SEIL lowering guarantees
-- [ ] Whether SEIL has stable binary and textual form
-- [ ] How stack-effect verification appears in SEIL
-- [ ] How known-phase evaluation appears in SEIL
+- [ ] SEIL instruction/opcode set, operand encodings, and per-opcode stack effects
