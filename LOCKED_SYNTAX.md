@@ -78,11 +78,14 @@ opaque
 shape
 when
 while
+yield
 ```
 
-Count: 18.
+Count: 19.
 
 `in` is a contextual word operator, not a form keyword. `as` is a contextual pattern keyword, not a cast keyword.
+
+`await`, `spawn`, and `task` are not hard keywords. They remain available as ordinary identifiers, method names, shape names, or data names.
 
 `import` and `export` are hard keywords. `import` takes in. `export` puts out. Module boundary forms affect source shape and SEIL/decompilation metadata. `known import` is compile-time acquisition/import.
 
@@ -407,7 +410,7 @@ Rationale:
 
 ```ebnf
 [147] defer-expr ::= "defer" EXPR ("when" EXPR)?
-[148] yield-keyword ::= /* no production */
+[148] yield-expr ::= "yield" EXPR?
 ```
 
 `defer` registers an expression to run when the current computation region/scope exits. It produces `Unit`.
@@ -421,7 +424,22 @@ defer file.close();
 defer lock.release() when locked;
 ```
 
-`yield` is not a core keyword. Generator/coroutine suspension requires a larger design around shapes such as `Resumable` or `Generator[T]`, callable compatibility, SEIL behavior, and cleanup interaction.
+`yield` is a core keyword/expression for resumable/generator-compatible contexts. It is not an ordinary function call.
+
+`yield expr` suspends or emits through the enclosing resumable protocol. Outside a resumable/generator-compatible context, `yield` is a diagnostic.
+
+Rules:
+- `yield` participates in stack/effect compatibility through the enclosing callable's result protocol
+- the yielded value type must match the enclosing resumable/generator output type
+- bare `yield` without an expression is accepted only when the yielded type is `Unit`
+- `yield` produces `Unit` locally after handing the value to the resumable protocol
+- suspension is not scope exit
+- `defer` does not run at suspension points
+- pending defers run on final scope exit, close, drop, or cancel according to the final resumable runtime rules
+
+Concurrency is protocol/capability driven, not hard-coded syntax. `yield` is the only core suspension keyword. `Task`, `Scheduler`, `Resumable`, `Generator`, and `Stream` are library/runtime shapes or data types rather than keywords.
+
+`await`, `spawn`, and `task` are ordinary names when used by libraries or runtimes.
 
 ## Conditional Expressions
 
