@@ -1,40 +1,20 @@
-# LOCKED_SYNTAX.md — Consolidated
+# LOCKED_SYNTAX.md — Heavy Compressed Reference
 
-## 1. Core Identity
+Status: compact, information-preserving reference of locked Musi surface syntax. Grammar snippets are documentation grammar in W3C XML 1.0 EBNF style; omitted forms are not accepted unless added by another locked section.
 
-Musi is a small systems language with a small core.
+## 1. Core invariants
 
-Musi is expression-first:
-- statements are not a separate semantic category
-- a top-level expression terminated by `;` is an accepted top-level item
-- `;` may discard a value or sequence expressions
-- definitions are expressions
-- control flow is expression-based
+- Musi is a small systems language with a small core.
+- Expression-first: no separate statement semantic category; top-level `EXPR;` is an accepted top-level item; `;` sequences/discards; definitions are expressions; control flow is expression-based.
+- Musi lowers directly to SEIL bytecode. SEIL is the canonical lowered form, like CIL in role.
+- No IR layer exists between Musi source and SEIL.
+- Source should lower to SEIL so SEIL-to-Musi decompilation can recover near-identical source when metadata is preserved.
+- Syntax must preserve maximal-munch lexing, one-token-lookahead parsing, no speculative parsing beyond one token, and no syntax kept only by convention from existing languages.
+- Any form needing more than one token of lookahead is rejected/redesigned.
 
-Musi targets SEIL bytecode directly. SEIL is the canonical lowered form, similar in role to CIL. Musi source should lower to SEIL so future SEIL-to-Musi decompilation can recover near-identical source when metadata is preserved.
-
-There is no IR layer between Musi source and SEIL.
-
-## 2. Parsing, Lexing, And Notation
-
-Syntax must preserve:
-- maximal-munch lexical design
-- one-token-lookahead parsing
-- no speculative parsing beyond one token
-- no syntax retained only because existing or conventional languages use it
-
-If a form needs more than one token of lookahead, it is not accepted.
-
-Grammar snippets use W3C XML 1.0 EBNF notation and document accepted surface shapes. Omitted forms are not accepted unless another locked section adds them. Snippets are documentation grammar, not the generated parser grammar.
+Notation atoms:
 
 ```ebnf
-A       ::= B C
-A       ::= B | C
-A       ::= B?
-A       ::= B*
-A       ::= B+
-A       ::= "token"
-A       ::= B /* comment */
 IDENT   ::= /* lexical identifier token */
 EXPR    ::= /* expression production defined by final grammar */
 TYPE    ::= /* type-expression production defined by final grammar */
@@ -42,76 +22,37 @@ PATTERN ::= /* pattern production defined by final grammar */
 ATTR    ::= /* attribute production defined by final grammar */
 ```
 
-## 3. Keywords
+## 2. Keywords and non-keywords
 
-A keyword is a hard-reserved source word required to introduce or disambiguate a grammar form.
+Keyword rule: a keyword is a hard-reserved source word required to introduce/disambiguate a grammar form. Built-ins, compiler-owned names, intrinsics, methods, shapes, data names, product/sum names, and built-in types are not keywords unless hard-reserved grammar introducers.
 
-A word is not a keyword merely because it is built in, compiler-owned, common, or standard-library-provided. Operators, compiler intrinsics, methods, traits/shapes, sum types, product types, and built-in types are not keywords unless hard-reserved as grammar introducers.
-
-Hard/form keywords locked so far:
+Hard/form keywords, count 19:
 
 ```text
-case
-cycle
-data
-defer
-else
-erased
-export
-fixed
-import
-known
-leave
-let
-match
-mut
-opaque
-shape
-when
-while
-yield
+case cycle data defer else erased export fixed import known leave let match mut opaque shape when while yield
 ```
 
-Count: 19.
+Contextual/non-keyword decisions:
 
-Contextual or non-keyword decisions:
-- `in` is a contextual word operator, not a form keyword.
-- `as` is a contextual pattern keyword, not cast syntax.
-- `await`, `spawn`, and `task` remain ordinary identifiers, method names, shape names, or data names.
-- `import` and `export` are hard keywords. `import` takes in; `export` puts out.
-- `known import` is compile-time acquisition/import.
-- Module boundary forms affect source shape and SEIL/decompilation metadata.
+```text
+in     = contextual word operator, not form keyword
+as     = contextual pattern keyword, not cast syntax
+await  = ordinary name
+spawn  = ordinary name
+task   = ordinary name
+```
+
+`import` and `export` are hard keywords: `import` takes in; `export` puts out. `known import` is compile-time acquisition/import. Module boundary forms affect source shape and SEIL/decompilation metadata.
 
 Not core keywords:
 
 ```text
-unsafe
-pin
-recur
-for
-break
-continue
-next
-trait
-hidden
-static
-const
-fn
-type
-struct
-enum
-class
-impl
-and
-or
-xor
-not
-is
+unsafe pin recur for break continue next trait hidden static const fn type struct enum class impl and or xor not is
 ```
 
-## 4. Comments
+## 3. Comments
 
-Comment spellings are locked.
+Locked comment grammar:
 
 ```ebnf
 line-comment       ::= "--" line-comment-text
@@ -123,76 +64,43 @@ block-module-doc   ::= "/-!" block-comment-body "-/"
 block-comment-body ::= (block-comment | block-doc-comment | block-module-doc | block-comment-char)*
 ```
 
-Maximal munch applies:
-- `--!` is a module doc comment.
-- `---` is a doc comment.
-- `/--` is a block doc comment.
-- `/-!` is a block module doc comment.
+Maximal munch: `--!` module doc; `---` doc; `/--` block doc; `/-!` block module doc. Block, block-doc, and block-module-doc comments share one nesting system. Line comments inside block comments are text. Nested block comments use a linear depth counter. Unterminated nested block comments are diagnostics. Module docs are distinct from item docs.
 
-Block comments, block doc comments, and block module doc comments participate in the same nesting system.
+## 4. Universal binding and generics
 
-Rules:
-- line comments inside block comments are comment text
-- nested block comments use a linear depth counter
-- unterminated nested block comments are diagnostic errors
-- module docs are supported separately from item docs
-
-## 5. Binding
-
-`let` is the universal binding form. It binds values, functions, data definitions, shape definitions, module/import results, compile-time values, runtime values, and attached receiver methods.
-
-There is no separate `fn`, `type`, `struct`, `enum`, `class`, `impl`, `const`, or `static` keyword.
+`let` is the universal binding form for values, functions, data definitions, shape definitions, modules/imports, compile-time values, runtime values, and attached receiver methods. No `fn`, `type`, `struct`, `enum`, `class`, `impl`, `const`, or `static` keyword exists.
 
 ```ebnf
-let-expr        ::= "let" bind-head generic-param-list? type-annot? param-list? result-type? ":=" EXPR
-                  | "let" receiver-head "." IDENT generic-param-list? param-list result-type? ":=" EXPR
-bind-head       ::= IDENT | "_" | operator-name | PATTERN
-receiver-head   ::= "(" IDENT type-annot ")"
-generic-param-list ::= "[" generic-param-list-body? "]"
+let-expr              ::= "let" bind-head generic-param-list? type-annot? param-list? result-type? ":=" EXPR
+                        | "let" receiver-head "." IDENT generic-param-list? param-list result-type? ":=" EXPR
+bind-head             ::= IDENT | "_" | operator-name | PATTERN
+receiver-head         ::= "(" IDENT type-annot ")"
+generic-param-list    ::= "[" generic-param-list-body? "]"
 generic-param-list-body ::= required-generic-param ("," required-generic-param)* ("," default-generic-param)* ","?
                           | default-generic-param ("," default-generic-param)* ","?
 required-generic-param ::= IDENT type-annot?
 default-generic-param  ::= IDENT type-annot? ":=" EXPR
-param-list      ::= "(" param-list-body? ")"
-param-list-body ::= required-param ("," required-param)* ("," default-param)* ","?
-                  | default-param ("," default-param)* ","?
-required-param  ::= IDENT type-annot | IDENT type-annot?
-default-param   ::= IDENT type-annot? ":=" EXPR
-result-type     ::= type-annot
-type-annot      ::= ":" TYPE
+param-list            ::= "(" param-list-body? ")"
+param-list-body       ::= required-param ("," required-param)* ("," default-param)* ","?
+                        | default-param ("," default-param)* ","?
+required-param        ::= IDENT type-annot | IDENT type-annot?
+default-param         ::= IDENT type-annot? ":=" EXPR
+result-type           ::= type-annot
+type-annot            ::= ":" TYPE
 ```
 
-Defaults must be trailing in every parameter list, including function parameters, method parameters, constructor-like parameters, and variant payload parameters.
+Defaults must trail in every parameter list: function, method, constructor-like, variant payload, generic. Bracketed generic parameters occur between binding name and ordinary call parameters. Generic call arguments use the same bracket-before-call shape: `name[Int, 4](value)`, `point.Point.make[Int]()`, `name[N := 4](value)`, `name[_, 4](value)`.
 
-Bracketed generic parameters belong between the binding name and ordinary call parameters.
+Generic rules:
 
-```musi
-let name[A : Type, N : known Nat](value : A) : [N]A := ...;
-let (self : Point).make[T : Type]() : Point := ...;
-```
+- Omitting bracket list asks compiler to infer all generic parameters.
+- Explicit generic call arguments may be positional or named with `:=`.
+- `_` in generic call argument is an explicit inference hole.
+- Required generic parameters without explicit/defaulted/inferred value are diagnostics.
+- Unresolved inference holes are diagnostics.
+- Generic call arguments follow UALO.
 
-Generic call arguments use the same bracket-before-call shape:
-
-```musi
-name[Int, 4](value)
-point.Point.make[Int]()
-name[N := 4](value)
-name[_, 4](value)
-```
-
-Rules:
-- omitting the bracket list asks the compiler to infer all generic parameters
-- explicit generic call arguments may be positional
-- explicit generic call arguments may be named with `:=`
-- `_` in a generic call argument is an explicit inference hole
-- required generic parameters without an explicit, defaulted, or inferred value are diagnostics
-- unresolved generic inference holes are diagnostics
-- generic parameter defaults must be trailing
-- generic call arguments follow the universal argument-list rule
-
-### Binding Qualifiers
-
-Binding syntax is plain. `known`, `fixed`, and `mut` do not appear before `let` and do not appear between `let` and the binding name.
+Binding qualifiers:
 
 ```ebnf
 let-binding        ::= "let" bind-head type-annot? ":=" EXPR
@@ -202,36 +110,20 @@ qualified-type     ::= "known"? "fixed"? "mut"? TYPE
 qualified-expr     ::= "known" EXPR | EXPR
 ```
 
-Canonical type qualifier order:
+Canonical qualifier order: `known fixed mut TYPE`. Other orders are absent from accepted grammar and may be canonicalized by diagnostics/formatting. Without annotation, inference preserves RHS qualified type; it does not invent or strip qualifiers.
 
-```text
-known fixed mut TYPE
-```
+## 5. Regions and separators
 
-Other orders are absent from accepted grammar and may be canonicalized by diagnostics/formatting.
-
-If a binding has no annotation, inference preserves the qualified type of the right-hand side. It does not invent or strip qualifiers.
-
-## 6. Regions And Separators
-
-### Computation Regions
-
-Parentheses delimit computation regions.
+Computation regions:
 
 ```ebnf
 computation-region ::= "(" computation-body? ")"
 computation-body   ::= EXPR (";" EXPR)* ";"?
 ```
 
-Semicolon inside a computation region sequences/discards:
-- `(step1(); step2())` produces the value/effect of `step2()`.
-- `(step1(); step2();)` discards `step2()` and produces `Unit` or the corresponding empty stack effect.
+Inside computation regions, `;` sequences/discards. `(step1(); step2())` returns/effects `step2`. `(step1(); step2();) ` discards `step2` and produces `Unit` or empty stack effect. Leading `;` is rejected.
 
-Leading semicolon is not accepted because it implies an empty computation step.
-
-### Structural Regions
-
-Curly braces delimit structural regions. They define members, fields, variants, cases, or rule tables. They are not sequential computation bodies.
+Structural regions:
 
 ```ebnf
 structural-region ::= "{" structural-body? "}"
@@ -239,24 +131,20 @@ structural-body   ::= structural-member (";" structural-member)* ";"?
 structural-member ::= data-field | data-case | shape-member | match-case
 ```
 
-Structural semicolon is a member/rule terminator, not a discard operator.
+Curly structural regions define members/fields/variants/cases/rule tables, not sequential computation. Structural `;` terminates a member/rule and does not discard.
 
-### Trailing Separators
-
-Trailing separators are allowed where the separator follows an item. Leading separators are not allowed.
+Trailing separator invariant:
 
 ```ebnf
 comma-items     ::= EXPR ("," EXPR)* ","?
 semicolon-items ::= structural-member (";" structural-member)* ";"?
 ```
 
-Comma-list positions use `X ("," X)* ","?`. Structural regions use `X (";" X)* ";"?`. Computation regions use `;` as sequencing/discard.
+Trailing separators allowed only after an item. No leading separators. Comma lists use `X ("," X)* ","?`; structural regions use `X (";" X)* ";"?`; computation regions use `;` as sequence/discard.
 
-## 7. Control Flow
+## 6. Conditional control, loops, defer, yield
 
-### Conditional Expressions
-
-`when` is the conditional guard operator.
+Conditional syntax:
 
 ```ebnf
 total-conditional ::= non-when-expr "when" non-when-expr "else" EXPR
@@ -265,150 +153,56 @@ non-when-expr     ::= /* expression production excluding unparenthesized when-ex
 ```
 
 Rules:
-- condition must be `Bit`
-- `when` is postfix guard syntax, not prefix syntax
-- total conditional branches must have compatible type/stack effect
-- `else` is the explicit fallback branch
-- no `then` keyword exists
-- guarded emission has zero-or-one emission shape
-- guarded emission is accepted only in contexts that consume zero-or-one emission
-- no hidden `Maybe`, `Unit`, bottom, or union is synthesized
-- unparenthesized nested `when` is not accepted in guarded value or condition position
-- parentheses are required for nested conditionals
-- `where` is not a guard keyword and has no core guard syntax
 
-Universal postfix guard rule:
-- `X when C` makes `X` conditional on `C`
-- `C` must be `Bit`
-- `C` is evaluated at the point where `X` would be admitted, registered, emitted, or selected
-- each guarded context defines what admission, registration, emission, or selection means
+- `when` is postfix guard syntax, not prefix; no `then` keyword.
+- Condition must be `Bit`.
+- Total conditional branches must have compatible type/stack effect.
+- `else` is explicit fallback.
+- Bare `VALUE when CONDITION` is guarded zero-or-one emission only in contexts that consume zero-or-one emission.
+- No hidden `Maybe`, `Unit`, bottom, or union is synthesized.
+- Unparenthesized nested `when` is rejected in guarded value or condition position; use parentheses.
+- `where` is not a guard keyword and has no core guard syntax.
+- Universal postfix guard: `X when C` makes `X` conditional on `C`; `C : Bit`; `C` evaluates at the point where `X` would be admitted/registered/emitted/selected; each guarded context defines that meaning.
 
-Examples:
-
-```musi
-value when ready else fallback
-value when ready
-value when ready else (other when available else fallback)
-(value when ready else other) when enabled else fallback
-```
-
-### Loops
-
-`while` is the only source loop form.
+Loop syntax:
 
 ```ebnf
 while-expr   ::= "while" EXPR computation-region
 loop-control ::= "leave" | "cycle"
 ```
 
-Rules:
-- `while` is a zero-or-more conditional repetition expression.
-- condition must be `Bit`.
-- body is a computation region.
-- `while` produces `Unit`.
-- `leave` exits the nearest enclosing `while`.
-- `cycle` skips remaining body and proceeds to the next condition check.
+Rules: `while` is the only source loop form; zero-or-more conditional repetition; condition `Bit`; body is computation region; result `Unit`; `leave` exits nearest `while`; `cycle` skips rest of body and checks condition again. No `for`, `break`, `continue`, `next`, or `recur` keyword. Iterable loops use ordinary functions/methods/shapes. Postcondition repetition uses sequencing + `while` or named library helpers. `recur` is rejected as a keyword because it would duplicate ordinary recursion and violate binding qualifier rules. `pin` is not core; stable-address semantics use `fixed`.
 
-There is no `for`, `break`, `continue`, `next`, or `recur` keyword in core.
-
-Iterable loops are expressed through ordinary functions, methods, and shapes. Postcondition repetition can be expressed by sequencing an initial body with a `while` loop or by named library helpers.
-
-`recur` does not earn a keyword slot because it would create a one-off postfix binding modifier such as `let recur N := ...`, violating the locked binding qualifier rule and duplicating ordinary recursion.
-
-`pin` is not a core keyword. Stable-address semantics are handled by `fixed`; scoped temporary non-moving access must be justified against `fixed`.
-
-### Defer And Yield
+Defer/yield:
 
 ```ebnf
 defer-expr ::= "defer" EXPR ("when" EXPR)?
 yield-expr ::= "yield" EXPR?
 ```
 
-`defer` registers an expression to run when the current computation region/scope exits. It produces `Unit`.
+`defer` registers cleanup for current computation region/scope exit and produces `Unit`. Cleanup runs on normal exit and loop-control exits (`leave`, `cycle`). Cleanup ordering remains runtime/control-flow design. `defer cleanup() when cond`: guard checked at registration; `Bit.True` registers cleanup; `Bit.False` registers none; guard is not re-evaluated at cleanup; cleanup expression must produce `Unit`; captured values must remain valid by scope/lifetime rules.
 
-Rules:
-- `defer` cleanup runs on normal exit and loop-control exits such as `leave` and `cycle`.
-- Exact cleanup ordering remains part of runtime/control-flow design.
-- `defer cleanup() when cond` is guarded defer registration.
-- the guard condition is evaluated at the defer registration point.
-- if the guard is `Bit.True`, the cleanup expression is registered.
-- if the guard is `Bit.False`, no cleanup is registered.
-- the cleanup expression does not re-evaluate the guard at cleanup time.
-- cleanup expression must produce `Unit`.
-- captured values must remain valid according to scope/lifetime rules.
+`yield` is a core expression for resumable/generator-compatible contexts, not an ordinary call. Outside such context it is diagnostic. `yield expr` suspends/emits through enclosing protocol; yielded type must match protocol output; bare `yield` only for `Unit`; local result is `Unit`; suspension is not scope exit; `defer` does not run at suspension; pending defers run on final scope exit/close/drop/cancel by final resumable runtime rules. Concurrency is protocol/capability driven. `Task`, `Scheduler`, `Resumable`, `Generator`, `Stream` are library/runtime names, not keywords. `await`, `spawn`, `task` remain ordinary names.
 
-```musi
-defer file.close();
-defer lock.release() when locked;
-```
+## 7. Match and patterns
 
-`yield` is a core keyword/expression for resumable/generator-compatible contexts. It is not an ordinary function call.
-
-Rules:
-- `yield expr` suspends or emits through the enclosing resumable protocol.
-- outside a resumable/generator-compatible context, `yield` is a diagnostic.
-- yielded value type must match the enclosing resumable/generator output type.
-- bare `yield` is accepted only when yielded type is `Unit`.
-- `yield` produces `Unit` locally after handing off the value.
-- suspension is not scope exit.
-- `defer` does not run at suspension points.
-- pending defers run on final scope exit, close, drop, or cancel according to final resumable runtime rules.
-
-Concurrency is protocol/capability driven, not hard-coded syntax. `yield` is the only core suspension keyword. `Task`, `Scheduler`, `Resumable`, `Generator`, and `Stream` are library/runtime shapes or data types.
-
-`await`, `spawn`, and `task` remain ordinary names.
-
-## 8. Match And Patterns
-
-### Match
-
-Pattern matching uses `match`. Each arm starts with `case` and ends with `;`. `=>` is the body/result arrow for both match arms and lambdas.
+Match grammar:
 
 ```ebnf
 match-expr        ::= "match" EXPR "{" match-case+ "}"
 match-case        ::= "case" case-pattern-list case-guard? "=>" EXPR ";"
 case-pattern-list ::= PATTERN ("," PATTERN)* ","?
 case-guard        ::= "when" EXPR
-lambda-expr       ::= '\' param-list type-annot? "=>" EXPR
+lambda-expr       ::= '\\' param-list type-annot? "=>" EXPR
 ```
 
-Rules:
-- `;` after a `case` arm terminates the structural case rule.
-- It does not discard the selected arm value.
-- To discard inside an arm, use a computation region with a final semicolon.
-- Pattern alternatives use comma separation inside one `case`.
-- `|` is not used for pattern alternatives.
-- Alternatives in one `case` share the same guard and body.
-- Pattern bindings must be compatible across alternatives: same names with compatible types in every alternative that reaches the shared body.
+Rules: every arm starts `case` and ends `;`; `=>` is body/result arrow for match arms and lambdas; arm `;` terminates structural case and does not discard selected value; use computation-region final `;` to discard inside arm. Pattern alternatives use commas in one `case`, not `|`; alternatives share guard/body; bindings across alternatives must be compatible: same names with compatible types in every alternative reaching body.
 
-### Exhaustiveness
+Exhaustiveness: `match` is exhaustive by default; non-exhaustive match is semantic error. Finite sum `data` matches must cover all variants or include wildcard `case _`. Guarded cases do not count as unconditional coverage. No `case else`; `else` belongs only to `when ... else`.
 
-`match` is exhaustive by default. Non-exhaustive `match` is a semantic error.
+Guard evaluation: cases top-to-bottom; alternatives left-to-right. Pattern tested before guard. Guard runs only after matching alternative, may reference pattern bindings, must be `Bit`. If matched guard is false, matching continues. Guards do not run for non-matching patterns. First unguarded match or guard-true match wins. Guarded cases are conditional coverage only.
 
-Rules:
-- finite sum `data` matches must cover all variants or include wildcard catch-all
-- guarded cases do not count as unconditional coverage
-- catch-all is `case _`
-- there is no `case else` syntax
-- `else` remains only the fallback marker for `when ... else`
-
-### Guard Evaluation
-
-Cases are tested top-to-bottom. Within one `case`, comma-separated pattern alternatives are tested left-to-right.
-
-Guard rules:
-- pattern alternative is tested first
-- guard runs only after its pattern alternative matched
-- guard can reference bindings from the matched pattern
-- guard expression must be `Bit`
-- if pattern matches but guard is false, matching continues
-- guards do not run for non-matching patterns
-- first matching unguarded case or guard-true case wins
-- guarded cases are conditional coverage for exhaustiveness
-
-### Pattern Grammar
-
-Patterns mirror datum syntax where they destructure values. Let binding heads may be patterns, so ordinary binding identifiers are identifier patterns.
+Pattern grammar:
 
 ```ebnf
 pattern              ::= alias-pattern
@@ -426,83 +220,29 @@ array-pattern        ::= "#[" (pattern ("," pattern)* ","?)? "]"
 rest-pattern         ::= ".." identifier-pattern?
 ```
 
-Examples:
+Pattern facts:
 
-```musi
-case #(x, y) => expr;
-case #{ name := n, age := _ } => expr;
-case #[head, ..tail] => expr;
-case #[first, second, ..] => expr;
-case .Some(value) => expr;
-case Maybe.Some(value) => expr;
-case id : UserId => id.raw;
+- Patterns mirror datum syntax for destructuring.
+- Let binding heads may be patterns.
+- Record shorthand `#{ name }` means `#{ name := name }`.
+- `as` is contextual pattern alias, not cast syntax; alias binds whole matched value.
+- In alternatives, aliases must be binding-compatible if shared body uses them.
+- `_` matches and binds nothing.
+- `_name` is an ordinary identifier if lexical grammar accepts it; it does not silence unused-binding checks.
 
-let #(x, y) := point;
-let #{ name := n, age := a } := person;
-```
-
-Record pattern shorthand:
-
-```musi
-case #{ name } => expr;
-```
-
-means:
-
-```musi
-case #{ name := name } => expr;
-```
-
-### Alias Patterns
-
-`as` is a contextual pattern keyword for alias patterns. It is not cast syntax.
+Rest patterns:
 
 ```ebnf
-alias-pattern ::= pattern-primary type-annot? ("as" identifier-pattern)?
+rest-pattern         ::= ".." identifier-pattern?
+array-rest-pattern   ::= ".." identifier-pattern?
+record-rest-pattern  ::= ".." identifier-pattern?
 ```
 
-The alias binds the whole value matched by the pattern.
+At most one rest pattern per tuple/record/array. Array/record rest may ignore or bind remaining elements/fields. Tuple rest requires tuple-rest/variadic tuple semantics; until locked, tuple rest is not accepted.
 
-```musi
-case .Some(x) as option => option;
-case #{ name := n } as person => n;
-case id : UserId as rawPattern => id.raw;
-```
+## 8. Data, datum literals, construction
 
-In pattern alternatives, aliases must be binding-compatible across alternatives if the shared body uses them.
-
-### Underscore Names
-
-`_` is the wildcard pattern. It matches and binds nothing.
-
-Identifiers beginning with underscore are ordinary identifiers. `_name` is not special syntax for silencing unused bindings. Normal unused-binding rules apply.
-
-### Rest Patterns
-
-```ebnf
-rest-pattern        ::= ".." identifier-pattern?
-array-rest-pattern  ::= ".." identifier-pattern?
-record-rest-pattern ::= ".." identifier-pattern?
-```
-
-Rules:
-- at most one rest pattern may appear in a tuple, record, or array pattern
-- array rest may ignore or bind remaining elements
-- record rest may ignore or bind remaining fields
-- tuple rest requires tuple rest/variadic tuple semantics; until locked, tuple rest is not accepted
-
-```musi
-case #[head, ..tail] => tail;
-case #[head, ..] => head;
-case #{ name := n, ..rest } => rest;
-case #{ name := n, .. } => n;
-```
-
-## 9. Data And Datum Syntax
-
-### Data
-
-`data` is the single data-definition form. The body determines whether data is product-shaped or sum-shaped. A `data` body must not mix product `let` entries and sum `case` entries.
+Data grammar:
 
 ```ebnf
 data-expr              ::= attr-list? "data" data-body
@@ -510,8 +250,7 @@ data-body              ::= product-data-body | sum-data-body | empty-data-body
 product-data-body      ::= "{" data-field (";" data-field)* ";"? "}"
 sum-data-body          ::= "{" data-case (";" data-case)* ";"? "}"
 empty-data-body        ::= "{" "}"
-data-field             ::= "let" IDENT type-annot field-default?
-                         | "let" IDENT ":=" EXPR
+data-field             ::= "let" IDENT type-annot field-default? | "let" IDENT ":=" EXPR
 field-default          ::= ":=" EXPR
 data-case              ::= "case" IDENT variant-payload? case-tag?
 variant-payload        ::= "(" variant-param-list? ")"
@@ -523,22 +262,9 @@ case-tag               ::= ":=" known-expr
 known-expr             ::= EXPR /* context requires known value */
 ```
 
-Rules:
-- `:= value` on the `case` initializes/defines variant identity.
-- tag/discriminant value must be `known`.
-- tags must be unique within the sum.
-- omitted tags are assigned by compiler in declaration order.
-- payload defaults stay inside payload parameters.
-- product and sum data stay separate.
-- if both product and sum are needed, pass one as a field of the other.
-- a `data` body may bind data-valued fields or associated data through `let`.
-- receiver methods are defined outside `data` or `shape` body with `let (self : Parent).method() := expr`.
+Rules: `data` is the only data-definition form. Body shape decides product/sum/empty. Product `let` entries and sum `case` entries must not mix. `case ... := value` initializes/defines variant identity; tag/discriminant must be known and unique; omitted tags assigned by compiler in declaration order; payload defaults stay in payload params. Product and sum data stay separate; if both are needed, use one as a field of the other. `data` body may bind data-valued fields/associated data through `let`. Receiver methods are outside `data`/`shape`: `let (self : Parent).method() := expr`. No `struct`, `enum`, `union`, `class`, `impl`.
 
-There is no separate `struct`, `enum`, `union`, `class`, or `impl` form.
-
-### Datum Literals
-
-Datum literals use `#` plus delimiter as a compound lexical category, separating value literals from type syntax and computation delimiters.
+Datum literals:
 
 ```ebnf
 datum-literal      ::= tuple-datum | record-datum | array-datum
@@ -548,14 +274,9 @@ array-datum        ::= "#[" (EXPR ("," EXPR)* ","?)? "]"
 record-datum-field ::= IDENT ":=" EXPR
 ```
 
-Meanings:
-- `#()` is empty tuple datum and canonicalizes to `Unit`.
-- `#{}` is empty record datum.
-- `#[]` is empty array/list datum and requires type context.
-- plain `{ ... }` never means value record literal.
-- plain `( ... )` never means tuple datum literal unless introduced by `#`.
+Meanings: `#()` empty tuple datum canonicalizes to `Unit`; `#{}` empty record datum; `#[]` empty array/list datum requiring type context. Plain `{...}` is never value record literal. Plain `(...)` is never tuple datum unless `#(`.
 
-### Type Delimiters And Indexing
+Type delimiters/indexing:
 
 ```ebnf
 tuple-type          ::= "(" (TYPE ("," TYPE)* ","?)? ")"
@@ -566,26 +287,9 @@ tuple-field-access  ::= EXPR "." INT
 array-index-access  ::= EXPR ".[" EXPR "]"
 ```
 
-Array/list types are prefixed on the element type:
+Array/list types: `[]T` dynamic/unbounded sequence; `[N]T` exact known length; `[A .. B]T` inclusive known length range; `[A ..< B]T` half-open known length range. Bounds must be known `Nat`. Generic/type application: `T[A, B]`. Tuple fields use `pair.0`; array/list indexing uses `list.[0]`.
 
-```musi
-[]T
-[N]T
-[A .. B]T
-[A ..< B]T
-```
-
-Meanings:
-- `[]T` is a dynamic/unbounded sequence of `T`.
-- `[N]T` is an exact known length `N` sequence.
-- `[A .. B]T` is an inclusive known length range.
-- `[A ..< B]T` is a half-open known length range.
-- bounds must be known `Nat` values.
-- generic/type application uses postfix brackets: `T[A, B]`.
-- tuple fields index by numeric field access: `pair.0`.
-- array/list values index by compound `.[` access: `list.[0]`.
-
-### Product And Sum Construction
+Construction:
 
 ```ebnf
 product-construction ::= TYPE record-datum
@@ -596,84 +300,19 @@ qualified-variant    ::= TYPE "." IDENT variant-args?
 variant-args         ::= "(" (EXPR ("," EXPR)* ","?)? ")"
 ```
 
-Rules:
-- product data construction uses named or unnamed record datum literals.
-- product data is not constructed with function-call syntax.
-- sum construction selects a variant through dot variant syntax.
+Rules: product data construction uses named or unnamed record datum literals and not function-call syntax. Sum construction selects a variant by dot variant syntax, e.g. `.Some(Type)` or `Maybe.Some(Type)`.
 
-```musi
-let ada : opaque Named := Person#{ name := "Ada" };
-let ada : opaque Named := #{ name := "Ada" };
-let optionalType := .Some(Type);
-let optionalType := Maybe.Some(Type);
-```
+## 9. Operators and expression parsing
 
-## 10. Operators
-
-### Fixed Operator Vocabulary
-
-Musi core has no user-defined symbolic operators. Only locked operator tokens have operator syntax. Domain-specific operations use named functions or methods.
-
-Fixed core operator tokens:
+Core has no user-defined symbolic operators. Only locked operator tokens have operator syntax. Domain-specific operations use named functions/methods. Fixed tokens:
 
 ```text
-.
-?.
-.[
-?.[
-#(
-#{
-#[
-:
-:=
-:?
-:>
-:?>
-<:
-~=
-|=
-=
-/=
-<
-<=
->
->=
-in
-+
--
-*
-/
-%
-|<
->|
->+
-@<
-@>
-&
-^
-|
-~
-??
-..
-..<
-=>
-->
+. ?. .[ ?.[ #( #{ #[ : := :? :> :?> <: ~= |= = /= < <= > >= in + - * / % |< >| >+ @< @> & ^ | ~ ?? .. ..< => ->
 ```
 
-### Word Operators
+`in` is the only core word operator; contextual in operator position. No `and`, `or`, `xor`, `not`, `is`, `lsh`, `rsh`, or similar word operators. Negated membership: `~(x in y)`.
 
-`in` is the only core word operator.
-
-```ebnf
-word-op ::= "in"
-```
-
-Rules:
-- `in` is contextual in operator position.
-- no `and`, `or`, `xor`, `not`, `is`, `lsh`, `rsh`, or similar word operators exist in core.
-- negated membership uses `~(x in y)`.
-
-### Equality, Ordering, Equivalence, Membership
+Relations:
 
 ```ebnf
 equality-op    ::= "=" | "/="
@@ -682,18 +321,9 @@ equivalence-op ::= "~="
 membership-op  ::= "in"
 ```
 
-Meanings:
-- `=` value equality
-- `/=` value inequality
-- `<`, `<=`, `>`, `>=` ordering comparisons
-- `~=` type/equivalence relation, not approximate numeric equality
-- `in` membership
+`=` equality only, never assignment. `/=` inequality. `< <= > >=` ordering. `~=` type/equivalence, not approximate numeric equality. Approximate equality is named function/method due tolerance/units/error/domain/type dependence.
 
-There is no approximate-equality operator in core. Approximation depends on tolerance, units, absolute vs relative error, domain, and numeric type, so it belongs in named functions or methods.
-
-### Binding And Update
-
-`:=` is binding/definition/initialization/update. `=` is equality only and never assignment.
+Binding/update:
 
 ```ebnf
 binding-expr ::= "let" bind-head type-annot? ":=" EXPR
@@ -701,67 +331,25 @@ update-expr  ::= place-expr ":=" EXPR
 place-expr   ::= IDENT | EXPR "." IDENT | EXPR "." INT | EXPR ".[" EXPR "]"
 ```
 
-Rules:
-- `let name := expr` creates or binds.
-- `place := expr` updates an existing place.
-- record/product datum fields use `:=` because they initialize named fields.
-- update requires mutable access or equivalent capability.
-- `:=` has the lowest precedence.
-- chained updates are not accepted unless a later rule explicitly defines them.
+`:=` binds/defines/initializes/updates. Record/product datum fields use `:=` because they initialize. Updates require mutable access or equivalent capability. `:=` lowest precedence. Chained updates rejected unless later rule defines them.
 
-### Algebra Operators
-
-Core Boolean/bit algebra operators:
+Algebra:
 
 ```ebnf
 algebra-op ::= "&" | "|" | "^" | "~"
 ```
 
-Meanings:
-- `&` conjunction / bitwise-and / type-phase intersection where type checking proves it
-- `|` disjunction / bitwise-or / type-phase union where type checking proves it
-- `^` xor / symmetric difference where type checking proves it
-- `~` complement / not where type checking proves it
+Meanings: `&` conjunction/bitwise-and/type intersection where proven; `|` disjunction/bitwise-or/type union where proven; `^` xor/symmetric difference where proven; `~` complement/not where proven. No separate logical/bitwise split. Applies to `Bit`, `Word`, `Word8`, `Word16`, `Word32`, `Word64`, `Bits[N]`, and type algebra where accepted. Guard contexts require `Bit`; no truthiness. Short-circuiting is control flow via `when ... else` or `match`. Not core: `and or xor not && || ! &? |? ~? |>`.
 
-There is no separate logical/bitwise operator split. `Bit`, `Word`, `Word8`, `Word16`, `Word32`, `Word64`, and `Bits[N]` use the same symbolic algebra where accepted by type checking.
-
-`Bit` is a sum type with known discriminants.
+`Bit` is a sum type with known discriminants; `true`/`false` are ordinary predefined/core bindings, not keywords. Canonical variants: `Bit.True`, `Bit.False`; shorthand `.True`/`.False` allowed when expected type is `Bit`.
 
 ```musi
-export let Bit := data {
-  case False := 0;
-  case True := 1;
-};
-
+export let Bit := data { case False := 0; case True := 1; };
 export let true : Bit := Bit.True;
 export let false : Bit := Bit.False;
 ```
 
-`true` and `false` are ordinary predefined/core bindings, not keywords. Canonical variant names are `Bit.True` and `Bit.False`. Variant shorthand `.True` and `.False` may be used when the expected type is `Bit`.
-
-Guard contexts require `Bit`. There is no truthiness.
-
-Short-circuiting is control flow, not algebra. Use `when ... else ...` or `match`.
-
-Not core Boolean/bit algebra syntax:
-
-```text
-and
-or
-xor
-not
-&&
-||
-!
-&?
-|?
-~?
-|>
-```
-
-### Parser Strategy, Precedence, And Associativity
-
-Musi does not parse all infix expressions as one flat semantic chain. Locked core operators parse with the locked precedence table.
+Parser tiers:
 
 ```ebnf
 postfix-expr      ::= EXPR postfix-op+
@@ -783,119 +371,61 @@ conditional-op    ::= "when"
 binding-op        ::= ":="
 ```
 
-### UDNS: Universal Dot Notation Syntax
+Precedence high→low:
 
-UDNS means Universal Dot Notation Syntax.
+1. postfix access/call/index
+2. prefix unary/modifiers
+3. callable arrow in type position `->`
+4. `* / %`
+5. `+ -`
+6. shifts/rotates `|< >| >+ @< @>`
+7. ranges `.. ..<`
+8. relation/type/equality/membership `< <= > >= = /= ~= :? :> :?> <: |= in`
+9. `&`
+10. `^`
+11. `|`
+12. `??`
+13. `when ... else` / `when`
+14. `:=`
 
-Dot notation is the universal syntax for member access, receiver-method access, tuple field access, namespace/module access, variant qualification, optional access, and indexed access compounds.
+Rules: expressions are not parsed as one flat semantic chain; precedence is syntax. `%` is CPU-style remainder, not mathematical modulo; true modulo belongs in named op such as `mod(a,b)`. Shift/rotate are maximal-munch single tokens. No `<<`/`>>`. No arithmetic-left-shift unless later semantics differ from zero-fill left shift. Algebra precedence: `&` > `^` > `|`. Relational/type/equality operators are non-chainable. `??` is right-associative and Maybe-only. Shift meanings: `|<` zero-fill left; `>|` zero-fill right; `>+` sign-fill arithmetic right; `@<` rotate left; `@>` rotate right.
+
+### UDNS and UFCS
+
+UDNS = Universal Dot Notation Syntax. Dot notation covers member access, receiver-method access, tuple field access, namespace/module access, variant qualification, optional access, and indexed access compounds.
 
 ```ebnf
-dot-postfix ::= "." IDENT
-              | "." INT
-              | ".[" EXPR "]"
-              | "?." IDENT
-              | "?." IDENT call-args
-              | "?.[" EXPR "]"
+dot-postfix ::= "." IDENT | "." INT | ".[" EXPR "]" | "?." IDENT | "?." IDENT call-args | "?.[" EXPR "]"
 ```
 
-UDNS owns these shapes:
+Owned shapes: `value.member`, `value.method(args)`, `tuple.0`, `module.item`, `Type.Variant(args)`, `.Some(args)`, `value?.member`, `value?.method(args)`, `value.[index]`, `value?.[index]`.
 
-```musi
-value.member
-value.method(args)
-tuple.0
-module.item
-Type.Variant(args)
-.Some(args)
-value?.member
-value?.method(args)
-value.[index]
-value?.[index]
-```
+UFCS is semantic resolution over UDNS: receiver methods from `let (self : T).method(...) := ...` use same dot/call surface as ordinary members. `|>` is absent; UDNS/UFCS are fluent composition mechanism.
 
-UFCS is a semantic resolution rule over UDNS: receiver methods defined by `let (self : T).method(...) := ...;` are accessed through the same dot/call surface as ordinary members.
+UDNS resolution order for `x.foo` / `x.foo(args)`:
 
-`|>` is not a core operator. Pipeline syntax is absent from core Musi. UDNS and UFCS are the fluent composition mechanism.
+1. direct member/field/variant/module-record member
+2. shape member required by known static type/constraint
+3. attached receiver method
+4. explicit dynamic/capability member operation only for `Any`, `opaque`, or capability-gated type
 
-UDNS resolution order for `x.foo` and `x.foo(args)`:
+Ambiguity at same priority is diagnostic. If a higher-priority candidate exists but is unusable, diagnostic; no fallback. Direct structure owns dot names. Receiver methods do not shadow fields/shape members. If `x.foo` is non-callable direct field and receiver method `foo` also exists, `x.foo()` diagnoses non-callable member. `Any` has no implicit duck-dot lookup; dynamic lookup is explicit operation/capability. No receiver-method escape syntax; receiver qualification uses ordinary UDNS/module/type paths.
 
-1. direct member, field, variant, or module-record member
-2. shape member required by the known static type or constraint
-3. attached receiver method defined by `let (self : T).foo(...) := ...`
-4. explicit dynamic/capability member operation only when the type is `Any`, `opaque`, or otherwise capability-gated
+## 10. Type-system surface
 
-If multiple candidates remain at the same priority, resolution is a diagnostic. If a higher-priority candidate exists but is unusable for the requested operation, resolution is a diagnostic and does not fall through to lower-priority candidates.
-
-Direct structure owns dot names. Receiver methods do not silently shadow fields or shape members.
-
-```musi
-x.foo()
-```
-
-If `x.foo` is a non-callable direct field and a receiver method named `foo` also exists, the expression is diagnosed as a call to a non-callable member. It does not fall through to the receiver method.
-
-`Any` does not get implicit duck-dot lookup. Dynamic member lookup must be an explicit operation or capability, not a magic UDNS fallback.
-
-There is no special receiver-method escape syntax. Receiver qualification uses ordinary UDNS/module/type paths.
-
-Precedence, highest to lowest:
-1. postfix access/call/index
-2. prefix unary and modifiers
-3. callable arrow in type position: `->`
-4. multiplicative: `* / %`
-5. additive: `+ -`
-6. shift/rotate: `|< >| >+ @< @>`
-7. range: `.. ..<`
-8. relational/type/equality/membership: `< <= > >= = /= ~= :? :> :?> <: |= in`
-9. algebra AND: `&`
-10. algebra XOR: `^`
-11. algebra OR: `|`
-12. nil-coalesce / Maybe fallback: `??`
-13. conditional: `when ... else` / `when`
-14. binding/update: `:=`
+Musi uses bidirectional type checking/inference.
 
 Rules:
-- `%` means remainder, not mathematical modulo.
-- true modulo belongs in a named operation such as `mod(a, b)` or a standard-library/compiler intrinsic.
-- shift and rotate operators are symbolic single tokens under maximal munch.
-- no `<<` or `>>` shift syntax.
-- no separate arithmetic-left-shift operator unless semantics distinct from zero-fill left shift are later defined.
-- `&` binds tighter than `^`; `^` binds tighter than `|`.
-- relational/type/equality operators are non-chainable.
-- `??` is right-associative and Maybe-only.
 
-Shift/rotate meanings:
-- `a |< n` zero-fill left shift
-- `a >| n` zero-fill right shift
-- `a >+ n` sign-fill arithmetic right shift
-- `a @< n` rotate left
-- `a @> n` rotate right
+- Missing annotations request inference, not dynamic fallback.
+- Annotations push expected types inward; expressions synthesize types outward.
+- Inference chooses the most precise/principal supported type.
+- Irresolvable ambiguity is diagnostic.
+- Inference never silently inserts `Any`.
+- Dynamic boundaries must be explicit through annotation, conversion, import/FFI boundary, or API return type.
+- Inferred structural, row, and capability constraints are ordinary Musi type info.
 
-## 11. Type System Surface
-
-### Bidirectional Gradual Inference
-
-Musi uses bidirectional type checking and inference.
-
-Rules:
-- missing annotations request inference, not fallback to dynamic typing
-- annotations push expected types inward
-- expressions synthesize types outward
-- inference chooses the most precise/principal type supported by the type system
-- ambiguity that the type system cannot resolve is a diagnostic
-- inference never silently inserts `Any`
-- dynamic boundaries must be explicit through annotation, conversion, import/FFI boundary, or API return type
-- inferred structural, row, and capability constraints are ordinary Musi type information
-
-Core lattice roles:
-- `Type[N]` is the universe of types at level `N`
-- `Type` is a predefined core `let` binding alias for `Type[0]`
-- `Any` is the explicit dynamic top value type
-- `_` in type position is an explicit inference hole
-- unresolved `_` holes are diagnostics
-- `Unit` is the canonical zero-information inhabited type
-- `Empty` is the uninhabited bottom type
-- `Error` is the top error type
+Core lattice/types:
 
 ```ebnf
 universe-type    ::= "Type" "[" EXPR "]"
@@ -909,121 +439,56 @@ error-type       ::= "Error"
 structural-type  ::= record-type | row-type | capability-type
 ```
 
-`Type[N]` is the primitive universe use form. Its constructor parameter is `known N : Nat`, so the call site writes `Type[N]` and the compiler checks that `N` is known. If a runtime/non-known value is used in this known-required position, it is a diagnostic.
+Facts:
 
-Known requirements are explicit at definition sites. Calls to known-required positions are implicit at use sites because the callee/type/form already declares the known requirement.
+- `Type[N]` is primitive universe use form; `N` is `known Nat`; runtime/non-known `N` is diagnostic.
+- Known requirements are explicit at definition sites; call sites omit `known` because callee/form declares requirement.
+- `Type[N] : Type[N + 1]`.
+- `Type` is predefined core binding alias: `export let Type := Type[0];`.
+- `type` remains not keyword. `Type0`, `Type1`, etc. are not built-in source forms unless defined.
+- `()` canonicalizes to `Unit`.
+- `Empty` is uninhabited bottom, not empty tuple; expression of type `Empty` may fit any required result because it never returns.
+- `Any` is explicit dynamic top value type; not null, absence, failure, callable-anything, or permission to ignore effects/capabilities.
+- Dynamic-to-static use requires `:?>` or explicit checked operation.
+- Static-to-dynamic use is explicit via annotation/conversion/dynamic boundary.
+- `Error` is built-in non-keyword top error type. Specific errors such as `AnyError`, `CastError` subtype `Error`.
+- Unannotated record datum may infer anonymous structural record/row type, not `Any`.
+- FFI/exported ABI boundaries require explicit representable types or representation metadata; anonymous structural/row types do not silently become ABI types.
 
-`Type[N]` has type `Type[N + 1]`. `Type` is not special syntax and not a keyword; it is the predefined core binding:
-
-```musi
-export let Type := Type[0];
-```
-
-`type` remains not a keyword. `Type0`, `Type1`, and similar names are not built-in source forms unless user or library code defines them.
-
-`()` canonicalizes to `Unit`. `Empty` is not the empty tuple; it is a type with no values. An expression with type `Empty` may fit any required result position because it never produces a value.
-
-`Any` does not mean null, absence, failure, callable-anything, or permission to ignore effects/capabilities. Dynamic-to-static use requires `:?>` or another explicit checked operation. Static-to-dynamic use is explicit through annotation, conversion, or a dynamic boundary.
-
-`Error` is a built-in non-keyword top error type. Specific error types are subtypes of `Error`.
-
-```musi
-AnyError <: Error
-CastError <: Error
-```
-
-Unannotated code may infer anonymous structural record/row types.
-
-```musi
-let p := #{ name := "Ada", age := 36 };
-```
-
-The inferred type is a structural record/row type with fields for `name` and `age`, not `Any`.
-
-FFI and exported ABI boundaries require explicit representable types or explicit representation metadata. Anonymous inferred structural/row types do not silently become ABI types.
-
-### Type Annotation
-
-`:` is the universal type annotation marker.
+Type annotation:
 
 ```ebnf
-type-annot          ::= ":" TYPE
-annotated-name      ::= IDENT type-annot
-annotated-result    ::= param-list type-annot
-annotated-receiver  ::= "(" IDENT type-annot ")"
-annotated-pattern   ::= PATTERN type-annot
+type-annot         ::= ":" TYPE
+annotated-name     ::= IDENT type-annot
+annotated-result   ::= param-list type-annot
+annotated-receiver ::= "(" IDENT type-annot ")"
+annotated-pattern  ::= PATTERN type-annot
 ```
 
-It applies in value, parameter, field, result, receiver, pattern, and shape-member positions.
+`:` applies to value, parameter, field, result, receiver, pattern, and shape-member positions. It is not cast/subtype/type-test/equivalence/conformance syntax.
 
-`:` is not overloaded for casts, subtyping, runtime type tests, type equivalence, or conformance.
-
-### Callable Types
-
-`->` is the callable type arrow.
+Callable types:
 
 ```ebnf
 callable-type        ::= callable-input "->" TYPE
 callable-input       ::= TYPE | tuple-type
 multi-input-callable ::= "(" TYPE ("," TYPE)+ ","? ")" "->" TYPE
-```
-
-Examples:
-
-```musi
-Int -> Text
-(Int, Text) -> Unit
-() -> Unit
-```
-
-Rules:
-- `->` is type-space callable arrow, not a curry operator in expression space.
-- `Unit` is the only canonical zero-information result type.
-- `()` is empty tuple type shape and canonicalizes to `Unit`.
-- chained callable arrows require explicit design before implicit currying is accepted.
-- parentheses spell intent: `A -> (B -> C)` or `(A, B) -> C`.
-
-Musi source and SEIL metadata use the same callable type surface:
-
-```ebnf
 source-callable-type ::= callable-type
 seil-callable-type   ::= callable-type
 ```
 
-Musi source does not use old stack-effect bracket syntax as the callable surface. SEIL is the lowered verifier form of Musi, not a separate source language. SEIL metadata preserves callable types in Musi syntax for near-identical decompilation.
+`->` is type-space callable arrow, not expression currying. `Unit` is canonical zero-information result. `()` is empty tuple type shape → `Unit`. Chained arrows require explicit design; use parentheses (`A -> (B -> C)`, `(A, B) -> C`). Musi source and SEIL metadata share callable type surface. No old source stack-effect bracket syntax. SEIL verifies lowered stack behavior while metadata preserves callable types for near-identical decompilation.
 
-### Stack-Effect Compatibility
+Stack-effect compatibility:
 
-Source uses callable types and observable result/effect compatibility. Raw stack-effect syntax is not a source surface. SEIL verifies lowered stack behavior against the observable shape.
+- Total conditionals require `cond : Bit`; branches unify to one observable result/effect; `Empty` branch lets other determine result; expected context pushes into both branches.
+- Bare guarded emission produces zero-or-one emission accepted only by consuming context.
+- `match` arms unify to one observable result/effect; `Empty` arms do not force result; guarded arms only conditional coverage; match exhaustive.
+- `defer : Unit`; cleanup expression `Unit`; cleanup effect attaches to scope/region exit, not local result; cleanup cannot consume non-live values.
+- `yield` only in compatible resumable/generator callable contexts; yielded value matches output protocol; local result `Unit`; suspension not scope exit; `defer` not run on suspension; pending defers run on final exit/close/drop/cancel.
+- Receiver methods treat receiver as semantic first input/capability; receiver syntax preserved by source metadata/decompilation; receiver mutability/stability comes from receiver type: `T`, `mut T`, `fixed T`, `fixed mut T`.
 
-Rules:
-- `a when cond else b` requires `cond : Bit`
-- both total conditional branches must unify to one observable result/effect shape
-- if one total conditional branch is `Empty`, the other branch determines the result
-- expected type/effect from context is pushed into both total conditional branches
-- `a when cond` produces zero-or-one emission of `a`
-- bare guarded emission is accepted only where the surrounding context consumes zero-or-one emission
-- `match` arms must unify to one observable result/effect shape
-- `Empty` match arms do not force the result type
-- guarded match arms contribute conditional coverage only
-- `match` remains exhaustive
-- `defer` produces `Unit`
-- deferred cleanup expressions must produce `Unit`
-- deferred cleanup effect attaches to scope/region exit, not local expression result
-- deferred cleanup cannot consume values that are no longer live
-- `yield` is valid only in resumable/generator-compatible callable contexts
-- yielded value must match the enclosing resumable output protocol
-- `yield` produces `Unit` locally after handing off the yielded value
-- suspension is not scope exit
-- `defer` does not run on `yield` suspension
-- pending defers run on final scope exit, close, drop, or cancel
-- receiver methods treat the receiver as a semantic first input/capability
-- receiver syntax is preserved by source metadata/decompilation
-- receiver mutability and stability come from receiver type: `T`, `mut T`, `fixed T`, or `fixed mut T`
-
-### Type Algebra
-
-Type-position algebra uses the same symbolic algebra family as value/bit algebra when the operands are types.
+Type algebra:
 
 ```ebnf
 type-union        ::= TYPE "|" TYPE
@@ -1032,77 +497,28 @@ type-difference   ::= TYPE "^" TYPE
 type-complement   ::= "~" TYPE
 ```
 
-Meanings:
-- `A | B` is union: a value is in `A` or `B`
-- `A & B` is intersection: a value is in both `A` and `B`
-- `A ^ B` is symmetric difference: a value is in either `A` or `B`, but not both
-- `~A` is complement: a value is outside `A` within the relevant type universe
-
-`A ^ B` is derived type algebra:
-
-```text
-A ^ B = (A | B) & ~(A & B)
-```
+Meanings: `A | B` union; `A & B` intersection; `A ^ B` symmetric difference; `~A` complement within relevant type universe. Derived law: `A ^ B = (A | B) & ~(A & B)`.
 
 Normalization laws:
-- `A | A` normalizes to `A`
-- `A & A` normalizes to `A`
-- `A | Empty` normalizes to `A`
-- `A & Empty` normalizes to `Empty`
-- `A | Any` normalizes to `Any`
-- `A & Any` normalizes to `A`
-- `~~A` normalizes to `A`
-- `A ^ A` normalizes to `Empty`
-- `A ^ Empty` normalizes to `A`
-- `A ^ Any` normalizes to `~A`
 
-Subtyping/equivalence facts:
-- `A` is a subtype of `B` exactly when `A | B` is equivalent to `B`
-- `A & B` is a subtype of `A`
-- `A & B` is a subtype of `B`
+```text
+A|A=A; A&A=A; A|Empty=A; A&Empty=Empty; A|Any=Any; A&Any=A; ~~A=A; A^A=Empty; A^Empty=A; A^Any=~A
+```
 
-Complement and symmetric difference are accepted only where the type universe makes them normalizable/checkable. Ambiguous or non-normalizable type algebra is a diagnostic.
+Subtyping/equivalence facts: `A <: B` iff `A | B ~= B`; `A & B <: A`; `A & B <: B`. Complement/symmetric difference accepted only where universe makes them normalizable/checkable; ambiguous/non-normalizable type algebra is diagnostic. Type algebra is type space; ABI/FFI representability checked separately. Algebraic types do not silently become ABI-safe tagged unions/layout records. No `iff`, `<=>`, `<->`, `=>`, `==` for type logic. Type equivalence `~=`; subtyping `<:`.
 
-Type algebra is Musi type space. ABI/FFI representability is checked separately. Algebraic types do not silently become ABI-safe tagged unions or layout-compatible records.
-
-No `iff`, `<=>`, `<->`, `=>`, or `==` operator is introduced for type logic. Type equivalence remains `~=`. Subtyping remains `<:`.
-
-### UALO: Universal Argument-List Ordering
-
-UALO means Universal Argument-List Ordering.
-
-All argument-list-shaped syntax follows one ordering rule: positional arguments first, then named arguments. Once named arguments begin, positional arguments cannot resume.
+UALO = Universal Argument-List Ordering:
 
 ```ebnf
-arg-list        ::= positional-arg ("," positional-arg)* ("," named-arg)* ","?
-                  | named-arg ("," named-arg)* ","?
-positional-arg  ::= "_" | EXPR
-named-arg       ::= IDENT ":=" EXPR
-call-args       ::= "(" arg-list? ")"
+arg-list       ::= positional-arg ("," positional-arg)* ("," named-arg)* ","? | named-arg ("," named-arg)* ","?
+positional-arg ::= "_" | EXPR
+named-arg      ::= IDENT ":=" EXPR
+call-args      ::= "(" arg-list? ")"
 ```
 
-Rules:
-- positional arguments come first
-- named arguments come after positional arguments
-- once a named argument appears, positional arguments cannot resume
-- defaults must be trailing in definitions
-- duplicate named arguments are diagnostics
-- unknown named arguments are diagnostics
-- positional and named arguments cannot bind the same parameter twice
-- the rule applies to ordinary call arguments, generic call arguments, attribute arguments, parameter/default definitions, variant payload arguments if named payload calls are locked later, and future argument-list-shaped syntax
+Rules: positional arguments first; named arguments after; once named starts, positional cannot resume; definition defaults trail; duplicate/unknown named args diagnostic; same parameter cannot be bound twice. Applies to ordinary calls, generic calls, attributes, parameter/default definitions, named variant payload calls if locked later, and future argument-list-shaped syntax. UALO is a surface invariant; receiver-style callable access uses ordinary binding/call semantics.
 
-```musi
-f(a, b, c := d)
-f(x := a, y := b)
-Matrix[Float32, rows := 4]
-@repr(.c, align := 4)
-```
-
-UALO is a surface-design invariant like UFCS: receiver-style callable access uses ordinary binding/call semantics, and argument-list ordering is universal across all argument-list-shaped forms.
-
-### Type Operator Family
-
-Musi uses a coherent `:`-led family for type-related operators.
+Type-operator family:
 
 ```ebnf
 type-test            ::= EXPR ":?" TYPE
@@ -1113,100 +529,36 @@ type-equivalence     ::= TYPE "~=" TYPE
 conformance-relation ::= TYPE "|=" TYPE
 ```
 
-Meanings:
-- `:` annotates
-- `:?` tests runtime type and returns `Bit`
-- `:>` requests explicit static conversion/cast
-- `:?>` performs checked runtime cast and returns explicit failure-capable result
-- `<:` states subtype relation
-- `~=` states type equivalence relation
-- `|=` states shape conformance/fits relation
+Meanings: `:` annotation; `:?` runtime type test → `Bit`; `:>` explicit static conversion/cast, not runtime checked; `:?>` checked runtime cast → explicit failure-capable result; `<:` subtype; `~=` type equivalence; `|=` shape conformance/fits. `:?` never returns narrowed value. `:?>` never returns `Bit`. `?=` is not accepted.
 
-Rules:
-- `:?` never returns narrowed value.
-- `:?>` never returns `Bit`.
-- `:>` is not runtime checked.
-- `?=` is not accepted and does not belong to the `:` type-operator family.
-
-### Optional Type And Operators
-
-`?T` is optional type sugar for `Maybe[T]`.
+Optional/Maybe:
 
 ```ebnf
 optional-type   ::= "?" TYPE
 maybe-fallback  ::= EXPR "??" EXPR
-optional-access ::= EXPR "?." IDENT
-                  | EXPR "?." IDENT call-args
-                  | EXPR "?.[" EXPR "]"
+optional-access ::= EXPR "?." IDENT | EXPR "?." IDENT call-args | EXPR "?.[" EXPR "]"
 ```
 
-Rules:
-- `?` in type position names optionality/maybe-ness.
-- `?` does not name `Expect`.
-- `??` works only on `?T` / `Maybe[T]`.
-- `??` fallback produces `T`.
-- `??` result type is `T`.
-- `??` fallback is lazy.
-- `?.` operates only on `?T` / `Maybe[T]`.
-- absent stays absent.
-- `?.` does not invent null.
-- `?.` composes with `??`.
+`?T` is `Maybe[T]`. `?` does not name `Expect`. `??` only for `?T`/`Maybe[T]`; fallback lazy; result `T`. `?.` only for `?T`/`Maybe[T]`; access/call/index only when present; absent stays absent; no null invented; composes with `??`. `when ... else` branches on `Bit`; `??` branches on optional presence; `?.` propagates absence. `Expect` remains explicit unless failure sugar later locked.
 
-Distinctions:
-- `when ... else ...` branches on `Bit`.
-- `??` branches on optional presence.
-- `?.` propagates absence through access.
-- `Expect` remains explicit unless separate failure sugar is locked later.
-
-### Expect And Checked Casts
+Expect/checked casts:
 
 ```ebnf
 expect-type         ::= "Expect" "[" TYPE "," TYPE "]"
 checked-cast-result ::= "Expect" "[" TYPE "," "CastError" "]"
 ```
 
-`:?>` returns an explicit `Expect` value:
+`:?>` returns `Expect[Target, CastError]`. No locked `Expect` sugar. `?T`, `??`, `?.` are Maybe-only. Failed casts carry error info. `CastError <: Error`. No hidden exceptions.
 
-```musi
-let checked : Expect[User, CastError] := value :?> User;
-```
+Dynamic `Any` capabilities:
 
-Rules:
-- no locked error/failure sugar for `Expect`
-- `?T`, `??`, and `?.` are Maybe-only
-- failed casts carry error information
-- `CastError` is a subtype of `Error`
-- no hidden exceptions are introduced
+- `Any` does not imply implicit dot/call/index lookup.
+- Dynamic ops are explicit witness-required shapes: e.g. `AnyMember.member(name) : Expect[Any, AnyError]`, `AnyIndex.index(key) : Expect[Any, AnyError]`, `AnyCall.call(name,args) : Expect[Any, AnyError]`.
+- `AnyMember`, `AnyIndex`, `AnyCall`, `AnyError`, `Error` are ordinary built-in/library/runtime names, not keywords.
+- `AnyError <: Error`; APIs may widen to `Expect[Any, Error]`.
+- `Any` values do not automatically provide dynamic capabilities; APIs decide which values carry/provide them.
 
-### Dynamic Any Capabilities
-
-`Any` does not imply implicit dot, call, or index lookup. Dynamic operations are explicit capabilities expressed with ordinary witness-required shapes.
-
-```musi
-let AnyMember := @witness shape {
-  let (self : Self).member(name : Text) : Expect[Any, AnyError];
-};
-
-let AnyIndex := @witness shape {
-  let (self : Self).index(key : Any) : Expect[Any, AnyError];
-};
-
-let AnyCall := @witness shape {
-  let (self : Self).call(name : Text, args : []Any) : Expect[Any, AnyError];
-};
-```
-
-Rules:
-- `AnyMember`, `AnyIndex`, `AnyCall`, `AnyError`, and `Error` are ordinary built-in/library/runtime names, not keywords
-- `AnyError` is the dynamic-value error subtype and fits `Error`
-- dynamic lookup returns explicit failure-capable results such as `Expect[Any, AnyError]`
-- APIs may widen dynamic failures to `Expect[Any, Error]`
-- a value of type `Any` does not automatically provide `AnyMember`, `AnyIndex`, or `AnyCall`
-- APIs decide whether a given dynamic value carries or provides those capabilities
-
-### Fixed Storage
-
-`fixed` is a type/storage-space modifier.
+Fixed storage:
 
 ```ebnf
 fixed-type     ::= "fixed" TYPE
@@ -1214,109 +566,50 @@ fixed-mut-type ::= "fixed" "mut" TYPE
 qualified-type ::= "known"? "fixed"? "mut"? TYPE
 ```
 
-`fixed T` means storage-qualified `T` whose address is stable for the value's lifetime and cannot be moved by the collector/runtime during that lifetime.
+`fixed T` = storage-qualified `T` with stable address for value lifetime, not movable by collector/runtime during that lifetime. It does not mean static/global, immutable, compile-time, type-associated, permanent, or thread-safe. Orthogonal to `mut`: `fixed T` stable address; `mut T` mutable access; `fixed mut T` both. Address-taking requires `fixed`; movable values cannot expose stable raw addresses. No separate `pin` keyword/expression/block. Pinning semantics represented by `fixed`. Temporary non-moving access uses APIs/capabilities over `fixed`. GC/runtime pinning hidden behind `fixed` lowering/runtime behavior. Stable address of non-`fixed` storage is error. FFI APIs needing stable pointers require `fixed` storage or explicit copy/borrow APIs.
 
-`fixed` does not mean:
-- static/global
-- immutable
-- compile-time
-- type-associated
-- permanent
-- thread-safe by itself
-
-`fixed` is orthogonal to `mut`:
-- `fixed T`: stable address, not necessarily mutable
-- `mut T`: mutable access, not necessarily stable-address storage
-- `fixed mut T`: stable address and mutable access
-
-Address-taking requires fixed storage. Movable values cannot expose stable raw addresses.
-
-There is no separate `pin` keyword, pin expression, or pin block. Pinning semantics are represented by `fixed`.
-
-Temporary non-moving access is expressed through APIs/capabilities over `fixed`, not syntax. GC/runtime pinning implementation is hidden behind `fixed` lowering/runtime behavior.
-
-Invalid attempts to take a stable address of non-`fixed` storage are errors. FFI APIs that require stable pointers require `fixed` storage or explicit copy/borrow APIs.
-
-### Opaque And Erased Types
-
-`opaque` and `erased` are type-space modifiers, not attributes.
+Opaque/erased:
 
 ```ebnf
 opaque-type ::= "opaque" TYPE
 erased-type ::= "erased" TYPE
 ```
 
-They affect type identity, representation, dispatch, checking, ABI/SEIL metadata, and decompilation.
+Type-space modifiers, not attributes. Affect type identity, representation, dispatch, checking, ABI/SEIL metadata, decompilation. `hidden` removed; use `opaque` for existential hiding, `erased` for opaque-result/static-hidden concrete type, `export`/absence for visibility, attributes for representation/ABI/interop. `opaque T` ≈ Swift `any T`: existential/capability with concrete type hidden behind `T`. `erased T` ≈ Swift `some T`: exposed type hides concrete name while definition has one compiler-known concrete type; static specialization may remain possible.
 
-`hidden` is removed. Use exact concepts:
-- `opaque` for existential type hiding
-- `erased` for opaque-result/static-hidden concrete type
-- `export` or non-export for module visibility
-- metadata/attributes for representation, ABI, or interop details
+## 11. Known phase
 
-`opaque T` is closest to Swift's `any T`: existential/capability value whose concrete type is hidden behind `T`.
-
-`erased T` is closest to Swift's `some T`: exposed type hides the concrete type name while the defining expression still has one compiler-known concrete underlying type. Static specialization may remain possible.
-
-## 12. Known Phase
-
-`known` is a phase modifier. It answers: can this be compile-time?
-
-`known` is not `const` and not `static`.
+`known` is a phase modifier asking whether something can be compile-time. It is not `const` or `static`.
 
 Rules:
-- `known expr` requests or requires compile-time evaluation.
-- `known T` requires a compile-time-known value/type-phase value of type `T`.
+
+- `known expr` requests/requires compile-time evaluation.
+- `known T` requires compile-time-known value/type-phase value of type `T`.
 - `known` appears only where compile-time availability is meaningful.
-- known requirements are explicit at definition sites by using `known` in type position.
-- call sites to known-required parameters do not repeat `known`; the compiler checks that the supplied argument is known.
-- if context already requires knownness, spelling is omitted at the call/use site.
-- if a value cannot be compile-time, `known` produces a diagnostic.
-- without `known`, evaluation is runtime unless context requires knownness.
-- known phase can construct datum literals when contained values are known-compatible.
-- case tag/discriminant positions require known values by context.
-- array/list type bounds are known-phase contexts.
+- Known requirements explicit at definition sites using `known` in type position.
+- Call sites to known-required params do not repeat `known`; compiler checks argument is known.
+- If context already requires knownness, spelling omitted at use site.
+- If value cannot be compile-time, diagnostic.
+- Without `known`, evaluation is runtime unless context requires knownness.
+- Known phase can construct datum literals when contained values are known-compatible.
+- Case tags/discriminants and array/list bounds require known values by context.
 - `known import` is compile-time acquisition/import.
 
-```musi
-let Vector[N : known Nat, T : Type](items : [N]T) := ...;
-let v := Vector[4, Int](items);
-```
+Boundary: known code may depend only on known values, known imports, type info, and compiler-permitted deterministic known intrinsics. Runtime values cannot be captured by `known`. Known values may generate or runtime-initialize representable values. Known→runtime allowed by embedding/lowering known result. Runtime→known forbidden.
 
-The definition states that `N` must be known. The call supplies `4`, not `known 4`. If a runtime value is supplied for `N`, it is a diagnostic.
+Known functions are Musi lowered to SEIL; known evaluation executes SEIL in known phase. No separate source-tree evaluator. Known evaluation is deterministic/resource-limited: no ambient runtime state; no wall-clock/time/random/environment/process/IO unless explicit deterministic known import/intrinsic; bounded fuel/step/memory limits are compiler settings; nontermination/limit exhaustion diagnostic; no dependency on target runtime mutable state; may use known imports, pure computation, type information, compiler-approved deterministic intrinsics.
 
-Known/runtime boundary:
-- known code may depend only on known values, known imports, type information, and compiler-permitted deterministic known intrinsics.
-- runtime values cannot be captured by `known`.
-- known values may generate or runtime-initialize representable values.
-- crossing from known to runtime is allowed by embedding/lowering known results.
-- crossing from runtime to known is not allowed.
+## 12. Safety, pointers, FFI
 
-Known functions are Musi code lowered to SEIL. Known evaluation executes SEIL in the known phase. There is no separate source-tree evaluator semantics.
-
-Known evaluation is deterministic and resource-limited:
-- no ambient runtime state
-- no wall-clock, time, random, environment, process, or IO access unless supplied by explicit deterministic known imports/intrinsics
-- bounded fuel, step, and memory limits are compiler settings
-- nontermination or limit exhaustion is a diagnostic
-- cannot depend on target runtime mutable state
-- may use known imports, pure computation, type information, and compiler-approved deterministic intrinsics
-
-## 13. Safety
-
-There is no `unsafe` keyword or unsafe expression/block form.
+No `unsafe` keyword or unsafe expression/block form.
 
 ```ebnf
 unsafe-keyword ::= /* no production */
 ```
 
-Unsafe-ness is represented by operation metadata, capabilities, types, and diagnostics rather than a lexical region.
+Unsafety is represented by operation metadata, capabilities, types, and diagnostics. Dangerous behavior is error, not warning: memory unsafety, capability violation, invalid pointer use, invalid FFI boundary use, invalid representation layout, runtime-to-known phase violation, unchecked dynamic failure. Warnings are for portability, deprecation, performance, unused bindings/imports, suspicious-but-defined code, or style/tooling. Dangerous-but-allowed operations require explicit type/capability/API/metadata representation.
 
-Dangerous behavior is an error, not a warning. Memory unsafety, capability violation, invalid pointer use, invalid FFI boundary use, invalid representation layout, runtime-to-known phase violation, and unchecked dynamic failure are diagnostics/errors.
-
-Warnings are for portability, deprecation, performance, unused bindings/imports, suspicious-but-defined code, or style/tooling. Dangerous-but-allowed operations require explicit type, capability, API, or metadata representation.
-
-Pointer types are built-in/library types, not keywords.
+Pointer types are built-in/library types, not keywords:
 
 ```ebnf
 unsafe-ptr        ::= "UnsafePtr" "[" TYPE "]"
@@ -1324,107 +617,27 @@ unsafe-mut-ptr    ::= "UnsafeMutPtr" "[" TYPE "]"
 unsafe-opaque-ptr ::= "UnsafeOpaquePtr"
 ```
 
-Rules:
-- `UnsafePtr[T]` is a readable pointer to `T`
-- `UnsafeMutPtr[T]` is a readable/writable pointer to `T`
-- `UnsafeOpaquePtr` is an opaque FFI/handle pointer without typed pointee access
-- pointer creation is explicit and capability checked
-- stable address creation requires `fixed`
-- mutable pointer creation requires `fixed mut`
-- no `&x` address-of syntax exists
-- no `*p` dereference syntax exists
-- no pointer arithmetic exists in core operators
-- pointer operations are explicit methods, fields, intrinsics, or capabilities
-- typed pointee access uses UDNS through `.pointee`
-- `UnsafePtr[T].pointee` reads `T`
-- `UnsafeMutPtr[T].pointee` reads or writes `T`
-- invalid pointer use is an error, not a warning
-- `UnsafeOpaquePtr` must be explicitly cast/converted through an API/capability before typed pointee access
+Rules: `UnsafePtr[T]` readable pointer; `UnsafeMutPtr[T]` readable/writable pointer; `UnsafeOpaquePtr` opaque FFI/handle pointer without typed pointee access. Pointer creation explicit/capability-checked. Stable address creation requires `fixed`; mutable pointer creation requires `fixed mut`. No `&x` address-of, no `*p` dereference, no core pointer arithmetic. Pointer ops are explicit methods/fields/intrinsics/capabilities. Typed pointee access uses UDNS `.pointee`. `UnsafePtr[T].pointee` reads `T`; `UnsafeMutPtr[T].pointee` reads/writes `T`. Invalid pointer use is error. `UnsafeOpaquePtr` must be explicitly cast/converted through API/capability before typed access.
 
-Rationale:
-- avoids lexical unsafe blocks that can hide too much
-- unsafe is a property of operations, boundaries, and capabilities
-- keeps keyword count down
-
-### Foreign Boundary Rules
-
-FFI uses attributes and ordinary `let` bindings, not keywords.
+FFI uses attributes + ordinary `let`, not keywords:
 
 ```ebnf
-extern-attr       ::= "@extern" attr-args
-extern-import     ::= extern-attr let-decl
-extern-export     ::= extern-attr "export" let-expr
-repr-attr         ::= "@repr" attr-args
-let-decl          ::= "let" bind-head generic-param-list? type-annot? param-list? result-type? ";"
+extern-attr   ::= "@extern" attr-args
+extern-import ::= extern-attr let-decl
+extern-export ::= extern-attr "export" let-expr
+repr-attr     ::= "@repr" attr-args
+let-decl      ::= "let" bind-head generic-param-list? type-annot? param-list? result-type? ";"
 ```
 
-Rust-to-Musi naming analogy:
-- Rust `use` maps to Musi `import`
-- Rust `pub` maps to Musi `export`
-- Rust `extern` maps to Musi `@extern`
+Rust analogy: Rust `use` → Musi `import`; Rust `pub` → Musi `export`; Rust `extern` → Musi `@extern`. `@extern` is the only FFI boundary attribute. Direction determined by body presence and `export`.
 
-`@extern` is the only FFI boundary attribute. Direction is determined by body presence and `export`.
+Rules: `@extern let ...;` imports external implementation. `@extern export let ... := ...;` exposes Musi implementation outward. `@extern` with body but without `export` is diagnostic. `export` remains module visibility only. No `foreign` keyword, `extern` keyword, `@export`, `@abi`, or `@expose` attribute. `@repr(...)` controls representation/layout. FFI boundary types must be representable. Anonymous structural/row types are not FFI boundary types. `Any`, `opaque`, `erased`, closures, shapes, `Maybe`, `Expect`, and GC references are not FFI-safe unless a profile explicitly defines representation. Strings are not silently C strings. Pointers use `UnsafePtr`, `UnsafeMutPtr`, `UnsafeOpaquePtr`. FFI failure explicit through return values/wrappers; no hidden exceptions. Unsupported profile/calling convention/layout/type combo is diagnostic.
 
-```musi
-@extern(.c, "puts", link := "c")
-let puts(text : UnsafePtr[CChar]) : CInt;
+`@extern` args follow UALO: first positional external profile, second symbol. Meta-level call canonicalizes to known metadata record. Fields: `profile`, `symbol`, `link`, `calling` (default `.cdecl` for outward `.c`), `variadic` (ABI-specific, e.g. `.c`). C ABI names such as `CVoid`, `CChar`, `CInt`, `CLongLong`, `CSize` are ordinary predefined/core/library bindings; exact representation is implementation/profile-defined.
 
-@extern(.c, "musi_add")
-export let add(a : CInt, b : CInt) : CInt := a + b;
-```
+## 13. Attributes and representation metadata
 
-Rules:
-- `@extern let ...;` without a body imports an external implementation into Musi
-- `@extern export let ... := ...;` exposes a Musi implementation outward
-- `@extern` with a body but without `export` is a diagnostic
-- `export` remains module visibility only
-- there is no `foreign` keyword
-- there is no `extern` keyword
-- there is no `@export`, `@abi`, or `@expose` attribute
-- `@repr(...)` controls data representation/layout
-- FFI boundary types must be representable
-- anonymous structural/row types are not FFI boundary types
-- `Any`, `opaque`, `erased`, closures, shapes, `Maybe`, `Expect`, and GC references are not FFI-safe unless a profile explicitly defines representation
-- strings are not silently C strings
-- pointers use `UnsafePtr`, `UnsafeMutPtr`, and `UnsafeOpaquePtr`
-- FFI failure is explicit through return values or wrappers; no hidden exceptions are introduced
-- unsupported profile, calling convention, layout, or type combination is a diagnostic
-
-`@extern` arguments follow UALO. The first positional argument is the external profile. The second positional argument is the symbol.
-
-The `@extern` meta-level call canonicalizes to a known metadata record.
-
-```musi
-@extern(.c, "printf", link := "c", variadic := .c)
-let printf(format : UnsafePtr[CChar]) : CInt;
-
-@extern(#{ profile := .c, symbol := "printf", link := "c", variadic := .c })
-```
-
-Attribute fields:
-- `profile` names the external profile when passed by name, such as `profile := .c`
-- `symbol` names the linker/import/export symbol when passed by name
-- `link` names the library/framework/module to link or load
-- `calling` names the calling convention and defaults to `.cdecl` for outward `.c`
-- `variadic` names an ABI-specific variadic profile when present, such as `variadic := .c`
-
-C ABI types are ordinary predefined/core or library `let` bindings, not keywords.
-
-```musi
-let CVoid := ...;
-let CChar := ...;
-let CInt := ...;
-let CLongLong := ...;
-let CSize := ...;
-```
-
-The exact representation of C ABI aliases is defined by the implementation/profile, but their source names are ordinary bindings.
-
-## 14. Attributes And Representation Metadata
-
-Attributes are structural metadata prefixes. They attach to the next grammar-owned node and do not compute, branch, emit a runtime value, or participate in runtime evaluation.
-
-Attribute payloads are known meta-level function calls. UALO applies to attribute payloads. The attribute schema maps positional slots, named arguments, defaults, allowed target node kinds, and repeatability to a canonical known metadata record.
+Attributes are structural metadata prefixes attached to the next grammar-owned node. They do not compute, branch, emit runtime values, or participate in runtime evaluation. Payloads are known meta-level function calls. UALO applies. Schema maps positional slots, named args, defaults, allowed target node kinds, repeatability to canonical known metadata record.
 
 ```ebnf
 attr-list          ::= attr+
@@ -1449,94 +662,26 @@ aligned-data-expr  ::= "@align" "(" attr-value ")" "data" data-body
 witness-shape-expr ::= "@witness" "shape" shape-body
 ```
 
-Attribute calls canonicalize to metadata records according to their schema.
+Confirmed attributes: `@packed`, `@align(...)`, `@witness`. Meanings: `@packed` packed/bit-structured representation metadata; `@align(...)` alignment metadata; `@witness` makes a `shape` require explicit witness conformance.
 
-```musi
-@align(4)
-@repr(.c, tag := .n8)
-@target(os := #[.linux, .macos], arch := .x64)
-@extern(.c, "puts", link := "c")
-```
+Attribute rules:
 
-canonical metadata shapes:
+- Arguments are compile-time metadata values; positional and named accepted; named use `:=`; datum literals and sum values accepted.
+- Schemas define positional parameter names, named params, defaults, allowed targets, repeatability, canonical metadata record shape.
+- Attribute calls canonicalize to metadata records; e.g. `@align(4)` → `#{ value := 4 }`, `@repr(.c, tag := .n8)` → `#{ profile := .c, tag := .n8 }`.
+- Conditional attributes are not separate grammar; conditionality belongs in payload, e.g. non-keyword field `enabled := ...`; if schema defines it as condition, it must be `known Bit`; `True` means metadata present, `False` absent; no runtime branch.
+- Attributes may prefix grammar-owned nodes only; arbitrary infix expressions need wrapped computation region.
+- Attribute applies only to exact next node; child propagation only by schema.
+- Unknown compiler attributes are diagnostics unless declared by imported/tooling mechanism.
+- Repeatability is schema-defined; repeated unique attribute on same target is diagnostic.
+- Recognized attributes preserved in SEIL metadata when affecting representation, ABI, checking, tooling, or near-identical decompilation.
+- Packed/bit-structured data remains `data`; no `bitstruct` keyword.
 
-```musi
-#{ value := 4 }
-#{ profile := .c, tag := .n8 }
-#{ os := #[.linux, .macos], arch := .x64 }
-#{ profile := .c, symbol := "puts", link := "c" }
-```
+Representation controls are schema-validated attributes only: `@repr(.c)`, `@packed`, `@align(4)`. Representation metadata args must be known. `@repr(profile, ...)` names layout/profile family. Profile schemas validate allowed targets/fields/values/combinations. Unsupported profile/field/value/combination diagnostic. Representation attributes apply only where schema allows: data definitions, fields, variants/cases, extern bindings. FFI boundary types must be representable under chosen profile. SEIL preserves layout and near-identical decompilation metadata.
 
-Confirmed surface attributes:
-- `@packed`
-- `@align(...)`
-- `@witness`
+Profile fields may include `tag`, `endian`, `padding`, `bits`, `layout`. Tag/profile values use Musi-native size spelling: `.nX` natural/unsigned-sized, `.iX` signed integer-sized, `.fX` floating-sized. Rule: type identity/storage/checking concept → type-space modifier; representation/ABI/interop → attribute.
 
-Meanings:
-- `@packed` marks packed/bit-structured representation metadata.
-- `@align(...)` marks representation alignment metadata.
-- `@witness` marks a `shape` as requiring explicit witness conformance.
-
-Rules:
-- attribute arguments are compile-time metadata values.
-- positional and named arguments are accepted.
-- named arguments use `:=`.
-- attribute arguments follow UALO.
-- attribute schemas define positional parameter names, named parameters, defaults, allowed target node kinds, repeatability, and canonical metadata record shape.
-- datum literals and sum-type values are accepted attribute values.
-- conditional attributes are not a separate grammar form.
-- conditionality belongs in the attribute payload through a non-keyword field such as `enabled := ...`.
-- `enabled` payload must be `known Bit` when the schema defines it as a condition.
-- if `enabled` is `Bit.True`, metadata is present; if `Bit.False`, absent.
-- the condition does not create runtime branching.
-- attributes may prefix grammar-owned nodes.
-- attributes do not prefix arbitrary infix expressions unless wrapped in a computation region.
-- an attribute applies only to the exact next node.
-- propagation to child nodes exists only when the attribute schema defines it.
-- unknown compiler attributes are diagnostics unless declared by an imported/tooling mechanism.
-- repeatability is defined by attribute schema.
-- unique attribute repeated on same target is diagnostic.
-- recognized attributes are preserved in SEIL metadata when they affect representation, ABI, checking, tooling, or near-identical decompilation.
-- packed/bit-structured data is still `data`; there is no `bitstruct` keyword.
-
-Representation controls are attributes and schema-validated metadata.
-
-```musi
-@repr(.c)
-@packed
-@align(4)
-```
-
-Rules:
-- representation controls are attributes only
-- representation metadata arguments must be known
-- `@repr(profile, ...)` names a layout/profile family
-- `@packed` requests packed representation under the active profile/schema
-- `@align(N)` requests known alignment `N`
-- profile schemas validate allowed targets, fields, and values
-- unsupported profile, field, value, or attribute combination is a diagnostic
-- representation attributes apply only where their schema allows, such as data definitions, fields, variants/cases, or extern bindings
-- FFI boundary types must be representable under their chosen profile
-- SEIL preserves representation metadata required for layout and near-identical decompilation
-
-Profile schemas may define fields such as `tag`, `endian`, `padding`, `bits`, and `layout`. Tag/profile values use Musi-native size spelling:
-- `.nX` for natural/unsigned-sized values
-- `.iX` for signed integer-sized values
-- `.fX` for floating-sized values
-
-```musi
-@repr(.c, tag := .n8)
-@repr(.c, endian := .little)
-@repr(.c, padding := .explicit)
-```
-
-Rule:
-- type identity/storage/checking concept: type-space modifier
-- representation/ABI/interop annotation: attribute
-
-## 15. Shapes And Conformance
-
-`shape` is the locked spelling for structural contracts.
+## 14. Shapes and conformance
 
 ```ebnf
 shape-expr   ::= "shape" shape-body
@@ -1544,34 +689,18 @@ shape-body   ::= "{" shape-member (";" shape-member)* ";"? "}"
 shape-member ::= "let" IDENT param-list? type-annot
 ```
 
-`shape` means an observable structure/capability contract: a value or type fits a shape when it provides required members and operations according to Musi conformance rules.
+`shape` is locked spelling for observable structure/capability contracts. A value/type fits a shape when it provides required members/operations under Musi conformance rules. `trait` is not core. `data` defines what a thing is; `shape` defines what it must look like.
 
-`trait` is not accepted as core spelling.
-
-`data` defines what a thing is. `shape` defines what a thing must look like.
-
-Default `shape` conformance is structural. A type or value fits a structural shape when it provides required observable members and operations with compatible types and stack effects. No conformance declaration is required.
-
-`@witness shape` defines a witness-required shape. Witness-required shapes are for semantic, lawful, marker, or capability contracts where members alone are insufficient. Empty marker shapes must use `@witness shape` to avoid every type fitting them accidentally.
-
-`|=` is the locked conformance/fits relation operator.
+Default shape conformance is structural: compatible required observable members/operations and stack effects; no declaration required. `@witness shape` requires explicit witness for semantic/lawful/marker/capability contracts where members alone are insufficient. Empty marker shapes must use `@witness shape` to avoid every type fitting accidentally.
 
 ```ebnf
 conformance-relation ::= TYPE "|=" TYPE
 witness-binding      ::= "let" TYPE "|=" TYPE ":=" record-datum
 ```
 
-Roles:
-- `T |= Shape` states or constrains that `T` fits `Shape`.
-- `let T |= Shape := witnessValue;` binds an explicit witness for witness-required conformance.
+`T |= Shape` states/constrains fit. `let T |= Shape := witnessValue;` binds explicit witness for witness-required conformance. No `impl`, `implements`, `extends`, or `trait`. Receiver methods and witness bindings use `let`. `|=` is not general-purpose Boolean test by default. Runtime fit checks for dynamic/opaque values remain open.
 
-There is no `impl`, `implements`, `extends`, or `trait` keyword. Receiver methods and witness bindings use universal `let`.
-
-`|=` should not become a general-purpose ordinary Boolean test by default. Runtime fit checks for dynamic or opaque values remain open.
-
-## 16. Modules, Imports, Exports, Visibility
-
-`import` and `export` are hard keywords with ESM-like directionality. `import` takes in. `export` puts out.
+## 15. Modules, imports, exports, visibility
 
 ```ebnf
 import-expr   ::= "import" import-source
@@ -1581,26 +710,9 @@ export-block  ::= "{" export-item (";" export-item)* ";"? "}"
 export-item   ::= let-expr
 ```
 
-Rules:
-- `import` is an expression that takes in a module, resource, or package according to module-system rules.
-- `known import` is compile-time import/acquisition.
-- import can use datum literals for multiple import inputs.
-- `export` marks a `let` binding for the current module surface.
-- exported receiver-method bindings are still `let` bindings.
-- standalone `match`, `while`, or arbitrary expressions are not export targets.
-- `export { ... }` is a structural export block, sugar over separate `export let ...;` forms.
-- modules are top-to-bottom strict.
-- export block items are processed top-to-bottom.
-- module boundary forms affect source shape and SEIL/decompilation metadata.
+Rules: `import` expression takes in module/resource/package. `known import` compile-time import/acquisition. Import may use datums for multiple inputs. `export` marks a `let` binding for module surface; exported receiver methods are still `let` bindings. Standalone `match`, `while`, arbitrary expressions are not export targets. `export { ... }` is structural block sugar over separate `export let ...;` forms. Modules top-to-bottom strict; export block items processed top-to-bottom. Module boundary forms affect source shape and SEIL/decompilation metadata.
 
-```musi
-export let makePoint() : Point := ...;
-export let (self : Point).make() : Point := ...;
-```
-
-The first exports an ordinary callable binding. The second exports a receiver-method binding attached to `Point` through receiver-prefix syntax.
-
-Modules are records. Imports bring in records.
+Modules are records; imports bring in records:
 
 ```ebnf
 module-value      ::= record-datum | named-record-value
@@ -1608,166 +720,37 @@ named-import-bind ::= "let" IDENT ":=" import-expr
 anonymous-import  ::= "let" "_" ":=" import-expr
 ```
 
-Rules:
-- a named import binds imported module record to a name.
-- an anonymous import brings imported record contents into scope without binding the record itself.
-- multi-import datum forms produce record-shaped imports.
+Named import binds imported record to a name. Anonymous import brings imported record contents into scope without binding record itself. Multi-import datums produce record-shaped imports.
 
-Visibility:
-- `export` is the only visibility mechanism.
-- exported binding is visible from the module.
-- non-exported binding is module-private.
-- no `public`, `private`, `protected`, `internal`, or `hidden` visibility words exist.
-- `opaque` controls type abstraction, not visibility.
-- modules are records; exports define the module record surface.
+Visibility: `export` only. Exported binding visible from module; non-export private by absence. No `public`, `private`, `protected`, `internal`, `hidden`. `opaque` controls type abstraction, not visibility. Modules are records; exports define module record surface.
 
-SEIL round-trip metadata must preserve:
-- import binding mode: named or anonymous
-- import source shape: string, tuple datum, or record datum
-- known/runtime phase of import
-- exported binding names
-- optional export block grouping as source metadata for near-identical decompilation
+SEIL round-trip metadata preserves import binding mode (named/anonymous), import source shape (string/tuple datum/record datum), known/runtime phase, exported binding names, and optionally export-block grouping. If grouping absent, decompiler may emit canonical separate `export let` forms preserving semantics.
 
-If grouping metadata is absent, the decompiler may emit canonical separate `export let` forms while preserving semantics.
+## 16. Open-question checklist
 
-## 17. Open Question Checklist
+Checked/locked:
 
-### Keyword Set
+- [x] Keyword set: hard keyword list; visibility words not separate; `import`; `export`; `hidden` removed; `erased`; `fixed`.
+- [x] Shape/conformance: `shape`; structural conformance; witness conformance; `|=`; erased shape value status.
+- [x] Type system: bidirectional gradual model; type algebra `| & ^ ~`; union/intersection representation/normalization; optional/error surface; callable source syntax; universal `:` annotations; cast/test operators.
+- [x] Stack effect: source syntax; first-class stack-effect decision; ordinary function callable exposure; compatibility for `when`, `match`, `defer`, `yield`, receiver methods; guarded emission effect model.
+- [x] Data: product field grammar; sum variant grammar; `case Variant(...) := value`; no product/sum mixing; associated data/value binding; constructors; destructuring/pattern syntax; tags/discriminants.
+- [x] Representation/metadata: attributes; `@packed`; alignment/endian/tags/padding/ABI layout controls; metadata placement; SEIL preservation.
+- [x] Comments: line/doc/module doc/block/block doc/block module doc/nesting.
+- [x] Delimiters/separators: `#(`, `#{`, `#[`; tuple types; bracket roles; trailing separators; empty tuple/record/array.
+- [x] Control flow: `when ... else` precedence/associativity; dangling-else prevention; nested `when` parenthesization; guarded emission contexts; loop syntax vs recursion; `defer`/`yield`/`pin` status.
+- [x] Match/patterns: exact pattern grammar; alternatives; comma alternatives not `|`; semicolon cases; exhaustiveness; guard order; binding syntax.
+- [x] Operators: full symbolic set; precedence; not-flat parsing; no user-defined symbolic ops; word ops; assignment/binding/update vs equality; equality/equivalence/ordering/approximation/membership/remainder.
+- [x] Modules/imports: modules as record-like values; import syntax; export syntax; visibility; path/source shape; SEIL round-trip.
+- [x] Known phase: meaning; applies to expressions/bindings/parameters/types where meaningful; limits; boundary; datum literals; functions compile to SEIL/no separate interpreter.
+- [x] Safety: no unsafe wrapper; capabilities/metadata/types; pointer types/ops; pinning via `fixed`; FFI rules; dangerous behavior errors not warnings.
 
-- [x] Final hard-reserved keyword list
-- [x] Whether visibility words are hard keywords or contextual introducers
-- [x] Whether `import` is a keyword or a compiler-owned function/form with special lowering
-- [x] Whether `export` is a keyword, metadata, or a structural member rule
-- [x] Whether `hidden` remains a surface concept
-- [x] Whether `erased` remains a surface concept
-- [x] Whether `fixed`, `stable`, or another word is needed for fixed storage/lifetime
-
-### Shape, Trait, And Conformance
-
-- [x] Final spelling: `shape`, `trait`, or another word
-- [x] Structural conformance rules
-- [x] Nominal/witness conformance rules, if any
-- [x] Whether shape/trait conformance uses `|=`, a word operator, or a different form
-- [x] Whether erased shape values are surface syntax, metadata, or compiler-owned lowering
-
-### Type System
-
-- [x] Bidirectional gradual type-system model
-- [x] Type-phase algebra for `|`, `&`, `^`, and `~`
-- [x] Union/intersection representation and normalization rules
-- [x] Optional/error type surface forms
-- [x] Whether callable types use stack-effect syntax directly
-- [x] Whether type annotations use `:` in every context
-- [x] Whether casts/tests use symbolic operators such as `:>` and `:?>`
-
-### Stack Effect
-
-- [x] Exact source syntax for stack effects
-- [x] Whether stack effects are first-class type values
-- [x] Whether ordinary functions expose stack-effect types or parameter/result sugar
-- [x] Stack-effect compatibility for `when`, `match`, `defer`, `yield`, and receiver methods
-- [x] Whether guarded emission requires a special effect kind or row-polymorphic stack effect
-
-### Data
-
-- [x] Product field grammar inside `data`
-- [x] Sum variant grammar inside `data`
-- [x] Exact meaning of `case Variant(...) := value`
-- [x] Whether product `let` entries and sum `case` entries can ever mix
-- [x] Associated data/value binding rules inside `data`
-- [x] Constructor generation rules
-- [x] Destructuring and pattern syntax for product data
-- [x] Variant tag/discriminant rules
-
-### Representation And Metadata
-
-- [x] Attribute syntax
-- [x] Whether `@packed` is the final packed-data spelling
-- [x] Representation controls such as alignment, endian, tags, padding, and ABI layout
-- [x] Whether representation metadata appears before `data`, after `data`, or inside the structural body
-- [x] Whether metadata is preserved in SEIL for decompilation
-
-### Comments
-
-- [x] Line comment spelling
-- [x] Line doc comment spelling
-- [x] Line module doc comment spelling
-- [x] Block comment spelling
-- [x] Block doc comment spelling
-- [x] Block module doc comment spelling
-- [x] Nested block comment support
-
-### Delimiters And Separators
-
-- [x] Exact grammar for `#(` tuple datum literals
-- [x] Exact grammar for `#{` record/product datum literals
-- [x] Exact grammar for `#[` array/list datum literals
-- [x] Whether plain tuple types use `(A, B)` or another form
-- [x] Whether `[]` is used for generics, indexing, stack effects, type application, or a reduced subset
-- [x] Trailing separator rules for `,` and `;`
-- [x] Empty tuple, empty record, and empty array syntax
-
-### Control Flow
-
-- [x] Exact precedence and associativity of `when ... else ...`
-- [x] Dangling-else prevention rule
-- [x] Whether `when` condition may contain unparenthesized `when`
-- [x] Whether guarded emission is allowed in specific structural contexts
-- [x] Whether loops exist as syntax or are expressed through recursion/recur forms
-- [x] Whether `defer`, `yield`, and `pin` earn hard keyword status
-
-### Match And Patterns
-
-- [x] Exact pattern grammar
-- [x] Whether pattern alternatives exist
-- [x] Whether pattern alternatives use `|`, repeated `case`, or another form
-- [x] Whether match cases require semicolons in all positions
-- [x] Exhaustiveness rules
-- [x] Guard evaluation order
-- [x] Pattern binding syntax
-
-### Operators
-
-- [x] Full symbolic operator set
-- [x] Operator precedence table or precedence-avoidance strategy
-- [x] Whether all infix expressions parse flat and precedence is semantic
-- [x] Whether user-defined symbolic operators exist
-- [x] Whether word operators exist at all
-- [x] Whether assignment/binding/update operators are distinct from equality
-- [x] Equality, equivalence, ordering, approximation, membership, and remainder operators
-
-### Modules And Imports
-
-- [x] Whether modules are ordinary record-like values
-- [x] Import expression syntax
-- [x] Export surface syntax
-- [x] Visibility rules
-- [x] Whether package/module paths are strings, symbols, datums, or dedicated syntax
-- [x] How imports/exports round-trip through SEIL
-
-### Runtime And SEIL
+Still open:
 
 - [ ] SEIL instruction model
 - [ ] SEIL metadata required for near-identical decompilation
 - [ ] Source-to-SEIL lowering guarantees
-- [ ] Whether SEIL has a stable binary and textual form
+- [ ] Whether SEIL has stable binary and textual form
 - [ ] How stack-effect verification appears in SEIL
 - [ ] How known-phase evaluation appears in SEIL
-
-### Known Phase
-
-- [x] Exact meaning of `known`
-- [x] Whether `known` applies to expressions, bindings, parameters, types, or all of them
-- [x] Known-phase evaluation limits
-- [x] Known/runtime boundary rules
-- [x] Whether known values can construct `#` datum literals
-- [x] Whether known functions compile to SEIL or evaluate through a separate interpreter
-
-### Safety
-
-- [x] Exact meaning of `unsafe`
-- [x] Whether unsafe is an expression wrapper, attribute, capability, or all of these
-- [x] Pointer types and pointer operations
-- [x] Pinning syntax and semantics
-- [x] Foreign boundary rules
-- [x] Whether dangerous behavior can ever be a warning instead of an error
+- [ ] Runtime fit checks for dynamic or opaque values
