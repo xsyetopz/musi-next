@@ -428,16 +428,34 @@ defer lock.release() when locked;
 `when` is the conditional guard operator.
 
 ```ebnf
-[45] total-conditional ::= EXPR "when" EXPR "else" EXPR
-[46] guarded-emission  ::= EXPR "when" EXPR
+[45] total-conditional ::= non-when-expr "when" non-when-expr "else" EXPR
+[46] guarded-emission  ::= non-when-expr "when" non-when-expr
+[198] non-when-expr    ::= /* expression production excluding unparenthesized when-expr */
 ```
 
 Rules:
 - the condition must be `Bit`
+- `when` is postfix guard syntax, not prefix syntax
 - total conditional branches must have compatible type/stack effect
 - `else` provides the fallback branch explicitly
+- no `then` keyword exists
 - guarded emission is accepted only in contexts where emitting nothing is meaningful
 - no hidden `Maybe`, `Unit`, bottom, or union is synthesized
+- unparenthesized nested `when` is not accepted in the guarded value or condition position
+- parentheses are required for nested conditional expressions
+
+`VALUE when CONDITION else FALLBACK` is total value selection. `VALUE when CONDITION` is guarded emission only in contexts that explicitly accept zero-or-one emission.
+
+```musi
+value when ready else fallback
+```
+
+Nested conditionals are grouped explicitly.
+
+```musi
+value when ready else (other when available else fallback)
+(value when ready else other) when enabled else fallback
+```
 
 ## Match And Case
 
@@ -1606,10 +1624,10 @@ These questions are intentionally open and are not locked by this document.
 
 ### Control Flow
 
-- [ ] Exact precedence and associativity of `when ... else ...`
-- [ ] Dangling-else prevention rule
-- [ ] Whether `when` condition may contain unparenthesized `when`
-- [ ] Whether guarded emission is allowed in specific structural contexts
+- [x] Exact precedence and associativity of `when ... else ...`
+- [x] Dangling-else prevention rule
+- [x] Whether `when` condition may contain unparenthesized `when`
+- [x] Whether guarded emission is allowed in specific structural contexts
 - [x] Whether loops exist as syntax or are expressed through recursion/recur forms
 - [x] Whether `defer`, `yield`, and `pin` earn hard keyword status
 
