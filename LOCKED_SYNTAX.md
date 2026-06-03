@@ -144,10 +144,15 @@ Rules:
 There is no separate `fn`, `type`, `struct`, `enum`, `class`, `impl`, `const`, or `static` keyword.
 
 ```ebnf
-let-expr        ::= "let" bind-head type-annot? param-list? result-type? ":=" EXPR
-                  | "let" receiver-head "." IDENT param-list result-type? ":=" EXPR
+let-expr        ::= "let" bind-head generic-param-list? type-annot? param-list? result-type? ":=" EXPR
+                  | "let" receiver-head "." IDENT generic-param-list? param-list result-type? ":=" EXPR
 bind-head       ::= IDENT | "_" | operator-name | PATTERN
 receiver-head   ::= "(" IDENT type-annot ")"
+generic-param-list ::= "[" generic-param-list-body? "]"
+generic-param-list-body ::= required-generic-param ("," required-generic-param)* ("," default-generic-param)* ","?
+                          | default-generic-param ("," default-generic-param)* ","?
+required-generic-param ::= IDENT type-annot?
+default-generic-param  ::= IDENT type-annot? ":=" EXPR
 param-list      ::= "(" param-list-body? ")"
 param-list-body ::= required-param ("," required-param)* ("," default-param)* ","?
                   | default-param ("," default-param)* ","?
@@ -158,6 +163,20 @@ type-annot      ::= ":" TYPE
 ```
 
 Defaults must be trailing in every parameter list, including function parameters, method parameters, constructor-like parameters, and variant payload parameters.
+
+Bracketed generic parameters belong between the binding name and ordinary call parameters.
+
+```musi
+let name[A : Type, N : known Nat](value : A) : [N]A := ...;
+let (self : Point).make[T : Type]() : Point := ...;
+```
+
+Generic call arguments use the same bracket-before-call shape:
+
+```musi
+name[Int, 4](value)
+point.Point.make[Int]()
+```
 
 ### Binding Qualifiers
 
@@ -706,7 +725,8 @@ Musi does not parse all infix expressions as one flat semantic chain. Locked cor
 
 ```ebnf
 postfix-expr      ::= EXPR postfix-op+
-postfix-op        ::= "." IDENT | "." INT | ".[" EXPR "]" | "?." IDENT | "?.[" EXPR "]" | call-args
+postfix-op        ::= "." IDENT | "." INT | ".[" EXPR "]" | "?." IDENT | "?.[" EXPR "]" | generic-call-args | call-args
+generic-call-args ::= "[" (EXPR ("," EXPR)* ","?)? "]"
 prefix-expr       ::= prefix-op EXPR
 prefix-op         ::= "known" | "fixed" | "mut" | "?" | "~" | "-"
 multiplicative-op ::= "*" | "/" | "%"
@@ -1050,13 +1070,22 @@ Rules:
 - `known expr` requests or requires compile-time evaluation.
 - `known T` requires a compile-time-known value/type-phase value of type `T`.
 - `known` appears only where compile-time availability is meaningful.
-- if context already requires knownness, spelling may be omitted.
+- known requirements are explicit at definition sites by using `known` in type position.
+- call sites to known-required parameters do not repeat `known`; the compiler checks that the supplied argument is known.
+- if context already requires knownness, spelling is omitted at the call/use site.
 - if a value cannot be compile-time, `known` produces a diagnostic.
 - without `known`, evaluation is runtime unless context requires knownness.
 - known phase can construct datum literals when contained values are known-compatible.
 - case tag/discriminant positions require known values by context.
 - array/list type bounds are known-phase contexts.
 - `known import` is compile-time acquisition/import.
+
+```musi
+let Vector[N : known Nat, T : Type](items : [N]T) := ...;
+let v := Vector[4, Int](items);
+```
+
+The definition states that `N` must be known. The call supplies `4`, not `known 4`. If a runtime value is supplied for `N`, it is a diagnostic.
 
 Known/runtime boundary:
 - known code may depend only on known values, known imports, type information, and compiler-permitted deterministic known intrinsics.
