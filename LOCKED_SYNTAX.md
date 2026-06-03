@@ -758,6 +758,66 @@ Shift/rotate meanings:
 
 ## 11. Type System Surface
 
+### Bidirectional Gradual Inference
+
+Musi uses bidirectional type checking and inference.
+
+Rules:
+- missing annotations request inference, not fallback to dynamic typing
+- annotations push expected types inward
+- expressions synthesize types outward
+- inference chooses the most precise/principal type supported by the type system
+- ambiguity that the type system cannot resolve is a diagnostic
+- inference never silently inserts `Any`
+- dynamic boundaries must be explicit through annotation, conversion, import/FFI boundary, or API return type
+- inferred structural, row, and capability constraints are ordinary Musi type information
+
+Core lattice roles:
+- `Type[N]` is the universe of types at level `N`
+- `Type` is a predefined core `let` binding alias for `Type[0]`
+- `Any` is the explicit dynamic top value type
+- `_` in type position is an explicit inference hole
+- unresolved `_` holes are diagnostics
+- `Unit` is the canonical zero-information inhabited type
+- `Empty` is the uninhabited bottom type
+
+```ebnf
+universe-type    ::= "Type" "[" EXPR "]"
+universe-param   ::= "known" IDENT ":" "Nat"
+type-alias       ::= "Type"
+type-hole        ::= "_"
+any-type         ::= "Any"
+unit-type        ::= "Unit" | "()"
+empty-type       ::= "Empty"
+structural-type  ::= record-type | row-type | capability-type
+```
+
+`Type[N]` is the primitive universe use form. Its constructor parameter is `known N : Nat`, so the call site writes `Type[N]` and the compiler checks that `N` is known. If a runtime/non-known value is used in this known-required position, it is a diagnostic.
+
+Known requirements are explicit at definition sites. Calls to known-required positions are implicit at use sites because the callee/type/form already declares the known requirement.
+
+`Type[N]` has type `Type[N + 1]`. `Type` is not special syntax and not a keyword; it is the predefined core binding:
+
+```musi
+export let Type := Type[0];
+```
+
+`type` remains not a keyword. `Type0`, `Type1`, and similar names are not built-in source forms unless user or library code defines them.
+
+`()` canonicalizes to `Unit`. `Empty` is not the empty tuple; it is a type with no values. An expression with type `Empty` may fit any required result position because it never produces a value.
+
+`Any` does not mean null, absence, failure, callable-anything, or permission to ignore effects/capabilities. Dynamic-to-static use requires `:?>` or another explicit checked operation. Static-to-dynamic use is explicit through annotation, conversion, or a dynamic boundary.
+
+Unannotated code may infer anonymous structural record/row types.
+
+```musi
+let p := #{ name := "Ada", age := 36 };
+```
+
+The inferred type is a structural record/row type with fields for `name` and `age`, not `Any`.
+
+FFI and exported ABI boundaries require explicit representable types or explicit representation metadata. Anonymous inferred structural/row types do not silently become ABI types.
+
 ### Type Annotation
 
 `:` is the universal type annotation marker.
@@ -807,6 +867,52 @@ seil-callable-type   ::= callable-type
 ```
 
 Musi source does not use old stack-effect bracket syntax as the callable surface. SEIL is the lowered verifier form of Musi, not a separate source language. SEIL metadata preserves callable types in Musi syntax for near-identical decompilation.
+
+### Type Algebra
+
+Type-position algebra uses the same symbolic algebra family as value/bit algebra when the operands are types.
+
+```ebnf
+type-union        ::= TYPE "|" TYPE
+type-intersection ::= TYPE "&" TYPE
+type-difference   ::= TYPE "^" TYPE
+type-complement   ::= "~" TYPE
+```
+
+Meanings:
+- `A | B` is union: a value is in `A` or `B`
+- `A & B` is intersection: a value is in both `A` and `B`
+- `A ^ B` is symmetric difference: a value is in either `A` or `B`, but not both
+- `~A` is complement: a value is outside `A` within the relevant type universe
+
+`A ^ B` is derived type algebra:
+
+```text
+A ^ B = (A | B) & ~(A & B)
+```
+
+Normalization laws:
+- `A | A` normalizes to `A`
+- `A & A` normalizes to `A`
+- `A | Empty` normalizes to `A`
+- `A & Empty` normalizes to `Empty`
+- `A | Any` normalizes to `Any`
+- `A & Any` normalizes to `A`
+- `~~A` normalizes to `A`
+- `A ^ A` normalizes to `Empty`
+- `A ^ Empty` normalizes to `A`
+- `A ^ Any` normalizes to `~A`
+
+Subtyping/equivalence facts:
+- `A` is a subtype of `B` exactly when `A | B` is equivalent to `B`
+- `A & B` is a subtype of `A`
+- `A & B` is a subtype of `B`
+
+Complement and symmetric difference are accepted only where the type universe makes them normalizable/checkable. Ambiguous or non-normalizable type algebra is a diagnostic.
+
+Type algebra is Musi type space. ABI/FFI representability is checked separately. Algebraic types do not silently become ABI-safe tagged unions or layout-compatible records.
+
+No `iff`, `<=>`, `<->`, `=>`, or `==` operator is introduced for type logic. Type equivalence remains `~=`. Subtyping remains `<:`.
 
 ### Type Operator Family
 
@@ -1099,11 +1205,19 @@ Rules:
 - `known import` is compile-time import/acquisition.
 - import can use datum literals for multiple import inputs.
 - `export` marks a `let` binding for the current module surface.
+- exported receiver-method bindings are still `let` bindings.
 - standalone `match`, `while`, or arbitrary expressions are not export targets.
 - `export { ... }` is a structural export block, sugar over separate `export let ...;` forms.
 - modules are top-to-bottom strict.
 - export block items are processed top-to-bottom.
 - module boundary forms affect source shape and SEIL/decompilation metadata.
+
+```musi
+export let makePoint() : Point := ...;
+export let (self : Point).make() : Point := ...;
+```
+
+The first exports an ordinary callable binding. The second exports a receiver-method binding attached to `Point` through receiver-prefix syntax.
 
 Modules are records. Imports bring in records.
 
@@ -1157,9 +1271,9 @@ If grouping metadata is absent, the decompiler may emit canonical separate `expo
 
 ### Type System
 
-- [ ] Bidirectional gradual type-system model
-- [ ] Type-phase algebra for `|`, `&`, `^`, and `~`
-- [ ] Union/intersection representation and normalization rules
+- [x] Bidirectional gradual type-system model
+- [x] Type-phase algebra for `|`, `&`, `^`, and `~`
+- [x] Union/intersection representation and normalization rules
 - [x] Optional/error type surface forms
 - [x] Whether callable types use stack-effect syntax directly
 - [x] Whether type annotations use `:` in every context
