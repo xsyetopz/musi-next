@@ -997,7 +997,268 @@ digraph seil_metadata {
 
 Required VM metadata affects verification, loading, linking, representation, capabilities, target availability, native/foreign linkage, and execution. Optional producer metadata preserves Musi source shape, original grouping, source spans, comments/docs when emitted, datum/operator/pattern spelling, and high-fidelity decompilation hints. Executable SEIL must run without optional producer metadata.
 
-## 17. Open-question checklist
+
+## 17. SEIL textual syntax and opcode registry
+
+Textual `.seil.txt` is a Lisp/Forth/assembly hybrid, not Musi syntax and not pure directive assembly. Module/table/declaration/metadata structure uses Lisp-like forms. Executable bodies use explicit `body` islands containing Forth-like stack-effect instruction streams with assembly-like labels. Descriptor references remain the table-reference language. This rejects CIL's class-first object model, required `.maxstack`, raw metadata blobs as normal metadata form, CLR modifier soup, and null/default-reference assumptions.
+
+Textual syntax rules:
+
+```text
+(seil 1 0)
+
+(module M<example>
+  (meta target (os := linux) (arch := x64)))
+
+(import M<core> "musi:core")
+
+(type T<Point> prod
+  (meta repr c)
+  (field x f64)
+  (field y f64))
+
+(type T<MaybeI32> sum
+  (alt None tag 0)
+  (alt Some tag 1 payld i32))
+
+(sig S<add>
+  (input a i32)
+  (input b i32)
+  (output i32))
+
+(func F<add> S<add>
+  (entry entry)
+  (body
+    entry:
+      ld.arg 0
+      ld.arg 1
+      add
+      ret))
+
+(export F<add> "add")
+```
+
+- canonical textual files start with `(seil major minor)`.
+- top-level declarations are Lisp-like forms: `module`, `import`, `export`, `type`, `sig`, `global`, `const`, `extern`, `intern`, and `func`.
+- descriptors identify table references: `M<...>` module, `T<...>` type, `S<...>` signature, `F<...>` function/callable, `G<...>` global/storage slot, `K<...>` constant, `P<owner/field>` product field, `A<owner/alternative>` sum alternative.
+- descriptor paths use `/` as path separator.
+- product type members use `(field name TYPE)` inside `(type ... prod ...)`.
+- sum type members use `(alt name tag NAT)` or `(alt name tag NAT payld TYPE)` inside `(type ... sum ...)`.
+- signatures are explicit `sig` forms with `input` and `output` forms.
+- functions reference signatures by `S<...>` descriptor; signatures are not inferred from `func` headers.
+- function entry block is explicit through `(entry label)`.
+- executable code appears only inside explicit `(body ...)` islands.
+- inside `body`, labels are `name:` and instructions are mnemonic-first Forth-like lines.
+- operands are never fused into mnemonic spelling.
+- one executable instruction appears per line in canonical body text.
+- textual SEIL does not use `->`.
+- no authored `.maxstack`; verifier computes stack bounds.
+- `(extern F<...> S<...> ...)` declares externally linked ABI-provided callable/data symbols.
+- `(intern F<...> S<...> ...)` declares SEAM/runtime/internal callable/data symbols.
+- `call` opcodes do not encode callee origin; callable declaration metadata does.
+- metadata uses `(meta name positional (field := value))`; no `@` metadata syntax, no `=`, and no raw metadata blob normal form.
+- metadata values are identifiers, strings, numbers, descriptors, or schema-defined atoms.
+- `:=` inside metadata named-argument forms defines named metadata argument values.
+- primitive types are bare type names; declared types use `T<...>` descriptors.
+
+Opcode registry rules:
+
+- opcode id is `u16`.
+- opcode ids are assigned by sparse family range, never by list order.
+- opcode ids never change meaning.
+- removed ids become reserved forever.
+- binary SEIL stores numeric opcode ids.
+- textual SEIL stores canonical mnemonics.
+- unknown opcode id is loader/verifier diagnostic unless declared by extension metadata.
+- extension opcodes require declared module feature/profile metadata.
+
+Mnemonic rules:
+
+```ebnf
+mnemonic      ::= mnemonic-part ("." mnemonic-part)*
+mnemonic-part ::= /* 2..7 ASCII identifier chars, canonical lowercase */
+```
+
+- hard keywords and SEIL mnemonic/directive parts share the 2..7 character naming law.
+- 1-character parts are rejected.
+- 8+ character parts are rejected.
+- design target is 3..6 characters.
+- 7-character parts require clear conventional rationale.
+- abbreviation is rejected if ambiguous inside compiler/VM terminology.
+- shortest obvious spelling wins; full spelling stays when already compact and clearer.
+- opcode names describe primitive VM/computer behavior, not Musi source behavior, except when the source term and VM primitive are the same operation.
+
+Canonical abbreviations used by the locked core registry:
+
+```text
+addr   address
+arg    argument
+bit    bit
+br     branch
+cap    capability
+chk    checked
+cln    cleanup
+cmp    compare
+const  constant
+conv   convert
+disp   dispatch
+dyn    dynamic
+elem   element
+env    environment/capture storage
+fld    field
+flt    float
+fn     function/callable value
+idx    index
+ind    indirect
+int    integer
+ld     load
+loc    local
+mk     make
+nat    natural/unsigned integer
+payld  payload
+ptr    pointer
+ref    reference
+repr   representation
+ret    return
+st     store
+txt    text
+ty     type
+yld    yield
+```
+
+Opcode family ranges:
+
+```text
+0x0000..0x00FF  control / terminators
+0x0100..0x01FF  stack
+0x0200..0x02FF  constants
+0x0300..0x03FF  frame / slots
+0x0400..0x04FF  calls / dispatch
+0x0500..0x05FF  scalar arithmetic
+0x0600..0x06FF  bitwise / shifts / rotates
+0x0700..0x07FF  comparison / tests
+0x0800..0x08FF  conversion / reinterpretation
+0x0900..0x09FF  memory / refs / pointers / allocation
+0x0A00..0x0AFF  product layout
+0x0B00..0x0BFF  sum / tag / payload
+0x0C00..0x0CFF  indexed storage
+0x0D00..0x0DFF  reserved core future
+0x0E00..0x0EFF  dynamic / capability / keyed storage
+0x0F00..0x0FFF  reserved core future
+0x1000..0x10FF  suspension / yield
+0x1100..0x11FF  cleanup edges
+0x1200..0x13FF  reserved core future
+0x1400..0x1FFF  reserved core future
+0x2000..0xEFFF  standard extensions/profiles
+0xF000..0xFFFF  private/experimental/vendor
+```
+
+Locked core opcode registry and per-opcode operand/stack-effect schemas live at repo root in `seil_opcodes.def`. The `.def` file uses Swift/LLVM-style `SEIL_OPCODE(swiftCase, rawValue, mnemonic, operands, stackEffect)` entries and stores each opcode id, Swift-safe case name, canonical textual mnemonic, operand schema, and stack-effect schema.
+
+
+Locked opcode semantics that constrain later operand schemas:
+
+- `const` loads a constant-table entry.
+- `const.int`, `const.nat`, `const.flt`, and `const.bit` are inline scalar constants.
+- `const.txt` and `const.bytes` are text/bytes constants, not proof of core runtime text/bytes operation opcodes.
+- `const.nil` is a typed VM nil sentinel, not Musi null. The verifier rejects nil where the type/profile does not admit nil.
+- `throw` and `rethrow` are exceptional control edges. Handler/catch/finally regions are body metadata, not opcodes.
+- `call`, `call.disp`, `call.ind`, and `call.dyn` are invocation mechanisms. Callee origin (`.extern`, `.intern`, ordinary SEIL body) lives in declaration metadata.
+- `call.dyn` is a SEAM dynamic-call protocol, not JavaScript/Python syntax.
+- `mk.fn` constructs callable value from function/body reference plus environment/captures as required by operand schema.
+- `div.un`, `rem.un`, and `cmp.*.un` are unsigned integer modes.
+- `%`/`rem` semantics are CPU-style remainder, not mathematical modulo.
+- float ordered/unordered behavior is defined by comparison operand/type schema; `.un` does not silently mean unordered float comparison.
+- `test.ty` is type test returning `Bit`.
+- `cast.ty` is checked type cast/coercion according to target type/profile.
+- `conv` converts by ordinary conversion schema; `conv.chk` is checked conversion; `bitcast` is representation-preserving reinterpretation; `conv.repr` converts across declared representation profiles.
+- `alloc` allocates heap/runtime storage by type/layout operand.
+- `alloc.arr` allocates indexed storage by layout/type/length.
+- `mk.arr` constructs indexed value from stack-provided elements.
+- product = record; tuple = positional product. `mk.prod` constructs product layout values; `fld` ops access named product fields; `idx` ops access positional product fields.
+- sum = variant. `mk.sum` constructs tagged sum values; `tag` ops inspect/check tag; `payld` ops access payload.
+- `elem` ops operate on runtime-indexed storage, distinct from product `idx` ops.
+- `box`/`unbox` are VM representation transitions between unboxed values and boxed/dynamic/heap representation; they are not `Any`-only source operations.
+- `cap.has` and `cap.need` operate on VM capability evidence.
+- `key` ops are dynamic keyed-storage protocol operations. Named member access lowers through key ops, static field/call ops, or dynamic call protocol; there are no separate member opcodes.
+- `yld` is the suspension/yield control edge. Distinct suspension/resume mechanics require distinct justified opcodes before being added.
+- `cln.*` operates on VM cleanup edges/regions, not source `defer` syntax.
+- known-phase behavior is verifier/evaluation metadata. Known evaluation runs ordinary verified SEIL under known-phase rules; there are no known-specific opcodes.
+- Maybe/Expect/Error and other ADTs lower through product/sum/tag/call primitives; they have no special core opcodes.
+- Text/bytes runtime operations are library/runtime calls or future justified layout opcodes; only constants are in the locked core registry.
+- Null/undefined language concepts do not become default reference behavior. `nil` is explicit and verifier-restricted.
+
+
+## 18. SEIL operand encodings, stack effects, and textual grammar
+
+Binary instructions are decoded from opcode schema. There is no per-instruction operand count byte in the instruction stream unless an opcode schema explicitly includes a variable-count/table operand. Opcode ids are `u16`; operands follow in schema order.
+
+Primitive binary operand encodings:
+
+```text
+u8    1 byte unsigned
+u16   2 bytes unsigned
+u32   4 bytes unsigned
+u64   8 bytes unsigned
+i8    1 byte two's-complement
+i16   2 bytes two's-complement
+i32   4 bytes two's-complement
+i64   8 bytes two's-complement
+f32   IEEE-754 binary32
+f64   IEEE-754 binary64
+varu  unsigned LEB128
+vari  signed LEB128
+```
+
+Index operands are `varu`:
+
+```text
+type_idx sig_idx func_idx field_idx alt_idx global_idx const_idx block_idx table_idx region_idx cap_idx arg_idx loc_idx env_idx slot_idx addr_idx
+```
+
+Stack-effect notation:
+
+```text
+...                 unchanged stack prefix
+..., A -> ...       pop top A
+... -> ..., A       push A
+terminal            instruction terminates the current control-flow edge
+T                   verifier-inferred type variable
+Bit                 bit/boolean value
+Nat                 natural/unsigned integer
+Ref[T]              managed/reference addressable T
+Ptr[T]              pointer to T
+Fn[S]               callable value matching signature S
+```
+
+Every opcode has a typed operand schema and typed stack-effect schema in `seil_opcodes.def`. `outputs(S)` means the output stack suffix of signature `S`; `inputs(S)` means the input stack suffix of signature `S`. For calls, arguments are consumed in signature order and outputs are produced in signature order.
+
+
+Semantic constraints:
+
+- `const.bit` payload must be `0` or `1`.
+- `const.nil` verifier-requires a type/profile admitting nil.
+- `const.int`, `const.nat`, and `const.flt` type operand determines accepted width/range. `const.flt` stores f32 values in f64 operand encoding with exact f32-roundtrip validation when target type is f32.
+- `div.un`, `rem.un`, and `cmp.*.un` are unsigned integer modes only.
+- float ordered/unordered behavior is defined by comparison type schema and is not implied by `.un`.
+- `st.fld` and `st.idx` store through an addressable product reference; they are not copy-update opcodes.
+- `mk.arr` consumes exactly the `varu` element count encoded in its operand.
+- `call.dyn`, `key` ops, `box`/`unbox`, and `cap.*` require profile/type metadata that defines the relevant dynamic/capability protocol.
+- exception handlers, cleanup regions, branch tables, address targets, yield/resume shapes, and dynamic argpack layouts are body metadata tables referenced by indices.
+
+DRY W3C XML 1.0-style EBNF for textual `.seil.txt` lives at repo root in `seil.ebnf`.
+
+Textual grammar constraints:
+
+- Structural forms may nest only as defined by `seil.ebnf`; executable instruction lines occur only inside explicit `body` forms.
+- `func` forms may contain `local`, `env`, `entry`, `region`, `body`, and `meta` forms.
+- `type` forms may contain `field` for `prod`, `alt` for `sum`, and `meta` forms.
+- `sig` forms may contain `input`, `output`, and `meta` forms.
+- `module`, `import`, `export`, `global`, `const`, `extern`, and `intern` forms may contain `meta` forms only unless a later schema explicitly permits more.
+- Descriptors are table references; assembler resolves them to binary table indices.
+- The parser uses form context to validate which nested forms are legal; opcode operand schemas validate instruction operands inside `body` forms.
+
+## 19. Open-question checklist
 
 Checked/locked:
 
@@ -1023,7 +1284,12 @@ Checked/locked:
 - [x] SEIL binary header: exactly 40 bytes; magic, format tuple, section-directory tuple, file size; semantic data lives in sections.
 - [x] SEIL module structure: sectioned module; required VM sections; executable bodies; required VM metadata; optional producer/source metadata.
 - [x] SEIL verification placement: basic-block stack-effect bodies; typed edge verification; verifier-computed stack bounds; no authored `.maxstack`.
+- [x] SEIL textual syntax: Lisp/Forth/assembly hybrid; descriptor references `M<...>`/`T<...>`; structural forms; `(meta name ... (field := value))`; body islands; labels; mnemonic-first instructions; no `->`.
+- [x] SEIL opcode registry: u16 sparse family ranges; stable ids; naming law; locked core opcode map in `seil_opcodes.def`; VM-oriented semantics.
+- [x] SEIL binary operand encodings: primitive encodings; varu indices; opcode-schema-driven instruction decode.
+- [x] SEIL per-opcode schemas: operand schema and stack-effect schema for every locked core opcode in `seil_opcodes.def`.
+- [x] SEIL textual grammar: DRY W3C XML 1.0-style EBNF for `.seil.txt`, descriptor grammar, metadata args, structural forms, body islands, and instruction lines.
 
 Still open:
 
-- [ ] SEIL instruction/opcode set, operand encodings, and per-opcode stack effects
+- [ ] SEIL implementation validation against assembler/disassembler/verifier tests
