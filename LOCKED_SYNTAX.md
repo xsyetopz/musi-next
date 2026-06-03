@@ -275,6 +275,13 @@ Rules:
 - no hidden `Maybe`, `Unit`, bottom, or union is synthesized
 - unparenthesized nested `when` is not accepted in guarded value or condition position
 - parentheses are required for nested conditionals
+- `where` is not a guard keyword and has no core guard syntax
+
+Universal postfix guard rule:
+- `X when C` makes `X` conditional on `C`
+- `C` must be `Bit`
+- `C` is evaluated at the point where `X` would be admitted, registered, emitted, or selected
+- each guarded context defines what admission, registration, emission, or selection means
 
 Examples:
 
@@ -322,7 +329,13 @@ yield-expr ::= "yield" EXPR?
 Rules:
 - `defer` cleanup runs on normal exit and loop-control exits such as `leave` and `cycle`.
 - Exact cleanup ordering remains part of runtime/control-flow design.
-- Guarded cleanup uses existing `when` syntax.
+- `defer cleanup() when cond` is guarded defer registration.
+- the guard condition is evaluated at the defer registration point.
+- if the guard is `Bit.True`, the cleanup expression is registered.
+- if the guard is `Bit.False`, no cleanup is registered.
+- the cleanup expression does not re-evaluate the guard at cleanup time.
+- cleanup expression must produce `Unit`.
+- captured values must remain valid according to scope/lifetime rules.
 
 ```musi
 defer file.close();
@@ -979,6 +992,35 @@ seil-callable-type   ::= callable-type
 
 Musi source does not use old stack-effect bracket syntax as the callable surface. SEIL is the lowered verifier form of Musi, not a separate source language. SEIL metadata preserves callable types in Musi syntax for near-identical decompilation.
 
+### Stack-Effect Compatibility
+
+Source uses callable types and observable result/effect compatibility. Raw stack-effect syntax is not a source surface. SEIL verifies lowered stack behavior against the observable shape.
+
+Rules:
+- `a when cond else b` requires `cond : Bit`
+- both total conditional branches must unify to one observable result/effect shape
+- if one total conditional branch is `Empty`, the other branch determines the result
+- expected type/effect from context is pushed into both total conditional branches
+- `a when cond` produces zero-or-one emission of `a`
+- bare guarded emission is accepted only where the surrounding context consumes zero-or-one emission
+- `match` arms must unify to one observable result/effect shape
+- `Empty` match arms do not force the result type
+- guarded match arms contribute conditional coverage only
+- `match` remains exhaustive
+- `defer` produces `Unit`
+- deferred cleanup expressions must produce `Unit`
+- deferred cleanup effect attaches to scope/region exit, not local expression result
+- deferred cleanup cannot consume values that are no longer live
+- `yield` is valid only in resumable/generator-compatible callable contexts
+- yielded value must match the enclosing resumable output protocol
+- `yield` produces `Unit` locally after handing off the yielded value
+- suspension is not scope exit
+- `defer` does not run on `yield` suspension
+- pending defers run on final scope exit, close, drop, or cancel
+- receiver methods treat the receiver as a semantic first input/capability
+- receiver syntax is preserved by source metadata/decompilation
+- receiver mutability and stability come from receiver type: `T`, `mut T`, `fixed T`, or `fixed mut T`
+
 ### Type Algebra
 
 Type-position algebra uses the same symbolic algebra family as value/bit algebra when the operands are types.
@@ -1309,11 +1351,10 @@ Rationale:
 FFI uses attributes and ordinary `let` bindings, not keywords.
 
 ```ebnf
-extern-attr       ::= "@extern" "(" extern-arg-list ")"
-extern-arg-list   ::= attr-arg-list
+extern-attr       ::= "@extern" attr-args
 extern-import     ::= extern-attr let-decl
 extern-export     ::= extern-attr "export" let-expr
-repr-attr         ::= "@repr" "(" attr-arg-list ")"
+repr-attr         ::= "@repr" attr-args
 let-decl          ::= "let" bind-head generic-param-list? type-annot? param-list? result-type? ";"
 ```
 
@@ -1351,9 +1392,13 @@ Rules:
 
 `@extern` arguments follow UALO. The first positional argument is the external profile. The second positional argument is the symbol.
 
+The `@extern` meta-level call canonicalizes to a known metadata record.
+
 ```musi
 @extern(.c, "printf", link := "c", variadic := .c)
 let printf(format : UnsafePtr[CChar]) : CInt;
+
+@extern(#{ profile := .c, symbol := "printf", link := "c", variadic := .c })
 ```
 
 Attribute fields:
@@ -1377,17 +1422,16 @@ The exact representation of C ABI aliases is defined by the implementation/profi
 
 ## 14. Attributes And Representation Metadata
 
-Attributes are structural metadata prefixes. They attach to the next grammar-owned node and do not compute, branch, emit a value, or participate in runtime evaluation.
+Attributes are structural metadata prefixes. They attach to the next grammar-owned node and do not compute, branch, emit a runtime value, or participate in runtime evaluation.
+
+Attribute payloads are known meta-level function calls. UALO applies to attribute payloads. The attribute schema maps positional slots, named arguments, defaults, allowed target node kinds, and repeatability to a canonical known metadata record.
 
 ```ebnf
 attr-list          ::= attr+
 attr               ::= "@" attr-name attr-args?
 attr-name          ::= IDENT ("." IDENT)*
 attr-args          ::= "(" attr-arg-list? ")"
-attr-arg-list      ::= attr-positional-arg ("," attr-positional-arg)* ("," attr-named-arg)* ","?
-                     | attr-named-arg ("," attr-named-arg)* ","?
-attr-positional-arg ::= attr-value
-attr-named-arg     ::= IDENT ":=" attr-value
+attr-arg-list      ::= arg-list
 attr-value         ::= literal | tuple-datum | record-datum | array-datum | variant-value | known-expr
 attributed-let     ::= attr-list let-expr
 attributed-data    ::= attr-list data-expr
@@ -1405,6 +1449,24 @@ aligned-data-expr  ::= "@align" "(" attr-value ")" "data" data-body
 witness-shape-expr ::= "@witness" "shape" shape-body
 ```
 
+Attribute calls canonicalize to metadata records according to their schema.
+
+```musi
+@align(4)
+@repr(.c, tag := .n8)
+@target(os := #[.linux, .macos], arch := .x64)
+@extern(.c, "puts", link := "c")
+```
+
+canonical metadata shapes:
+
+```musi
+#{ value := 4 }
+#{ profile := .c, tag := .n8 }
+#{ os := #[.linux, .macos], arch := .x64 }
+#{ profile := .c, symbol := "puts", link := "c" }
+```
+
 Confirmed surface attributes:
 - `@packed`
 - `@align(...)`
@@ -1419,12 +1481,13 @@ Rules:
 - attribute arguments are compile-time metadata values.
 - positional and named arguments are accepted.
 - named arguments use `:=`.
-- attribute arguments follow the universal argument-list rule.
+- attribute arguments follow UALO.
+- attribute schemas define positional parameter names, named parameters, defaults, allowed target node kinds, repeatability, and canonical metadata record shape.
 - datum literals and sum-type values are accepted attribute values.
 - conditional attributes are not a separate grammar form.
-- conditionality belongs in the attribute payload, usually `when := ...`.
-- `when` payload must be `known Bit` when the schema defines it as a condition.
-- if condition is true, metadata is present; if false, absent.
+- conditionality belongs in the attribute payload through a non-keyword field such as `enabled := ...`.
+- `enabled` payload must be `known Bit` when the schema defines it as a condition.
+- if `enabled` is `Bit.True`, metadata is present; if `Bit.False`, absent.
 - the condition does not create runtime branching.
 - attributes may prefix grammar-owned nodes.
 - attributes do not prefix arbitrary infix expressions unless wrapped in a computation region.
@@ -1435,6 +1498,37 @@ Rules:
 - unique attribute repeated on same target is diagnostic.
 - recognized attributes are preserved in SEIL metadata when they affect representation, ABI, checking, tooling, or near-identical decompilation.
 - packed/bit-structured data is still `data`; there is no `bitstruct` keyword.
+
+Representation controls are attributes and schema-validated metadata.
+
+```musi
+@repr(.c)
+@packed
+@align(4)
+```
+
+Rules:
+- representation controls are attributes only
+- representation metadata arguments must be known
+- `@repr(profile, ...)` names a layout/profile family
+- `@packed` requests packed representation under the active profile/schema
+- `@align(N)` requests known alignment `N`
+- profile schemas validate allowed targets, fields, and values
+- unsupported profile, field, value, or attribute combination is a diagnostic
+- representation attributes apply only where their schema allows, such as data definitions, fields, variants/cases, or extern bindings
+- FFI boundary types must be representable under their chosen profile
+- SEIL preserves representation metadata required for layout and near-identical decompilation
+
+Profile schemas may define fields such as `tag`, `endian`, `padding`, `bits`, and `layout`. Tag/profile values use Musi-native size spelling:
+- `.nX` for natural/unsigned-sized values
+- `.iX` for signed integer-sized values
+- `.fX` for floating-sized values
+
+```musi
+@repr(.c, tag := .n8)
+@repr(.c, endian := .little)
+@repr(.c, padding := .explicit)
+```
 
 Rule:
 - type identity/storage/checking concept: type-space modifier
@@ -1571,7 +1665,7 @@ If grouping metadata is absent, the decompiler may emit canonical separate `expo
 - [x] Exact source syntax for stack effects
 - [x] Whether stack effects are first-class type values
 - [x] Whether ordinary functions expose stack-effect types or parameter/result sugar
-- [ ] Stack-effect compatibility for `when`, `match`, `defer`, `yield`, and receiver methods
+- [x] Stack-effect compatibility for `when`, `match`, `defer`, `yield`, and receiver methods
 - [x] Whether guarded emission requires a special effect kind or row-polymorphic stack effect
 
 ### Data
@@ -1589,7 +1683,7 @@ If grouping metadata is absent, the decompiler may emit canonical separate `expo
 
 - [x] Attribute syntax
 - [x] Whether `@packed` is the final packed-data spelling
-- [ ] Representation controls such as alignment, endian, tags, padding, and ABI layout
+- [x] Representation controls such as alignment, endian, tags, padding, and ABI layout
 - [x] Whether representation metadata appears before `data`, after `data`, or inside the structural body
 - [x] Whether metadata is preserved in SEIL for decompilation
 
