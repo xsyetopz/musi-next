@@ -1,6 +1,6 @@
-# LOCKED_SYNTAX.md — Heavy Compressed Reference
+# LOCKED_LANGUAGE_DESIGN.md — Heavy Compressed Reference
 
-Status: compact, information-preserving reference of locked Musi surface syntax. Grammar snippets are documentation grammar in W3C XML 1.0 EBNF style; omitted forms are not accepted unless added by another locked section.
+Status: compact, information-preserving reference of locked Musi language design before SEIL instruction definition. Grammar snippets are documentation grammar in W3C XML 1.0 EBNF style; omitted forms are not accepted unless added by another locked section.
 
 ## 1. Core invariants
 
@@ -129,6 +129,8 @@ Rules:
 - Swift-style `\(...)` interpolation is not core Musi.
 - `{name}` is not core interpolation grammar.
 - if interpolation is ever added, `$name` / `${EXPR}` is the reserved direction.
+- no automatic indentation trimming/dedent occurs; source contents between delimiters are the string contents.
+- indentation trimming belongs in explicit library/API calls, not string literal syntax.
 
 Backticks are Swift-like escaped identifiers.
 
@@ -412,7 +414,7 @@ update-expr  ::= place-expr ":=" EXPR
 place-expr   ::= IDENT | EXPR "." IDENT | EXPR "." INT | EXPR ".[" EXPR "]"
 ```
 
-`:=` binds/defines/initializes/updates. Record/product datum fields use `:=` because they initialize. Updates require mutable access or equivalent capability. `:=` lowest precedence. Chained updates rejected unless later rule defines them.
+`:=` binds/defines/initializes/updates. Record/product datum fields use `:=` because they initialize. Updates require mutable access or equivalent capability. `:=` lowest precedence. Chained updates are never accepted in core Musi; `a := b := c` is diagnostic.
 
 Algebra:
 
@@ -469,7 +471,7 @@ Precedence high→low:
 13. `when ... else` / `when`
 14. `:=`
 
-Rules: expressions are not parsed as one flat semantic chain; precedence is syntax. `%` is CPU-style remainder, not mathematical modulo; true modulo belongs in named op such as `mod(a,b)`. Shift/rotate are maximal-munch single tokens. No `<<`/`>>`. No arithmetic-left-shift unless later semantics differ from zero-fill left shift. Algebra precedence: `&` > `^` > `|`. Relational/type/equality operators are non-chainable. `??` is right-associative and Maybe-only. Shift meanings: `|<` zero-fill left; `>|` zero-fill right; `>+` sign-fill arithmetic right; `@<` rotate left; `@>` rotate right.
+Rules: expressions are not parsed as one flat semantic chain; precedence is syntax. `%` is CPU-style remainder, not mathematical modulo; true modulo belongs in named op such as `mod(a,b)`. Shift/rotate are maximal-munch single tokens. No `<<`/`>>`. No arithmetic-left-shift operator exists; left shift is `|<` and fills low bits with zero. Algebra precedence: `&` > `^` > `|`. Relational/type/equality operators are non-chainable. `??` is right-associative and Maybe-only. Shift meanings: `|<` zero-fill left; `>|` zero-fill right; `>+` sign-fill arithmetic right; `@<` rotate left; `@>` rotate right.
 
 ### UDNS and UFCS
 
@@ -597,7 +599,7 @@ named-arg      ::= IDENT ":=" EXPR
 call-args      ::= "(" arg-list? ")"
 ```
 
-Rules: positional arguments first; named arguments after; once named starts, positional cannot resume; definition defaults trail; duplicate/unknown named args diagnostic; same parameter cannot be bound twice. Applies to ordinary calls, generic calls, attributes, parameter/default definitions, named variant payload calls if locked later, and future argument-list-shaped syntax. UALO is a surface invariant; receiver-style callable access uses ordinary binding/call semantics.
+Rules: positional arguments first; named arguments after; once named starts, positional cannot resume; definition defaults trail; duplicate/unknown named args diagnostic; same parameter cannot be bound twice. Applies to ordinary calls, generic calls, attributes, parameter/default definitions, named variant payload calls, and future argument-list-shaped syntax. Variant payload calls accept named arguments under UALO, e.g. `.Point(x := 1, y := 2)`. UALO is a surface invariant; receiver-style callable access uses ordinary binding/call semantics.
 
 Type-operator family:
 
@@ -620,7 +622,7 @@ maybe-fallback  ::= EXPR "??" EXPR
 optional-access ::= EXPR "?." IDENT | EXPR "?." IDENT call-args | EXPR "?.[" EXPR "]"
 ```
 
-`?T` is `Maybe[T]`. `?` does not name `Expect`. `??` only for `?T`/`Maybe[T]`; fallback lazy; result `T`. `?.` only for `?T`/`Maybe[T]`; access/call/index only when present; absent stays absent; no null invented; composes with `??`. `when ... else` branches on `Bit`; `??` branches on optional presence; `?.` propagates absence. `Expect` remains explicit unless failure sugar later locked.
+`?T` is `Maybe[T]`. `?` does not name `Expect`. `??` only for `?T`/`Maybe[T]`; fallback lazy; result `T`. `?.` only for `?T`/`Maybe[T]`; access/call/index only when present; absent stays absent; no null invented; composes with `??`. `when ... else` branches on `Bit`; `??` branches on optional presence; `?.` propagates absence. `Expect` remains explicit; no failure-propagation sugar exists in core Musi.
 
 Expect/checked casts:
 
@@ -753,10 +755,30 @@ Attribute rules:
 - Conditional attributes are not separate grammar; conditionality belongs in payload, e.g. non-keyword field `enabled := ...`; if schema defines it as condition, it must be `known Bit`; `True` means metadata present, `False` absent; no runtime branch.
 - Attributes may prefix grammar-owned nodes only; arbitrary infix expressions need wrapped computation region.
 - Attribute applies only to exact next node; child propagation only by schema.
-- Unknown compiler attributes are diagnostics unless declared by imported/tooling mechanism.
+- Unknown compiler-affecting attributes are diagnostics. Tooling-only attributes must be namespaced, such as `@tool.name(...)`, and are ignored by compiler semantics unless a tool handles them. Native/compiler modules use `musi:` import prefixes, such as `musi:core` and `musi:ffi`; these are native modules with optional `.ms` interface surfaces, not ordinary Musi implementations.
 - Repeatability is schema-defined; repeated unique attribute on same target is diagnostic.
 - Recognized attributes preserved in SEIL metadata when affecting representation, ABI, checking, tooling, or near-identical decompilation.
 - Packed/bit-structured data remains `data`; no `bitstruct` keyword.
+
+`@target` is the structural availability attribute. It follows the same attribute meta-level function-call/UALO rules as every other attribute and canonicalizes to known metadata.
+
+Target rules:
+
+- `@target(...)` attaches to the next grammar-owned node.
+- Target arguments are known metadata.
+- Scalar field value means exact match.
+- Array datum field value means any-of for that field.
+- Record fields are ANDed together.
+- Array datum of record predicates is OR across record predicates.
+- Nonmatching targets make the node absent before semantic checks for that compilation target.
+- `@target` is unique on a node; compose with datums instead of repeating it.
+- No runtime branching is introduced.
+- No `cfg` keyword, string DSL, `any`/`all` keyword, or special repeated-attribute OR rule exists.
+
+```musi
+@target(os := #[.linux, .macos], arch := .x64)
+@target(#[#{ os := .linux, arch := .x64 }, #{ os := .macos, arch := .aarch64 }])
+```
 
 Representation controls are schema-validated attributes only: `@repr(.c)`, `@packed`, `@align(4)`. Representation metadata args must be known. `@repr(profile, ...)` names layout/profile family. Profile schemas validate allowed targets/fields/values/combinations. Unsupported profile/field/value/combination diagnostic. Representation attributes apply only where schema allows: data definitions, fields, variants/cases, extern bindings. FFI boundary types must be representable under chosen profile. SEIL preserves layout and near-identical decompilation metadata.
 
@@ -779,7 +801,7 @@ conformance-relation ::= TYPE "|=" TYPE
 witness-binding      ::= "let" TYPE "|=" TYPE ":=" record-datum
 ```
 
-`T |= Shape` states/constrains fit. `let T |= Shape := witnessValue;` binds explicit witness for witness-required conformance. No `impl`, `implements`, `extends`, or `trait`. Receiver methods and witness bindings use `let`. `|=` is not general-purpose Boolean test by default. Runtime fit checks for dynamic/opaque values remain open.
+`T |= Shape` states/constrains fit. `let T |= Shape := witnessValue;` binds explicit witness for witness-required conformance. No `impl`, `implements`, `extends`, or `trait`. Receiver methods and witness bindings use `let`. `|=` is not a runtime Boolean predicate. Runtime fit checks use `:?` / `:?>` against concrete type or shape boundaries when runtime evidence exists. `Any` requires explicit capability/API for dynamic checks. `opaque` does not grant arbitrary runtime introspection.
 
 ## 15. Modules, imports, exports, visibility
 
@@ -801,7 +823,7 @@ named-import-bind ::= "let" IDENT ":=" import-expr
 anonymous-import  ::= "let" "_" ":=" import-expr
 ```
 
-Named import binds imported record to a name. Anonymous import brings imported record contents into scope without binding record itself. Multi-import datums produce record-shaped imports.
+Named import binds imported record to a name. Anonymous import brings imported record contents into scope without binding record itself. Multi-import datums produce record-shaped imports. Native/compiler modules use `musi:` import prefixes, similar in role to `node:`/`bun:` prefixes: `musi:core`, `musi:ffi`, etc. These modules are native/compiler-provided and may expose `.ms` interface surfaces; their internals are not required to be written in Musi.
 
 Visibility: `export` only. Exported binding visible from module; non-export private by absence. No `public`, `private`, `protected`, `internal`, `hidden`. `opaque` controls type abstraction, not visibility. Modules are records; exports define module record surface.
 
@@ -818,13 +840,16 @@ Checked/locked:
 - [x] Data: product field grammar; sum variant grammar; `case Variant(...) := value`; no product/sum mixing; associated data/value binding; constructors; destructuring/pattern syntax; tags/discriminants.
 - [x] Representation/metadata: attributes; `@packed`; alignment/endian/tags/padding/ABI layout controls; metadata placement; SEIL preservation.
 - [x] Comments: line/doc/module doc/block/block doc/block module doc/nesting.
-- [x] Delimiters/separators: `#(`, `#{`, `#[`; tuple types; bracket roles; trailing separators; empty tuple/record/array.
+- [x] Delimiters/separators/literals: `#(`, `#{`, `#[`; tuple types; bracket roles; trailing separators; empty tuple/record/array; numeric suffixes/separators/base prefixes; triple-quoted multiline strings; escaped identifiers.
 - [x] Control flow: `when ... else` precedence/associativity; dangling-else prevention; nested `when` parenthesization; guarded emission contexts; loop syntax vs recursion; `defer`/`yield`/`pin` status.
 - [x] Match/patterns: exact pattern grammar; alternatives; comma alternatives not `|`; semicolon cases; exhaustiveness; guard order; binding syntax.
 - [x] Operators: full symbolic set; precedence; not-flat parsing; no user-defined symbolic ops; word ops; assignment/binding/update vs equality; equality/equivalence/ordering/approximation/membership/remainder.
 - [x] Modules/imports: modules as record-like values; import syntax; export syntax; visibility; path/source shape; SEIL round-trip.
 - [x] Known phase: meaning; applies to expressions/bindings/parameters/types where meaningful; limits; boundary; datum literals; functions compile to SEIL/no separate interpreter.
 - [x] Safety: no unsafe wrapper; capabilities/metadata/types; pointer types/ops; pinning via `fixed`; FFI rules; dangerous behavior errors not warnings.
+- [x] Lexical literals: numeric separators; base prefixes; literal suffixes; triple-quoted strings; escaped identifiers; reserved interpolation direction; no automatic multiline-string indentation trimming.
+- [x] Attributes: universal attribute call model; UALO payloads; `@target`; tooling namespace rule; compiler-affecting unknown attribute diagnostics.
+- [x] Native modules: `musi:` import prefix; native/compiler-provided modules; optional `.ms` interface surfaces.
 
 Still open:
 
@@ -834,4 +859,3 @@ Still open:
 - [ ] Whether SEIL has stable binary and textual form
 - [ ] How stack-effect verification appears in SEIL
 - [ ] How known-phase evaluation appears in SEIL
-- [ ] Runtime fit checks for dynamic or opaque values

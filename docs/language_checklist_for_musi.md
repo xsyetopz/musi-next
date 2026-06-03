@@ -2,7 +2,7 @@
 
 Source checklist: `docs/language_checklist.md`.
 
-This file keeps the original checklist shape and answers it for Musi using locked design decisions from `LOCKED_SYNTAX.md`. Marker legend: `[x]` means Musi intentionally has or directly answers the item; `[-]` means non-applicable/rejected/not claimed; `[~]` means deferred to implementation or the Swift/SEIL version; `[?]` means the item needs evidence before the claim can be made.
+This file keeps the original checklist shape and answers it for Musi using locked design decisions from `LOCKED_LANGUAGE_DESIGN.md`. Marker legend: `[x]` means Musi intentionally has or directly answers the item; `[-]` means non-applicable/rejected/not claimed; `[~]` means deferred to implementation or the Swift/SEIL version; `[?]` means the item needs evidence before the claim can be made.
 
 ## You appear to be advocating a new:
 
@@ -153,7 +153,7 @@ This file keeps the original checklist shape and answers it for Musi using locke
 - [-] The most significant program written in your language isn't even its own compiler
   - Not claimed.
 - [-] No language spec
-  - `LOCKED_SYNTAX.md` is the current locked syntax/design artifact. Full SEIL/runtime spec remains to be written.
+  - `LOCKED_LANGUAGE_DESIGN.md` is the current locked syntax/design artifact. Full SEIL/runtime spec remains to be written.
 - [-] "The implementation is the spec"
     - [-] The implementation is closed-source
     - [-] covered by patents
