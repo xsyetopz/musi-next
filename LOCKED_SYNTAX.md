@@ -82,7 +82,7 @@ while
 
 Count: 18.
 
-`in` is a contextual word operator, not a form keyword.
+`in` is a contextual word operator, not a form keyword. `as` is a contextual pattern keyword, not a cast keyword.
 
 `import` and `export` are hard keywords. `import` takes in. `export` puts out. Module boundary forms affect source shape and SEIL/decompilation metadata. `known import` is compile-time acquisition/import.
 
@@ -304,6 +304,87 @@ Iterable loops are expressed through ordinary functions, methods, and shapes ove
 
 
 
+
+## Known Phase Rules
+
+`known` is a phase modifier. It answers the question: can this be compile-time?
+
+`known` is not `const` and is not `static`.
+
+
+Rules:
+- `known expr` requests or requires compile-time evaluation of `expr`
+- `known T` requires a compile-time-known value/type-phase value of type `T`
+- `known` appears only where compile-time availability is meaningful
+- if a context already requires knownness, the spelling may be omitted
+- if a value cannot be compile-time, `known` produces a diagnostic
+- without `known`, evaluation is runtime unless context requires knownness
+
+Known phase can construct datum literals when contained values are known-compatible.
+
+```musi
+let point := known #(1, 2);
+let config := known #{ retries := 3, timeout := 30 };
+let table := known #[1, 2, 3];
+```
+
+Case tag/discriminant positions require known values by context.
+
+```musi
+let TokenKind := data {
+  case Eof := 0;
+  case Ident(text : Text) := 1;
+};
+```
+
+`known import` is compile-time acquisition/import.
+
+
+Known/runtime boundary is strict.
+
+Rules:
+- known code may depend only on known values, known imports, type information, and compiler-permitted known intrinsics
+- runtime values cannot be captured by `known`
+- known values may be used to generate or runtime-initialize values if representable
+- crossing from known to runtime is allowed by embedding/lowering the known result
+- crossing from runtime to known is not allowed
+
+Array/list type bounds are known-phase contexts.
+
+```musi
+let n := known 4;
+let xs : [n]Word8 := #[0, 0, 0, 0];
+```
+
+
+Known functions are Musi code lowered to SEIL. Known evaluation executes SEIL in the known phase.
+
+There is no separate source-tree evaluator semantics for known functions.
+
+Rationale:
+- one semantics
+- no source AST evaluator drift
+- direct fit with Musi targeting SEIL
+- known and runtime phases share verifier/lowering rules
+- compiler/tooling can execute SEIL for known evaluation without requiring the compiler at runtime
+
+
+Known evaluation is deterministic and resource-limited.
+
+Rules:
+- known evaluation has no ambient runtime state
+- known evaluation has no wall-clock, time, random, environment, process, or IO access unless provided through explicit known imports/intrinsics that are deterministic by definition
+- bounded fuel, step, and memory limits are implementation/compiler settings
+- nontermination or limit exhaustion is a diagnostic
+- known evaluation cannot depend on target runtime mutable state
+- known evaluation may use known imports, pure computation, type information, and compiler-approved deterministic intrinsics
+
+Rationale:
+- avoids compiler hangs
+- avoids spooky action at a distance
+- keeps builds reproducible
+- keeps known phase separate from runtime ambient state
+
 ## Unsafe
 
 There is no `unsafe` keyword or unsafe expression/block form.
@@ -364,9 +445,10 @@ Pattern matching uses `match`. Each match arm starts with `case` and ends with s
 
 ```ebnf
 [47] match-expr  ::= "match" EXPR "{" match-case+ "}"
-[48] match-case  ::= "case" PATTERN case-guard? "=>" EXPR ";"
-[49] case-guard  ::= "when" EXPR
-[50] lambda-expr ::= '\' param-list type-annot? "=>" EXPR
+[48] match-case  ::= "case" case-pattern-list case-guard? "=>" EXPR ";"
+[49] case-pattern-list ::= PATTERN ("," PATTERN)* ","?
+[50] case-guard  ::= "when" EXPR
+[51] lambda-expr ::= '\' param-list type-annot? "=>" EXPR
 ```
 
 The semicolon after a `case` arm terminates the structural case rule. It does not discard the selected arm value and does not make the match produce `Unit`.
@@ -389,7 +471,192 @@ match value {
 }
 ```
 
-Pattern alternatives are not locked as syntax. Repeated `case` arms are the core spelling for multiple alternatives that produce the same expression unless a later rule changes this.
+Pattern alternatives use comma separation inside a `case`. `|` is not used for pattern alternatives. All alternatives in one `case` share the same guard and body. Pattern bindings must be compatible across alternatives: the same names must be bound with compatible types in every alternative that reaches the shared body.
+
+
+`as` is a contextual pattern keyword for alias patterns.
+
+```ebnf
+[171] alias-pattern ::= pattern-primary type-annot? ("as" identifier-pattern)?
+```
+
+The alias binds the whole value matched by the pattern. `as` is not cast syntax; casts/conversions use `:>` and `:?>`.
+
+```musi
+case .Some(x) as option => option;
+case #{ name := n } as person => n;
+case id : UserId as rawPattern => id.raw;
+```
+
+In pattern alternatives, aliases must be binding-compatible across alternatives if the shared body uses them.
+
+
+```musi
+match token {
+  case .LParen, .RParen, .LBrace, .RBrace => "delimiter";
+  case .Ident(text) => text;
+}
+```
+
+
+
+## Match Exhaustiveness
+
+`match` is exhaustive by default. Non-exhaustive `match` is a semantic error.
+
+Exhaustiveness is checked by semantic analysis.
+
+Rules:
+- finite sum `data` matches must cover all variants or include wildcard catch-all
+- guarded cases do not count as unconditional coverage
+- catch-all is `case _`
+- there is no `case else` syntax
+
+```musi
+match maybe {
+  case .Some(x) when x > 0 => x;
+  case .Some(_) => 0;
+  case .None => fallback;
+}
+```
+
+```musi
+match maybe {
+  case .Some(x) when x > 0 => x;
+  case .Some(_) => 0;
+  case _ => fallback;
+}
+```
+
+`else` remains the fallback marker for `when ... else`; it is not a match pseudo-pattern.
+
+
+## Match Guard Evaluation
+
+Match cases are tested top-to-bottom. Within one `case`, comma-separated pattern alternatives are tested left-to-right.
+
+Guard evaluation order:
+- pattern alternative is tested first
+- guard runs only after its pattern alternative matched
+- guard can reference bindings from the matched pattern
+- guard expression must be `Bit`
+- if the pattern matches but guard is false, matching continues to the next alternative/case
+- guards do not run for non-matching patterns
+- first matching unguarded case or guard-true case wins
+- guarded cases are conditional coverage for exhaustiveness
+
+```musi
+match maybe {
+  case .Some(x) when x > 0 => x;
+  case .Some(_) => 0;
+  case _ => fallback;
+}
+```
+
+## Pattern Grammar
+
+Patterns mirror datum syntax where they destructure values. Let binding heads may be patterns, so ordinary binding identifiers are identifier patterns.
+
+```ebnf
+[159] pattern              ::= alias-pattern
+[171] alias-pattern        ::= pattern-primary type-annot? ("as" identifier-pattern)?
+[160] pattern-primary      ::= wildcard-pattern | identifier-pattern | literal-pattern | variant-pattern | tuple-pattern | record-pattern | array-pattern | rest-pattern
+[161] wildcard-pattern     ::= "_"
+[162] identifier-pattern   ::= IDENT
+[163] literal-pattern      ::= INT | FLOAT | STRING | RUNE
+[164] variant-pattern      ::= "." IDENT pattern-args? | TYPE "." IDENT pattern-args?
+[165] pattern-args         ::= "(" (pattern ("," pattern)* ","?)? ")"
+[166] tuple-pattern        ::= "#(" (pattern ("," pattern)* ","?)? ")"
+[167] record-pattern       ::= "#{" (record-pattern-field ("," record-pattern-field)* ","?)? "}"
+[168] record-pattern-field ::= IDENT (":=" pattern)?
+[169] array-pattern        ::= "#[" (pattern ("," pattern)* ","?)? "]"
+[170] rest-pattern         ::= ".." identifier-pattern?
+```
+
+Examples:
+
+```musi
+case #(x, y) => expr;
+case #{ name := n, age := _ } => expr;
+case #[head, ..tail] => expr;
+case #[first, second, ..] => expr;
+case .Some(value) => expr;
+case Maybe.Some(value) => expr;
+case id : UserId => id.raw;
+```
+
+Record pattern shorthand:
+
+```musi
+case #{ name } => expr;
+```
+
+means the same binding shape as:
+
+```musi
+case #{ name := name } => expr;
+```
+
+Let bindings can destructure through pattern heads.
+
+```musi
+let #(x, y) := point;
+let #{ name := n, age := a } := person;
+```
+
+Rationale:
+- tuple, record, and array patterns use `#(`, `#{`, and `#[` to mirror datum value syntax
+- identifier patterns cover normal let-bound names
+- `_` is wildcard
+- `..` is rest/spread pattern
+- `#` keeps destructuring patterns in value/datum space, not type/structure space
+
+
+## Underscore Names
+
+`_` is the wildcard pattern. It matches and binds nothing.
+
+Identifiers beginning with underscore are ordinary identifiers.
+
+```ebnf
+[172] wildcard-pattern   ::= "_"
+[173] identifier-pattern ::= IDENT
+```
+
+`_name` is not special syntax for silencing an unused binding. If `_name` is accepted by the identifier grammar, it is a normal name and normal unused-binding rules apply.
+
+Unused bindings are unused regardless of spelling. No naming convention suppresses unused-binding checks.
+
+```musi
+case .Some(_) => 0;
+case .Some(_value) => 0;
+```
+
+The first binds nothing. The second binds `_value`; if `_value` is not used, it is an unused binding.
+
+
+## Rest Patterns
+
+Rest patterns use `..`.
+
+```ebnf
+[174] rest-pattern       ::= ".." identifier-pattern?
+[175] array-rest-pattern ::= ".." identifier-pattern?
+[176] record-rest-pattern ::= ".." identifier-pattern?
+```
+
+Rules:
+- at most one rest pattern may appear in a tuple, record, or array pattern
+- array rest may ignore or bind the remaining elements
+- record rest may ignore or bind the remaining fields
+- tuple rest requires tuple rest/variadic tuple semantics; until those are locked, tuple rest is not accepted
+
+```musi
+case #[head, ..tail] => tail;
+case #[head, ..] => head;
+case #{ name := n, ..rest } => rest;
+case #{ name := n, .. } => n;
+```
 
 ## Data
 
@@ -492,19 +759,29 @@ Datums exist to separate value construction from type syntax:
 
 ```ebnf
 [69] tuple-type          ::= "(" (TYPE ("," TYPE)* ","?)? ")"
-[70] array-list-type     ::= "[" (TYPE ("," TYPE)* ","?)? "]" TYPE
-[71] generic-application ::= TYPE "[" (TYPE ("," TYPE)* ","?)? "]"
-[72] tuple-field-access  ::= EXPR "." INT
-[73] array-index-access  ::= EXPR ".[" EXPR "]"
+[70] array-list-type     ::= "[" array-bound? "]" TYPE
+[71] array-bound         ::= EXPR | EXPR ".." EXPR | EXPR "..<" EXPR
+[72] generic-application ::= TYPE "[" (TYPE ("," TYPE)* ","?)? "]"
+[73] tuple-field-access  ::= EXPR "." INT
+[74] array-index-access  ::= EXPR ".[" EXPR "]"
 ```
 
 Array/list types are prefixed on the element type.
 
 ```musi
-[A, B]T
+[]T
+[N]T
+[A .. B]T
+[A ..< B]T
 ```
 
-The bracket prefix carries array/list type parameters such as size, bounds, shape, or other locked array/list metadata. Exact array/list parameter meanings remain open.
+Meanings:
+- `[]T` is a dynamic/unbounded sequence of `T`
+- `[N]T` is an exact known length `N` sequence of `T`
+- `[A .. B]T` is an inclusive known length range
+- `[A ..< B]T` is a half-open known length range
+
+Bounds must be known `Nat` values. Range bounds use normal range syntax; there is no separate `[A; B]T` bound syntax.
 
 Generic/type application uses postfix brackets on the type constructor.
 
@@ -721,14 +998,35 @@ They affect type identity, representation, dispatch, checking, ABI/SEIL metadata
 
 ## Attributes And Packed Data
 
-Attributes fit representation and interop metadata, not core type-space operations.
+Attributes are structural metadata prefixes. They attach to the next grammar-owned node and do not compute, branch, emit a value, or participate in runtime evaluation.
 
 ```ebnf
-[85] attr-list          ::= ATTR+
-[86] confirmed-attr     ::= "@packed" | "@align" "(" EXPR ")" | "@witness"
-[87] packed-data-expr   ::= "@packed" "data" data-body
-[88] aligned-data-expr  ::= "@align" "(" EXPR ")" "data" data-body
-[89] witness-shape-expr ::= "@witness" "shape" shape-body
+[177] attr-list             ::= attr+
+[178] attr                  ::= "@" attr-name attr-args?
+[179] attr-name             ::= IDENT ("." IDENT)*
+[180] attr-args             ::= "(" attr-arg-list? ")"
+[181] attr-arg-list         ::= attr-arg ("," attr-arg)* ","?
+[182] attr-arg              ::= IDENT ":=" attr-value | attr-value
+[183] attr-value            ::= literal
+                             | tuple-datum
+                             | record-datum
+                             | array-datum
+                             | variant-value
+                             | known-expr
+[184] attributed-let        ::= attr-list let-expr
+[185] attributed-data       ::= attr-list data-expr
+[186] attributed-shape      ::= attr-list shape-expr
+[187] attributed-case       ::= attr-list case-rule
+[188] attributed-match      ::= attr-list match-expr
+[189] attributed-while      ::= attr-list while-expr
+[190] attributed-defer      ::= attr-list defer-expr
+[191] attributed-import     ::= attr-list import-expr
+[192] attributed-export    ::= attr-list export-expr
+[193] attributed-lambda    ::= attr-list lambda-expr
+[194] attributed-region    ::= attr-list computation-region
+[195] packed-data-expr     ::= "@packed" "data" data-body
+[196] aligned-data-expr    ::= "@align" "(" attr-value ")" "data" data-body
+[197] witness-shape-expr   ::= "@witness" "shape" shape-body
 ```
 
 Confirmed surface attributes:
@@ -741,9 +1039,43 @@ Meanings:
 - `@align(...)` marks representation alignment metadata
 - `@witness` marks a `shape` as requiring explicit witness conformance
 
-Packed/bit-structured data is still `data`. It does not get a new keyword such as `bitstruct`.
+Attribute arguments are compile-time metadata values. Positional arguments and named arguments are both accepted. Named arguments use `:=`. Datum literals and sum-type values are accepted attribute values.
 
-`foreign`/`extern` interop metadata belongs in attributes with parameters and remains a later FFI design topic.
+```musi
+@align(4)
+data { let value : Int; };
+
+@packed(bits := 32, layout := .dense)
+data { let flags : Word; };
+
+@witness
+shape { let (self : Self).show() : Text; };
+```
+
+Conditional attributes are not a separate grammar form. Conditionality belongs in the attribute payload as known-time metadata, usually through a named argument such as `when := ...`.
+
+```musi
+@packed(when := Target.hasPackedAbi)
+data { let value : Word; };
+```
+
+The `when` payload value must be `known Bit` when the attribute schema defines it as a condition. If the condition is true, the metadata is present. If the condition is false, the metadata is absent. The condition does not create runtime branching.
+
+Attributes may prefix grammar-owned nodes such as `let`, `data`, `shape`, `case`, `match`, `while`, `defer`, `import`, `export`, lambda expressions, and computation regions. Attributes do not prefix arbitrary infix expressions unless the expression is wrapped in a computation region.
+
+```musi
+@trace (
+  a + b
+)
+```
+
+An attribute applies only to the exact next node. Attribute propagation to child nodes exists only when that attribute's schema explicitly defines propagation.
+
+Unknown compiler attributes are diagnostics unless they are declared by an imported/tooling mechanism defined later. Repeatability is defined by the attribute schema. A unique attribute repeated on the same target is a diagnostic.
+
+Recognized attributes are preserved in SEIL metadata when they affect representation, ABI, checking, tooling, or near-identical decompilation.
+
+Packed/bit-structured data is still `data`. It does not get a new keyword such as `bitstruct`.
 
 Rule:
 - type identity/storage/checking concept: type-space modifier
@@ -1155,6 +1487,23 @@ let std := import #{
 ```
 
 
+
+## Visibility
+
+`export` is the only visibility mechanism.
+
+```ebnf
+[158] visibility-form ::= "export"
+```
+
+Rules:
+- exported binding is visible from the module
+- non-exported binding is module-private
+- no `public`, `private`, `protected`, `internal`, or `hidden` visibility words exist
+- `opaque` controls type abstraction, not visibility
+
+Modules are records. Exports define the module record surface. Non-export is private by absence.
+
 ## Module SEIL Round-Trip
 
 SEIL module metadata must preserve import/export information needed for semantic decompilation.
@@ -1182,7 +1531,7 @@ These questions are intentionally open and are not locked by this document.
 ### Keyword Set
 
 - [x] Final hard-reserved keyword list
-- [ ] Whether visibility words are hard keywords or contextual introducers
+- [x] Whether visibility words are hard keywords or contextual introducers
 - [x] Whether `import` is a keyword or a compiler-owned function/form with special lowering
 - [x] Whether `export` is a keyword, metadata, or a structural member rule
 - [x] Whether `hidden` remains a surface concept
@@ -1215,15 +1564,16 @@ These questions are intentionally open and are not locked by this document.
 - [ ] Stack-effect compatibility for `when`, `match`, `defer`, `yield`, and receiver methods
 - [ ] Whether guarded emission requires a special effect kind or row-polymorphic stack effect
 
+#
 ### Data
 
-- [ ] Product field grammar inside `data`
-- [ ] Sum variant grammar inside `data`
+- [x] Product field grammar inside `data`
+- [x] Sum variant grammar inside `data`
 - [x] Exact meaning of `case Variant(...) := value`
 - [x] Whether product `let` entries and sum `case` entries can ever mix
-- [ ] Associated data/value binding rules inside `data`
+- [x] Associated data/value binding rules inside `data`
 - [x] Constructor generation rules
-- [ ] Destructuring and pattern syntax for product data
+- [x] Destructuring and pattern syntax for product data
 - [x] Variant tag/discriminant rules
 
 ### Representation And Metadata
@@ -1231,8 +1581,8 @@ These questions are intentionally open and are not locked by this document.
 - [x] Attribute syntax
 - [x] Whether `@packed` is the final packed-data spelling
 - [ ] Representation controls such as alignment, endian, tags, padding, and ABI layout
-- [ ] Whether representation metadata appears before `data`, after `data`, or inside the structural body
-- [ ] Whether metadata is preserved in SEIL for decompilation
+- [x] Whether representation metadata appears before `data`, after `data`, or inside the structural body
+- [x] Whether metadata is preserved in SEIL for decompilation
 
 ### Comments
 
@@ -1265,13 +1615,13 @@ These questions are intentionally open and are not locked by this document.
 
 ### Match And Patterns
 
-- [ ] Exact pattern grammar
-- [ ] Whether pattern alternatives exist
-- [ ] Whether pattern alternatives use `|`, repeated `case`, or another form
+- [x] Exact pattern grammar
+- [x] Whether pattern alternatives exist
+- [x] Whether pattern alternatives use `|`, repeated `case`, or another form
 - [x] Whether match cases require semicolons in all positions
-- [ ] Exhaustiveness rules
-- [ ] Guard evaluation order
-- [ ] Pattern binding syntax
+- [x] Exhaustiveness rules
+- [x] Guard evaluation order
+- [x] Pattern binding syntax
 
 ### Operators
 
@@ -1305,10 +1655,10 @@ These questions are intentionally open and are not locked by this document.
 
 - [x] Exact meaning of `known`
 - [x] Whether `known` applies to expressions, bindings, parameters, types, or all of them
-- [ ] Known-phase evaluation limits
-- [ ] Known/runtime boundary rules
-- [ ] Whether known values can construct `#` datum literals
-- [ ] Whether known functions compile to SEIL or evaluate through a separate interpreter
+- [x] Known-phase evaluation limits
+- [x] Known/runtime boundary rules
+- [x] Whether known values can construct `#` datum literals
+- [x] Whether known functions compile to SEIL or evaluate through a separate interpreter
 
 ### Safety
 
