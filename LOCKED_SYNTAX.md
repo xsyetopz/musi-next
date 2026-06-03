@@ -227,12 +227,13 @@ Rules:
 
 ## Match And Case
 
-Pattern matching uses `match`. Each match arm starts with `case` and ends with semicolon.
+Pattern matching uses `match`. Each match arm starts with `case` and ends with semicolon. `=>` is the body/result arrow for both match arms and lambdas.
 
 ```ebnf
-[47] match-expr ::= "match" EXPR "{" match-case+ "}"
-[48] match-case ::= "case" PATTERN case-guard? "=>" EXPR ";"
-[49] case-guard ::= "when" EXPR
+[47] match-expr  ::= "match" EXPR "{" match-case+ "}"
+[48] match-case  ::= "case" PATTERN case-guard? "=>" EXPR ";"
+[49] case-guard  ::= "when" EXPR
+[50] lambda-expr ::= '\' param-list type-annot? "=>" EXPR
 ```
 
 The semicolon after a `case` arm terminates the structural case rule. It does not discard the selected arm value and does not make the match produce `Unit`.
@@ -264,22 +265,22 @@ Pattern alternatives are not locked as syntax. Repeated `case` arms are the core
 The body determines whether the data is product-shaped or sum-shaped. A `data` body must not mix product `let` entries and sum `case` entries.
 
 ```ebnf
-[50] data-expr              ::= attr-list? "data" data-body
-[51] data-body              ::= product-data-body | sum-data-body | empty-data-body
-[52] product-data-body      ::= "{" data-field (";" data-field)* ";"? "}"
-[53] sum-data-body          ::= "{" data-case (";" data-case)* ";"? "}"
-[54] empty-data-body        ::= "{" "}"
-[55] data-field             ::= "let" IDENT type-annot field-default?
+[51] data-expr              ::= attr-list? "data" data-body
+[52] data-body              ::= product-data-body | sum-data-body | empty-data-body
+[53] product-data-body      ::= "{" data-field (";" data-field)* ";"? "}"
+[54] sum-data-body          ::= "{" data-case (";" data-case)* ";"? "}"
+[55] empty-data-body        ::= "{" "}"
+[56] data-field             ::= "let" IDENT type-annot field-default?
                              | "let" IDENT ":=" EXPR
-[56] field-default          ::= ":=" EXPR
-[57] data-case              ::= "case" IDENT variant-payload? case-tag?
-[58] variant-payload        ::= "(" variant-param-list? ")"
-[59] variant-param-list     ::= required-variant-param ("," required-variant-param)* ("," default-variant-param)* ","?
+[57] field-default          ::= ":=" EXPR
+[58] data-case              ::= "case" IDENT variant-payload? case-tag?
+[59] variant-payload        ::= "(" variant-param-list? ")"
+[60] variant-param-list     ::= required-variant-param ("," required-variant-param)* ("," default-variant-param)* ","?
                              | default-variant-param ("," default-variant-param)* ","?
-[60] required-variant-param ::= IDENT type-annot | type-annot | TYPE
-[61] default-variant-param  ::= IDENT type-annot? ":=" EXPR
-[62] case-tag               ::= ":=" known-expr
-[63] known-expr             ::= EXPR /* context requires known value */
+[61] required-variant-param ::= IDENT type-annot | type-annot | TYPE
+[62] default-variant-param  ::= IDENT type-annot? ":=" EXPR
+[63] case-tag               ::= ":=" known-expr
+[64] known-expr             ::= EXPR /* context requires known value */
 ```
 
 `:= value` on the `case` itself initializes or defines the variant identity.
@@ -531,6 +532,106 @@ Guard contexts require `Bit`. There is no truthiness.
 
 Short-circuiting is control flow, not algebra. Use `when ... else ...` or `match`.
 
+
+## Operator Precedence And Associativity
+
+Musi uses mathematical/common algebra precedence where it does not create silent semantic traps. Parentheses are required where chaining or precedence would otherwise create misleading expressions.
+
+```ebnf
+[114] postfix-expr      ::= EXPR postfix-op+
+[115] postfix-op        ::= "." IDENT | "." INT | ".[" EXPR "]" | "?." IDENT | "?.[" EXPR "]" | call-args
+[116] prefix-expr       ::= prefix-op EXPR
+[117] prefix-op         ::= "known" | "fixed" | "mut" | "?" | "~" | "-"
+[118] multiplicative-op ::= "*" | "/" | "%"
+[119] additive-op       ::= "+" | "-"
+[120] shift-op          ::= "|<" | ">|" | ">+"
+[121] rotate-op         ::= "@<" | "@>"
+[122] range-op          ::= ".." | "..<"
+[123] relation-op       ::= "<" | "<=" | ">" | ">=" | "=" | "/=" | "~=" | ":?" | ":>" | ":?>" | "<:" | "|="
+[124] algebra-and-op    ::= "&"
+[125] algebra-xor-op    ::= "^"
+[126] algebra-or-op     ::= "|"
+[127] nil-coalesce-op   ::= "??"
+[128] conditional-op    ::= "when"
+[129] binding-op        ::= ":="
+```
+
+Precedence, highest to lowest:
+
+```text
+1. postfix access/call/index
+2. prefix unary and modifiers
+3. callable arrow in type position: ->
+4. multiplicative: * / %
+5. additive: + -
+6. shift/rotate: |< >| >+ @< @>
+7. range: .. ..<
+8. relational/type/equality: < <= > >= = /= ~= :? :> :?> <: |=
+9. algebra AND: &
+10. algebra XOR: ^
+11. algebra OR: |
+12. nil-coalesce / maybe fallback: ??
+13. conditional: when ... else / when
+14. binding/update: :=
+```
+
+`%` means remainder, not mathematical modulo.
+
+Rationale:
+- CPUs define and compute remainder directly
+- true modulo has different negative-number behavior and usually needs adjustment
+- Musi is a small systems language, so `%` maps to the primitive machine operation
+- this is explicit CPU semantics, not C-baggage inheritance
+
+True modulo belongs in a named operation such as `mod(a, b)` or a standard-library/compiler intrinsic with specified semantics.
+
+
+Shift and rotate operators are symbolic single tokens under maximal munch.
+
+```ebnf
+[130] shift-op  ::= "|<" | ">|" | ">+"
+[131] rotate-op ::= "@<" | "@>"
+```
+
+Meanings:
+- `a |< n` shifts left and fills with zero bits
+- `a >| n` shifts right and fills with zero bits
+- `a >+ n` shifts right and fills with sign bit / arithmetic right shift
+- `a @< n` rotates left
+- `a @> n` rotates right
+
+There is no `<<` or `>>` shift syntax. Those forms carry mathematical “much less/greater” meaning and C/C++ baggage.
+
+There is no separate arithmetic-left-shift operator unless Musi later defines semantics distinct from zero-fill left shift. Signed overflow policy belongs to type/overflow rules, not a separate left-shift operator.
+
+Algebra precedence follows mathematical/common logic-gate convention:
+- `&` binds tighter than `^`
+- `^` binds tighter than `|`
+
+The same algebra table applies to `Bit`, `Word`, `Bits[N]`, and type algebra where type checking accepts the operators.
+
+Relational/type/equality operators are non-chainable.
+
+```musi
+(a < b) & (b < c)
+```
+
+spells a range-like comparison explicitly.
+
+`??` is right-associative nil-coalesce / Maybe fallback.
+
+```musi
+a ?? b ?? c
+```
+
+means:
+
+```musi
+a ?? (b ?? c)
+```
+
+`??` remains Maybe-only and does not apply to `Expect`.
+
 ## Optional Type And Operators
 
 `?T` is the optional type sugar for `Maybe[T]`.
@@ -582,6 +683,34 @@ This applies in value, parameter, field, result, receiver, pattern, and shape-me
 `:=` remains binding/definition/initialization.
 
 `=` remains equality. `/=` remains inequality.
+
+
+## Callable Types
+
+`->` is the callable type arrow.
+
+```ebnf
+[132] callable-type       ::= callable-input "->" TYPE
+[133] callable-input      ::= TYPE | tuple-type
+[134] multi-input-callable ::= "(" TYPE ("," TYPE)+ ","? ")" "->" TYPE
+```
+
+```musi
+Int -> Text
+(Int, Text) -> Unit
+() -> Unit
+```
+
+`->` is a type-space callable arrow. It is not a curry operator in expression space.
+
+Chained callable arrows require explicit design before they are accepted as implicit currying. Until that design is locked, parentheses spell intent.
+
+```musi
+A -> (B -> C)
+(A, B) -> C
+```
+
+Musi source does not use old stack-effect syntax as the callable surface. Callable types use `->`.
 
 ## Type Operator Family
 
@@ -707,7 +836,7 @@ These questions are intentionally open and are not locked by this document.
 - [ ] Type-phase algebra for `|`, `&`, `^`, and `~`
 - [ ] Union/intersection representation and normalization rules
 - [x] Optional/error type surface forms
-- [ ] Whether callable types use stack-effect syntax directly
+- [x] Whether callable types use stack-effect syntax directly
 - [x] Whether type annotations use `:` in every context
 - [x] Whether casts/tests use symbolic operators such as `:>` and `:?>`
 
@@ -715,7 +844,7 @@ These questions are intentionally open and are not locked by this document.
 
 - [ ] Exact source syntax for stack effects
 - [ ] Whether stack effects are first-class type values
-- [ ] Whether ordinary functions expose stack-effect types or parameter/result sugar
+- [x] Whether ordinary functions expose stack-effect types or parameter/result sugar
 - [ ] Stack-effect compatibility for `when`, `match`, `defer`, `yield`, and receiver methods
 - [ ] Whether guarded emission requires a special effect kind or row-polymorphic stack effect
 
@@ -780,12 +909,12 @@ These questions are intentionally open and are not locked by this document.
 ### Operators
 
 - [ ] Full symbolic operator set
-- [ ] Operator precedence table or precedence-avoidance strategy
+- [x] Operator precedence table or precedence-avoidance strategy
 - [ ] Whether all infix expressions parse flat and precedence is semantic
 - [ ] Whether user-defined symbolic operators exist
 - [ ] Whether word operators exist at all
 - [ ] Whether assignment/binding/update operators are distinct from equality
-- [ ] Equality, equivalence, ordering, approximation, and membership operators
+- [ ] Equality, equivalence, ordering, approximation, membership, and remainder operators
 
 ### Modules And Imports
 
