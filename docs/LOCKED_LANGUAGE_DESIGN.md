@@ -891,26 +891,29 @@ digraph seil_module {
   Header [label="40-byte binary header"];
   Directory [label="section directory"];
   Asm [label="mandatory asm section"];
-  Core [label="typed metadata sections"];
-  Bodies [label="procedure bodies"];
-  Tool [label="optional tool/source metadata"];
+  Deps [label="deps"];
+  Defs [label="defs"];
+  Code [label="code"];
+  Data [label="data"];
+  Meta [label="meta"];
+  Tool [label="tool"];
 
   Module -> Header;
   Header -> Directory [label="points to"];
   Directory -> Asm [label="decode first"];
-  Directory -> Core;
-  Directory -> Bodies;
+  Directory -> Deps;
+  Directory -> Defs;
+  Directory -> Code;
+  Directory -> Data;
+  Directory -> Meta;
   Directory -> Tool;
 
   Asm -> Identity [label="asm identity/version"];
-  Asm -> Capabilities [label="capabilities/runtime"];
-  Asm -> Exts [label="ext sections/opcodes"];
-  Core -> Names [label="symbols/names"];
-  Core -> Types [label="types/signatures/layouts"];
-  Core -> Consts [label="constants"];
-  Core -> Imports [label="imports/exports"];
-  Core -> Procedures [label="procedures/globals"];
-  Core -> Meta [label="body/runtime metadata"];
+  Deps -> Requirements [label="runtime/cap/ext/imports"];
+  Defs -> Definitions [label="types/sigs/globals/procs"];
+  Code -> Bodies [label="blocks/regions/instructions"];
+  Data -> Layouts [label="payloads/layouts/refmaps/abi/dyn"];
+  Meta -> RequiredMeta [label="required semantic metadata"];
 }
 ```
 
@@ -954,22 +957,17 @@ offset  size  field
 Section families:
 
 ```text
-names          symbols, strings, module paths, field/alt names
-asm            mandatory early asm identity, version, capability/runtime, ext contract
-asmrefs        asm references and dependency identity
-imports        module/native/foreign imports
-exports        exported module surface
-types          primitive/composite/qualified SEIL types
-sigs           `sig` callable `in`/`out` contracts
-consts         typed constants and known-evaluated values
-procs          procedure declarations and implementation origins
-layouts        representation, packing, alignment, endian, tags, padding, ABI layout, reference maps
-body-meta      blocks, locals, env slots, regions, handlers, safepoints, stack/root maps
-bodies         executable stack-effect instruction bodies
-tool-meta      optional source maps, source-shape, comments/docs, decompilation hints
+names  interned names and strings
+asm    current module identity, version, entry
+deps   runtime/cap/ext requirements, asm refs, imports
+defs   types, fields, alts, sigs, globals, constants, procs, exports
+code   bodies, blocks, regions, branch tables, address targets, instruction bytes
+data   constant payloads, layouts, reference maps, ABI records, dynamic/cap schemas
+meta   required semantic metadata not owned by defs/code/data
+tool   optional non-semantic source/tool metadata
 ```
 
-`asm` is mandatory and must be decodable using only the fixed header's core container format version. Unknown executable opcodes and semantic section kinds are rejected. Unknown non-semantic tool metadata is skippable only when the active core schema marks it skippable.
+`asm` is mandatory and must be decodable using only the fixed header's core container format version. `deps` carries runtime/cap/ext/import requirements and is decoded before remaining semantic rows. Unknown executable opcodes and semantic section kinds are rejected. Unknown non-semantic `tool` rows are skippable only when the active core schema marks them skippable.
 
 Required VM metadata affects verification, loading, linking, representation, capabilities, target availability, native/foreign linkage, GC roots/barriers, and execution. Optional tool metadata preserves Musi source shape, exact source symbols, original grouping, source spans, comments/docs when emitted, datum/operator/pattern spelling, and high-fidelity decompilation hints. Executable SEIL must run without optional tool metadata.
 
@@ -1057,7 +1055,7 @@ Opcode registry rules:
 - SEAM binary image stores numeric opcode ids.
 - SEIL text stores canonical mnemonics.
 - unknown opcode id is loader/verifier diagnostic unless declared by core ext metadata and supported by the consuming SEAM.
-- ext opcodes require asm-declared feature metadata before body operand decoding.
+- ext opcodes require `deps`-declared feature metadata before body operand decoding.
 
 Mnemonic rules:
 
@@ -1270,8 +1268,8 @@ Checked/locked:
 - [x] Native modules: `musi:` import prefix; native/compiler-provided modules; optional `.ms` interface surfaces.
 - [x] SEIL identity: Stack Effect Intermediate Language; SEAM executable language; not Musi-only and not disposable compiler IR.
 - [x] SEIL artifacts: `.seil` textual executable IL; SEAM binary image exists as internal assembled form.
-- [x] SEAM binary image header: exactly 40 bytes; `SEAM` magic, format tuple, section-directory tuple, file size; semantic contract lives in mandatory asm section.
-- [x] SEIL module structure: WAT/Lisp-like text module; SEAM binary image; mandatory early `asm` section; typed metadata sections; procedure bodies; required VM metadata; optional tool/source metadata.
+- [x] SEAM binary image header: exactly 40 bytes; `SEAM` magic, format tuple, section-directory tuple, file size; semantic contract splits between mandatory `asm` identity and `deps` dependency rows.
+- [x] SEIL module structure: WAT/Lisp-like text module; SEAM binary image; compact section families `names`, `asm`, `deps`, `defs`, `code`, `data`, `meta`, `tool`; required VM metadata; optional tool/source metadata.
 - [x] SEIL verification placement: basic-block stack-effect bodies; typed edge verification; verifier-computed stack bounds; no authored `.maxstack`.
 - [x] SEIL textual syntax: WAT/Lisp-like `(module ...)` root; CIL-like assembly/reference roles; symbolic names; structural forms; `(meta name ... (field := value))`; Forth/RPN-like procedure instruction streams; labels; mnemonic-first instructions; no `->`.
 - [x] SEIL opcode registry: u16 sparse family ranges; stable ids; naming law; locked core opcode map in `seil_opcodes.def`; VM-oriented semantics.

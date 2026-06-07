@@ -19,7 +19,7 @@ This file collects current `## Unknowns` entries from specs so they can be resol
 - Unknown required semantic sections are rejected.
 - Unknown metadata sections are skippable only when explicitly marked non-semantic/skippable by core.
 - Unknown required sections, opcodes, flags, or metadata schemas are rejected when the consuming VM/tool does not support the declaring core ext.
-- Version, capability, and runtime declarations live in the mandatory asm section and must be decoded before loaders decide whether later payloads can be decoded, skipped, or rejected.
+- Binary `asm` carries only current module identity, version, and entry metadata. Runtime, capability, extension, dependency, and import contracts live in `deps` and must be decoded before loaders decide whether later payloads can be decoded, skipped, or rejected.
 - SEIL/SEAM do not use executable-semantics dialects. Each behavior is core, library/native, frontend-owned, or unsupported.
 
 ### SEIL text shape
@@ -29,14 +29,15 @@ This file collects current `## Unknowns` entries from specs so they can be resol
 - SEIL text uses symbols as human-facing references; assemblers resolve symbols to binary table indices. Descriptor-heavy references are not the normal hand-written surface.
 - Directive names are chosen for clarity and are not constrained by opcode mnemonic length. Opcode mnemonic parts keep the 2..7 character law.
 
-### Container header and asm section
+### Container header, asm, and deps sections
 
 - SEAM binary images keep an exactly 40-byte fixed header as container probe data only.
 - The 40-byte header carries magic, container format version, header size, reserved-zero flags, section-directory location, and file size.
 - The header must not carry asm identity, dependency contracts, capability set, runtime contract, or ext declarations.
 - SEIL uses a WAT-like textual module model and a CIL-inspired assembly/reference plus typed metadata-table model rather than a raw instruction-stream model.
-- Section kind `2` is `asm`. A mandatory early asm section carries asm identity/version, required capabilities, runtime declaration, dependency declarations, ext section/opcode declarations, and entry metadata needed before dependent payload decoding.
-- Loaders validate the 40-byte header and section directory first, then decode only the mandatory core asm section before deciding whether remaining sections can be decoded, skipped, or rejected.
+- Section kind `2` is `asm`. A mandatory early asm section carries only current module identity, version, and entry metadata needed before dependent payload decoding.
+- SEAM binary image core section families are `names`, `asm`, `deps`, `defs`, `code`, `data`, `meta`, and `tool`.
+- Loaders validate the 40-byte header and section directory first, then decode the mandatory core `asm` section and dependency contracts in `deps` before deciding whether remaining sections can be decoded, skipped, or rejected.
 - Executable bodies remain compact streams whose operands reference metadata table indices/tokens. Required execution metadata is not optional; tool/debug/source metadata is skippable and non-semantic.
 - SEIL should avoid CIL costs that do not fit SEIL/SEAM: no PE/COFF coupling, no implicit runtime-specific verification loopholes, no attributes that secretly alter execution, and no complex binding policy unless a future package spec explicitly requires it.
 - Compression, checksum, signature, and archive transport are package/container-layer concerns, not core SEAM binary image concerns.
@@ -71,7 +72,7 @@ This file collects current `## Unknowns` entries from specs so they can be resol
 
 ### `seil/binary-image-format.md`
 
-- Physical table record layouts and packing are not specified for every section payload.
+- Physical row layouts and packing are not specified for every section payload.
 
 ### `seil/instructions.md`
 

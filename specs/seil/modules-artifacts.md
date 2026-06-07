@@ -37,15 +37,17 @@ Core declarations are VM-behavior declarations:
 
 ## Asm Identity
 
-A module has exactly one local `asm` declaration. It provides load/link identity, asm version, required capabilities, runtime contract, and entry metadata.
+A module has exactly one local `asm` declaration. It provides load/link identity, asm version, entry metadata, and the textual home for early runtime/capability contract members.
 
 Asm references use `asmref`, following the CIL distinction between current asm and referenced asms. Reference name and version are semantic dependency identity. Origin strings describe where a dependency comes from, such as `musi:core`, but do not replace asm identity.
+
+Assembly lowers textual `runtime` and `cap` members, top-level `ext` declarations, `asmref` declarations, and `import` declarations into binary `deps` rows. The binary `asm` section remains the identity/version/entry section, not a dependency catch-all.
 
 ## Internal Binary Image
 
 The internal binary image has a fixed 40-byte probe header and section directory. The header is not module metadata. Semantic contracts live in sections and tables.
 
-The mandatory early `asm` section is the encoded form of the textual local `asm` declaration plus required core ext declarations.
+The mandatory early `asm` section is the encoded identity subset of the textual local `asm` declaration. Runtime, capability, extension, dependency, and import requirements live in `deps`.
 
 ## Section Families
 
@@ -53,19 +55,14 @@ Internal binary images use these section families:
 
 - `names`
 - `asm`
-- `asmrefs`
-- `types`
-- `sigs`
-- `consts`
-- `imports`
-- `exports`
-- `procs`
-- `layouts`
-- `body-meta`
-- `bodies`
-- `tool-meta`
+- `deps`
+- `defs`
+- `code`
+- `data`
+- `meta`
+- `tool`
 
-`tool-meta` is optional, non-semantic, and skippable for execution.
+Rows inside those sections stay narrow. `deps` owns runtime/cap/ext requirements, asm refs, and imports. `defs` owns types, fields, alts, signatures, globals, constants, procedures, and exports. `code` owns body/control tables and instruction bytes. `data` owns constant payloads, layouts, ref maps, ABI records, and dynamic/cap schemas. `meta` owns required semantic metadata not owned elsewhere. `tool` is optional, non-semantic, and skippable for execution.
 
 ## Imports And Exports
 
@@ -98,5 +95,5 @@ A module is rejected before execution when:
 - imports/exports are semantically incompatible;
 - body verification fails;
 - required body or VM metadata is absent;
-- ext section or opcode schemas required by the asm section are unsupported;
-- unknown executable opcodes or semantic section kinds appear.
+- ext row-kind or opcode schemas required by `deps` are unsupported;
+- unknown executable opcodes, semantic section kinds, or required semantic row kinds appear.

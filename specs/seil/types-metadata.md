@@ -12,9 +12,9 @@ External sources used:
 
 ## Asm metadata
 
-The local `asm` declaration is required metadata and is decoded before dependent payloads. It records asm identity, asm version, required capabilities, entry metadata, and core ext declarations needed before section/body decoding.
+The local `asm` declaration is required metadata. Textual `asm` records asm identity, asm version, entry metadata, and early runtime/capability contract members for hand-authored SEIL.
 
-Asm metadata is semantic. A loader or verifier must reject a module when a required asm contract is unsupported. Asm `meta` entries are accepted only when defined by the core metadata schema.
+Assembly lowers runtime/capability contract members, extension declarations, asm references, and imports into binary `deps` rows. Binary `asm` carries identity/version/entry rows only and is decoded before dependent payloads. A loader or verifier must reject a module when a required `deps` contract is unsupported. Asm `meta` entries are accepted only when defined by the core metadata schema.
 
 ## Type universe
 
@@ -61,7 +61,7 @@ Tool metadata includes source maps, exact source symbol spelling, source-shape h
 
 ## Targets and semantic ownership
 
-SEIL/SEAM do not use executable-semantics dialects. Numeric behavior, ABI details, FFI representability, ext sections, ext opcodes, capability protocols, dynamic operations, nil admission, pointer/memory policies, and native binding rules are core SEIL/SEAM behavior, library/native behavior, frontend-owned behavior, or unsupported.
+SEIL/SEAM do not use executable-semantics dialects. Numeric behavior, ABI details, FFI representability, ext row kinds, ext opcodes, capability protocols, dynamic operations, nil admission, pointer/memory policies, and native binding rules are core SEIL/SEAM behavior, library/native behavior, frontend-owned behavior, or unsupported.
 
 Target metadata determines availability of declarations and code before semantic checks or verification. Target metadata is not a runtime branch mechanism.
 

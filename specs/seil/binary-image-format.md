@@ -6,7 +6,7 @@ The binary image keeps loader-friendly density rather than absolute binary golf:
 
 - fixed probe header;
 - section directory;
-- typed table sections;
+- compact section families with typed row kinds;
 - interned names;
 - `u16` opcode ids;
 - schema-ordered operands using fixed-width scalars and `varu`/`vari`;
@@ -46,31 +46,39 @@ Section entries are sorted by `(offset, kind)`. Payload ranges must not overlap 
 
 ## Section Kinds
 
-|            Id | Family                  |
-| ------------: | ----------------------- |
-|             1 | `names`                 |
-|             2 | `asm`                   |
-|             3 | `asmrefs`               |
-|             4 | `types`                 |
-|             5 | `sigs`                  |
-|             6 | `consts`                |
-|             7 | `imports`               |
-|             8 | `exports`               |
-|             9 | `procs`                 |
-|            10 | `layouts`               |
-|            11 | `body-meta`             |
-|            12 | `bodies`                |
-|            13 | `tool-meta`             |
-|  2000..=32767 | standard ext sections   |
-| 32768..=65535 | private/vendor sections |
+|   Id | Family  |
+| ---: | ------- |
+|    1 | `names` |
+|    2 | `asm`   |
+|    3 | `deps`  |
+|    4 | `defs`  |
+|    5 | `code`  |
+|    6 | `data`  |
+|    7 | `meta`  |
+|    8 | `tool`  |
 
-`asm` is mandatory and must be decodable using only the core image format. `tool-meta` is optional and non-semantic. Unknown semantic sections reject the image. Unknown tool metadata is skippable only when core metadata marks it non-semantic.
+`asm` is mandatory and must be decodable using only the core image format. Dependency contracts in `deps` are decoded before remaining semantic payloads. Unknown core semantic sections reject the image. Extension payloads are not new core section families; they use declared row kinds inside `data`, `meta`, or `tool`.
 
-## Tables And Indices
+## Rows And Indices
 
-Semantic sections encode compact typed tables. Text symbols are interned into the `names` section. Table refs are namespace-relative `varu` values.
+Semantic sections encode compact typed rows. Text symbols are interned into the `names` section. Table refs are namespace-relative `varu` values.
 
-Rows use compact schemas owned by their section kind. Field names are not encoded in rows. Optional row fields use presence bits or row-specific tags.
+Rows use compact schemas owned by their section and row kind. Field names are not encoded in rows. Optional row fields use presence bits or row-specific tags.
+
+Core row families:
+
+| Section | Row kinds                                                                    |
+| ------- | ---------------------------------------------------------------------------- |
+| `names` | names, strings                                                               |
+| `asm`   | current assembly identity, version, entry                                    |
+| `deps`  | runtime/cap/ext requirements, asm refs, imports                              |
+| `defs`  | types, fields, alts, sigs, inputs, outputs, globals, consts, procs, exports  |
+| `code`  | bodies, blocks, regions, branch tables, address targets, instruction bytes   |
+| `data`  | constant payloads, layouts, reference maps, ABI records, dynamic/cap schemas |
+| `meta`  | required semantic metadata not owned by `defs`, `code`, or `data`            |
+| `tool`  | optional non-semantic source/tool metadata                                   |
+
+`tool` rows are skippable only when marked non-semantic by core row schema. Required executable semantics must not depend on `tool`.
 
 ## Instruction Encoding
 
@@ -105,6 +113,7 @@ Before verification, SEAM checks:
 - section directory lies inside `file_size`;
 - section payloads lie inside `file_size`;
 - exactly one mandatory `asm` section exists;
-- required semantic sections are present;
+- required semantic section families and rows are present;
+- dependency contracts in `deps` decode before dependent semantic rows;
 - logical tables decode before operand resolution;
-- tool metadata can be skipped without changing execution.
+- `tool` rows can be skipped without changing execution.

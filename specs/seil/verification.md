@@ -17,25 +17,26 @@ The verifier consumes a decoded SEIL module, active target metadata, capability 
 ## Acceptance order
 
 1. Validate the fixed header and section directory.
-2. Locate exactly one mandatory `asm` section and decode it using only the core container format version.
-3. Resolve the `asm` capabilities, dependency declarations, core ext section declarations, and core ext opcode schema declarations.
-4. Reject the module if any required asm contract is unsupported.
-5. Decode remaining section payloads into typed logical tables according to accepted asm contracts; skip only metadata declared non-semantic and skippable by core.
-6. Validate table shape, index ranges, and acyclic table dependencies where required by table kind.
-7. Verify types, layouts, signatures, globals, constants, imports, exports, and procedure declarations.
-8. Decode each body with the active opcode schema set.
-9. Verify body-local metadata tables before instructions that reference them.
-10. Verify every instruction operand and stack effect.
-11. Verify control-flow joins and terminal edges.
-12. Derive safepoints and live managed-reference maps for evaluation stack, arguments, locals, environments, and globals.
-13. Verify that managed-reference writes carry required barrier obligations.
-14. Compute verifier-owned execution metadata such as maximum stack depth and frame frame-storage requirements.
+2. Locate exactly one mandatory `asm` section and decode its identity/version/entry rows using only the core container format version.
+3. Decode dependency contracts from `deps` before remaining semantic payloads.
+4. Resolve runtime requirements, capability requirements, asm references, imports, core ext row-kind declarations, and core ext opcode schema declarations from `deps`.
+5. Reject the module if any required dependency contract is unsupported.
+6. Decode remaining section payloads into typed logical tables according to accepted dependency contracts; skip only metadata declared non-semantic and skippable by core.
+7. Validate table shape, index ranges, and acyclic table dependencies where required by table kind.
+8. Verify types, layouts, signatures, globals, constants, imports, exports, and procedure declarations.
+9. Decode each body with the active opcode schema set.
+10. Verify body-local metadata tables before instructions that reference them.
+11. Verify every instruction operand and stack effect.
+12. Verify control-flow joins and terminal edges.
+13. Derive safepoints and live managed-reference maps for evaluation stack, arguments, locals, environments, and globals.
+14. Verify that managed-reference writes carry required barrier obligations.
+15. Compute verifier-owned execution metadata such as maximum stack depth and frame frame-storage requirements.
 
 No authored `.maxstack` is accepted as authority. Stack bounds are verifier-computed.
 
 ## Opcode schema validation
 
-Each opcode id has exactly one active schema. Core opcodes use `seil_opcodes.def`. Core ext opcodes require asm-declared metadata that supplies their schema before operand decoding. Unknown opcode ids fail verification.
+Each opcode id has exactly one active schema. Core opcodes use `seil_opcodes.def`. Core ext opcodes require `deps`-declared metadata that supplies their schema before operand decoding. Unknown opcode ids fail verification.
 
 Operand validation is schema-driven:
 

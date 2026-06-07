@@ -20,19 +20,18 @@ SEIL/SEAM have no dialect escape hatch for executable semantics. A feature is co
 
 SEAM tooling may assemble `.seil` into an internal binary image for loading, caching, package transport, or execution. That binary image starts with a fixed probe header. The header identifies the container and section directory only. Semantic compatibility does not live in the header.
 
-Semantic module data lives in mandatory metadata tables and executable bodies. Core module metadata includes:
+Semantic module data lives in compact section families, typed rows, and executable instruction streams. Core binary section families are:
 
-- module identity and version
-- imports and exports
-- type table
-- signature table
-- layout table
-- constants
-- procedure declarations
-- body metadata
-- executable bodies
+- `names`: interned names and strings
+- `asm`: current module identity, version, and entry
+- `deps`: runtime/cap/ext requirements, asm refs, and imports
+- `defs`: types, fields, alts, signatures, globals, constants, procedures, and exports
+- `code`: bodies, blocks, regions, branch tables, address targets, and instruction bytes
+- `data`: constant payloads, layouts, reference maps, ABI records, and dynamic/capability schemas
+- `meta`: required semantic metadata not owned by `defs`, `code`, or `data`
+- `tool`: optional non-semantic source/tool metadata
 
-Unknown semantic sections, tables, metadata, or opcodes are rejected.
+Unknown semantic section families, required row kinds, metadata schemas, or opcodes are rejected.
 
 Tool metadata is optional. It can preserve source spans, original names, comments, docs, import/export shape, source grouping, and decompilation hints. It cannot affect execution, verification, linking, or runtime behavior.
 
@@ -89,13 +88,14 @@ SEAM executes modules through this order:
 
 1. read fixed header
 2. read section directory
-3. read mandatory module metadata
-4. reject unknown semantic parts
-5. decode tables and bodies
-6. verify opcode, type, stack, control, and metadata contracts
-7. link imports, exports, native procedures, and foreign procedures
-8. initialize module
-9. execute entry or exported callable
+3. read mandatory `asm` identity/version/entry rows
+4. read dependency contracts from `deps`
+5. reject unsupported dependencies or unknown semantic parts
+6. decode `defs`, `code`, `data`, `meta`, and supported `tool` rows
+7. verify opcode, type, stack, control, and metadata contracts
+8. link imports, exports, native procedures, and foreign procedures
+9. initialize module
+10. execute entry or exported callable
 
 A frame contains:
 
@@ -177,7 +177,7 @@ No gap may remain assigned to an executable-semantics dialect.
 
 Core gaps that still need detailed specification:
 
-- physical binary table layouts
+- physical binary row layouts
 - full verifier rule tables
 - branch join compatibility rules
 - dynamic call, keyed storage, and capability schemas

@@ -58,10 +58,12 @@ Example:
 | `global` | global storage declaration                     |
 | `const`  | typed constant declaration                     |
 | `proc`   | invokable declaration and optional body        |
-| `ext`    | core extension section/opcode ownership        |
+| `ext`    | core extension row/opcode ownership            |
 | `tool`   | optional non-semantic tool/source metadata     |
 
 `asm` owns module entry metadata through `(entry symbol)`. Procedure entry labels are ordinary labels inside `proc` bodies.
+
+Inside `ext`, `section` takes two numeric operands before policy: section-family id, then row-kind id. It declares an extension row kind hosted by an existing binary section family; it does not create a new binary section family. Policy is `required` or `skippable`.
 
 ## Procedures
 
