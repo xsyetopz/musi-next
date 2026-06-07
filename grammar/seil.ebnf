@@ -1,167 +1,226 @@
-seil-text        ::= form-ws? seil-form form-ws? top-form* form-ws?
+seil-text           ::= form-ws? module form-ws?
 
-seil-form        ::= "(" "seil" ws version form-ws? ")"
+module              ::= "(" "module" ws module-name module-decl* form-ws? ")"
 
-version          ::= digits ws digits
+module-decl         ::= form-ws? (asm-decl
+                                  | asmref-decl
+                                  | file-decl
+                                  | import-decl
+                                  | export-decl
+                                  | type-decl
+                                  | sig-decl
+                                  | global-decl
+                                  | const-decl
+                                  | proc-decl
+                                  | ext-decl
+                                  | tool-decl)
 
-top-form         ::= module-form
-                   | import-form
-                   | export-form
-                   | type-form
-                   | sig-form
-                   | global-form
-                   | const-form
-                   | extern-form
-                   | intern-form
-                   | func-form
+asm-decl            ::= "(" "asm" ws symbol asm-member* form-ws? ")"
 
-module-form      ::= "(" "module" ws module-desc form-body? ")"
+asmref-decl         ::= "(" "asmref" ws symbol asmref-member* form-ws? ")"
 
-import-form      ::= "(" "import" ws module-desc ws string meta-form* form-ws? ")"
+asm-member          ::= form-ws? (ver-decl
+                                  | cap-decl
+                                  | runtime-decl
+                                  | entry-decl
+                                  | meta-decl)
 
-export-form      ::= "(" "export" ws ref-desc ws string meta-form* form-ws? ")"
+asmref-member       ::= form-ws? (ver-decl
+                                  | origin-decl
+                                  | pubkey-decl
+                                  | culture-decl
+                                  | meta-decl)
 
-type-form        ::= "(" "type" ws type-desc ws type-kind type-member* form-ws? ")"
+ver-decl            ::= "(" "ver" ws number ws number ws number ws number form-ws? ")"
 
-sig-form         ::= "(" "sig" ws sig-desc sig-member* form-ws? ")"
+cap-decl            ::= "(" "cap" ws symbol meta-decl* form-ws? ")"
 
-global-form      ::= "(" "global" ws global-desc ws type-ref meta-form* form-ws? ")"
+runtime-decl        ::= "(" "runtime" ws symbol meta-decl* form-ws? ")"
 
-const-form       ::= "(" "const" ws const-desc ws type-ref ws literal meta-form* form-ws? ")"
+entry-decl          ::= "(" "entry" ws symbol form-ws? ")"
 
-extern-form      ::= "(" "extern" ws func-desc ws sig-desc meta-form* form-ws? ")"
+origin-decl         ::= "(" "origin" ws string form-ws? ")"
 
-intern-form      ::= "(" "intern" ws func-desc ws sig-desc meta-form* form-ws? ")"
+pubkey-decl         ::= "(" "pubkey" ws bytes-literal form-ws? ")"
 
-func-form        ::= "(" "func" ws func-desc ws sig-desc func-member* form-ws? ")"
+culture-decl        ::= "(" "culture" ws string form-ws? ")"
 
-form-body        ::= meta-form* form-ws?
+file-decl           ::= "(" "file" ws string file-member* form-ws? ")"
 
-type-kind        ::= "prod"
-                     | "sum"
+file-member         ::= form-ws? (digest-decl | meta-decl)
 
-type-member      ::= form-ws? (meta-form | field-form | alt-form)
+digest-decl         ::= "(" "digest" ws symbol ws bytes-literal form-ws? ")"
 
-sig-member       ::= form-ws? (meta-form | input-form | output-form)
+import-decl         ::= "(" "import" ws symbol ws string meta-decl* form-ws? ")"
 
-func-member      ::= form-ws? (meta-form | local-form | env-form | entry-form | region-form | body-form)
+export-decl         ::= "(" "export" ws symbol ws string meta-decl* form-ws? ")"
 
-meta-form        ::= "(" "meta" ws ident meta-arg* form-ws? ")"
+type-decl           ::= "(" "type" ws symbol type-member* form-ws? ")"
 
-meta-arg         ::= ws (named-meta-arg | meta-value)
+type-member         ::= form-ws? (layout-decl | field-decl | alt-decl | meta-decl)
 
-named-meta-arg   ::= "(" ident ws ":=" ws meta-value form-ws? ")"
+layout-decl         ::= "(" "layout" ws layout-kind layout-member* form-ws? ")"
 
-meta-value       ::= ident
-                     | string
-                     | number
-                     | ref-desc
+layout-kind         ::= "scalar"
+                       | "product"
+                       | "tagged"
+                       | "array"
+                       | "opaque"
 
-field-form       ::= "(" "field" ws ident ws type-ref form-ws? ")"
+layout-member       ::= form-ws? meta-decl
 
-alt-form         ::= "(" "alt" ws ident ws "tag" ws number (ws "payld" ws type-ref)? form-ws? ")"
+field-decl          ::= "(" "field" ws symbol ws type-ref field-member* form-ws? ")"
 
-input-form       ::= "(" "input" ws (ident ws type-ref | type-ref) form-ws? ")"
+field-member        ::= form-ws? meta-decl
 
-output-form      ::= "(" "output" ws type-ref form-ws? ")"
+alt-decl            ::= "(" "alt" ws symbol ws number (ws type-ref)? alt-member* form-ws? ")"
 
-local-form       ::= "(" "local" ws number ws (ident ws type-ref | type-ref) form-ws? ")"
+alt-member          ::= form-ws? meta-decl
 
-env-form         ::= "(" "env" ws number ws (ident ws type-ref | type-ref) form-ws? ")"
+sig-decl            ::= "(" "sig" ws symbol sig-member* form-ws? ")"
 
-entry-form       ::= "(" "entry" ws ident form-ws? ")"
+sig-member          ::= form-ws? (in-decl | out-decl | meta-decl)
 
-region-form      ::= "(" "region" ws ident ws ident ws ident ws ident ws ident form-ws? ")"
+in-decl             ::= "(" "in" ws (symbol ws type-ref | type-ref) form-ws? ")"
 
-body-form        ::= "(" "body" body-ws? body-line* body-ws? ")"
+out-decl            ::= "(" "out" ws type-ref form-ws? ")"
 
-body-line        ::= body-ws? (comment | label-line | instruction-line)? line-end
+global-decl         ::= "(" "global" ws symbol ws type-ref global-member* form-ws? ")"
 
-comment          ::= ";" comment-text
+global-member       ::= form-ws? meta-decl
 
-label-line       ::= ident ":"
+const-decl          ::= "(" "const" ws symbol ws type-ref ws literal const-member* form-ws? ")"
 
-instruction-line ::= mnemonic (ws operand)*
+const-member        ::= form-ws? meta-decl
 
-mnemonic         ::= ident ("." ident)*
+proc-decl           ::= "(" "proc" ws symbol ws sig-ref proc-member* proc-body? form-ws? ")"
 
-operand          ::= number
-                     | string
-                     | ident
-                     | ref-desc
+proc-member         ::= form-ws? (local-decl
+                                  | env-decl
+                                  | region-decl
+                                  | extern-decl
+                                  | intrin-decl
+                                  | meta-decl)
 
-ref-desc         ::= module-desc
-                     | type-desc
-                     | sig-desc
-                     | func-desc
-                     | global-desc
-                     | const-desc
-                     | product-desc
-                     | alt-desc
+proc-body           ::= body-ws? body-line+
 
-module-desc      ::= "M" "<" path ">"
+local-decl          ::= "(" "local" ws symbol ws type-ref form-ws? ")"
 
-type-desc        ::= "T" "<" path ">"
+env-decl            ::= "(" "env" ws symbol ws type-ref form-ws? ")"
 
-sig-desc         ::= "S" "<" path ">"
+region-decl         ::= "(" "region" ws symbol region-member* form-ws? ")"
 
-func-desc        ::= "F" "<" path ">"
+region-member       ::= form-ws? meta-decl
 
-global-desc      ::= "G" "<" path ">"
+extern-decl         ::= "(" "extern" extern-member* form-ws? ")"
 
-const-desc       ::= "K" "<" path ">"
+extern-member       ::= form-ws? (abi-decl | symbol-decl | meta-decl)
 
-product-desc     ::= "P" "<" path "/" ident ">"
+intrin-decl         ::= "(" "intrin" intrin-member* form-ws? ")"
 
-alt-desc         ::= "A" "<" path "/" ident ">"
+intrin-member       ::= form-ws? (runtime-decl | symbol-decl | meta-decl)
 
-type-ref         ::= primitive-type
-                     | type-desc
+abi-decl            ::= "(" "abi" ws symbol form-ws? ")"
 
-primitive-type   ::= "Bit"
-                     | "Byte"
-                     | "i8"
-                     | "i16"
-                     | "i32"
-                     | "i64"
-                     | "n8"
-                     | "n16"
-                     | "n32"
-                     | "n64"
-                     | "f32"
-                     | "f64"
-                     | "ptr"
-                     | "ref"
+symbol-decl         ::= "(" "symbol" ws string form-ws? ")"
 
-path             ::= ident ("/" ident)*
+body-line           ::= body-ws? (comment | label-line | instruction-line)? line-end
 
-literal          ::= number
-                     | string
-                     | bytes-literal
-                     | "nil"
-                     | "true"
-                     | "false"
+comment             ::= ";" comment-text
 
-bytes-literal    ::= "x\"" hex-pair (ws? hex-pair)* "\""
+label-line          ::= symbol ":"
 
-hex-pair         ::= hex-digit hex-digit
+instruction-line    ::= mnemonic (ws operand)*
 
-ident            ::=  /* lexical identifier token */
+mnemonic            ::= ident ("." ident)*
 
-number           ::=  /* lexical numeric token */
+operand             ::= literal
+                       | symbol
+                       | type-ref
+                       | sig-ref
 
-string           ::=  /* lexical string token */
+ext-decl            ::= "(" "ext" ws symbol ext-member* form-ws? ")"
 
-digits           ::=  /* one or more decimal digits */
+ext-member          ::= form-ws? (section-decl | opcode-decl | meta-decl)
 
-hex-digit        ::=  /* 0..9 a..f A..F */
+section-decl        ::= "(" "section" ws number ws section-policy meta-decl* form-ws? ")"
 
-ws               ::=  /* one or more horizontal whitespace chars */
+section-policy      ::= "required"
+                       | "skippable"
 
-form-ws          ::=  /* whitespace or comments between forms */
+opcode-decl         ::= "(" "opcode" ws number ws number meta-decl* form-ws? ")"
 
-body-ws          ::=  /* whitespace inside body form before/after body lines */
+tool-decl           ::= "(" "tool" tool-member* form-ws? ")"
 
-line-end         ::=  /* newline or EOF */
+tool-member         ::= form-ws? meta-decl
 
-comment-text     ::=  /* chars until line-end */
+meta-decl           ::= "(" "meta" ws symbol meta-arg* form-ws? ")"
+
+meta-arg            ::= ws (named-meta-arg | meta-value)
+
+named-meta-arg      ::= "(" symbol ws ":=" ws meta-value form-ws? ")"
+
+meta-value          ::= literal
+                       | symbol
+                       | type-ref
+                       | sig-ref
+
+module-name         ::= symbol
+
+sig-ref             ::= symbol
+
+type-ref            ::= primitive-type
+                       | "(" "ref" ws type-ref form-ws? ")"
+                       | "(" "ptr" ws type-ref form-ws? ")"
+                       | symbol
+
+primitive-type      ::= "Bit"
+                       | "Byte"
+                       | "i8"
+                       | "i16"
+                       | "i32"
+                       | "i64"
+                       | "n8"
+                       | "n16"
+                       | "n32"
+                       | "n64"
+                       | "f32"
+                       | "f64"
+
+symbol              ::= bare-symbol
+                       | escaped-symbol
+
+bare-symbol         ::=  /* lexical symbol token excluding SEIL reserved words in directive-head position */
+
+escaped-symbol      ::= "`" escaped-symbol-body "`"
+
+escaped-symbol-body ::=  /* non-newline chars with backslash escaping for ` and \ */
+
+ident               ::=  /* lexical opcode mnemonic part */
+
+number              ::=  /* lexical numeric token */
+
+string              ::=  /* lexical string token */
+
+literal             ::= number
+                       | string
+                       | bytes-literal
+                       | "nil"
+                       | "true"
+                       | "false"
+
+bytes-literal       ::= "x\"" hex-pair (ws? hex-pair)* "\""
+
+hex-pair            ::= hex-digit hex-digit
+
+hex-digit           ::=  /* 0..9 a..f A..F */
+
+ws                  ::=  /* one or more horizontal whitespace chars */
+
+form-ws             ::=  /* whitespace or comments between forms */
+
+body-ws             ::=  /* whitespace inside proc before/after body lines */
+
+line-end            ::=  /* newline or EOF */
+
+comment-text        ::=  /* chars until line-end */

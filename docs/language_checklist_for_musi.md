@@ -15,7 +15,7 @@ This file keeps the original checklist shape and answers it for Musi using locke
 - [x] procedural
   - Callable bindings and receiver methods cover ordinary procedure/function organization.
 - [x] stack-based
-  - SEIL is stack-effect interpreted. Ordinary Musi source does not expose old stack-effect syntax; callable types use `(A, B) -> C`.
+  - SEIL is stack-effect interpreted. Ordinary Musi source does not expose SEIL stack-effect syntax; callable types use `(A, B) -> C`.
 - [x] "multi-paradigm"
   - Musi combines expression-first syntax, algebraic data, imperative control flow, structural shapes, receiver methods, and FFI. This is not marketed as novelty; it is a small-core systems design.
 - [-] lazy
@@ -188,8 +188,8 @@ This file keeps the original checklist shape and answers it for Musi using locke
   - `%` is CPU remainder, not mathematical modulo. Shifts/rotates map to CPU-like operations. Pointer/fixed rules acknowledge address stability.
 - [-] RAM does not work that way
   - `fixed` and pointer rules account for movable storage and stable addresses.
-- [~] VMs do not work that way
-  - SEIL is intentionally the VM/lowered form. Detailed instruction model remains open.
+- [x] VMs do not work that way
+  - SEIL is intentionally the VM/lowered form. Instruction model is locked by `seil_opcodes.def`, `grammar/seil.ebnf`, and owning SEIL specs.
 - [-] Compilers do not work that way
   - Known evaluation executes SEIL; type/phase/layout/pointer checks are compiler responsibilities.
 - [-] Compilers cannot work that way
@@ -207,7 +207,7 @@ This file keeps the original checklist shape and answers it for Musi using locke
 - [~] The compiler crashes if you look at it funny
   - Requires implementation evidence.
 - [~] The VM crashes if you look at it funny
-  - Requires SEIL/runtime implementation evidence.
+  - SEIL/runtime implementation evidence is still required for performance and conformance; language-level GC direction is specified through managed refs, layouts, safepoints, barriers, and `fixed` storage.
 - [?] You don't seem to understand basic optimization techniques
   - The design avoids parser exponentiality, uses CPU-aligned arithmetic semantics, and separates representation metadata. Performance evidence still needed.
 - [-] You don't seem to understand basic systems programming
@@ -292,7 +292,7 @@ Source advice: `docs/advice_for_designer_of_my_own_programming_language.md`.
 - [x] Use static types
   - Bidirectional inference and explicit dynamic top `Any`.
 - [x] Make it efficient
-  - CPU remainder semantics, CPU-like shift/rotate operations, representation metadata, no parser speculation, SEIL bytecode target.
+  - CPU remainder semantics, CPU-like shift/rotate operations, representation metadata, no parser speculation, SEIL executable IL target.
 - [x] Use `[]` for generics, not `<>`
   - Locked: `T[A, B]`; array/list types are prefix `[N]T`.
 - [x] Treat comments as grammar/trivia with reasonable restrictions
@@ -306,20 +306,20 @@ Source advice: `docs/advice_for_designer_of_my_own_programming_language.md`.
 - [x] Understand lvalues vs rvalues
   - `place := expr`, mutable/fixed storage, pointer `.pointee`, and `UnsafeMutPtr` separate readable/writable locations.
 - [x] Consider stack vs register machine tradeoffs
-  - Musi intentionally targets SEIL stack-effect bytecode. Detailed instruction model remains open.
+  - Musi intentionally targets locked SEIL stack-effect executable IL.
 - [x] Think through shared library paths, TLS, and relocations
-  - `@extern` includes `link`, `symbol`, `calling`, profile, and representability rules. TLS/relocations remain profile/runtime implementation details.
+  - `@extern` includes `link`, `symbol`, `calling`, ABI descriptor, and representability rules. TLS/relocations remain ABI/runtime implementation details.
 
 ## Remaining Evidence Needed Before Full Confidence
 
-- [~] SEIL instruction model
+- [x] SEIL instruction model locked at spec level
 - [~] SEIL metadata format required for near-identical decompilation
 - [~] source-to-SEIL lowering guarantees
-- [~] stable textual/binary SEIL form
+- [x] stable SEIL text direction: WAT-like module text with CIL-like assembly/reference roles; SEAM binary image keeps 40-byte header
 - [~] stack-effect verifier implementation
 - [~] known-phase SEIL execution implementation
 - [~] parser evidence for the one-token-lookahead grammar
 - [~] diagnostic quality evidence
-- [~] concrete FFI profile definitions and C alias representations
-- [~] runtime memory model and ownership/GC details
+- [~] concrete FFI ABI descriptor definitions and C alias representations
+- [x] runtime memory model and ownership/GC direction: managed references, `fixed` storage, precise SEIL roots/barriers, and generational Immix as a SEAM GC strategy
 - [~] debugger/IDE/REPL tooling

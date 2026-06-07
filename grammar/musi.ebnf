@@ -470,7 +470,7 @@ escaped-ident-body      ::=  /* non-newline escaped identifier chars */ ;
 
 line-comment-text       ::=  /* chars until line end */ ;
 
-letter                  ::=  /* Unicode letter or implementation profile letter */ ;
+letter                  ::=  /* Unicode letter or implementation-defined letter */ ;
 
 digit                   ::= "0"
                             | "1"

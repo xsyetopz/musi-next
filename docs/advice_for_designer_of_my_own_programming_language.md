@@ -9,7 +9,7 @@
 
 To that end
 
-There are things almost every language does for good reasons, and other things copied from outdated tutorials or papers. Below are concrete recommendations.
+There are things almost every language does for good reasons, and other things copied from weak tutorials or papers. Below are concrete recommendations.
 
 ## Lexer / Parser
 
@@ -33,7 +33,7 @@ There are things almost every language does for good reasons, and other things c
 
 - To handle arbitrary function calls, either require forward declarations or perform two passes over the input.
 - Never implement a tree-evaluator; they are slow.
-- If you support constexpr evaluation, provide a bytecode interpreter even when generating machine code.
+- If you support constexpr evaluation, execute the same verified VM-level form used by runtime loading instead of walking source trees.
 - Avoid offloading compiler responsibilities to the standard library when they belong in the compiler.
 - Understand lvalues vs rvalues; treat them as separate lowering strategies on expression AST nodes.
 - Make the driver able to produce multiple outputs (as toggles):
@@ -49,7 +49,7 @@ There are things almost every language does for good reasons, and other things c
 
 ## Runtime
 
-- Consider stack vs register machine trade-offs (Java's bytecode is illustrative).
+- Consider stack vs register machine trade-offs; SEIL/SEAM is the source of truth for this project.
 - Avoid GC when possible; prefer explicit ownership (e.g. `weak`, `unique`) and consider a cycle detector at exit.
 - Avoid pointer-chasing data structures where possible.
 - Think through shared library paths, TLS models, and relocations even for interpreted languages.

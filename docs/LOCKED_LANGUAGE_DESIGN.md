@@ -6,7 +6,10 @@ Status: compact, information-preserving reference of locked Musi language design
 
 - Musi is a small systems language with a small core.
 - Expression-first: no separate statement semantic category; top-level `EXPR;` is an accepted top-level item; `;` sequences/discards; definitions are expressions; control flow is expression-based.
-- Musi lowers directly to SEIL bytecode. SEIL is the canonical lowered form, like CIL in role.
+- Musi lowers directly to SEIL. SEIL is the canonical lowered executable form, like CIL in role.
+- SEIL is lower-level than ASTs because it clarifies ambiguous source constructs and removes redundant source forms.
+- SEIL is higher-level than typical compiler IRs because it preserves semantic types and source relationship metadata.
+- SEIL compiles every valid Musi program into a small set of core constructs with clean executable semantics and syntax-directed typing.
 - No IR layer exists between Musi source and SEIL.
 - Source should lower to SEIL so SEIL-to-Musi decompilation can recover near-identical source when metadata is preserved.
 - Syntax must preserve maximal-munch lexing, one-token-lookahead parsing, no speculative parsing beyond one token, and no syntax kept only by convention from existing languages.
@@ -95,7 +98,7 @@ Numeric rules:
 - unsuffixed non-negative integer literals are `Nat`.
 - negative integer expressions are `Int`.
 - a decimal point or `fX`/`FX` suffix makes the literal `Float`.
-- unsupported literal width for the target/profile is a diagnostic.
+- unsupported literal width for the target is a diagnostic.
 
 ```musi
 1_000n32
@@ -279,11 +282,11 @@ case-guard        ::= "when" EXPR
 lambda-expr       ::= '\\' param-list type-annot? "=>" EXPR
 ```
 
-Rules: every arm starts `case` and ends `;`; `=>` is body/result arrow for match arms and lambdas; arm `;` terminates structural case and does not discard selected value; use computation-region final `;` to discard inside arm. Pattern alternatives use commas in one `case`, not `|`; alternatives share guard/body; bindings across alternatives must be compatible: same names with compatible types in every alternative reaching body.
+Rules: every arm starts `case` and ends `;`; `=>` is body/result arrow for match arms and lambdas; arm `;` terminates structural case and does not discard selected value; use computation-region final `;` to discard inside arm. Pattern alts use commas in one `case`, not `|`; alts share guard/body; bindings across alts must be compatible: same names with compatible types in every alt reaching body.
 
 Exhaustiveness: `match` is exhaustive by default; non-exhaustive match is semantic error. Finite sum `data` matches must cover all variants or include wildcard `case _`. Guarded cases do not count as unconditional coverage. No `case else`; `else` belongs only to `when ... else`.
 
-Guard evaluation: cases top-to-bottom; alternatives left-to-right. Pattern tested before guard. Guard runs only after matching alternative, may reference pattern bindings, must be `Bit`. If matched guard is false, matching continues. Guards do not run for non-matching patterns. First unguarded match or guard-true match wins. Guarded cases are conditional coverage only.
+Guard evaluation: cases top-to-bottom; alts left-to-right. Pattern tested before guard. Guard runs only after matching alt, may reference pattern bindings, must be `Bit`. If matched guard is false, matching continues. Guards do not run for non-matching patterns. First unguarded match or guard-true match wins. Guarded cases are conditional coverage only.
 
 Pattern grammar:
 
@@ -309,7 +312,7 @@ Pattern facts:
 - Let binding heads may be patterns.
 - Record shorthand `#{ name }` means `#{ name := name }`.
 - `as` is contextual pattern alias, not cast syntax; alias binds whole matched value.
-- In alternatives, aliases must be binding-compatible if shared body uses them.
+- In alts, aliases must be binding-compatible if shared body uses them.
 - `_` matches and binds nothing.
 - `_name` is an ordinary identifier if lexical grammar accepts it; it does not silence unused-binding checks.
 
@@ -560,7 +563,7 @@ source-callable-type ::= callable-type
 seil-callable-type   ::= callable-type
 ```
 
-`->` is type-space callable arrow, not expression currying. `Unit` is canonical zero-information result. `()` is empty tuple type shape → `Unit`. Chained arrows require explicit design; use parentheses (`A -> (B -> C)`, `(A, B) -> C`). Musi source and SEIL metadata share callable type surface. No old source stack-effect bracket syntax. SEIL verifies lowered stack behavior while metadata preserves callable types for near-identical decompilation.
+`->` is type-space callable arrow, not expression currying. `Unit` is canonical zero-information result. `()` is empty tuple type shape → `Unit`. Chained arrows require explicit design; use parentheses (`A -> (B -> C)`, `(A, B) -> C`). Musi source and SEIL metadata share callable type surface. No source stack-effect bracket syntax. SEIL verifies lowered stack behavior while metadata preserves callable types for near-identical decompilation.
 
 Stack-effect compatibility:
 
@@ -714,9 +717,9 @@ let-decl      ::= "let" bind-head generic-param-list? type-annot? param-list? re
 
 Rust analogy: Rust `use` → Musi `import`; Rust `pub` → Musi `export`; Rust `extern` → Musi `@extern`. `@extern` is the only FFI boundary attribute. Direction determined by body presence and `export`.
 
-Rules: `@extern let ...;` imports external implementation. `@extern export let ... := ...;` exposes Musi implementation outward. `@extern` with body but without `export` is diagnostic. `export` remains module visibility only. No `foreign` keyword, `extern` keyword, `@export`, `@abi`, or `@expose` attribute. `@repr(...)` controls representation/layout. FFI boundary types must be representable. Anonymous structural/row types are not FFI boundary types. `Any`, `opaque`, `erased`, closures, shapes, `Maybe`, `Expect`, and GC references are not FFI-safe unless a profile explicitly defines representation. Strings are not silently C strings. Pointers use `UnsafePtr`, `UnsafeMutPtr`, `UnsafeOpaquePtr`. FFI failure explicit through return values/wrappers; no hidden exceptions. Unsupported profile/calling convention/layout/type combo is diagnostic.
+Rules: `@extern let ...;` imports external implementation. `@extern export let ... := ...;` exposes Musi implementation outward. `@extern` with body but without `export` is diagnostic. `export` remains module visibility only. No `foreign` keyword, `extern` keyword, `@export`, `@abi`, or `@expose` attribute. `@repr(...)` controls representation/layout. FFI boundary types must be representable. Anonymous structural/row types are not FFI boundary types. `Any`, `opaque`, `erased`, closures, shapes, `Maybe`, `Expect`, and GC references are not FFI-safe unless core ABI metadata explicitly defines representation. Strings are not silently C strings. Pointers use `UnsafePtr`, `UnsafeMutPtr`, `UnsafeOpaquePtr`. FFI failure explicit through return values/wrappers; no hidden exceptions. Unsupported ABI/calling convention/layout/type combo is diagnostic.
 
-`@extern` args follow UALO: first positional external profile, second symbol. Meta-level call canonicalizes to known metadata record. Fields: `profile`, `symbol`, `link`, `calling` (default `.cdecl` for outward `.c`), `variadic` (ABI-specific, e.g. `.c`). C ABI names such as `CVoid`, `CChar`, `CInt`, `CLongLong`, `CSize` are ordinary predefined/core/library bindings; exact representation is implementation/profile-defined.
+`@extern` args follow UALO: first positional ABI, second symbol. Meta-level call canonicalizes to known metadata record. Fields: `abi`, `symbol`, `link`, `calling` (default `.cdecl` for outward `.c`), `variadic` (ABI-specific, e.g. `.c`). C ABI names such as `CVoid`, `CChar`, `CInt`, `CLongLong`, `CSize` are ordinary predefined/core/library bindings; exact representation is core ABI metadata.
 
 ## 13. Attributes and representation metadata
 
@@ -745,13 +748,13 @@ aligned-data-expr  ::= "@align" "(" attr-value ")" "data" data-body
 witness-shape-expr ::= "@witness" "shape" shape-body
 ```
 
-Confirmed attributes: `@packed`, `@align(...)`, `@witness`. Meanings: `@packed` packed/bit-structured representation metadata; `@align(...)` alignment metadata; `@witness` makes a `shape` require explicit witness conformance.
+Confirmed attributes: `@packed`, `@align(...)`, `@witness`, `@noalloc`. Meanings: `@packed` packed/bit-structured representation metadata; `@align(...)` alignment metadata; `@witness` makes a `shape` require explicit witness conformance; `@noalloc` marks a callable as performing no managed heap allocation.
 
 Attribute rules:
 
 - Arguments are compile-time metadata values; positional and named accepted; named use `:=`; datum literals and sum values accepted.
 - Schemas define positional parameter names, named params, defaults, allowed targets, repeatability, canonical metadata record shape.
-- Attribute calls canonicalize to metadata records; e.g. `@align(4)` → `#{ value := 4 }`, `@repr(.c, tag := .n8)` → `#{ profile := .c, tag := .n8 }`.
+- Attribute calls canonicalize to metadata records; e.g. `@align(4)` → `#{ value := 4 }`, `@repr(.c, tag := .n8)` → `#{ abi := .c, tag := .n8 }`.
 - Conditional attributes are not separate grammar; conditionality belongs in payload, e.g. non-keyword field `enabled := ...`; if schema defines it as condition, it must be `known Bit`; `True` means metadata present, `False` absent; no runtime branch.
 - Attributes may prefix grammar-owned nodes only; arbitrary infix expressions need wrapped computation region.
 - Attribute applies only to exact next node; child propagation only by schema.
@@ -780,9 +783,11 @@ Target rules:
 @target(#[#{ os := .linux, arch := .x64 }, #{ os := .macos, arch := .aarch64 }])
 ```
 
-Representation controls are schema-validated attributes only: `@repr(.c)`, `@packed`, `@align(4)`. Representation metadata args must be known. `@repr(profile, ...)` names layout/profile family. Profile schemas validate allowed targets/fields/values/combinations. Unsupported profile/field/value/combination diagnostic. Representation attributes apply only where schema allows: data definitions, fields, variants/cases, extern bindings. FFI boundary types must be representable under chosen profile. SEIL preserves layout and near-identical decompilation metadata.
+Representation controls are schema-validated attributes only: `@repr(.c)`, `@packed`, `@align(4)`. Representation metadata args must be known. `@repr(abi, ...)` names a core ABI/layout family. Core schemas validate allowed targets/fields/values/combinations. Unsupported ABI/field/value/combination diagnostic. Representation attributes apply only where schema allows: data definitions, fields, variants/cases, extern bindings. FFI boundary types must be representable under chosen ABI. SEIL preserves layout and near-identical decompilation metadata.
 
-Profile fields may include `tag`, `endian`, `padding`, `bits`, `layout`. Tag/profile values use Musi-native size spelling: `.nX` natural/unsigned-sized, `.iX` signed integer-sized, `.fX` floating-sized. Rule: type identity/storage/checking concept → type-space modifier; representation/ABI/interop → attribute.
+ABI/layout fields may include `tag`, `endian`, `padding`, `bits`, `layout`. Tag/ABI values use Musi-native size spelling: `.nX` natural/unsigned-sized, `.iX` signed integer-sized, `.fX` floating-sized. Rule: type identity/storage/checking concept → type-space modifier; representation/ABI/interop → attribute.
+
+`@noalloc` rules: applies to procedures. It means no managed heap allocation in the body or transitive calls. It rejects managed allocation, boxing, managed array/text/object creation, closure allocation, calls to non-`@noalloc` procedures, and dynamic calls unless the target is proven `@noalloc`. Native imports may be declared `@noalloc`; an incorrect declaration is an FFI contract violation. `@noalloc` is not a GC-off switch.
 
 ## 14. Shapes and conformance
 
@@ -832,17 +837,29 @@ SEIL round-trip metadata preserves import binding mode (named/anonymous), import
 
 ## 16. SEIL artifact and module structure before opcode definition
 
-SEIL means Stack Effect Intermediate Language. `Intermediate` means shared executable VM language for SEAM, comparable in role to CIL for CLR, not a disposable compiler-internal IR. SEAM means Stack Effect Abstract Machine. Musi is the primary/reference source language targeting SEIL; other future languages may target SEIL. Informal `Musi bytecode` means SEIL emitted from Musi source, not Musi-only bytecode.
+SEIL means Stack Effect Intermediate Language. `Intermediate` means shared executable VM language for SEAM, comparable in role to CIL for CLR, not a disposable compiler-internal IR. SEAM means Stack Effect Abstract Machine. Musi is the primary/reference source language targeting SEIL; other future languages may target SEIL.
+
+SEIL is both lower-level than abstract syntax trees and higher-level than typical compiler intermediate languages. It clarifies ambiguous source constructs, removes redundant source forms, preserves semantic types, and keeps a close relationship with the source program when tool metadata is present. Its purpose is to compile every valid Musi program into a small set of core constructs with clean executable semantics. SEIL has a syntax-directed type system so SEIL programs are straightforward to analyze, verify, transform, assemble, disassemble, and execute. SEAM executes verified SEIL in the same broad relationship that CLR executes CIL, without adopting CLR/CIL constraints that do not fit SEIL/SEAM.
+
+SEIL text is WAT/Lisp-like typed module text with Forth/RPN-like instruction bodies: one parenthesized `module` root, symbolic declarations, and line-oriented stack-effect procedure streams. It borrows CIL/ILAsm's assembly/reference/metadata/body role, but removes the CIL object-model center and maps declarations to SEAM behavior.
 
 Artifact extensions:
 
 ```text
 .ms        Musi source
-.seil      binary executable SEIL module
-.seil.txt  textual hand-authorable SEIL
+.seil      textual executable SEIL module
+SEAM binary image  internal assembled executable image
 ```
 
-Textual `.seil.txt` is an assembly-like DSL for SEAM's typed, stack-effect-verified executable language. Binary `.seil` is the compact executable encoding. Both represent the same SEIL semantic model. `.seil.txt` assembles to `.seil`; `.seil` can be dumped to canonical `.seil.txt` text. No file-magic guessing is required for ordinary tooling.
+`.seil` is the public hand-authorable executable IL. SEAM tooling may assemble `.seil` into an internal binary image with an exactly 40-byte header. Canonical disassembly emits `.seil` text.
+
+External design evidence used for SEIL text/metadata/GC:
+
+- WebAsm text uses a parenthesized module format that maps to a binary VM module.
+- ECMA-335 ILAsm exposes asm identity, asm references, modules, metadata, and method bodies as declaration assembly.
+- Precise managed-reference VMs use typed stack/frame maps at GC safepoints.
+- Generational collectors require write barriers/remembered sets for old-to-young references.
+- Immix supplies a mature mark-region collector strategy that can be used by SEAM's generational collector.
 
 Architecture graph:
 
@@ -851,20 +868,19 @@ digraph seil_architecture {
   rankdir=LR;
   Musi [label="Musi .ms"];
   Other [label="future frontend"];
-  Text [label="text SEIL .seil.txt"];
-  Binary [label="binary SEIL .seil"];
+  Text [label="SEIL .seil text"];
+  Binary [label="SEAM binary image"];
   SEAM [label="SEAM verifier/loader/executor"];
 
-  Musi -> Binary [label="lower"];
-  Musi -> Text [label="emit/dump when requested"];
-  Other -> Binary [label="lower"];
+  Musi -> Text [label="lower"];
+  Other -> Text [label="lower"];
   Text -> Binary [label="assemble"];
-  Binary -> Text [label="dump"];
+  Binary -> Text [label="disassemble"];
   Binary -> SEAM [label="verify + execute"];
 }
 ```
 
-A SEIL module is sectioned. The executable semantics live in required VM sections and metadata. Producer/source-shape metadata is optional and affects tooling/decompilation only.
+A `.seil` module is a typed textual declaration tree. A SEAM binary image is a sectioned internal encoding of the same module semantics. Tool/source-shape metadata is optional and affects tooling/decompilation only.
 
 Module graph:
 
@@ -874,27 +890,31 @@ digraph seil_module {
   Module [label="SEIL module"];
   Header [label="40-byte binary header"];
   Directory [label="section directory"];
-  Core [label="required VM sections"];
-  Bodies [label="executable bodies"];
-  Producer [label="optional producer/source metadata"];
+  Asm [label="mandatory asm section"];
+  Core [label="typed metadata sections"];
+  Bodies [label="procedure bodies"];
+  Tool [label="optional tool/source metadata"];
 
   Module -> Header;
   Header -> Directory [label="points to"];
+  Directory -> Asm [label="decode first"];
   Directory -> Core;
   Directory -> Bodies;
-  Directory -> Producer;
+  Directory -> Tool;
 
-  Core -> Names [label="strings/names"];
-  Core -> Types [label="types/signatures"];
-  Core -> Constants [label="constants"];
-  Core -> Imports [label="imports"];
-  Core -> Exports [label="exports"];
-  Core -> Decls [label="declarations/layouts"];
-  Core -> Meta [label="required VM metadata"];
+  Asm -> Identity [label="asm identity/version"];
+  Asm -> Capabilities [label="capabilities/runtime"];
+  Asm -> Exts [label="ext sections/opcodes"];
+  Core -> Names [label="symbols/names"];
+  Core -> Types [label="types/signatures/layouts"];
+  Core -> Consts [label="constants"];
+  Core -> Imports [label="imports/exports"];
+  Core -> Procedures [label="procedures/globals"];
+  Core -> Meta [label="body/runtime metadata"];
 }
 ```
 
-Binary `.seil` fixed header is exactly 40 bytes. The header is loader-probe data, not module metadata. All semantic module data lives in sections.
+SEAM binary image fixed header is exactly 40 bytes. The header is loader-probe data, not module metadata.
 
 ```text
 Header := (
@@ -904,7 +924,7 @@ Header := (
   file_size : u64,
 )
 
-Magic := u32              -- ASCII "SEIL"
+Magic := u32              -- ASCII "SEAM"
 
 Format := (
   major       : u8,
@@ -915,7 +935,7 @@ Format := (
 
 SectionDirectoryRef := (
   count    : u32,
-  reserved : u32,         -- always 0 unless future format version defines it
+  reserved : u32,         -- current format requires 0
   offset   : u64,
   size     : u64,
 )
@@ -925,141 +945,108 @@ Concrete 40-byte layout:
 
 ```text
 offset  size  field
-0       4     magic                  "SEIL"
+0       4     magic                  "SEAM"
 4       4     format                 (major: u8, minor: u8, header_size: u8, flags: u8)
 8       24    sections               (count: u32, reserved: u32, offset: u64, size: u64)
 32      8     file_size              u64
 ```
 
-The section directory names every section by kind, offset, size, count, and encoding flags. Section payloads are independently skippable so loaders can avoid cold producer/source metadata.
-
-Required section families:
+Section families:
 
 ```text
-names          strings, identifiers, module paths, symbols, field/case names
-modules        module identity, dependencies, native/compiler module references
-types          primitive/composite/generic/qualified SEIL types
-signatures     callable signatures, phase/capability requirements
-constants      typed constants and known-evaluated values
+names          symbols, strings, module paths, field/alt names
+asm            mandatory early asm identity, version, capability/runtime, ext contract
+asmrefs        asm references and dependency identity
 imports        module/native/foreign imports
-exports        public module surface
-declarations  functions, values, data, fields, cases, shapes, witnesses, native/foreign bindings
-layouts        representation, packing, alignment, endian, tags, padding, ABI layout
-bodies         executable stack-effect bodies
-vm-metadata    metadata required for loading, linking, verification, execution
-producer-meta  optional source maps, source-shape, comments/docs, decompilation hints
+exports        exported module surface
+types          primitive/composite/qualified SEIL types
+sigs           `sig` callable `in`/`out` contracts
+consts         typed constants and known-evaluated values
+procs          procedure declarations and implementation origins
+layouts        representation, packing, alignment, endian, tags, padding, ABI layout, reference maps
+body-meta      blocks, locals, env slots, regions, handlers, safepoints, stack/root maps
+bodies         executable stack-effect instruction bodies
+tool-meta      optional source maps, source-shape, comments/docs, decompilation hints
 ```
 
-Executable body graph:
+`asm` is mandatory and must be decodable using only the fixed header's core container format version. Unknown executable opcodes and semantic section kinds are rejected. Unknown non-semantic tool metadata is skippable only when the active core schema marks it skippable.
 
-```dot
-digraph seil_body {
-  rankdir=LR;
-  Body [label="body"];
-  Locals [label="locals/captures"];
-  Blocks [label="basic blocks"];
-  Verify [label="typed stack-effect verification"];
-
-  Body -> Locals;
-  Body -> Blocks;
-  Blocks -> B0 [label="entry block"];
-  Blocks -> Bn [label="block n"];
-  B0 -> Term0 [label="instructions then terminator"];
-  Bn -> Termn [label="instructions then terminator"];
-  Blocks -> Verify;
-}
-```
-
-Pre-opcode body rules:
-
-- A body has a signature, locals/captures, basic blocks, instruction sequences, and terminators.
-- Every instruction has verifier-known typed stack effect.
-- Every block has a checked entry stack shape and exit/terminator edge shape.
-- Branches, loops, `leave`, `cycle`, `defer`, `yield`, calls, and returns must preserve compatible stack shapes on every edge.
-- Verifier computes stack bounds; no authored `.maxstack` equivalent exists.
-- Known-phase execution runs verified SEIL under deterministic known-phase limits and capability/import rules.
-
-Metadata graph:
-
-```dot
-digraph seil_metadata {
-  rankdir=LR;
-  VM [label="required VM metadata"];
-  Producer [label="optional producer metadata"];
-  Execute [label="execution/verifiability"];
-  Tools [label="source maps/decompilation/tools"];
-
-  VM -> Execute [label="required"];
-  Producer -> Tools [label="optional"];
-  Producer -> Execute [label="no dependency", style=dashed];
-}
-```
-
-Required VM metadata affects verification, loading, linking, representation, capabilities, target availability, native/foreign linkage, and execution. Optional producer metadata preserves Musi source shape, original grouping, source spans, comments/docs when emitted, datum/operator/pattern spelling, and high-fidelity decompilation hints. Executable SEIL must run without optional producer metadata.
-
+Required VM metadata affects verification, loading, linking, representation, capabilities, target availability, native/foreign linkage, GC roots/barriers, and execution. Optional tool metadata preserves Musi source shape, exact source symbols, original grouping, source spans, comments/docs when emitted, datum/operator/pattern spelling, and high-fidelity decompilation hints. Executable SEIL must run without optional tool metadata.
 
 ## 17. SEIL textual syntax and opcode registry
 
-Textual `.seil.txt` is a Lisp/Forth/assembly hybrid, not Musi syntax and not pure directive assembly. Module/table/declaration/metadata structure uses Lisp-like forms. Executable bodies use explicit `body` islands containing Forth-like stack-effect instruction streams with assembly-like labels. Descriptor references remain the table-reference language. This rejects CIL's class-first object model, required `.maxstack`, raw metadata blobs as normal metadata form, CLR modifier soup, and null/default-reference assumptions.
+Textual `.seil` is WAT/Lisp-like typed module text plus Forth/RPN-like instruction bodies, not Musi syntax and not CIL syntax. It uses S-expressions for declarations/metadata and line-oriented symbolic stack-effect instructions directly inside `proc` forms.
 
 Textual syntax rules:
 
 ```text
-(seil 1 0)
+(module example
+  (asm example
+    (ver 1 0 0 0)
+    (runtime seam)
+    (entry add))
 
-(module M<example>
-  (meta target (os := linux) (arch := x64)))
+  (asmref core
+    (ver 1 0 0 0)
+    (origin "musi:core"))
 
-(import M<core> "musi:core")
+  (file "example.seil")
 
-(type T<Point> prod
-  (meta repr c)
-  (field x f64)
-  (field y f64))
+  (import core "musi:core")
+  (export add "add")
 
-(type T<MaybeI32> sum
-  (alt None tag 0)
-  (alt Some tag 1 payld i32))
+  (type Point
+    (layout product)
+    (field x f64)
+    (field y f64))
 
-(sig S<add>
-  (input a i32)
-  (input b i32)
-  (output i32))
+  (type MaybeI32
+    (layout tagged)
+    (alt None 0)
+    (alt Some 1 i32))
 
-(func F<add> S<add>
-  (entry entry)
-  (body
+  (sig add
+    (in a i32)
+    (in b i32)
+    (out i32))
+
+  (proc add add
     entry:
-      ld.arg 0
-      ld.arg 1
+      ld.arg a
+      ld.arg b
       add
-      ret))
-
-(export F<add> "add")
+      ret
+  ))
 ```
 
-- canonical textual files start with `(seil major minor)`.
-- top-level declarations are Lisp-like forms: `module`, `import`, `export`, `type`, `sig`, `global`, `const`, `extern`, `intern`, and `func`.
-- descriptors identify table references: `M<...>` module, `T<...>` type, `S<...>` signature, `F<...>` function/callable, `G<...>` global/storage slot, `K<...>` constant, `P<owner/field>` product field, `A<owner/alternative>` sum alternative.
-- descriptor paths use `/` as path separator.
-- product type members use `(field name TYPE)` inside `(type ... prod ...)`.
-- sum type members use `(alt name tag NAT)` or `(alt name tag NAT payld TYPE)` inside `(type ... sum ...)`.
-- signatures are explicit `sig` forms with `input` and `output` forms.
-- functions reference signatures by `S<...>` descriptor; signatures are not inferred from `func` headers.
-- function entry block is explicit through `(entry label)`.
-- executable code appears only inside explicit `(body ...)` islands.
-- inside `body`, labels are `name:` and instructions are mnemonic-first Forth-like lines.
+- canonical textual files contain exactly one `module` root.
+- local asm identity is declared by `(asm name ...)`.
+- referenced asms are declared by `(asmref name ...)`.
+- `asm` and `asmref` declarations use `(ver major minor build revision)`, following ILAsm's assembly identity version role.
+- SEIL text does not require source-level metadata-version, instruction-set-version, or runtime-version boilerplate; those compatibility contracts belong to SEAM binary image format and SEAM acceptance.
+- top-level module declarations include `asm`, `asmref`, `file`, `import`, `export`, `type`, `sig`, `global`, `const`, `proc`, `ext`, and `tool`.
+- program symbols are exact logical symbols; assemblers must not case-fold, dash-convert, Unicode-normalize, abbreviate, or otherwise rewrite them.
+- symbols assemble to binary table indices; descriptor-heavy text such as `F<...>` or `S<...>` is not the ordinary hand-written surface.
+- product types use `(layout product)` plus `field` members.
+- tagged types use `(layout tagged)` plus `alt` members.
+- signatures are explicit `sig` forms with `in` and `out` forms.
+- `proc` declarations reference signatures by symbol and may contain direct instruction lines after declaration forms.
+- executable code appears directly inside `proc`; no separate body form exists.
+- inside procedure bodies, labels are `name:` and instructions are mnemonic-first stack-effect lines.
 - operands are never fused into mnemonic spelling.
-- one executable instruction appears per line in canonical body text.
-- textual SEIL does not use `->`.
-- no authored `.maxstack`; verifier computes stack bounds.
-- `(extern F<...> S<...> ...)` declares externally linked ABI-provided callable/data symbols.
-- `(intern F<...> S<...> ...)` declares SEAM/runtime/internal callable/data symbols.
-- `call` opcodes do not encode callee origin; callable declaration metadata does.
+- one executable instruction appears per line in canonical body text, and closing parentheses follow a body line terminator.
+- no authored `.maxstack`; verifier computes stack bounds, frame requirements, safepoint maps, and live managed-reference maps.
 - metadata uses `(meta name positional (field := value))`; no `@` metadata syntax, no `=`, and no raw metadata blob normal form.
-- metadata values are identifiers, strings, numbers, descriptors, or schema-defined atoms.
-- `:=` inside metadata named-argument forms defines named metadata argument values.
-- primitive types are bare type names; declared types use `T<...>` descriptors.
+- primitive types are bare type names; managed and unmanaged references use `(ref T)` and `(ptr T)`.
+
+GC/GenImmix text-level rules:
+
+- managed references are explicit through `(ref T)`.
+- layout metadata must identify reference fields/elements for tracing and barriers.
+- allocation, calls, dynamic calls, throws, yields, and core runtime/native operations are safepoints.
+- stores into reference-bearing heap/global/array/boxed storage have write-barrier obligations under generational collection.
+- Immix lines, blocks, cards, nurseries, and remembered sets are SEAM implementation details, not ordinary SEIL syntax.
+- Musi `fixed` lowers to SEIL metadata/operations that constrain movement or pin storage for a defined lifetime.
 
 Opcode registry rules:
 
@@ -1067,10 +1054,10 @@ Opcode registry rules:
 - opcode ids are assigned by sparse family range, never by list order.
 - opcode ids never change meaning.
 - removed ids become reserved forever.
-- binary SEIL stores numeric opcode ids.
-- textual SEIL stores canonical mnemonics.
-- unknown opcode id is loader/verifier diagnostic unless declared by extension metadata.
-- extension opcodes require declared module feature/profile metadata.
+- SEAM binary image stores numeric opcode ids.
+- SEIL text stores canonical mnemonics.
+- unknown opcode id is loader/verifier diagnostic unless declared by core ext metadata and supported by the consuming SEAM.
+- ext opcodes require asm-declared feature metadata before body operand decoding.
 
 Mnemonic rules:
 
@@ -1079,11 +1066,11 @@ mnemonic      ::= mnemonic-part ("." mnemonic-part)*
 mnemonic-part ::= /* 2..7 ASCII identifier chars, canonical lowercase */
 ```
 
-- hard keywords and SEIL mnemonic/directive parts share the 2..7 character naming law.
-- 1-character parts are rejected.
-- 8+ character parts are rejected.
-- design target is 3..6 characters.
-- 7-character parts require clear conventional rationale.
+- opcode mnemonic parts use the 2..7 character naming law. SEIL directive words are chosen for clarity and are not constrained by opcode mnemonic length.
+- 1-character opcode parts are rejected.
+- 8+ character opcode parts are rejected.
+- opcode design target is 3..6 characters.
+- 7-character opcode parts require clear conventional rationale.
 - abbreviation is rejected if ambiguous inside compiler/VM terminology.
 - shortest obvious spelling wins; full spelling stays when already compact and clearer.
 - opcode names describe primitive VM/computer behavior, not Musi source behavior, except when the source term and VM primitive are the same operation.
@@ -1132,7 +1119,7 @@ Opcode family ranges:
 0x0000..0x00FF  control / terminators
 0x0100..0x01FF  stack
 0x0200..0x02FF  constants
-0x0300..0x03FF  frame / slots
+0x0300..0x03FF  frame / globals
 0x0400..0x04FF  calls / dispatch
 0x0500..0x05FF  scalar arithmetic
 0x0600..0x06FF  bitwise / shifts / rotates
@@ -1149,8 +1136,8 @@ Opcode family ranges:
 0x1100..0x11FF  cleanup edges
 0x1200..0x13FF  reserved core future
 0x1400..0x1FFF  reserved core future
-0x2000..0xEFFF  standard extensions/profiles
-0xF000..0xFFFF  private/experimental/vendor
+0x2000..0xEFFF  standard extensions
+0xF000..0xFFFF  private/vendor
 ```
 
 Locked core opcode registry and per-opcode operand/stack-effect schemas live at repo root in `seil_opcodes.def`. The `.def` file uses Swift/LLVM-style `SEIL_OPCODE(swiftCase, rawValue, mnemonic, operands, stackEffect)` entries and stores each opcode id, Swift-safe case name, canonical textual mnemonic, operand schema, and stack-effect schema.
@@ -1161,17 +1148,17 @@ Locked opcode semantics that constrain later operand schemas:
 - `const` loads a constant-table entry.
 - `const.int`, `const.nat`, `const.flt`, and `const.bit` are inline scalar constants.
 - `const.txt` and `const.bytes` are text/bytes constants, not proof of core runtime text/bytes operation opcodes.
-- `const.nil` is a typed VM nil sentinel, not Musi null. The verifier rejects nil where the type/profile does not admit nil.
+- `const.nil` is a typed VM nil sentinel, not Musi null. The verifier rejects nil where the type metadata does not admit nil.
 - `throw` and `rethrow` are exceptional control edges. Handler/catch/finally regions are body metadata, not opcodes.
-- `call`, `call.disp`, `call.ind`, and `call.dyn` are invocation mechanisms. Callee origin (`.extern`, `.intern`, ordinary SEIL body) lives in declaration metadata.
+- `call`, `call.disp`, `call.ind`, and `call.dyn` are invocation mechanisms. Callee origin (`extern`, `intrin`, ordinary SEIL body) lives in declaration metadata.
 - `call.dyn` is a SEAM dynamic-call protocol, not JavaScript/Python syntax.
-- `mk.fn` constructs callable value from function/body reference plus environment/captures as required by operand schema.
+- `mk.fn` constructs callable value from procedure reference plus environment/captures as required by operand schema.
 - `div.un`, `rem.un`, and `cmp.*.un` are unsigned integer modes.
 - `%`/`rem` semantics are CPU-style remainder, not mathematical modulo.
 - float ordered/unordered behavior is defined by comparison operand/type schema; `.un` does not silently mean unordered float comparison.
 - `test.ty` is type test returning `Bit`.
-- `cast.ty` is checked type cast/coercion according to target type/profile.
-- `conv` converts by ordinary conversion schema; `conv.chk` is checked conversion; `bitcast` is representation-preserving reinterpretation; `conv.repr` converts across declared representation profiles.
+- `cast.ty` is checked type cast/coercion according to core type rules.
+- `conv` converts by ordinary conversion schema; `conv.chk` is checked conversion; `bitcast` is representation-preserving reinterpretation; `conv.repr` converts across declared core representations.
 - `alloc` allocates heap/runtime storage by type/layout operand.
 - `alloc.arr` allocates indexed storage by layout/type/length.
 - `mk.arr` constructs indexed value from stack-provided elements.
@@ -1213,7 +1200,7 @@ vari  signed LEB128
 Index operands are `varu`:
 
 ```text
-type_idx sig_idx func_idx field_idx alt_idx global_idx const_idx block_idx table_idx region_idx cap_idx arg_idx loc_idx env_idx slot_idx addr_idx
+type_idx sig_idx func_idx field_idx alt_idx global_idx const_idx block_idx table_idx region_idx cap_idx arg_idx loc_idx env_idx addr_idx
 ```
 
 Stack-effect notation:
@@ -1237,26 +1224,28 @@ Every opcode has a typed operand schema and typed stack-effect schema in `seil_o
 Semantic constraints:
 
 - `const.bit` payload must be `0` or `1`.
-- `const.nil` verifier-requires a type/profile admitting nil.
+- `const.nil` verifier-requires type metadata admitting nil.
 - `const.int`, `const.nat`, and `const.flt` type operand determines accepted width/range. `const.flt` stores f32 values in f64 operand encoding with exact f32-roundtrip validation when target type is f32.
 - `div.un`, `rem.un`, and `cmp.*.un` are unsigned integer modes only.
 - float ordered/unordered behavior is defined by comparison type schema and is not implied by `.un`.
 - `st.fld` and `st.idx` store through an addressable product reference; they are not copy-update opcodes.
 - `mk.arr` consumes exactly the `varu` element count encoded in its operand.
-- `call.dyn`, `key` ops, `box`/`unbox`, and `cap.*` require profile/type metadata that defines the relevant dynamic/capability protocol.
+- `call.dyn`, `key` ops, `box`/`unbox`, and `cap.*` require core type/capability metadata that defines the relevant dynamic/capability protocol.
 - exception handlers, cleanup regions, branch tables, address targets, yield/resume shapes, and dynamic argpack layouts are body metadata tables referenced by indices.
 
-DRY W3C XML 1.0-style EBNF for textual `.seil.txt` lives at repo root in `seil.ebnf`.
+DRY W3C XML 1.0-style EBNF for textual `.seil` lives in `grammar/seil.ebnf`.
 
 Textual grammar constraints:
 
-- Structural forms may nest only as defined by `seil.ebnf`; executable instruction lines occur only inside explicit `body` forms.
-- `func` forms may contain `local`, `env`, `entry`, `region`, `body`, and `meta` forms.
-- `type` forms may contain `field` for `prod`, `alt` for `sum`, and `meta` forms.
-- `sig` forms may contain `input`, `output`, and `meta` forms.
-- `module`, `import`, `export`, `global`, `const`, `extern`, and `intern` forms may contain `meta` forms only unless a later schema explicitly permits more.
-- Descriptors are table references; assembler resolves them to binary table indices.
-- The parser uses form context to validate which nested forms are legal; opcode operand schemas validate instruction operands inside `body` forms.
+- Structural forms may nest only as defined by `grammar/seil.ebnf`; executable instruction lines occur only directly inside `proc` forms after declaration forms.
+- `module` is the single textual root.
+- `asm` declarations define local asm identity; `asmref` declarations define external asm references.
+- `proc` forms may contain `local`, `env`, `region`, `extern`, `intrin`, and `meta` forms, followed by direct instruction lines.
+- `type` forms may contain `layout`, `field`, `alt`, and `meta` forms.
+- `sig` forms may contain `in`, `out`, and `meta` forms.
+- `global`, `const`, `import`, and `export` forms may contain `meta` forms only unless a later schema explicitly permits more.
+- Symbols are table references; assembler resolves them to binary table indices while preserving exact logical names.
+- The parser uses form context to validate which nested forms are legal; opcode operand schemas validate instruction operands inside `proc` body lines.
 
 ## 19. Open-question checklist
 
@@ -1271,7 +1260,7 @@ Checked/locked:
 - [x] Comments: line/doc/module doc/block/block doc/block module doc/nesting.
 - [x] Delimiters/separators/literals: `#(`, `#{`, `#[`; tuple types; bracket roles; trailing separators; empty tuple/record/array; numeric suffixes/separators/base prefixes; triple-quoted multiline strings; escaped identifiers.
 - [x] Control flow: `when ... else` precedence/associativity; dangling-else prevention; nested `when` parenthesization; guarded emission contexts; loop syntax vs recursion; `defer`/`yield`/`pin` status.
-- [x] Match/patterns: exact pattern grammar; alternatives; comma alternatives not `|`; semicolon cases; exhaustiveness; guard order; binding syntax.
+- [x] Match/patterns: exact pattern grammar; alts; comma alts not `|`; semicolon cases; exhaustiveness; guard order; binding syntax.
 - [x] Operators: full symbolic set; precedence; not-flat parsing; no user-defined symbolic ops; word ops; assignment/binding/update vs equality; equality/equivalence/ordering/approximation/membership/remainder.
 - [x] Modules/imports: modules as record-like values; import syntax; export syntax; visibility; path/source shape; SEIL round-trip.
 - [x] Known phase: meaning; applies to expressions/bindings/parameters/types where meaningful; limits; boundary; datum literals; functions compile to SEIL/no separate interpreter; known execution runs verified SEIL.
@@ -1280,15 +1269,15 @@ Checked/locked:
 - [x] Attributes: universal attribute call model; UALO payloads; `@target`; tooling namespace rule; compiler-affecting unknown attribute diagnostics.
 - [x] Native modules: `musi:` import prefix; native/compiler-provided modules; optional `.ms` interface surfaces.
 - [x] SEIL identity: Stack Effect Intermediate Language; SEAM executable language; not Musi-only and not disposable compiler IR.
-- [x] SEIL artifacts: `.seil` binary executable module; `.seil.txt` textual hand-authorable form; same semantic model.
-- [x] SEIL binary header: exactly 40 bytes; magic, format tuple, section-directory tuple, file size; semantic data lives in sections.
-- [x] SEIL module structure: sectioned module; required VM sections; executable bodies; required VM metadata; optional producer/source metadata.
+- [x] SEIL artifacts: `.seil` textual executable IL; SEAM binary image exists as internal assembled form.
+- [x] SEAM binary image header: exactly 40 bytes; `SEAM` magic, format tuple, section-directory tuple, file size; semantic contract lives in mandatory asm section.
+- [x] SEIL module structure: WAT/Lisp-like text module; SEAM binary image; mandatory early `asm` section; typed metadata sections; procedure bodies; required VM metadata; optional tool/source metadata.
 - [x] SEIL verification placement: basic-block stack-effect bodies; typed edge verification; verifier-computed stack bounds; no authored `.maxstack`.
-- [x] SEIL textual syntax: Lisp/Forth/assembly hybrid; descriptor references `M<...>`/`T<...>`; structural forms; `(meta name ... (field := value))`; body islands; labels; mnemonic-first instructions; no `->`.
+- [x] SEIL textual syntax: WAT/Lisp-like `(module ...)` root; CIL-like assembly/reference roles; symbolic names; structural forms; `(meta name ... (field := value))`; Forth/RPN-like procedure instruction streams; labels; mnemonic-first instructions; no `->`.
 - [x] SEIL opcode registry: u16 sparse family ranges; stable ids; naming law; locked core opcode map in `seil_opcodes.def`; VM-oriented semantics.
-- [x] SEIL binary operand encodings: primitive encodings; varu indices; opcode-schema-driven instruction decode.
+- [x] SEAM binary image operand encodings: primitive encodings; varu indices; opcode-schema-driven instruction decode.
 - [x] SEIL per-opcode schemas: operand schema and stack-effect schema for every locked core opcode in `seil_opcodes.def`.
-- [x] SEIL textual grammar: DRY W3C XML 1.0-style EBNF for `.seil.txt`, descriptor grammar, metadata args, structural forms, body islands, and instruction lines.
+- [x] SEIL textual grammar: DRY W3C XML 1.0-style EBNF for `.seil`, module root, `asm` declarations, symbols, metadata args, structural forms, procedure instruction streams, and instruction lines.
 
 Still open:
 
