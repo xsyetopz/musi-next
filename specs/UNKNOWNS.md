@@ -2,7 +2,7 @@
 
 Collect current `## Unknowns` from specs. Resolve here, then fold into owning specs.
 
-USER choice file: `docs/musi_full_spec_solution_selection.md` defines A/B/C closure paths and exact current-unknown coverage for all gap families. Until USER checks one option, listed gaps remain unresolved.
+USER choice file: `docs/musi_full_spec_solution_selection.md` is the checkbox source of truth. `docs/musi_full_spec_solution_options.md` defines A/B/C language directions and exact current-unknown coverage. Until USER checks one option, listed gaps remain unresolved.
 
 ## Locked decisions
 
