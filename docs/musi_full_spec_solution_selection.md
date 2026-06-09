@@ -4,7 +4,7 @@ Purpose: USER selects one long-term closure path for every current language/spec
 
 Selection rule:
 
-- [ ] A — Minimal Self-Hosted SEAM Core
+- [ ] A — Mature Self-Hosted SEAM Core
 - [ ] B — Embedded-First Profile Kernel
 - [ ] C — Tool-Exact Spec Kernel
 
@@ -25,9 +25,9 @@ Every option must keep:
 - explicit intrinsic declarations through `musi:rt`;
 - no Rust-derived design source.
 
-## Option A — Minimal Self-Hosted SEAM Core
+## Option A — Mature Self-Hosted SEAM Core
 
-Design center: make the smallest complete VM/language kernel that can host its own compiler and VM.
+Design center: make a mature, stable, self-hostable VM/language kernel with disciplined small-core scope.
 
 Resolution rule:
 
@@ -38,31 +38,31 @@ Resolution rule:
 Long-term choices:
 
 - Parser proof: grammar remains LL/LR(1)-auditable; every accepted form gets fixture + parse table proof.
-- Diagnostics: small typed catalog first; every rejected source form maps to stable code.
+- Diagnostics: mature typed catalog; every rejected source form maps to stable code.
 - Lowering: one canonical lowering per source form; no lowering variants for style.
-- Source maps/tool metadata: minimum near-identical decompile metadata only.
+- Source maps/tool metadata: stable near-identical decompile metadata with no non-semantic bloat.
 - Imports/packages: simple module graph with explicit package manifest; no implicit discovery beyond configured roots.
 - SEIL text formatting: one canonical formatter; no alternate pretty styles.
 - Type/metadata binary encodings: schema-packed rows with stable ids; no field names in binary.
 - Trap/numeric behavior: CPU-like exactness where hardware has one obvious behavior; otherwise checked op or structured trap.
 - Compatibility edges: explicit metadata table only; verifier never infers from names.
 - Capability/dynamic argpack/keyed storage: fixed row schemas; dynamic means capability-proven, not duck typing.
-- Frames/handlers/cancel: minimal frame objects with required root/safepoint/cleanup tables.
+- Frames/handlers/cancel: stable frame objects with required root/safepoint/cleanup tables.
 - GC: GenImmix allowed; default policy fixed enough for conformance, tunables non-semantic.
 - Finalization: no implicit finalizers; explicit cleanup only.
 - Host API: tiny embedding ABI: load, verify, link, init, call, resume/cancel, inspect failure.
-- Core modules: smallest `musi:rt` intrinsic catalog needed for self-hosting.
+- Core modules: complete self-hosting `musi:rt` intrinsic catalog; no speculative extras.
 - Stdlib: Go-like/C#-like, but outside language core.
 
 Best when:
 
-- self-hosting and floppy-small implementation matter most;
-- fewer moving parts beat rich tooling;
-- some ergonomics wait for library layer.
+- self-hosting and long-term small-core maturity matter most;
+- disciplined core boundaries beat feature spread;
+- ergonomics belong in library layer when not core semantics.
 
 Risk:
 
-- tooling/decompilation may be less rich at first;
+- tooling/decompilation stays intentionally lean unless needed for stable semantics;
 - embedded hosts may need adapters around the tiny host API.
 
 ## Option B — Embedded-First Profile Kernel
@@ -149,17 +149,17 @@ Risk:
 
 | Gap family                   | A                             | B                                     | C                                |
 | ---------------------------- | ----------------------------- | ------------------------------------- | -------------------------------- |
-| parser proof                 | minimal proof + fixtures      | proof + low-memory parser fixtures    | full checked grammar artifact    |
-| diagnostics                  | small stable catalog          | compact codes + optional rich text    | complete typed catalog           |
+| parser proof                 | stable proof + fixtures       | proof + low-memory parser fixtures    | full checked grammar artifact    |
+| diagnostics                  | mature stable catalog         | compact codes + optional rich text    | complete typed catalog           |
 | lowering                     | one canonical lowering        | compact canonical lowering            | exhaustive algorithm             |
-| source maps/tool metadata    | minimum decompile metadata    | tiered optional metadata              | full near-identical metadata     |
+| source maps/tool metadata    | stable decompile metadata     | tiered optional metadata              | full near-identical metadata     |
 | imports/packages             | explicit simple manifest      | explicit low-memory manifests/bundles | exact names, archives, versions  |
 | text formatting              | one canonical formatter       | compact canonical formatter           | full round-trip spec             |
 | metadata binary encodings    | stable schema-packed rows     | compact schema-packed rows            | every row schema specified       |
 | trap/numeric behavior        | CPU-like or checked/trap      | profile-declared support/trap         | exact reason-code mapping        |
 | compatibility edges          | explicit table only           | compact explicit table                | full schema + corpus             |
-| dynamic/capability protocols | fixed minimal schemas         | bounded low-memory schemas            | full protocol schemas            |
-| frame/control layout         | minimal root/safepoint tables | compact optional tables               | exact table formats              |
+| dynamic/capability protocols | fixed stable schemas          | bounded low-memory schemas            | full protocol schemas            |
+| frame/control layout         | stable root/safepoint tables  | compact optional tables               | exact table formats              |
 | memory/GC                    | conformance policy + tunables | GenImmix profile limits               | exact object/barrier/root spec   |
 | finalization                 | none; explicit cleanup        | none; explicit handle cleanup         | decision table; default none     |
 | host API                     | tiny ABI                      | C-compatible limited ABI              | versioned normative API          |
@@ -172,8 +172,8 @@ Every current `specs/**` unknown maps to one row below. USER selection chooses t
 
 | Current gap                               | Covered by                      | A closure                       | B closure                              | C closure                              |
 | ----------------------------------------- | ------------------------------- | ------------------------------- | -------------------------------------- | -------------------------------------- |
-| control block layout patterns             | lowering                        | minimal canonical blocks        | compact canonical blocks               | exhaustive per-form layouts            |
-| generator object representation           | frame/control layout            | minimal resumable object        | optional compact suspension object     | exact object/table format              |
+| control block layout patterns             | lowering                        | stable canonical blocks         | compact canonical blocks               | exhaustive per-form layouts            |
+| generator object representation           | frame/control layout            | stable resumable object         | optional compact suspension object     | exact object/table format              |
 | nested cleanup ordering                   | frame/control layout            | lexical LIFO cleanup table      | compact cleanup table                  | exact cleanup order matrix             |
 | every source expression lowering          | lowering                        | one canonical lowering          | compact canonical lowering             | exhaustive lowering algorithm          |
 | source-map/tool metadata payloads         | source maps/tool metadata       | minimum decompile payload       | tiered optional payloads               | full near-identical payload schemas    |
@@ -183,21 +183,21 @@ Every current `specs/**` unknown maps to one row below. USER selection chooses t
 | SEAM failure to Musi diagnostics          | diagnostics / trap behavior     | stable code mapping             | compact code mapping                   | full diagnostic/failure map            |
 | trap taxonomy                             | trap/numeric behavior           | small structured trap set       | profile-declared traps                 | exact reason-code taxonomy             |
 | numeric overflow + FP exceptions          | trap/numeric behavior           | CPU-like or checked/trap        | declared support/trap per profile      | exact opcode/schema behavior           |
-| access/region permission metadata         | dynamic/capability protocols    | minimal permission rows         | bounded compact rows                   | full permission schema                 |
+| access/region permission metadata         | dynamic/capability protocols    | stable permission rows          | bounded compact rows                   | full permission schema                 |
 | module-name canonicalization              | imports/packages                | exact simple symbol rule        | explicit compact package name rule     | full canonical naming spec             |
 | multi-module package/archive              | imports/packages                | manifest package                | low-memory bundle/archive              | normative archive format               |
 | compatibility edge schema                 | compatibility edges             | explicit table only             | compact explicit table                 | full schema + verifier corpus          |
 | type/metadata binary encodings            | metadata binary encodings       | stable schema-packed rows       | compact varu/interned rows             | all row schemas specified              |
-| ABI descriptor grammar                    | metadata binary encodings / FFI | minimal ABI metadata grammar    | compact ABI/profile grammar            | full ABI descriptor grammar            |
-| verifier diagnostic codes/messages        | diagnostics                     | small stable verifier catalog   | compact codes + optional text          | complete typed verifier diagnostics    |
-| capability table schema                   | dynamic/capability protocols    | fixed minimal cap table         | bounded cap table                      | full capability schema                 |
-| dynamic argument-pack representation      | dynamic/capability protocols    | fixed minimal argpack           | bounded compact argpack                | full argpack protocol                  |
+| ABI descriptor grammar                    | metadata binary encodings / FFI | stable ABI metadata grammar     | compact ABI/profile grammar            | full ABI descriptor grammar            |
+| verifier diagnostic codes/messages        | diagnostics                     | mature stable verifier catalog  | compact codes + optional text          | complete typed verifier diagnostics    |
+| capability table schema                   | dynamic/capability protocols    | fixed stable cap table          | bounded cap table                      | full capability schema                 |
+| dynamic argument-pack representation      | dynamic/capability protocols    | fixed stable argpack            | bounded compact argpack                | full argpack protocol                  |
 | keyed-storage constraints                 | dynamic/capability protocols    | fixed key/value rules           | bounded key/value profile              | full keyed-storage schema              |
-| reason-code enum                          | trap/numeric behavior           | small enum                      | compact profile-aware enum             | full normative enum                    |
+| reason-code enum                          | trap/numeric behavior           | stable enum                     | compact profile-aware enum             | full normative enum                    |
 | host outcome representation               | host API                        | tiny outcome ABI                | C-compatible outcome ABI               | versioned normative outcome API        |
-| numeric failure to trap kind map          | trap/numeric behavior           | small mapping table             | profile-declared mapping               | exhaustive mapping table               |
-| in-memory frame layout                    | frame/control layout            | minimal root/safepoint frame    | compact profile frame                  | exact frame layout                     |
-| handler matching table format             | frame/control layout            | minimal handler table           | compact handler table                  | exact handler table format             |
+| numeric failure to trap kind map          | trap/numeric behavior           | stable mapping table            | profile-declared mapping               | exhaustive mapping table               |
+| in-memory frame layout                    | frame/control layout            | stable root/safepoint frame     | compact profile frame                  | exact frame layout                     |
+| handler matching table format             | frame/control layout            | stable handler table            | compact handler table                  | exact handler table format             |
 | suspended cancellation API                | frame/control layout / host API | resume/cancel ABI               | compact optional cancel API            | normative cancellation API             |
 | object header layout                      | memory/GC                       | conformance header contract     | compact profile header                 | exact object header                    |
 | GC algorithm parameters                   | memory/GC                       | semantic policy + tunables      | profile limits                         | exact parameters/probes                |
