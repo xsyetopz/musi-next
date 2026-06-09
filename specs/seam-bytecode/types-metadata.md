@@ -20,7 +20,7 @@ Assembly lowers runtime/capability contracts, ext declarations, asm refs, and im
 
 SEAM bytecode text/disassembly admits primitive names `Bit`, `Byte`, `i8`, `i16`, `i32`, `i64`, `n8`, `n16`, `n32`, `n64`, `f32`, `f64`. Managed/unmanaged refs use constructors `(ref T)` and `(ptr T)`.
 
-Types are semantic metadata. They drive verification, layout, calling convention, representation transitions, memory access, dynamic protocol checks, import/export compatibility, root tracing, barriers.
+Types are semantic metadata. They drive verification, layout, calling convention, representation transitions, memory access, dynamic protocol checks, import/export compatibility, root tracing, barriers. Type, layout, ABI, dynamic, capability, and tool metadata table schemas come from the same declarative generated schema source used by `.seam` encoding.
 
 ## Sigs
 
@@ -57,7 +57,7 @@ Loader/verifier rejects modules missing required VM metadata for accepted instru
 
 ## Optional tool metadata
 
-Tool metadata includes source maps, exact source symbol spelling, source-shape hints, comments/docs, datum/operator/pattern spelling, decompilation hints. Execution must not depend on it. SEAM may skip tool metadata during execution loading.
+Tool metadata uses typed non-semantic registry rows. It includes source maps, exact source symbol spelling, source-shape hints, comments/docs, import/export grouping, datum/operator/pattern spelling, decompilation hints, and probe/debug data. Execution must not depend on it. SEAM may skip tool metadata during execution loading.
 
 ## Targets and semantic ownership
 
@@ -67,9 +67,9 @@ Target metadata determines availability before semantic checks/verification. Tar
 
 ## ABI boundary rules
 
-Extern/native ABI boundary types must be representable under core ABI metadata. `Any`, opaque/erased values, closures, shapes, `Maybe`, `Expect`, GC refs, and other high-level source constructs are not ABI-safe unless core ABI metadata defines explicit representation. Text values are not silently C strings.
+Extern/native ABI boundary types must be representable under core ABI metadata. ABI descriptors are host-ABI capable from start: C ABI, handles, callbacks through exported callable handles, resources, async/yield/resumable interaction, cancellation, failure outcomes, and representable memory access metadata. `Any`, opaque/erased values, closures, shapes, `Maybe`, `Expect`, GC refs, and other high-level source constructs are not ABI-safe unless core ABI metadata defines explicit representation. Text values are not silently C strings.
 
-## Unknowns
+## Detail gaps
 
-- Exact binary encodings for all type/metadata table payloads not defined.
-- Exact ABI descriptor grammar not fully specified.
+- Exact generated type/layout/metadata schema entries are not defined.
+- Exact ABI descriptor fields and validation rules are not fully specified.

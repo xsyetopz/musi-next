@@ -56,12 +56,12 @@ Keeps checklist shape; answers for Musi from `LOCKED_LANGUAGE_DESIGN.md`. Legend
       - `yield` core suspension keyword. `Task`, `Scheduler`, `Resumable`, `Generator`, `Stream` library/runtime names.
     - [~] a REPL
       - Not syntax-locked; source→SEAM bytecode + known-phase SEAM bytecode do not block it.
-    - [~] debugger support
-      - SEAM bytecode metadata preservation goal; debugger still tooling work.
+    - [x] debugger support
+      - `musi:probe`, typed non-semantic tool metadata, and authorized probe APIs define debugger/probe boundary; exact tool implementation remains evidence work.
     - [x] IDE support
       - One-token parsing, comments, UALO, UDNS, metadata preservation help tooling.
-    - [~] I/O
-      - I/O is library/runtime design; FFI/imports allow it.
+    - [x] I/O
+      - Optional provider/capability-gated modules include `musi:fs`, `musi:process`, `musi:time`, `musi:random`, and host-resource APIs; exact API contents remain detail work.
     - [x] to interact with code not written in your language
       - `@extern`, `@repr`, C ABI aliases, `unmanaged`, `Address`, `Region`, `Access[T]`, `Access[mut T]`, `MutAccess[T]`, and `OpaqueAccess[T]` are locked.
 - [-] The entire world speaks 7-bit ASCII
@@ -102,11 +102,11 @@ Keeps checklist shape; answers for Musi from `LOCKED_LANGUAGE_DESIGN.md`. Legend
 - [x] closures
   - Lambda expression syntax exists with `=>`.
 - [~] tail recursion
-  - No `recur`; ordinary recursion exists. Tail-call guarantees pending implementation/SEAM bytecode.
+  - No `recur`; ordinary recursion exists. Tail-call guarantees remain exact lowering/runtime detail.
 - [x] coroutines
   - `yield` core keyword for resumable/generator contexts.
-- [-] reflection
-  - Not surface claim.
+- [x] reflection
+  - Explicit optional `musi:reflect` module only; no ambient reflection.
 - [x] subtyping
   - `<:` is locked. `Empty`, `Any`, shapes, opaque/erased, and type algebra participate in the type system.
 - [-] multiple inheritance
@@ -359,7 +359,7 @@ Musi-to-SEAM-bytecode locks:
 - [x] semantic runtime effects must lower into required SEAM bytecode metadata/declarations
 - [x] `fixed`, `unmanaged`, access/address, FFI, target, shape/witness lowering obligations
 - [~] exact lowering algorithm for every source expression
-- [~] exact source-map/tool-metadata payloads for high-fidelity decompilation
+- [~] exact generated schema source, compatibility relation entries, and typed tool-metadata payloads
 - [x] import path resolution policy: ESM-like strings, manifest imports/dependencies, reserved `musi:`, extensionless policy, `index.ms` fallback
 
 SEAM bytecode locks:
@@ -373,9 +373,12 @@ SEAM bytecode locks:
 - [x] opcode registry ranges and stack-effect notation
 - [x] managed `(ref T)` vs VM `(ptr T)` distinction
 - [x] verifier responsibilities: types, stack effects, metadata refs, roots, safepoints
-- [~] exact text/disassembly assembler/disassembler canonical formatting details
+- [x] generated row/type/metadata schema source and generated compatibility relation direction
+- [x] typed non-semantic tool metadata registry
+- [x] numeric edge behavior visible by opcode/schema
+- [~] exact text/disassembly assembler/disassembler readable formatter details
 - [~] exact per-type metadata binary encodings
-- [~] exact trap taxonomy and numeric edge behavior
+- [~] exact trap taxonomy and numeric edge map
 
 SEAM locks:
 
@@ -386,17 +389,24 @@ SEAM locks:
 - [x] `fixed` implementation choices: pin, nonmoving, unmanaged copy, reject
 - [x] `unmanaged` outside managed tracing/movement/reclamation unless core metadata says otherwise
 - [x] explicit dynamic/capability/box/keyed protocols
+- [x] capability/resource graph typed nodes and typed authority edges
+- [x] typed UALO argpacks and typed key schemas
+- [x] baseline capability-aware host embedding API shape
+- [x] object layout direction: compact headers plus side tables
+- [x] JVM-style `seamArguments` flag shape and locked initial flags
+- [x] layout-driven barriers; source never calls barriers
+- [x] no core finalizers/destructors/resurrection
 - [x] no hidden host UB; invalid behavior is reject/trap/failure
 - [~] exact frame object layout
-- [~] exact host embedding API beyond tagged outcomes and opaque resumable handles
-- [~] exact GC policy/tuning and allocator details
+- [~] exact host embedding API signatures and canonical result struct field layout
+- [~] exact `seamArguments` defaults/ranges/conflicts and allocator details
 
 Runtime/core library locks:
 
-- [x] `musi:core`, `musi:ffi`, `musi:rt` are native/compiler module prefixes with optional `.ms` interface surfaces.
+- [x] required native/compiler modules are `musi:core`, `musi:rt`, `musi:ffi`, and `musi:text`; optional provider/capability-gated modules are `musi:host`, `musi:fs`, `musi:process`, `musi:time`, `musi:random`, `musi:encoding`, `musi:reflect`, `musi:probe`, `musi:package`, `musi:schema`, `musi:bytecode`, and `musi:test`.
 - [x] `musi:rt` intrinsics need declared signature, phase, allocation, failure/trap, capability, target/profile, and lowering metadata.
 - [~] exact `musi:rt` intrinsic catalog
-- [~] exact standard native module catalog
+- [~] exact standard native module API contents
 - [~] exact Go-like/C#-like stdlib surface
 
 Implementation/conformance evidence:

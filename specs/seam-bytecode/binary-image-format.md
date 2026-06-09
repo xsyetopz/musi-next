@@ -12,7 +12,9 @@
 - schema-ordered operands using fixed scalars and `varu`/`vari`;
 - skippable tool metadata.
 
-Compression, checksums, signatures, resources, and archive transport belong to package/container layer, not core `.seam` image.
+Compression, checksums, signatures, resources, and archive transport belong to package/container layer, not core `.seam` image. Container/archive spec is mandatory before bundled distribution, signed packages, resource bundles, plugin archives, or streaming package loading. That future container must preserve loose package graph behavior.
+
+`.seam` row, type, and metadata schemas come from one declarative generated schema source. That source drives documentation, encoder/decoder tables, verification-facing schema data, and conformance fixtures. Hand-written docs may explain schemas but must not become a second schema authority.
 
 ## Fixed Header
 
@@ -77,7 +79,7 @@ This lets loader skip unsupported skippable row kinds, reject unsupported requir
 
 Semantic sections encode compact typed rows. Text symbols intern into `names`. Table refs are namespace-relative `varu`.
 
-Rows use schemas owned by section + row kind. Field names not encoded. Optional fields use presence bits or row-specific tags.
+Rows use schemas owned by section + row kind through the generated schema source. Field names not encoded. Optional fields use presence bits or row-specific tags.
 
 Core row families:
 
@@ -133,8 +135,9 @@ Before verification, SEAM checks:
 - logical tables decode before operand resolution;
 - `tool` rows can skip without changing execution.
 
-## Unknowns
+## Detail gaps
 
 - Section-family ids beyond core use explicit registry/dependency declarations; exact registry contents beyond core are not specified.
-- Exact per-row binary schemas not fully specified.
-- Exact package/container transport beyond core `.seam` image not specified.
+- Exact generated schema source format and artifact ownership are not specified.
+- Exact per-row binary schemas are not fully specified.
+- Exact package/container transport beyond core `.seam` image is not specified until distribution gate is entered.

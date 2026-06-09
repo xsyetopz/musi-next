@@ -138,6 +138,12 @@ Inside escaped symbols, `` \` `` denotes literal backtick and `\\` denotes liter
 
 Strings use double quotes with backslash escapes for `"`, `\`, `n`, `r`, `t`, and `u{HEX}` Unicode scalar values. Canonical text emits shortest valid escapes and UTF-8 source text.
 
+## Canonical Formatter
+
+Text/disassembly has one readable canonical formatter. There is no compact canonical mode. Canonical output uses stable indentation, stable blank-line placement, and one executable instruction per line. Closing parentheses for procedure bodies follow a body line terminator and never share an instruction line.
+
+Assembler/disassembler diagnostics use stable codes with module/proc/body context when available. Messages report expected/found/offending token or form; source spans are used when the parser has them.
+
 ## Canonical Ordering
 
 Canonical text/disassembly declaration order:
@@ -172,8 +178,8 @@ Assembler must:
 - reject unknown executable semantics;
 - keep tool metadata non-semantic.
 
-## Unknowns
+## Detail gaps
 
-- Exact canonical whitespace policy not specified.
-- Exact diagnostic wording for text parse/assemble failures not specified.
-- Exact `tool` metadata schemas not specified.
+- Exact readable indentation width and blank-line placement table are not specified.
+- Exact diagnostic wording for text parse/assemble failures is not specified.
+- Exact `tool` metadata schemas are not specified.

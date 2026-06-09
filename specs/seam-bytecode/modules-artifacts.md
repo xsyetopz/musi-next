@@ -16,6 +16,8 @@ Project evidence: `LOCKED_LANGUAGE_DESIGN.md` sections 16-18, `grammar/seam-byte
 
 Developers may hand-author the text/disassembly form and assemble it to `.seam`. Assemblers must not invent behavior outside SEAM bytecode. Disassemblers preserve executable semantics except omitted optional tool metadata.
 
+Source package canonical form remains loose graph: `musi.json` + `.ms` + `.seam` files. Container/archive format is mandatory only at distribution gate: bundled distribution, signed packages, resource bundles, plugin archives, or streaming package loading. Future containers must preserve loose graph behavior.
+
 ## Design Model
 
 SEAM bytecode text/disassembly uses WAT/Lisp-like `module` root because SEAM bytecode is typed executable module language. Declarations carry CIL-like assembly/reference, metadata, and body roles. Procedure bodies use Forth/RPN-like stack instruction streams.
@@ -61,6 +63,8 @@ Name match alone not enough. SEAM rejects link when semantic contracts mismatch.
 
 Host-provided modules are explicit graph nodes with provider and capability metadata. They do not appear through ambient globals.
 
+Required standard native modules are `musi:core`, `musi:rt`, `musi:ffi`, and `musi:text`. Optional provider/capability-gated modules are `musi:host`, `musi:fs`, `musi:process`, `musi:time`, `musi:random`, `musi:encoding`, `musi:reflect`, `musi:probe`, `musi:package`, `musi:schema`, `musi:bytecode`, and `musi:test`. Importing an absent optional standard module is load/link missing-provider diagnostic. `known import` of optional standard module requires deterministic known-capable provider metadata and otherwise fails at compile time.
+
 ## Procedure Ownership
 
 Executable bodies belong to `proc`. Procedure has signature and exactly one implementation origin:
@@ -84,11 +88,12 @@ Reject module before execution when:
 - table indices reference missing entries;
 - declarations reference unavailable target features or unsupported core ext contracts;
 - imports/exports semantically incompatible;
+- package/module initialization dependency cycle detected;
 - body verification fails;
 - required body/VM metadata absent;
 - ext row-kind or opcode schemas required by `deps` unsupported;
 - unknown executable opcodes, semantic section kinds, or required semantic row kinds appear.
 
-## Unknowns
+## Detail gaps
 
-- Exact package/archive format for multiple modules not specified.
+- Exact package/archive format for multiple modules is not specified until distribution gate is entered.

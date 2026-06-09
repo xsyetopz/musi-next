@@ -32,13 +32,38 @@ SEAM may use generational Immix:
 - movement allowed unless layout/storage metadata says fixed/pinned;
 - old-to-young refs tracked by remembered sets via write barriers.
 
-Collector details are not ordinary SEAM bytecode syntax. SEAM bytecode specifies semantic data: exact managed-ref locations, layout metadata, safepoints, barrier obligations.
+Collector details are not ordinary SEAM bytecode syntax. SEAM bytecode specifies semantic data: exact managed-ref locations, layout metadata, safepoints, barrier obligations. GC tuning is runtime policy through `seamArguments`, not source semantics.
+
+## `seamArguments` GC and limits
+
+GC/limit parameters enter through manifest/host launch policy as `seamArguments`. Flag shape and terminology follow JVM style, with SEAM-specific Immix names only where JVM terminology has no exact term. Locked initial flags:
+
+```text
+-Xms<size>
+-Xmx<size>
+-Xss<size>
+-Xmn<size>
+-XX:NewRatio=<n>
+-XX:SurvivorRatio=<n>
+-XX:MaxGCPauseMillis=<ms>
+-XX:GCTimeRatio=<n>
+-XX:+UseIncrementalGC
+-XX:-UseIncrementalGC
+-XX:+UseImmixDefrag
+-XX:-UseImmixDefrag
+-XX:ImmixBlockSize=<size>
+-XX:ImmixLineSize=<size>
+-XX:+StressGC
+-XX:FuelMax=<count>
+```
+
+These flags affect resource limits, collector behavior, and failure timing. They do not change language semantics.
 
 ## Values and references
 
 SEAM values: scalars, aggregates, managed refs, unmanaged pointer/access values, address tokens, callables, boxes, nil sentinels where core metadata admits, core runtime values.
 
-Managed refs point to SEAM-managed objects. Layout metadata supplies fields, reference maps, size/alignment, array elem kind, tags, core representation.
+Managed refs point to SEAM-managed objects. Object layout uses compact headers plus side tables: headers stay small, while type/layout/GC metadata lives in side tables. Layout metadata supplies fields, reference maps, size/alignment, array elem kind, tags, core representation.
 
 Unmanaged pointer/access values are explicit system values. Not interchangeable with managed refs or addresses. Access load/store obey type/layout/region/capability rules and cannot bypass barriers. `Address` alone cannot load, store, or root managed objects.
 
@@ -77,7 +102,7 @@ Generational collection needs barriers when managed ref stored into location out
 - globals/static slots;
 - core-defined ref-bearing storage.
 
-SEAM bytecode store/transition ops carry barrier obligations when target layout contains managed refs. Source never calls card-mark/remembered-set APIs directly. SEAM/JIT/interpreter inserts or executes barrier.
+Barrier rules are layout-driven. SEAM bytecode store/transition ops declare storage/layout effects; barrier obligations derive from ref maps, layout metadata, and active collector policy. Source never calls card-mark/remembered-set APIs directly. SEAM/JIT/interpreter inserts or executes barrier.
 
 Raw byte/memory writes cannot update managed-ref-bearing storage in verifiable SEAM bytecode. Core checked bulk op may preserve barriers + root visibility when needed.
 
@@ -94,11 +119,10 @@ Pinning visible to SEAM, not ordinary GC-unaware source logic. Excess/long pinni
 
 ## Finalization and destructors
 
-SEAM bytecode assumes no finalization for ordinary managed values. Resource management lowers through explicit cleanup/control metadata or core runtime types. If finalization added, core SEAM must define ordering, resurrection, safepoints, moving-collector interaction.
+SEAM bytecode defines no finalization/destructor semantics for ordinary managed values. Resource management lowers through explicit cleanup/control metadata, handles, host APIs, or core runtime types. No resurrection model exists in core.
 
 ## Unknowns
 
-- Exact object header layout not specified.
-- Exact GC algorithm parameters not specified.
-- Exact write/read barrier encodings not specified.
-- Exact finalization/destructor semantics not specified.
+- Exact object header fields and side-table row schemas not specified.
+- Exact `seamArguments` units, parsing, defaults, bounds, and conflict rules not specified.
+- Exact layout-driven barrier decision table not specified.

@@ -4,6 +4,8 @@ Project evidence: `seam_bytecode_opcodes.def`.
 
 The locked core opcode registry is authoritative for core opcode ids, canonical mnemonics, operand schemas, and stack-effect schemas. `.seam` image stores numeric opcode ids; SEAM bytecode text/disassembly stores canonical mnemonics.
 
+Numeric edge behavior is visible by opcode/schema. Ordinary numeric opcodes use their locked CPU-like behavior; checked/trapping/failing variants must be separate opcode/schema choices such as `.chk`, not hidden target/type metadata modes.
+
 ## Registry rules
 
 - Opcode ids are `u16`.

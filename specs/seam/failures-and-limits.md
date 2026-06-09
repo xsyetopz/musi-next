@@ -18,7 +18,7 @@ Host-visible invocation outcome is exactly one tagged state:
 | `trapped`   | `trap` or core-defined runtime invariant violation occurred             |
 | `cancelled` | suspended computation was cancelled/closed by runtime/host protocol     |
 
-Load, verify, link, init, and resource-limit failures are classified under `failed` with phase/reason payloads. Structured failures are explicit operation/host outcomes. Traps are VM/runtime invariant violations or explicit `trap`. Host exceptions do not cross boundary as host exceptions; they become `failed` or `trapped` by ABI/host metadata.
+Load, verify, link, init, and resource-limit failures are classified under `failed` with phase/reason payloads. Reason code shape is `phase + subsystem + reason + source relation`. Structured failures are explicit operation/host outcomes. Traps are VM/runtime invariant violations or explicit `trap`. Host exceptions do not cross boundary as host exceptions; they become `failed` or `trapped` by ABI/host metadata.
 
 `halt` = any non-yielded final outcome. `returned`, `failed`, `trapped`, and `cancelled` halt.
 
@@ -43,7 +43,7 @@ Known-phase exhaustion = compile-time known-execution failure. Runtime exhaustio
 
 ## Diagnostic payload
 
-Structured failure keeps module id, procedure/body id, instruction offset or block/instruction index, opcode, relevant operand/table ref, source span when tool metadata supplies one, and reason code. Failure classification cannot require source spans.
+Structured failure keeps module id, procedure/body id, instruction offset or block/instruction index, opcode, relevant operand/table ref, source span when tool metadata supplies one, phase-tuple reason code, and boundary context when failure crosses host/resource/capability/ABI boundary. Failure classification cannot require source spans.
 
 ## Validation and failure cases
 
@@ -51,5 +51,6 @@ Load, verification, link, and init failures happen before user entry execution. 
 
 ## Unknowns
 
-- Exact reason-code enum not specified.
+- Exact phase-tuple reason code catalog not specified.
 - Exact numeric-failure to trap-kind map not specified.
+- Exact boundary-aware diagnostic code/message catalog not specified.

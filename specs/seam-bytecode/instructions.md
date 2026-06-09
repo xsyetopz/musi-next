@@ -46,7 +46,7 @@ Callee origin lives in declaration metadata: SEAM bytecode body, intrin/runtime 
 
 ## Scalar arithmetic, bitwise operations, and comparisons
 
-Arithmetic, bitwise, shift, rotate, unary numeric, and comparison ops use scalar types admitted by core numeric rules. Signed/unsigned variants are distinct integer modes. Division by zero, invalid shifts, overflow, NaN ordering, and checked-conversion failures use core trap/diagnostic behavior.
+Arithmetic, bitwise, shift, rotate, unary numeric, and comparison ops use scalar types admitted by core numeric rules. Signed/unsigned variants are distinct integer modes. Ordinary ops use locked CPU-like behavior from opcode/type schema. Checked, trapping, or failing behavior is visible in explicit opcode/schema such as `.chk`; no hidden target/type metadata mode changes an ordinary opcode.
 
 `rem` = CPU-style remainder. `.un` suffix on division, remainder, comparison = unsigned integer mode.
 
@@ -80,10 +80,10 @@ Indexed storage ops address runtime-indexed arrays/sequences. `mk.arr` consumes 
 
 Instruction schemas declare safepoint, allocation, runtime-call, and managed-ref-write behavior. Allocation, calls, dynamic calls, throws, yields, and native/foreign boundaries that can allocate/block/call back are safepoints. At safepoint, SEAM must enumerate live managed refs from verifier stack maps.
 
-Stores through `st.ref`, `st.fld`, `st.idx`, `st.elem`, `st.key`, representation transitions, and core storage ops carry write-barrier obligation when target layout can contain managed refs. Instruction does not name cards, remembered sets, or Immix internals; those are SEAM details.
+Stores through `st.ref`, `st.fld`, `st.idx`, `st.elem`, `st.key`, representation transitions, and core storage ops carry write-barrier obligation when target layout can contain managed refs. Barrier obligation is layout-driven from ref maps, layout metadata, opcode storage effects, and active collector policy. Instruction does not name cards, remembered sets, or Immix internals; those are SEAM details.
 
-## Unknowns
+## Detail gaps
 
-- Exact trap taxonomy not fully specified.
-- Exact numeric overflow + floating exception behavior not fully specified.
-- Exact access/region permission metadata not fully specified.
+- Exact trap taxonomy is not fully specified.
+- Exact numeric overflow + floating exception behavior map is not fully specified.
+- Exact access/region permission metadata is not fully specified.

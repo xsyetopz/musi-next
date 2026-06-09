@@ -12,7 +12,7 @@ External sources:
 
 ## Inputs
 
-Verifier consumes decoded SEAM bytecode module, active target metadata, capability metadata, opcode schemas, type/layout tables, sig tables, procedure declarations, body-local metadata tables, and import/export declarations. It does not consume Musi source and does not depend on optional tool metadata.
+Verifier consumes decoded SEAM bytecode module, active target metadata, capability metadata, opcode schemas, type/layout tables, sig tables, procedure declarations, body-local metadata tables, import/export declarations, and the generated compatibility relation. It does not consume Musi source and does not depend on optional tool metadata.
 
 ## Acceptance order
 
@@ -26,7 +26,7 @@ Verifier consumes decoded SEAM bytecode module, active target metadata, capabili
 8. Verify types, layouts, signatures, globals, constants, imports, exports, procedure declarations.
 9. Decode each body with active opcode schema set.
 10. Verify body-local metadata tables before referenced instructions.
-11. Verify each instruction operand + stack effect.
+11. Verify each instruction operand + stack effect using the generated compatibility relation.
 12. Verify control-flow joins + terminal edges.
 13. Derive safepoints + live managed-reference maps for stack, args, locals, envs, globals.
 14. Verify managed-reference writes carry barrier obligations.
@@ -70,9 +70,13 @@ Verifier classifies every stack, arg, local, env, global, and heap field as mana
 
 Safepoints: allocation, ordinary/dynamic calls, throws, yields, native/foreign boundaries that can allocate/block/call back, and any opcode schema-declared safepoint. SEAM may add safepoints only if it can derive equivalent live-ref maps.
 
-Stores into ref-bearing heap fields, arrays, boxes, globals, or other ref-bearing locations require write barrier. Raw memory ops cannot write managed-ref fields unless core checked op preserves barriers + root visibility.
+Stores into ref-bearing heap fields, arrays, boxes, globals, or other ref-bearing locations require write barrier. Barrier obligations are layout-driven: they derive from ref maps, layout metadata, storage effects declared by opcode schema, and active collector policy. Raw memory ops cannot write managed-ref fields unless core checked op preserves barriers + root visibility.
 
-## Unknowns
+## Diagnostics
 
-- Exact compatibility edge schemas not fully specified.
-- Exact diagnostic codes/messages for verifier failures not specified here.
+Verifier diagnostics use stable codes/kinds plus subject-first full messages, labels, and real hints. Diagnostics include module/proc/body context and exact offending opcode, operand, table ref, stack value, metadata row, or control edge when known.
+
+## Detail gaps
+
+- Exact generated compatibility relation entries are not fully specified.
+- Exact verifier diagnostic code/message catalog is not specified here.

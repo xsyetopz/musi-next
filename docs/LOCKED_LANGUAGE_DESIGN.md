@@ -834,16 +834,20 @@ let util := import "./util";
 let core := import "musi:core";
 ```
 
-Source package canonical format is `musi.json` plus `.ms` files. `musi.json` is close to `deno.json`: it owns package metadata, `imports`, `exports`, dependencies, workspaces, tasks, and compiler/tool policy.
+Source package canonical format is loose graph: `musi.json` plus `.ms` and `.seam` files. `musi.json` is close to `deno.json`: it owns package metadata, `imports`, `exports`, dependencies, workspaces, tasks, and compiler/tool policy.
 
 Specifier rules:
 
 - Relative/absolute string specifiers resolve as paths under package/workspace policy.
 - Bare specifiers and package names resolve through manifest `imports`/`dependencies`.
 - `musi:` is reserved like `node:`/`bun:`. User packages, import maps, and dependency names cannot shadow `musi:`.
-- Native/compiler modules use `musi:` prefixes like `musi:core`, `musi:ffi`, `musi:rt`; they may expose `.ms` interfaces; internals need not be Musi.
+- Native/compiler modules use reserved `musi:` prefixes. Required native modules: `musi:core`, `musi:rt`, `musi:ffi`, `musi:text`. Optional provider/capability-gated modules: `musi:host`, `musi:fs`, `musi:process`, `musi:time`, `musi:random`, `musi:encoding`, `musi:reflect`, `musi:probe`, `musi:package`, `musi:schema`, `musi:bytecode`, `musi:test`. They may expose `.ms` interfaces; internals need not be Musi.
+- Importing an absent optional `musi:` module is a load/link missing-provider diagnostic.
+- `known import` of optional module requires deterministic known-capable provider metadata; absent/nondeterministic provider is compile-time diagnostic.
 - Extensionless imports are allowed or rejected by first-class compiler/linter policy.
 - If extensionless imports are enabled, `./foo` first resolves to `./foo.ms`; directory fallback to `./foo/index.ms` is only a default fallback when no direct file match exists.
+
+Package/module initialization cycles are load/link diagnostics. No lazy cycle breaking and no half-initialized SCC ordering.
 
 Visibility: `export` only. Exported binding visible; non-export private by absence. No `public`, `private`, `protected`, `internal`, `hidden`. `opaque` controls abstraction, not visibility. Modules are records; exports define record surface. Manifest `exports` controls package public surface; source `export` controls module public surface.
 
@@ -985,9 +989,11 @@ tool   optional non-semantic source/tool metadata
 
 Each section payload: row-kind directory, row offset table, packed row bytes. Row-kind entry gives kind id, count, offset ranges, payload range, schema/core tag, required/skippable policy. Rows schema-packed; no field names. Unsupported required rows reject before deep decode; skippable rows skip without execution change.
 
-Required VM metadata affects verify/load/link/layout/capability/target/native/foreign/GC/execution. Optional tool metadata preserves source shape, symbols, grouping, spans, docs, spelling, decompile hints. Executable SEAM bytecode runs without optional tool metadata.
+`.seam` row, type, and metadata schemas use one declarative generated schema source. It drives docs, encoder/decoder tables, verifier-facing schema data, and conformance fixtures. Type/verifier compatibility uses one generated declarative relation shared by verifier rules, docs, and tests.
 
-Package/container transport is outside core `.seam`: compression, checksums, signatures, resources, and multiple images are package/archive responsibilities.
+Required VM metadata affects verify/load/link/layout/capability/target/native/foreign/GC/execution. Optional tool metadata uses typed non-semantic registry rows and preserves source shape, symbols, grouping, spans, docs, spelling, probe data, decompile hints. Executable SEAM bytecode runs without optional tool metadata.
+
+Package/container transport is outside core `.seam`: compression, checksums, signatures, resources, and multiple images are package/archive responsibilities. Container/archive spec is mandatory before bundled distribution, signed packages, resource bundles, plugin archives, or streaming package loading, and must preserve loose package graph behavior.
 
 ## 17. SEAM bytecode text/disassembly syntax and opcode registry
 
@@ -1050,7 +1056,7 @@ Text/disassembly syntax rules:
 - executable code appears directly inside `proc`; no separate body form exists.
 - inside procedure bodies, labels are `name:` and instructions are mnemonic-first stack-effect lines.
 - operands are never fused into mnemonic spelling.
-- one executable instruction appears per line in canonical body text, and closing parentheses follow a body line terminator.
+- readable canonical formatter only: stable indentation/blank-line rules, one executable instruction per line, no compact canonical mode; closing parentheses follow a body line terminator.
 - no authored `.maxstack`; verifier computes stack bounds, frame requirements, safepoint maps, and live managed-reference maps.
 - metadata uses `(meta name positional (field := value))`; no `@` metadata syntax, no `=`, and no raw metadata blob normal form.
 - primitive types are bare type names; managed and unmanaged VM references use `(ref T)` and `(ptr T)`.
@@ -1061,8 +1067,11 @@ GC/GenImmix text-level rules:
 - Musi source `Access[T]` and `Access[mut T]` lower to explicit SEAM bytecode pointer/reference operations plus required region/layout/capability metadata; source `Address` is not a GC root and cannot be dereferenced by itself.
 - layout metadata must identify reference fields/elements for tracing and barriers.
 - allocation, calls, dynamic calls, throws, yields, and core runtime/native operations are safepoints.
-- stores into reference-bearing heap/global/array/boxed storage have write-barrier obligations under generational collection.
+- stores into reference-bearing heap/global/array/boxed storage have layout-driven write-barrier obligations under generational collection.
 - Immix lines, blocks, cards, nurseries, and remembered sets are SEAM implementation details, not ordinary SEAM bytecode syntax.
+- object layout uses compact headers plus side tables.
+- GC parameters are manifest/host policy through `seamArguments`, using JVM-style flags: `-Xms`, `-Xmx`, `-Xss`, `-Xmn`, `-XX:NewRatio`, `-XX:SurvivorRatio`, `-XX:MaxGCPauseMillis`, `-XX:GCTimeRatio`, `-XX:+/-UseIncrementalGC`, `-XX:+/-UseImmixDefrag`, `-XX:ImmixBlockSize`, `-XX:ImmixLineSize`, `-XX:+StressGC`, `-XX:FuelMax`.
+- no core finalizers; ordinary managed values have no destructor/finalization/resurrection semantics.
 - Musi `fixed` lowers to SEAM bytecode metadata/operations that constrain movement or pin storage for a defined lifetime.
 - Musi `unmanaged` lowers to SEAM bytecode/runtime metadata that excludes the value from managed tracing, movement, and reclamation unless explicit core metadata says otherwise.
 
@@ -1282,18 +1291,20 @@ Checked/locked:
 - [x] Safety: no unsafe wrapper; capabilities/metadata/types; access/address types and operations; pinning via `fixed`; unmanaged storage via `unmanaged`; FFI rules; dangerous behavior errors not warnings.
 - [x] Lexical literals: numeric separators; base prefixes; literal suffixes; triple-quoted strings; escaped identifiers; reserved interpolation direction; no automatic multiline-string indentation trimming.
 - [x] Attributes: universal attribute call model; UALO payloads; `@target`; tooling namespace rule; compiler-affecting unknown attribute diagnostics.
-- [x] Native modules: reserved `musi:` import prefix; native/compiler-provided modules; optional `.ms` interface surfaces; explicit host-provided graph nodes.
+- [x] Native modules: required `musi:core`, `musi:rt`, `musi:ffi`, `musi:text`; optional provider/capability-gated `musi:host`, `musi:fs`, `musi:process`, `musi:time`, `musi:random`, `musi:encoding`, `musi:reflect`, `musi:probe`, `musi:package`, `musi:schema`, `musi:bytecode`, `musi:test`; optional imports fail at load/link when provider absent; `known import` requires deterministic known provider.
 - [x] SEAM bytecode identity: SEAM executable bytecode; not Musi-only and not disposable compiler IR.
 - [x] SEAM bytecode artifacts: `.seam` compiled bytecode image; SEAM bytecode text/disassembly is a tool format; no second bytecode artifact.
 - [x] `.seam` image header: exactly 40 bytes; `SEAM` magic, format tuple, section-directory tuple, file size; semantic contract splits between mandatory `asm` identity and `deps` dependency rows.
-- [x] SEAM bytecode module structure: `.seam` image; text/disassembly module form; compact section families `names`, `asm`, `deps`, `defs`, `code`, `data`, `meta`, `tool`; required VM metadata; optional tool/source metadata.
-- [x] SEAM bytecode verification placement: basic-block stack-effect bodies; typed edge verification; verifier-computed stack bounds; no authored `.maxstack`.
-- [x] SEAM bytecode text/disassembly syntax: WAT/Lisp-like `(module ...)` root; CIL-like assembly/reference roles; symbolic names; structural forms; `(meta name ... (field := value))`; Forth/RPN-like procedure instruction streams; labels; mnemonic-first instructions; no `->`.
+- [x] SEAM bytecode module structure: `.seam` image; text/disassembly module form; compact section families `names`, `asm`, `deps`, `defs`, `code`, `data`, `meta`, `tool`; required VM metadata; optional typed non-semantic tool/source metadata.
+- [x] SEAM bytecode verification placement: region/edge metadata first; basic-block stack-effect bodies; typed edge verification; verifier-computed stack bounds; no authored `.maxstack`.
+- [x] SEAM bytecode text/disassembly syntax: WAT/Lisp-like `(module ...)` root; CIL-like assembly/reference roles; symbolic names; structural forms; `(meta name ... (field := value))`; Forth/RPN-like procedure instruction streams; labels; mnemonic-first instructions; one-instruction-per-line readable canonical formatter; no `->`.
 - [x] SEAM bytecode opcode registry: u16 sparse family ranges; stable ids; naming law; locked core opcode map in `seam_bytecode_opcodes.def`; VM-oriented semantics.
 - [x] `.seam` image operand encodings: primitive encodings; varu indices; opcode-schema-driven instruction decode.
 - [x] SEAM bytecode per-opcode schemas: operand schema and stack-effect schema for every locked core opcode in `seam_bytecode_opcodes.def`.
 - [x] SEAM bytecode text/disassembly grammar: DRY W3C XML 1.0-style EBNF for text/disassembly, module root, `asm` declarations, symbols, metadata args, structural forms, procedure instruction streams, and instruction lines.
+- [x] SEAM runtime memory policy: compact object headers plus side tables; JVM-style `seamArguments`; layout-driven barriers; no core finalizers/resurrection.
 
 Still open:
 
 - [ ] SEAM bytecode implementation validation against image loader, assembler/disassembler, verifier tests
+- [ ] exact generated schema source, compatibility relation entries, lowering fixture corpus, host API signatures, and `seamArguments` defaults

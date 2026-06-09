@@ -17,7 +17,7 @@ SEAM owns:
 - construct module instances + runtime frames;
 - execute stack-effect instructions;
 - enforce deterministic known-phase limits;
-- manage memory, refs, capabilities, dynamic protocols, suspension, cleanup, failures.
+- manage memory, refs, typed capability/resource graph, dynamic protocols, suspension, cleanup, failures.
 
 ## Module lifecycle
 
@@ -27,9 +27,10 @@ SEAM owns:
 4. Decode `asm` and `deps`, then logical tables.
 5. Verify opcode schemas, operands, stack effects, metadata refs, control edges.
 6. Link imports/exports/native/foreign declarations under active target, capability, ABI metadata.
-7. Initialize dependencies before dependents; manifest declaration order breaks otherwise equal ties.
-8. Init module globals + required runtime structures.
-9. Execute entry points or callable exports.
+7. Reject dependency/init cycles with load/link diagnostic.
+8. Initialize dependencies before dependents; manifest declaration order breaks otherwise equal ties.
+9. Init module globals + required runtime structures.
+10. Execute entry points or callable exports.
 
 Load/verify/link failure means no execution.
 
@@ -41,7 +42,7 @@ Calls create frames from verified metadata. Returns must match signature outputs
 
 ## Known-phase execution
 
-Musi known execution runs verified SEAM bytecode under SEAM, not source-tree evaluator. Deterministic limits. No ambient time/random/process/env/filesystem/network/IO unless explicit deterministic known import or declared `musi:rt` intrinsic supplies it.
+Musi known execution runs verified SEAM bytecode under SEAM, not source-tree evaluator. Deterministic limits. No ambient time/random/process/env/filesystem/network/IO unless explicit deterministic known import or declared `musi:rt` intrinsic supplies it. Optional known imports require deterministic known-capable provider metadata.
 
 Fuel, step, recursion, and memory limits are enforcement. Limit exhaustion = known-execution failure, not fallback to runtime.
 
@@ -49,7 +50,7 @@ Fuel, step, recursion, and memory limits are enforcement. Limit exhaustion = kno
 
 Import/export compatibility checks signature, type, layout, target, capability, ABI metadata. Foreign/native calls mediated by declarations + ABI metadata. Dangerous/unrepresentable ABI behavior rejected by compiler/runtime validation, not warning.
 
-SEAM has one core C-compatible FFI bridge. SEAM bytecode calls native via import metadata. Native calls SEAM bytecode via exported callable tables or host embedding handles. Managed values cross as opaque handles unless core ABI metadata marks represented, fixed, or copied. Native callbacks enter via SEAM trampolines so frames, roots, safepoints, and failures stay valid. Native calls are failure-capable unless metadata proves otherwise; host exceptions do not cross the SEAM boundary.
+SEAM has one host-ABI-capable FFI bridge. It includes C ABI plus handles, callbacks through exported callable handles, resources, async/yield/resumable interaction, cancellation, failure outcomes, and representable memory access metadata. SEAM bytecode calls native via import metadata. Native calls SEAM bytecode via exported callable tables or host embedding handles. Managed values cross as opaque handles unless core ABI metadata marks represented, fixed, or copied. Native callbacks enter via SEAM trampolines so frames, roots, safepoints, and failures stay valid. Native calls are failure-capable unless metadata proves otherwise; host exceptions do not cross the SEAM boundary.
 
 ## Control edges
 
@@ -59,9 +60,14 @@ SEAM executes verified branch, return, exception, cleanup, leave, yield edges us
 
 Runtime failures: traps, rejected casts, checked conversions, failed capabilities, invalid dynamic protocol, memory violations, bounds, nil misuse where disallowed, unhandled failures, failed linkage, deterministic-limit exhaustion, cancellation.
 
-Failures stay structured runtime/diagnostic events. SEAM never turns failure into host UB. Host-visible invocation outcomes are tagged: `returned`, `yielded`, `failed`, `trapped`, `cancelled`.
+Failures stay structured runtime/diagnostic events. SEAM never turns failure into host UB. Host-visible invocation outcomes are tagged: `returned`, `yielded`, `failed`, `trapped`, `cancelled` and represented by canonical tagged result structs. Host bindings may adapt shape but preserve exact tags and payload fields.
+
+## Host embedding API
+
+Baseline host embedding API is capability-aware. It includes load/link/call/resume/cancel/close/outcome plus module, resource, and capability-graph operations. Reflective frame/failure/package inspection belongs behind authorized `musi:probe` and tooling APIs, not baseline host API.
 
 ## Unknowns
 
-- Exact frame object layout not specified.
-- Exact host embedding API shape beyond tagged outcomes and opaque resumable handles not specified.
+- Exact host API function signatures not specified.
+- Exact canonical result struct field layout not specified.
+- Exact cyclic-init diagnostic wording/code not specified.

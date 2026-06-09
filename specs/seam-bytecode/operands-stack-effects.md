@@ -75,8 +75,8 @@ Verification fails when instruction consumes unavailable values, stack values ha
 
 ## Type compatibility
 
-Default compatibility = exact type equality after aliases. Core metadata may declare explicit widening, representation, nil-admission, callable, box/unbox, or dynamic compatibility edges. Verifier must not invent compatibility from source names.
+Default compatibility = exact type equality after aliases. Core metadata may declare explicit widening, representation, nil-admission, callable, box/unbox, or dynamic compatibility edges. Type/verifier compatibility uses one generated declarative relation that drives verifier behavior, docs, and conformance tests. Verifier must not invent compatibility from source names.
 
-## Unknowns
+## Detail gaps
 
-- Exact compatibility edge schema not fully specified.
+- Exact generated compatibility relation entries and edge payload schemas are not fully specified.

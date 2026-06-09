@@ -17,17 +17,19 @@ Musi compilation emits `.seam` bytecode image with asm metadata, imports/exports
 
 Any Musi construct affecting runtime representation, verification, linking, FFI, capabilities, dynamic behavior, target availability, known execution, GC roots, or write barriers must lower into SEAM bytecode semantic declarations or required metadata.
 
+Every accepted Musi grammar form needs a normative lowering recipe and pass/fail fixture corpus. Lowering-related `.seam` row/type/metadata schemas come from the generated schema source. Type and control-edge compatibility use the generated declarative relation.
+
 ## Names and source relationship
 
 Musi names lower to exact SEAM bytecode symbols. No case-fold, dash-convert, Unicode-normalize, abbreviate, or rewrite. Escaped source name stores same logical symbol; SEAM bytecode may use its own escaped spelling in text.
 
-Tool metadata may preserve grouping, import/export shape, manifest/package graph identity, comments/docs, spans, operator spelling, pattern spelling, decompilation hints. Tool metadata cannot affect SEAM execution.
+Tool metadata uses typed non-semantic registry. It may preserve grouping, import/export shape, manifest/package graph identity, comments/docs, spans, operator spelling, pattern spelling, decompilation hints, debugger/probe data, and decompiler hints. Tool metadata cannot affect SEAM execution.
 
 ## Known phase
 
 `known` expressions, bindings, params, and types lower to SEAM bytecode and execute under deterministic SEAM known-phase limits. Compiler must not evaluate known code by walking Musi ASTs.
 
-Known execution has no ambient time/random/process/env/IO/filesystem/network unless explicit deterministic known import or declared `musi:rt` intrinsic provides it.
+Known execution has no ambient time/random/process/env/IO/filesystem/network unless explicit deterministic known import or declared `musi:rt` intrinsic provides it. `known import` of optional standard modules requires deterministic known-capable provider metadata.
 
 ## Target filtering
 
@@ -43,7 +45,7 @@ If extensionless imports are enabled by policy, `./foo` resolves to `./foo.ms`; 
 
 Source `export` lowers to module export metadata. Manifest `exports` lowers to package/public-surface metadata and does not replace source `export`. Host-provided modules lower as explicit graph nodes with provider and capability metadata.
 
-Package/container transport is outside core `.seam`; `.seam` remains compiled bytecode image.
+Package/container transport is outside core `.seam`; `.seam` remains compiled bytecode image. Container/archive spec is required only at distribution gate: bundled distribution, signed packages, resource bundles, plugin archives, or streaming package loading, and must preserve loose `musi.json` + `.ms` + `.seam` graph behavior.
 
 ## Representation, GC, and FFI
 
@@ -51,7 +53,7 @@ Package/container transport is outside core `.seam`; `.seam` remains compiled by
 
 Managed refs lower to `(ref T)`. Source `Access[T]` / `Access[mut T]` lower to explicit SEAM bytecode pointer/ref ops plus layout, region, permission, capability metadata. SEAM bytecode still uses `(ptr T)` for VM unmanaged pointer/access values. `Address` lowers only as address token; cannot load/store/root managed values without explicit region/access conversion.
 
-ABI boundary types must be representable. `Any`, opaque/erased values, closures, shapes, `Maybe`, `Expect`, GC refs, and text values are not silently ABI-compatible unless core ABI metadata defines representation. Native resources cross as opaque handles by default; typed `Access[T]`/`Address` require ABI metadata declaring representable memory access. Native calls are failure-capable unless metadata proves otherwise.
+ABI boundary types must be representable. Host-ABI descriptors include C ABI plus handles, callbacks through exported callable handles, resources, async/yield/resumable interaction, cancellation, failure outcomes, and representable memory access metadata. `Any`, opaque/erased values, closures, shapes, `Maybe`, `Expect`, GC refs, and text values are not silently ABI-compatible unless core ABI metadata defines representation. Native resources cross as opaque handles by default; typed `Access[T]`/`Address` require ABI metadata declaring representable memory access. Native calls are failure-capable unless metadata proves otherwise.
 
 ## Fixed storage and access
 
@@ -63,7 +65,7 @@ Access types lower to explicit SEAM bytecode pointer/ref ops + layout metadata. 
 
 ## Shapes, witnesses, and dynamic behavior
 
-Shapes and witness conformance lower to metadata/evidence referenced by SEAM bytecode dynamic/capability ops. `Any` does not imply implicit dynamic lookup. Dynamic ops require explicit metadata + evidence. Dynamic calls carry callee, UALO-shaped arg pack, expected signature, result contract, and structured failure. Keyed storage is limited to declared key domains.
+Shapes and witness conformance lower to metadata/evidence referenced by SEAM bytecode dynamic/capability ops. `Any` does not imply implicit dynamic lookup. Dynamic ops require explicit metadata + evidence. Dynamic calls carry callee, typed UALO argpack record, expected signature, result contract, and structured failure. Keyed storage is limited to typed key schemas. Capability/resource graph lowers as typed non-forgeable nodes and typed authority edges.
 
 ## No-allocation contract
 
@@ -71,8 +73,9 @@ Shapes and witness conformance lower to metadata/evidence referenced by SEAM byt
 
 `@noalloc` is allocation contract, not GC-off.
 
-## Unknowns
+## Detail gaps
 
-- Exact lowering algorithms for every Musi expression form not fully specified here.
-- Exact source-map/tool-metadata payloads not specified.
-- Exact package/archive/container format beyond `.seam` images not specified.
+- Exact lowering recipe contents for every Musi expression form not fully specified here.
+- Exact lowering pass/fail fixture corpus not specified.
+- Exact typed tool metadata schemas not specified.
+- Exact host ABI descriptor fields and validation rules not specified.

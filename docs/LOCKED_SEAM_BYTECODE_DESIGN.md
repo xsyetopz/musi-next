@@ -37,9 +37,11 @@ Unknown semantic section families, required row kinds, metadata schemas, or opco
 
 Each section payload starts with row-kind directory, then row offset table, then packed row bytes. Row-kind entry states row kind id, row count, offset-table range, payload range, schema id/core schema tag, required/skippable policy. Keeps sections compact; avoids giant universal record.
 
-Tool metadata optional. It may preserve source spans, names, comments, docs, import/export shape, grouping, decompilation hints. It cannot affect execution, verification, linking, runtime behavior.
+`.seam` row, type, and metadata schemas use one declarative generated schema source. It drives docs, encoder/decoder tables, verification-facing schema data, and conformance fixtures.
 
-Package/archive/container formats may wrap `.seam` images. Compression, checksums, signatures, resources, and multi-image bundling live outside the core `.seam` image.
+Tool metadata optional. It uses a typed non-semantic registry and may preserve source spans, names, comments, docs, import/export shape, grouping, spelling, probe data, and decompilation hints. It cannot affect execution, verification, linking, runtime behavior.
+
+Package/archive/container formats may wrap `.seam` images. Compression, checksums, signatures, resources, and multi-image bundling live outside the core `.seam` image. Container/archive spec is mandatory before Musi claims bundled distribution, signed packages, resource bundles, plugin archives, or streaming package loading. Future containers must preserve the loose package graph behavior.
 
 Assembly/module/package names are canonical + case-sensitive. Tools must not case-fold, Unicode-normalize, dash-convert, or rewrite logical names.
 
@@ -54,11 +56,11 @@ SEAM bytecode text/disassembly combines:
 
 Readable assembly form, exact VM behavior. `.seam` itself remains the compiled bytecode image.
 
-Every opcode has stable numeric id, mnemonic, immediate operand schema, stack-effect schema, verification behavior, runtime behavior.
+Every opcode has stable numeric id, mnemonic, immediate operand schema, stack-effect schema, verification behavior, runtime behavior. Numeric edge behavior is visible by opcode/schema: ordinary ops use locked CPU-like behavior and checked/trapping/failing variants are explicit schema/opcode choices such as `.chk`.
 
 Verifier tracks stack height + value types at every instruction. Procedure body declares signature. `ret` must match outputs.
 
-Branch targets have incoming stack shape. All incoming edges to same target must match. No hidden coercion at joins; conversion must appear in bytecode.
+Branch targets have incoming stack shape. All incoming edges to same target must match. No hidden coercion at joins; conversion must appear in bytecode. Type/verifier compatibility uses one generated declarative relation shared by verifier rules, docs, and tests.
 
 Core value forms: scalars, products, sums, indexed storage/arrays, callable values, boxes, managed refs, unmanaged access values, address tokens.
 
@@ -91,9 +93,13 @@ Args/locals/env/captures are typed slots. Operand stack typed by verifier state,
 
 SEAM derives GC roots from verified stack maps. Roots include managed refs on operand stack, frame slots, globals, active exception state, yield state, runtime handles.
 
+Object layout uses compact headers plus side tables. Headers stay small; type/layout/GC metadata lives in side tables.
+
+GC parameters are manifest/host policy through `seamArguments`, using JVM-style flag shape and terminology with SEAM-specific Immix names where JVM has no term: `-Xms`, `-Xmx`, `-Xss`, `-Xmn`, `-XX:NewRatio`, `-XX:SurvivorRatio`, `-XX:MaxGCPauseMillis`, `-XX:GCTimeRatio`, `-XX:+UseIncrementalGC`, `-XX:-UseIncrementalGC`, `-XX:+UseImmixDefrag`, `-XX:-UseImmixDefrag`, `-XX:ImmixBlockSize`, `-XX:ImmixLineSize`, `-XX:+StressGC`, `-XX:FuelMax`.
+
 Safepoints: allocation, calls, dynamic calls, throws, yields, native/foreign boundaries that can allocate/block/call back.
 
-Managed-ref writes into heap/global/array/boxed/ref-bearing storage must execute write barrier. Raw byte writes cannot smuggle managed refs.
+Managed-ref writes into heap/global/array/boxed/ref-bearing storage must execute write barrier. Barrier rules are layout-driven from ref maps, layout metadata, opcode storage effects, and active collector policy. Source never calls barriers. Raw byte writes cannot smuggle managed refs.
 
 `fixed` = stable address/access path required. SEAM may pin, use nonmoving storage, copy to unmanaged storage, or reject. `fixed` not GC-off. `unmanaged` = representation outside managed tracing, movement, reclamation unless core metadata says otherwise.
 
@@ -103,13 +109,15 @@ Suspended computations are opaque resumable handles to hosts. Host API exposes r
 
 Nested defer cleanup order is lexical LIFO for normal return, `leave`, `cycle`, cancellation, and close. Trap/abort cleanup remains separately specified.
 
+No core finalizers. Ordinary managed values have no finalization/destructor semantics and no resurrection model. Resource cleanup is explicit through `defer`, cleanup regions, handles, and host APIs.
+
 ## 5. Musi, Packages, FFI, Dynamic Semantics
 
 Musi remains flagship source language. Human-first, infix, expression-shaped.
 
 Musi lowers directly to `.seam`. Musi docs explain stack effects through SEAM bytecode text/disassembly + verifier behavior, not by forcing Forth-like source.
 
-Source package canonical format: `musi.json` + `.ms` files. Import syntax uses ESM-like string paths: `import "path/to/file"`. `musi.json` owns package metadata, `imports`, `exports`, dependencies, and policy knobs.
+Source package canonical format is loose graph: `musi.json` + `.ms` + `.seam` files. Import syntax uses ESM-like string paths: `import "path/to/file"`. `musi.json` owns package metadata, `imports`, `exports`, dependencies, and policy knobs.
 
 Bare specifiers/package names resolve through manifest `imports`/`dependencies`. `musi:` is reserved like `node:`/`bun:`; user packages and import maps cannot shadow it. Source `export` controls module surface; manifest `exports` controls package public surface.
 
@@ -117,7 +125,13 @@ Extensionless imports are policy/lint controlled. If enabled, `./foo` resolves t
 
 `.seam` is build/cache/distribution artifact. Package/container transport outside core SEAM bytecode owns compression, checksums, signatures, resources, and multiple images.
 
-Host-provided modules participate in the package graph as explicit nodes with provider and capability metadata.
+Host-provided modules participate in the package graph as explicit nodes with provider and capability metadata. Importing an absent optional standard module is load/link missing-provider diagnostic. `known import` of an optional module requires provider metadata declaring deterministic known capability; otherwise compile-time diagnostic.
+
+Required native modules: `musi:core`, `musi:rt`, `musi:ffi`, `musi:text`.
+
+Optional provider/capability-gated modules: `musi:host`, `musi:fs`, `musi:process`, `musi:time`, `musi:random`, `musi:encoding`, `musi:reflect`, `musi:probe`, `musi:package`, `musi:schema`, `musi:bytecode`, `musi:test`.
+
+Package/module initialization cycles reject with load/link diagnostic. No lazy cycle breaking and no half-initialized SCC ordering.
 
 Musi low-level memory names: `Address`, `Region`, `Access[T]`, `Access[mut T]`. `MutAccess[T]` and `OpaqueAccess[T]` are source DRY aliases only. No source `Ptr`/`Pointer`; SEAM bytecode may still use VM `(ptr T)` and `Ptr[T]` notation.
 
@@ -135,9 +149,9 @@ export let foo(value : CInt) : CInt := value;
 
 Callbacks from host into Musi are exported Musi functions passed by symbol/handle through host embedding API; no callback syntax. Native resources crossing FFI use opaque handles by default; typed `Access[T]`/`Address` only when ABI metadata declares representable memory access. Native calls are failure-capable unless metadata proves otherwise.
 
-Musi dynamic features lower to bounded core SEAM bytecode dynamic mechanisms. Dynamic calls must carry callee, UALO-shaped arg pack, expected signature, result contract, structured failure. Keyed storage is limited to declared key domains. Capability checks define evidence semantics.
+Musi dynamic features lower to bounded core SEAM bytecode dynamic mechanisms. Dynamic calls must carry callee, typed UALO argpack record, expected signature, result contract, structured failure. Keyed storage is limited to typed key schemas. Capability checks define evidence semantics.
 
-Capabilities are first-class non-forgeable runtime values plus metadata requirements. Capability requirements appear in SEAM bytecode/module metadata, not new Musi syntax for now. Host resource handles are values protected by capabilities; identity stays separate from authority.
+Capabilities are first-class non-forgeable runtime values plus metadata requirements. Capability/resource graph uses typed nodes and typed authority edges with opaque stable identity. Nodes include provider, module, resource, capability, and handle metadata; graph inspection requires authority. Capability requirements appear in SEAM bytecode/module metadata, not new Musi syntax for now. Host resource handles are values protected by capabilities; identity stays separate from authority.
 
 `Any` does not auto-enable duck lookup. `Address` is non-authoritative by itself; load/store/permission comes from `Region`/`Access`/capability metadata.
 
@@ -153,7 +167,7 @@ Tool metadata optional + non-semantic. May preserve Musi source spans, comments,
 
 Known-phase execution deterministic. No ambient time/random/process/env/filesystem/network/IO unless explicit deterministic import provides it.
 
-Standard native modules provide filesystem, process, time, randomness, text, encoding, system integration. Library/native surface, not hidden SEAM bytecode semantics.
+Standard native modules are explicit `musi:` imports. Required bootstrap: `musi:core`, `musi:rt`, `musi:ffi`, `musi:text`. Optional standard modules are provider/capability-gated: `musi:host`, `musi:fs`, `musi:process`, `musi:time`, `musi:random`, `musi:encoding`, `musi:reflect`, `musi:probe`, `musi:package`, `musi:schema`, `musi:bytecode`, `musi:test`. Library/native surface, not hidden SEAM bytecode semantics.
 
 ## 6. Gap Resolution Policy
 
@@ -169,15 +183,16 @@ No executable-semantics dialect bucket.
 Core gaps needing detail:
 
 - full verifier rule tables
-- branch join compatibility rules
-- dynamic call, keyed storage, capability schemas
-- trap/failure reason enum
-- frame/object layout contracts
-- GC barrier + safepoint rule tables
-- host embedding API detail
-- native/foreign ABI descriptors
-- package/archive/container format beyond loose `musi.json` + `.ms` + `.seam`
-- Musi-to-SEAM-bytecode lowering patterns
-- tool metadata payloads for source maps + decompilation
+- generated branch join/type compatibility relation entries
+- exact generated row/type/schema contents
+- exact typed capability graph node/edge schemas
+- exact typed argpack and key-schema encodings
+- exact phase-tuple reason code catalog
+- exact host embedding API signatures and canonical result struct fields
+- exact native/foreign host-ABI descriptor fields
+- exact `seamArguments` defaults/ranges/conflict rules
+- exact package/archive/container format after distribution gate
+- exact Musi-to-SEAM-bytecode lowering recipes and fixtures
+- exact typed tool metadata schemas
 
 Detail gaps only, not platform identity gaps. Fold into owning specs.
