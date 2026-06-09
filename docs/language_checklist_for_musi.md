@@ -314,6 +314,8 @@ Source advice: `docs/advice_for_designer_of_my_own_programming_language.md`.
 
 Purpose: one place to know when Musi spec is fully locked. `[x]` = locked in docs/specs/grammar. `[~]` = direction locked, exact rules/evidence missing. `[?]` = still needs decision or proof.
 
+USER selection gate: `docs/musi_full_spec_solution_selection.md` lists A/B/C long-term closure paths plus exact current-unknown coverage. Until one option is checked there, remaining `[~]` gaps stay open.
+
 Spec gates:
 
 - [x] Simplicity
