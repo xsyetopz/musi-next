@@ -1,66 +1,66 @@
 # SEAM runtime and execution
 
-SEAM is the Stack Effect Abstract Machine: the VM/runtime that loads, verifies, links, and executes SEIL modules. SEAM is not Musi source syntax, SEIL text syntax, or the SEAM binary image format itself.
+SEAM = Stack Effect Abstract Machine. Loads, verifies, links, executes SEIL modules. Not Musi syntax, not SEIL text syntax, not binary image format.
 
 Project evidence: `LOCKED_LANGUAGE_DESIGN.md` sections 16-18, known-phase notes, opcode semantics, `docs/language_checklist_for_musi.md`.
 
-References: WebAsm execution separates store, module instances, frames, and traps from validation: <https://webassembly.github.io/spec/core/exec/index.html>. The JVM specifies runtime data areas for frames and heap storage: <https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-2.html#jvms-2.5>.
+References: WebAsm separates store/module instances/frames/traps from validation: <https://webassembly.github.io/spec/core/exec/index.html>. JVM defines runtime frames/heap areas: <https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-2.html#jvms-2.5>.
 
 ## Responsibilities
 
 SEAM owns:
 
-- loading `.seil` modules;
-- decoding and validating section/table data;
-- verifying SEIL bodies;
-- resolving imports, exports, native bindings, and foreign bindings;
-- constructing module instances and runtime frames;
-- executing stack-effect instructions;
-- enforcing deterministic known-phase limits;
-- managing memory, references, capabilities, dynamic protocols, suspension, cleanup, and failure channels.
+- load `.seil` modules;
+- decode/validate section + table data;
+- verify SEIL bodies;
+- resolve imports, exports, native bindings, foreign bindings;
+- construct module instances + runtime frames;
+- execute stack-effect instructions;
+- enforce deterministic known-phase limits;
+- manage memory, refs, capabilities, dynamic protocols, suspension, cleanup, failures.
 
 ## Module lifecycle
 
-1. Load `.seil` text or assembled SEAM binary image data.
-2. Validate header, section directory, and required sections.
+1. Load `.seil` text or assembled SEAM binary image.
+2. Validate header, section directory, required sections.
 3. Decode logical tables.
-4. Verify opcode schemas, operands, stack effects, metadata references, and control-flow edges.
-5. Link imports/exports/native/foreign declarations under active target, capability, and ABI metadata.
-6. Initialize module globals and required runtime structures.
+4. Verify opcode schemas, operands, stack effects, metadata refs, control edges.
+5. Link imports/exports/native/foreign declarations under active target, capability, ABI metadata.
+6. Init module globals + required runtime structures.
 7. Execute entry points or callable exports.
 
-A module that fails loading, verification, or linking does not execute.
+Load/verify/link failure means no execution.
 
 ## Execution state
 
-SEAM execution state includes loaded module instances, callable frames, evaluation stacks, locals, arguments, environment/capture slots, global slots, heap/runtime storage, capability evidence, cleanup-region state, exception state, suspension state, fuel/step counters, and memory-limit state.
+State includes module instances, callable frames, stacks, locals, args, env/captures, globals, heap/runtime storage, capability evidence, cleanup regions, exception state, suspension state, fuel/step counters, memory limits.
 
-Function calls create frames whose argument/local/environment layout is determined by verified SEIL metadata. Returns must match signature outputs.
+Calls create frames from verified metadata. Returns must match signature outputs.
 
 ## Known-phase execution
 
-Musi known execution runs verified SEIL under SEAM, not a separate source-tree evaluator. Known execution has deterministic limits and no ambient access to time, random, process, environment, filesystem, networking, or IO unless a deterministic known import/intrinsic explicitly supplies it.
+Musi known execution runs verified SEIL under SEAM, not source-tree evaluator. Deterministic limits. No ambient time/random/process/env/filesystem/network/IO unless explicit deterministic known import or declared `musi:rt` intrinsic supplies it.
 
-Fuel, step, recursion, and memory limits are enforcement mechanisms. Limit exhaustion is a known-execution failure, not silent fallback to runtime execution.
+Fuel, step, recursion, and memory limits are enforcement. Limit exhaustion = known-execution failure, not fallback to runtime.
 
-## Imports, exports, native, and foreign calls
+## Imports, exports, native, foreign calls
 
-Import/export compatibility is checked against signature, type, layout, target, capability, and ABI metadata. Foreign/native calls are mediated by declarations and ABI metadata. Dangerous or unrepresentable ABI behavior is rejected by compiler/runtime validation rather than downgraded to warnings.
+Import/export compatibility checks signature, type, layout, target, capability, ABI metadata. Foreign/native calls mediated by declarations + ABI metadata. Dangerous/unrepresentable ABI behavior rejected by compiler/runtime validation, not warning.
 
-SEAM exposes one core C-compatible FFI bridge. SEIL calls native code through import metadata. Native code calls SEIL through exported callable tables. Managed values cross this boundary as handles unless core ABI metadata marks them represented, fixed, or copied. Native callbacks enter through SEAM trampolines so frames, roots, safepoints, and failures remain valid.
+SEAM has one core C-compatible FFI bridge. SEIL calls native via import metadata. Native calls SEIL via exported callable tables. Managed values cross as handles unless core ABI metadata marks represented, fixed, or copied. Native callbacks enter via SEAM trampolines so frames, roots, safepoints, and failures stay valid.
 
 ## Control edges
 
-SEAM executes verified branch, return, exception, cleanup, leave, and yield edges using body metadata tables. Cleanup regions run according to explicit cleanup instructions and region metadata. Suspension records yield/resume state according to signature metadata.
+SEAM executes verified branch, return, exception, cleanup, leave, yield edges using body metadata. Cleanup regions run by explicit cleanup instructions + region metadata. Suspension records yield/resume state by signature metadata.
 
 ## Failure channels
 
-Runtime failure may arise from traps, rejected casts, checked conversions, failed capability requirements, invalid dynamic protocol use, memory violations, out-of-bounds access, null/nil misuse where disallowed, unhandled exceptions, failed linkage, and deterministic-limit exhaustion.
+Runtime failures: traps, rejected casts, checked conversions, failed capabilities, invalid dynamic protocol, memory violations, bounds, nil misuse where disallowed, unhandled exceptions, failed linkage, deterministic-limit exhaustion.
 
-Failures remain structured runtime/diagnostic events. SEAM never converts failure into unspecified host behavior.
+Failures stay structured runtime/diagnostic events. SEAM never turns failure into host UB.
 
 ## Unknowns
 
-- Exact frame object layout is not specified.
-- Exact module initialization ordering beyond load/verify/link/init is not fully specified.
-- Exact host embedding API is not specified.
+- Exact frame object layout not specified.
+- Exact module initialization order after load/verify/link/init not fully specified.
+- Exact host embedding API not specified.

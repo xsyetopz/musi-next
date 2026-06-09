@@ -1,22 +1,22 @@
 # SEAM Binary Image Format
 
-`.seil` is textual executable IL. SEAM tooling may assemble `.seil` into a dense binary image for loading, caching, distribution inside a package, or execution. That image is not the public SEIL source format.
+`.seil` is textual executable IL. SEAM tooling may assemble `.seil` into dense binary image for loading, caching, package distribution, or execution. Image is not public SEIL source format.
 
-The binary image keeps loader-friendly density rather than absolute binary golf:
+Binary image favors loader-friendly density over binary golf:
 
 - fixed probe header;
 - section directory;
 - compact section families with typed row kinds;
 - interned names;
 - `u16` opcode ids;
-- schema-ordered operands using fixed-width scalars and `varu`/`vari`;
+- schema-ordered operands using fixed scalars and `varu`/`vari`;
 - skippable tool metadata.
 
-Compression, checksums, signatures, and archive transport belong to a package/container layer, not the core image.
+Compression, checksums, signatures, archive transport belong to package/container layer, not core image.
 
 ## Fixed Header
 
-A binary image begins with an exactly 40-byte header. The header is loader-probe data; semantic module data lives in sections.
+Binary image begins with exactly 40-byte header. Header = loader-probe data; semantic module data lives in sections.
 
 | Offset | Size | Field       | Meaning                                                                     |
 | -----: | ---: | ----------- | --------------------------------------------------------------------------- |
@@ -25,11 +25,11 @@ A binary image begins with an exactly 40-byte header. The header is loader-probe
 |      8 |   24 | `sections`  | `(count: u32, reserved: u32, offset: u64, size: u64)`                       |
 |     32 |    8 | `file_size` | total image size as `u64`                                                   |
 
-`format.flags` and `sections.reserved` are `0` in the current format. Fixed-width integers and floating payloads are little-endian. Single-byte fields are byte-order independent. The magic byte sequence is `53 45 41 4D` (`SEAM`).
+`format.flags` and `sections.reserved` are `0` now. Fixed-width ints and floating payloads little-endian. Single-byte fields byte-order independent. Magic bytes: `53 45 41 4D` (`SEAM`).
 
 ## Section Directory
 
-The section directory starts at `header.sections.offset`, contains `header.sections.count` entries, and occupies `header.sections.size` bytes. Each directory entry is 32 bytes:
+Directory starts at `header.sections.offset`, has `header.sections.count` entries, spans `header.sections.size` bytes. Each entry = 32 bytes:
 
 | Offset | Size | Field           | Meaning                                           |
 | -----: | ---: | --------------- | ------------------------------------------------- |
@@ -42,7 +42,7 @@ The section directory starts at `header.sections.offset`, contains `header.secti
 |     28 |    1 | `align_log2`    | required payload alignment as log2 bytes          |
 |     29 |    3 | `reserved_tail` | `0`                                               |
 
-Section entries are sorted by `(offset, kind)`. Payload ranges must not overlap and must fit inside `file_size`. Non-zero reserved fields and unsupported flags reject the image.
+Entries sorted by `(offset, kind)`. Payload ranges must not overlap and must fit inside `file_size`. Non-zero reserved fields or unsupported flags reject image.
 
 ## Section Kinds
 
@@ -57,13 +57,27 @@ Section entries are sorted by `(offset, kind)`. Payload ranges must not overlap 
 |    7 | `meta`  |
 |    8 | `tool`  |
 
-`asm` is mandatory and must be decodable using only the core image format. Dependency contracts in `deps` are decoded before remaining semantic payloads. Unknown core semantic sections reject the image. Extension payloads are not new core section families; they use declared row kinds inside `data`, `meta`, or `tool`.
+`asm` mandatory and decodable using only core image format. `deps` decoded before dependent semantic payloads. Unknown core semantic sections reject. Extension payloads are not new core section families; they use declared row kinds inside `data`, `meta`, or `tool`.
+
+## Section Payload Shape
+
+Each section payload:
+
+```text
+row_kind_directory
+row_offset_table
+packed_row_bytes
+```
+
+Row-kind directory first. It lists row kinds in section. Each row-kind entry records row kind id, row count, row offset-table range, payload range, row schema id or core schema tag, required/skippable policy. Row offset table follows and gives per-row byte offsets into `packed_row_bytes`. Row bytes are schema-packed; field names not encoded.
+
+This lets loader skip unsupported skippable row kinds, reject unsupported required row kinds before deep decode, and jump directly by namespace-relative index. Section must not encode rows outside declared row-kind directory.
 
 ## Rows And Indices
 
-Semantic sections encode compact typed rows. Text symbols are interned into the `names` section. Table refs are namespace-relative `varu` values.
+Semantic sections encode compact typed rows. Text symbols intern into `names`. Table refs are namespace-relative `varu`.
 
-Rows use compact schemas owned by their section and row kind. Field names are not encoded in rows. Optional row fields use presence bits or row-specific tags.
+Rows use schemas owned by section + row kind. Field names not encoded. Optional fields use presence bits or row-specific tags.
 
 Core row families:
 
@@ -78,7 +92,7 @@ Core row families:
 | `meta`  | required semantic metadata not owned by `defs`, `code`, or `data`            |
 | `tool`  | optional non-semantic source/tool metadata                                   |
 
-`tool` rows are skippable only when marked non-semantic by core row schema. Required executable semantics must not depend on `tool`.
+`tool` rows skippable only when core row schema marks non-semantic. Required executable semantics must not depend on `tool`.
 
 ## Instruction Encoding
 
@@ -89,7 +103,7 @@ opcode: u16
 operands: schema-ordered bytes
 ```
 
-There is no generic operand-count byte. Operands follow the accepted opcode schema from `seil_opcodes.def`.
+No generic operand-count byte. Operands follow accepted opcode schema from `seil_opcodes.def`.
 
 Primitive operand encodings:
 
@@ -101,19 +115,26 @@ Primitive operand encodings:
 | `varu`           | unsigned LEB128                             |
 | `vari`           | signed LEB128                               |
 
-`varu` and `vari` use shortest-form encodings.
+`varu` and `vari` use shortest form.
 
 ## Loader Validation
 
 Before verification, SEAM checks:
 
-- header magic is `SEAM`;
-- header size is `40`;
-- reserved fields and unsupported flags are zero;
-- section directory lies inside `file_size`;
-- section payloads lie inside `file_size`;
-- exactly one mandatory `asm` section exists;
-- required semantic section families and rows are present;
-- dependency contracts in `deps` decode before dependent semantic rows;
+- header magic `SEAM`;
+- header size `40`;
+- reserved fields and unsupported flags zero;
+- section directory inside `file_size`;
+- section payloads inside `file_size`;
+- exactly one mandatory `asm` section;
+- required semantic section families and rows present;
+- `deps` decode before dependent semantic rows;
+- each section payload has valid row-kind directory, row offset table, packed row byte range;
 - logical tables decode before operand resolution;
-- `tool` rows can be skipped without changing execution.
+- `tool` rows can skip without changing execution.
+
+## Unknowns
+
+- Exact section-family ids beyond core not specified.
+- Exact per-row binary schemas not fully specified.
+- Exact package/container transport not specified.

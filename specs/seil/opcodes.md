@@ -16,29 +16,29 @@ The locked core opcode registry is authoritative for core opcode ids, canonical 
 
 ## Family ranges
 
-| Range            | Family                                |
-| ---------------- | ------------------------------------- |
-| `0x0000..0x00FF` | control / terminators                 |
-| `0x0100..0x01FF` | stack                                 |
-| `0x0200..0x02FF` | constants                             |
-| `0x0300..0x03FF` | frame / globals                       |
-| `0x0400..0x04FF` | calls / dispatch                      |
-| `0x0500..0x05FF` | scalar arithmetic                     |
-| `0x0600..0x06FF` | bitwise / shifts / rotates            |
-| `0x0700..0x07FF` | comparison / tests                    |
-| `0x0800..0x08FF` | conversion / reinterpretation         |
-| `0x0900..0x09FF` | memory / refs / pointers / allocation |
-| `0x0A00..0x0AFF` | product layout                        |
-| `0x0B00..0x0BFF` | sum / tag / payload                   |
-| `0x0C00..0x0CFF` | indexed storage                       |
-| `0x0D00..0x0DFF` | reserved core future                  |
-| `0x0E00..0x0EFF` | dynamic / capability / keyed storage  |
-| `0x0F00..0x0FFF` | reserved core future                  |
-| `0x1000..0x10FF` | suspension / yield                    |
-| `0x1100..0x11FF` | cleanup edges                         |
-| `0x1200..0x1FFF` | reserved core future                  |
-| `0x2000..0xEFFF` | standard extensions                   |
-| `0xF000..0xFFFF` | private/vendor                        |
+| Range            | Family                                          |
+| ---------------- | ----------------------------------------------- |
+| `0x0000..0x00FF` | control / terminators                           |
+| `0x0100..0x01FF` | stack                                           |
+| `0x0200..0x02FF` | constants                                       |
+| `0x0300..0x03FF` | frame / globals                                 |
+| `0x0400..0x04FF` | calls / dispatch                                |
+| `0x0500..0x05FF` | scalar arithmetic                               |
+| `0x0600..0x06FF` | bitwise / shifts / rotates                      |
+| `0x0700..0x07FF` | comparison / tests                              |
+| `0x0800..0x08FF` | conversion / reinterpretation                   |
+| `0x0900..0x09FF` | memory / refs / VM pointers/access / allocation |
+| `0x0A00..0x0AFF` | product layout                                  |
+| `0x0B00..0x0BFF` | sum / tag / payload                             |
+| `0x0C00..0x0CFF` | indexed storage                                 |
+| `0x0D00..0x0DFF` | reserved core future                            |
+| `0x0E00..0x0EFF` | dynamic / capability / keyed storage            |
+| `0x0F00..0x0FFF` | reserved core future                            |
+| `0x1000..0x10FF` | suspension / yield                              |
+| `0x1100..0x11FF` | cleanup edges                                   |
+| `0x1200..0x1FFF` | reserved core future                            |
+| `0x2000..0xEFFF` | standard extensions                             |
+| `0xF000..0xFFFF` | private/vendor                                  |
 
 ## Locked core opcodes
 

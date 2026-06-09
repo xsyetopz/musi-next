@@ -1,52 +1,58 @@
 # Temporary unknowns discussion index
 
-This file collects current `## Unknowns` entries from specs so they can be resolved in one place before decisions are folded back into the owning spec files.
+Collect current `## Unknowns` from specs. Resolve here, then fold into owning specs.
 
 
 ## Locked decisions
 
 ### SEIL definition and design center
 
-- SEIL is lower-level than ASTs: it clarifies ambiguous source constructs and removes redundant source forms.
-- SEIL is higher-level than typical compiler IRs: it preserves semantic types and a close source-program relationship when tool metadata is present.
-- SEIL compiles every valid Musi program into a small set of core constructs with clean executable semantics.
-- SEIL has a syntax-directed type system for analysis, verification, transformation, assembly, disassembly, and execution.
-- SEIL+SEAM follows the broad CIL+CLR relationship: SEAM executes verified SEIL, while SEIL avoids CLR/CIL constraints not justified by Musi/SEAM semantics.
+- SEIL lower than ASTs: clarifies source ambiguity, removes redundant forms.
+- SEIL higher than disposable IR: preserves semantic types + source relation when tool metadata exists.
+- Valid Musi lowers to small SEIL core with clean executable semantics.
+- SEIL has syntax-directed typing for analysis, verification, transform, assembly, disassembly, execution.
+- SEIL+SEAM broadly CIL+CLR-like, without CLR/CIL costs not justified by Musi/SEAM.
 
 ### Executable semantics and unknown data
 
-- SEIL core is closed by default. Unknown executable opcodes are rejected unless declared by a supported core ext before operand decoding and verification.
-- Unknown required semantic sections are rejected.
-- Unknown metadata sections are skippable only when explicitly marked non-semantic/skippable by core.
-- Unknown required sections, opcodes, flags, or metadata schemas are rejected when the consuming VM/tool does not support the declaring core ext.
-- Binary `asm` carries only current module identity, version, and entry metadata. Runtime, capability, extension, dependency, and import contracts live in `deps` and must be decoded before loaders decide whether later payloads can be decoded, skipped, or rejected.
-- SEIL/SEAM do not use executable-semantics dialects. Each behavior is core, library/native, frontend-owned, or unsupported.
+- SEIL core closed by default. Unknown executable opcode rejected unless supported core ext declares schema before operand decoding/verification.
+- Unknown required semantic sections rejected.
+- Unknown metadata sections skippable only when core marks non-semantic/skippable.
+- Unsupported required sections/opcodes/flags/metadata schemas rejected.
+- Binary `asm` carries only current module id/version/entry. Runtime/cap/ext/dependency/import contracts live in `deps` and decode before dependent payload decisions.
+- No executable-semantics dialects. Behavior is core, library/native, frontend-owned, or unsupported.
 
 ### SEIL text shape
 
-- SEIL text is WAT-like typed module text: exactly one `(module ...)` root.
-- SEIL text borrows CIL/ILAsm roles for `asm`, `asmref`, versioned references, metadata declarations, and executable bodies, but removes the CLR object-model center.
-- SEIL text uses symbols as human-facing references; assemblers resolve symbols to binary table indices. Descriptor-heavy references are not the normal hand-written surface.
-- Directive names are chosen for clarity and are not constrained by opcode mnemonic length. Opcode mnemonic parts keep the 2..7 character law.
+- SEIL text = WAT-like typed module text: exactly one `(module ...)` root.
+- Borrows CIL/ILAsm roles for `asm`, `asmref`, versioned refs, metadata, bodies; removes CLR object-model center.
+- Text uses symbols for humans; assembler resolves to binary table indices. Descriptor-heavy refs not normal handwritten surface.
+- Directives use clarity; opcode mnemonic parts keep 2..7 char law.
 
 ### Container header, asm, and deps sections
 
-- SEAM binary images keep an exactly 40-byte fixed header as container probe data only.
-- The 40-byte header carries magic, container format version, header size, reserved-zero flags, section-directory location, and file size.
-- The header must not carry asm identity, dependency contracts, capability set, runtime contract, or ext declarations.
-- SEIL uses a WAT-like textual module model and a CIL-inspired assembly/reference plus typed metadata-table model rather than a raw instruction-stream model.
-- Section kind `2` is `asm`. A mandatory early asm section carries only current module identity, version, and entry metadata needed before dependent payload decoding.
-- SEAM binary image core section families are `names`, `asm`, `deps`, `defs`, `code`, `data`, `meta`, and `tool`.
-- Loaders validate the 40-byte header and section directory first, then decode the mandatory core `asm` section and dependency contracts in `deps` before deciding whether remaining sections can be decoded, skipped, or rejected.
-- Executable bodies remain compact streams whose operands reference metadata table indices/tokens. Required execution metadata is not optional; tool/debug/source metadata is skippable and non-semantic.
-- SEIL should avoid CIL costs that do not fit SEIL/SEAM: no PE/COFF coupling, no implicit runtime-specific verification loopholes, no attributes that secretly alter execution, and no complex binding policy unless a future package spec explicitly requires it.
-- Compression, checksum, signature, and archive transport are package/container-layer concerns, not core SEAM binary image concerns.
+- Binary images keep exactly 40-byte probe header only.
+- Header carries magic, format version, header size, reserved-zero flags, section-directory location, file size.
+- Header must not carry asm id, deps, caps, runtime contract, or ext declarations.
+- SEIL uses WAT-like module text + CIL-inspired asm/ref + typed metadata tables, not raw instruction stream.
+- Section kind `2` = `asm`; mandatory early asm carries only module id/version/entry needed before dependent payload decode.
+- Core families: `names`, `asm`, `deps`, `defs`, `code`, `data`, `meta`, `tool`.
+- Section payload = row-kind directory, row offset table, packed row bytes.
+- Row-kind entry: kind id, count, offset-table range, payload range, schema id/core tag, required/skippable policy.
+- Rows schema-packed; no field names encoded.
+- Loader validates header + directory, decodes `asm` + `deps`, then decides decode/skip/reject for rest.
+- Bodies stay compact streams; operands reference metadata indices/tokens. Required execution metadata is mandatory; tool/debug/source metadata skippable non-semantic.
+- Avoid CIL costs: no PE/COFF coupling, runtime-specific loopholes, attributes secretly changing execution, complex binding policy unless package spec requires it.
+- Compression/checksum/signature/archive transport = package/container layer, not core image.
 
 ### GC and GenImmix consequence
 
-- SEIL exposes managed references, layouts, typed stack effects, safepoints, and barrier obligations.
-- SEAM may implement managed storage with generational Immix, but Immix lines, blocks, cards, nurseries, and remembered sets are runtime internals, not normal SEIL syntax.
-- Musi `fixed` lowers to SEIL metadata/operations that constrain movement or pin storage for a defined lifetime; it does not disable GC globally.
+- SEIL exposes managed refs, layouts, typed stack effects, safepoints, barrier obligations.
+- SEAM may use generational Immix; lines/blocks/cards/nurseries/remembered sets are runtime internals, not SEIL syntax.
+- Musi `fixed` lowers to metadata/ops constraining movement/pinning for lifetime; not GC-off.
+- Musi low-level memory: `Address`, `Region`, `Access[T]`, `Access[mut T]`; no source `Ptr`/`Pointer`.
+- `Address` not GC root and cannot load/store. `Access` lowers to pointer/ref ops plus region/permission/layout/cap metadata.
+- `MutAccess[T]` and `OpaqueAccess[T]` DRY aliases only. `unmanaged` keyword/type qualifier marks storage/representation outside managed tracing/movement/reclamation unless core metadata says otherwise.
 
 ## Musi
 
@@ -70,15 +76,11 @@ This file collects current `## Unknowns` entries from specs so they can be resol
 
 ## SEIL
 
-### `seil/binary-image-format.md`
-
-- Physical row layouts and packing are not specified for every section payload.
-
 ### `seil/instructions.md`
 
 - Exact trap taxonomy is not fully specified.
 - Exact numeric overflow and floating-point exception behavior is not fully specified.
-- Exact pointer-region permission metadata is not fully specified.
+- Exact access/region permission metadata is not fully specified.
 
 ### `seil/modules-artifacts.md`
 

@@ -59,7 +59,7 @@ required-param          ::= ident type-annot?  ;
 
 default-param           ::= ident type-annot? ":=" expr  ;
 
-qualified-type          ::= "known"? "fixed"? "mut"? type-expr  ;
+qualified-type          ::= "known"? "fixed"? "unmanaged"? "mut"? type-expr  ;
 
 qualified-expr          ::= "known" expr
                             | expr;
@@ -232,6 +232,7 @@ type-prefix             ::= "~" type-prefix
                       | "erased" type-prefix
                       | "known" type-prefix
                       | "fixed" type-prefix
+                      | "unmanaged" type-prefix
                       | "mut" type-prefix
                       | type-primary ;
 type-primary            ::= ident type-arg-list?

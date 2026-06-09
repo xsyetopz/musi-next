@@ -1,59 +1,58 @@
 ## Two goals
 
-- Make it predictable
-  - Make it deterministic
-  - Make it easy to reason about (for humans and computers)
-  - Avoid global state at all phases
-  - Use static types
-- Make it efficient
+- Predictable
+  - deterministic
+  - easy for humans + computers to reason about
+  - no global state by default
+  - static types
+- Efficient
 
-To that end
-
-There are things almost every language does for good reasons, and other things copied from weak tutorials or papers. Below are concrete recommendations.
+Rules below support those goals.
 
 ## Lexer / Parser
 
-- Keep the lexer and parser separate. At most, use lexer states.
-- Avoid surprises: follow familiar language conventions where possible.
-- Use [] for generics, not <>.
-- Treat comments as part of the grammar (with reasonable placement restrictions) to ease refactoring tools.
-- Allow lexing from any random point in a file (this constrains multi-line string design).
-- Consider avoiding floating-point literals in the lexer; use a compile-time function like `float("1.0")` if possible.
-- Ensure linear efficiency for lexer and parser (avoid exponential behaviors).
-  - In the lexer, match keywords as identifiers and perform a lookup before parsing.
-  - This allows versioned keywords and makes identifier-based compiled code possible.
-- Prefer DFA/NFA-based regex engines; avoid Perl-style regexes.
-- Avoid parser tools/approaches mentioning: parser combinators, LL(*), memoization, packrat, PEG, GLL, GLR.
-- Prefer: LALR(1), IELR(1), CLR(1), LR(1), recursive ascent. Conditionally good: LL(1) (with automation), recursive descent (if finite lookahead is verified).
-- Efficient but often not useful: LR(0), SLR(1), SLL(1).
-- Inspect and override tool defaults where sensible.
-  - `bison --xml` can help build runtimes while bison builds the LR machine.
+- Keep lexer and parser separate. Lexer states OK.
+- Avoid surprise. Use familiar conventions only when behavior matches.
+- Use `[]` for generics, not `<>`.
+- Treat comments as grammar/trivia with placement rules. Refactoring tools need them.
+- Allow lexing from random file points where possible; this constrains multi-line strings.
+- Consider moving float parsing out of lexer into compile-time API like `float("1.0")`.
+- Keep lexer/parser linear. No exponential behavior.
+  - Lex keywords as identifiers, then keyword-lookup before parse.
+  - This permits versioned keywords and identifier-based compiled code.
+- Prefer DFA/NFA regex engines. Avoid Perl-style regexes.
+- Avoid parser tools/approaches that rely on parser combinators, LL(*), memoization, packrat, PEG, GLL, or GLR.
+- Prefer LALR(1), IELR(1), CLR(1), LR(1), recursive ascent.
+- LL(1) and recursive descent OK only when finite lookahead is verified.
+- LR(0), SLR(1), and SLL(1) are efficient but often too weak.
+- Inspect tool defaults. Override when needed.
+  - `bison --xml` can expose LR machine data while bison builds parser.
 
 ## Lowering
 
-- To handle arbitrary function calls, either require forward declarations or perform two passes over the input.
-- Never implement a tree-evaluator; they are slow.
-- If you support constexpr evaluation, execute the same verified VM-level form used by runtime loading instead of walking source trees.
-- Avoid offloading compiler responsibilities to the standard library when they belong in the compiler.
-- Understand lvalues vs rvalues; treat them as separate lowering strategies on expression AST nodes.
-- Make the driver able to produce multiple outputs (as toggles):
-  - nothing (syntax/semantic checks)
-  - pretty-printed source
-  - semantic AST dump (pre-lowering)
-  - high-level IR (text and binary)
-  - low-level IR (text and binary)
-  - machine code (text and binary)
-  - executable or shared library
-  - run the produced executable immediately
-- Ensure inputs and compilation stages can be parallelized and are race-safe.
+- For arbitrary calls, require forward declarations or use two-pass input analysis.
+- Never use source-tree evaluator for execution. Slow, divergent from runtime.
+- If compile-time evaluation exists, execute same verified VM form runtime loads.
+- Do not push compiler duties into stdlib when compiler must know rule.
+- Model lvalues and rvalues separately in lowering.
+- Driver should support output toggles:
+  - no output, checks only
+  - pretty source
+  - semantic AST dump
+  - high-level IR text/binary
+  - low-level IR text/binary
+  - machine code text/binary
+  - executable/shared library
+  - run produced executable
+- Compilation stages and inputs should be parallel-safe.
 
 ## Runtime
 
-- Consider stack vs register machine trade-offs; SEIL/SEAM is the source of truth for this project.
-- Avoid GC when possible; prefer explicit ownership (e.g. `weak`, `unique`) and consider a cycle detector at exit.
+- Choose stack vs register machine deliberately; this repo uses SEIL/SEAM as source of truth.
+- Avoid GC pressure where possible; consider explicit ownership such as `weak` and `unique`, plus exit-time cycle detection.
 - Avoid pointer-chasing data structures where possible.
 - Think through shared library paths, TLS models, and relocations even for interpreted languages.
-- Dynamically-scoped variables can be implemented via TLS: use push/save semantics instead of global set.
+- Dynamic-scope vars can use TLS push/save semantics, not global set.
 
 --
-Notes: this document is a concise checklist of design recommendations for language implementers.
+Notes: concise checklist for language implementers.
