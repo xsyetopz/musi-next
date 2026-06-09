@@ -8,23 +8,23 @@ References: WebAsm separates traps from success: <https://webassembly.github.io/
 
 ## Invocation outcomes
 
-Each SEAM invocation ends in exactly one state:
+Host-visible invocation outcome is exactly one tagged state:
 
-| Outcome          | Meaning                                                                       |
-| ---------------- | ----------------------------------------------------------------------------- |
-| `returned`       | entry frame returned normally with verified outputs                           |
-| `trapped`        | `trap` or core-defined trap condition occurred                                |
-| `threw`          | exception escaped all handlers                                                |
-| `link-failed`    | import/export/native/foreign linkage failed before execution                  |
-| `limit-exceeded` | fuel, step, recursion, memory, or known-phase limit was exceeded              |
-| `suspended`      | invocation yielded and produced a resumable state instead of final completion |
-| `cancelled`      | suspended computation closed/dropped/cancelled by host/runtime protocol       |
+| Outcome     | Meaning                                                                 |
+| ----------- | ----------------------------------------------------------------------- |
+| `returned`  | entry frame returned normally with verified outputs                     |
+| `yielded`   | invocation yielded and produced opaque resumable handle                 |
+| `failed`    | structured non-trap failure escaped or occurred before/during execution |
+| `trapped`   | `trap` or core-defined runtime invariant violation occurred             |
+| `cancelled` | suspended computation was cancelled/closed by runtime/host protocol     |
 
-`halt` = any non-suspended final outcome. `returned`, `trapped`, `threw`, `link-failed`, `limit-exceeded`, and `cancelled` halt.
+Load, verify, link, init, and resource-limit failures are classified under `failed` with phase/reason payloads. Structured failures are explicit operation/host outcomes. Traps are VM/runtime invariant violations or explicit `trap`. Host exceptions do not cross boundary as host exceptions; they become `failed` or `trapped` by ABI/host metadata.
+
+`halt` = any non-yielded final outcome. `returned`, `failed`, `trapped`, and `cancelled` halt.
 
 ## Trap sources
 
-Trap sources: explicit `trap`, failed checked casts/conversions, invalid `unbox`, failed `cap.need`, bounds, memory permission violations, invalid reference/access/address use, invalid dynamic protocol, divide-by-zero when core numeric rules choose trap semantics, other core runtime violations.
+Trap sources: explicit `trap`, VM/runtime invariant violations, invalid reference/access/address use, memory permission violations, invalid dynamic protocol states, bounds, failed checked casts/conversions when core numeric/type rules classify them as traps, invalid `unbox`, divide-by-zero when core numeric rules choose trap semantics, other core runtime violations. Failed `cap.need` and host/operation failures use structured `failed` unless metadata classifies a violation as trap.
 
 Verification rejects statically knowable violations. Traps cover accepted modules whose runtime values fail.
 
@@ -39,7 +39,7 @@ SEAM enforces:
 - known-phase deterministic execution limits;
 - host-specific resource limits.
 
-Known-phase exhaustion = compile-time known-execution failure. Runtime exhaustion = runtime failure. No silent interpreter/host fallback.
+Known-phase exhaustion = compile-time known-execution failure. Runtime exhaustion = structured `failed` outcome. No silent interpreter/host fallback.
 
 ## Diagnostic payload
 
@@ -47,10 +47,9 @@ Structured failure keeps module id, procedure/body id, instruction offset or blo
 
 ## Validation and failure cases
 
-Load, verification, link failures happen before execution. Runtime traps happen during execution. SEAM must not continue frame after final halt.
+Load, verification, link, and init failures happen before user entry execution. Runtime traps happen during execution. SEAM must not continue frame after final halt.
 
 ## Unknowns
 
 - Exact reason-code enum not specified.
-- Exact host embedding outcome representation not specified.
 - Exact numeric-failure to trap-kind map not specified.

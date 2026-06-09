@@ -15,7 +15,7 @@ Keeps checklist shape; answers for Musi from `LOCKED_LANGUAGE_DESIGN.md`. Legend
 - [x] procedural
   - Callable bindings + receiver methods cover procedure/function organization.
 - [x] stack-based
-  - SEIL stack-effect interpreted. Musi source hides SEIL stack syntax; callable types use `(A, B) -> C`.
+  - SEAM bytecode stack-effect interpreted. Musi source hides SEAM bytecode stack syntax; callable types use `(A, B) -> C`.
 - [x] "multi-paradigm"
   - Expression-first syntax, algebraic data, imperative control, structural shapes, receiver methods, FFI. Not novelty claim; small-core systems design.
 - [-] lazy
@@ -55,9 +55,9 @@ Keeps checklist shape; answers for Musi from `LOCKED_LANGUAGE_DESIGN.md`. Legend
     - [x] concurrency
       - `yield` core suspension keyword. `Task`, `Scheduler`, `Resumable`, `Generator`, `Stream` library/runtime names.
     - [~] a REPL
-      - Not syntax-locked; source→SEIL + known-phase SEIL do not block it.
+      - Not syntax-locked; source→SEAM bytecode + known-phase SEAM bytecode do not block it.
     - [~] debugger support
-      - SEIL metadata preservation goal; debugger still tooling work.
+      - SEAM bytecode metadata preservation goal; debugger still tooling work.
     - [x] IDE support
       - One-token parsing, comments, UALO, UDNS, metadata preservation help tooling.
     - [~] I/O
@@ -102,7 +102,7 @@ Keeps checklist shape; answers for Musi from `LOCKED_LANGUAGE_DESIGN.md`. Legend
 - [x] closures
   - Lambda expression syntax exists with `=>`.
 - [~] tail recursion
-  - No `recur`; ordinary recursion exists. Tail-call guarantees pending implementation/SEIL.
+  - No `recur`; ordinary recursion exists. Tail-call guarantees pending implementation/SEAM bytecode.
 - [x] coroutines
   - `yield` core keyword for resumable/generator contexts.
 - [-] reflection
@@ -153,7 +153,7 @@ Keeps checklist shape; answers for Musi from `LOCKED_LANGUAGE_DESIGN.md`. Legend
 - [-] The most significant program written in your language isn't even its own compiler
   - Not claimed.
 - [-] No language spec
-  - `LOCKED_LANGUAGE_DESIGN.md` is the current locked syntax/design artifact. Full SEIL/runtime spec remains to be written.
+  - `LOCKED_LANGUAGE_DESIGN.md` is the current locked syntax/design artifact. Full SEAM bytecode/runtime spec details remain to be written.
 - [-] "The implementation is the spec"
     - [-] The implementation is closed-source
     - [-] covered by patents
@@ -168,7 +168,7 @@ Keeps checklist shape; answers for Musi from `LOCKED_LANGUAGE_DESIGN.md`. Legend
 - [?] The name of your language makes it impossible to find on Google
   - Searchability is a claim needing evidence; not assessed here.
 - [-] Interpreted languages will never be as fast as C
-  - Musi does not claim C speed. It targets SEIL interpretation.
+  - Musi does not claim C speed. It targets SEAM bytecode interpretation.
 - [-] Compiled languages will never be "extensible"
   - Not relevant as a claim.
 - [-] Writing a compiler that understands English is AI-complete
@@ -189,15 +189,15 @@ Keeps checklist shape; answers for Musi from `LOCKED_LANGUAGE_DESIGN.md`. Legend
 - [-] RAM does not work that way
   - `fixed` and access rules account for movable storage and stable addresses.
 - [x] VMs do not work that way
-  - SEIL is intentionally the VM/lowered form. Instruction model is locked by `seil_opcodes.def`, `grammar/seil.ebnf`, and owning SEIL specs.
+  - SEAM bytecode is intentionally the VM/lowered form. Instruction model is locked by `seam_bytecode_opcodes.def`, `grammar/seam-bytecode-text.ebnf`, and owning SEAM bytecode specs.
 - [-] Compilers do not work that way
-  - Known evaluation executes SEIL; type/phase/layout/access checks are compiler responsibilities.
+  - Known evaluation executes SEAM bytecode; type/phase/layout/access checks are compiler responsibilities.
 - [-] Compilers cannot work that way
   - Syntax is constrained to maximal munch and one-token lookahead; impossible parser forms are rejected by design.
 - [?] Shift-reduce conflicts in parsing seem to be resolved using rand()
   - Not allowed by design; parser evidence still required.
 - [-] You require the compiler to be present at runtime
-  - No. Runtime executes SEIL; known evaluation is compile phase.
+  - No. Runtime executes SEAM bytecode; known evaluation is compile phase.
 - [-] You require the language runtime to be present at compile-time
   - No ambient runtime state is available to `known` code.
 - [~] Your compiler errors are completely inscrutable
@@ -207,7 +207,7 @@ Keeps checklist shape; answers for Musi from `LOCKED_LANGUAGE_DESIGN.md`. Legend
 - [~] The compiler crashes if you look at it funny
   - Requires implementation evidence.
 - [~] The VM crashes if you look at it funny
-  - SEIL/runtime implementation evidence is still required for performance and conformance; language-level GC direction is specified through managed refs, layouts, safepoints, barriers, and `fixed` storage.
+  - SEAM bytecode/runtime implementation evidence is still required for performance and conformance; language-level GC direction is specified through managed refs, layouts, safepoints, barriers, and `fixed` storage.
 - [?] You don't seem to understand basic optimization techniques
   - The design avoids parser exponentiality, uses CPU-aligned arithmetic semantics, and separates representation metadata. Performance evidence still needed.
 - [-] You don't seem to understand basic systems programming
@@ -237,7 +237,7 @@ Keeps checklist shape; answers for Musi from `LOCKED_LANGUAGE_DESIGN.md`. Legend
     - [-] Prolog
   - Musi does not claim to be faster than these.
 - [-] Rejection of orthodox programming-language theory without justification
-  - Unconventional choices are justified by parser constraints, explicit phase/type/effect rules, null avoidance, and SEIL/FFI goals.
+  - Unconventional choices are justified by parser constraints, explicit phase/type/effect rules, null avoidance, and SEAM bytecode/FFI goals.
 - [-] Rejection of orthodox systems programming without justification
   - Systems rules are explicit: fixed storage, unmanaged storage/representation, access capabilities, addresses, FFI representability, representation metadata.
 - [-] Rejection of orthodox algorithmic theory without justification
@@ -254,7 +254,7 @@ Keeps checklist shape; answers for Musi from `LOCKED_LANGUAGE_DESIGN.md`. Legend
 - [-] We already have a safe imperative OO language
   - Musi has no classes or inheritance; receiver methods and shapes are not OO class syntax.
 - [-] We already have a safe statically-typed eager functional language
-  - Musi is systems/FFI/SEIL oriented with fixed storage and explicit access/address semantics.
+  - Musi is systems/FFI/SEAM bytecode oriented with fixed storage and explicit access/address semantics.
 - [-] You have reinvented Lisp but worse
   - No macro core, no S-expression syntax, no syntax-as-code claim.
 - [-] You have reinvented Javascript but worse
@@ -273,7 +273,7 @@ Keeps checklist shape; answers for Musi from `LOCKED_LANGUAGE_DESIGN.md`. Legend
 ## In conclusion, this is what I think of you:
 
 - [?] You have some interesting ideas, but this won't fly.
-  - Musi still needs SEIL/runtime/parser implementation evidence, but the locked syntax addresses the major checklist pitfalls.
+  - Musi still needs SEAM bytecode/runtime/parser implementation evidence, but the locked syntax addresses the major checklist pitfalls.
 - [-] This is a bad language, and you should feel bad for inventing it.
   - The design avoids many known language mistakes: null, `==`, hidden exceptions, implicit dynamic fallback, parser ambiguity, unsafe-warning downgrades.
 - [-] Programming in this language is an adequate punishment for inventing it.
@@ -292,7 +292,7 @@ Source advice: `docs/advice_for_designer_of_my_own_programming_language.md`.
 - [x] Use static types
   - Bidirectional inference and explicit dynamic top `Any`.
 - [x] Make it efficient
-  - CPU remainder semantics, CPU-like shift/rotate operations, representation metadata, no parser speculation, SEIL executable IL target.
+  - CPU remainder semantics, CPU-like shift/rotate operations, representation metadata, no parser speculation, SEAM bytecode target.
 - [x] Use `[]` for generics, not `<>`
   - Locked: `T[A, B]`; array/list types are prefix `[N]T`.
 - [x] Treat comments as grammar/trivia with reasonable restrictions
@@ -300,13 +300,13 @@ Source advice: `docs/advice_for_designer_of_my_own_programming_language.md`.
 - [x] Avoid exponential parser behavior
   - Syntax that needs more than one token of lookahead is rejected by design.
 - [x] Avoid tree evaluator for known/constexpr evaluation
-  - Known functions lower to SEIL; known evaluation executes SEIL.
+  - Known functions lower to SEAM bytecode; known evaluation executes SEAM bytecode.
 - [x] Avoid offloading compiler responsibilities to the standard library
   - Type, phase, fixed-storage, unmanaged storage/representation, access/address, FFI, layout, and dangerous-operation checks are diagnostics/compiler responsibilities.
 - [x] Understand lvalues vs rvalues
   - `place := expr`, mutable/fixed storage, `Access[T]`, and `Access[mut T]` separate readable/writable locations.
 - [x] Consider stack vs register machine tradeoffs
-  - Musi intentionally targets locked SEIL stack-effect executable IL.
+  - Musi intentionally targets locked SEAM bytecode stack-effect execution.
 - [x] Think through shared library paths, TLS, and relocations
   - `@extern` includes `link`, `symbol`, `calling`, ABI descriptor, and representability rules. TLS/relocations remain ABI/runtime implementation details.
 
@@ -314,7 +314,7 @@ Source advice: `docs/advice_for_designer_of_my_own_programming_language.md`.
 
 Purpose: one place to know when Musi spec is fully locked. `[x]` = locked in docs/specs/grammar. `[~]` = direction locked, exact rules/evidence missing. `[?]` = still needs decision or proof.
 
-USER selection gate: `docs/musi_full_spec_solution_selection.md` is the checkbox source of truth. `docs/musi_full_spec_solution_options.md` explains A/B/C as language directions and maps current unknowns. Until one option is checked, remaining `[~]` gaps stay open.
+USER selection gate: `docs/musi_full_spec_solution_selection.md` is the direction checkbox source of truth. `docs/musi_full_spec_solution_options.md` explains A/B/C as language directions. `docs/musi_unknown_solution_choices.md` gives per-gap solution checkboxes. Until options are checked, remaining `[~]` gaps stay open.
 
 Spec gates:
 
@@ -352,42 +352,43 @@ Source-language locks:
 - [~] exact parser proof for one-token-lookahead grammar
 - [~] exact diagnostic catalog for every rejected source form
 
-Musi-to-SEIL locks:
+Musi-to-SEAM-bytecode locks:
 
-- [x] direct Musi-to-SEIL lowering, no intermediate IR layer
-- [x] known execution runs verified SEIL, not source-tree evaluator
-- [x] semantic runtime effects must lower into required SEIL metadata/declarations
+- [x] direct Musi-to-SEAM-bytecode lowering, no intermediate IR layer
+- [x] known execution runs verified SEAM bytecode, not source-tree evaluator
+- [x] semantic runtime effects must lower into required SEAM bytecode metadata/declarations
 - [x] `fixed`, `unmanaged`, access/address, FFI, target, shape/witness lowering obligations
 - [~] exact lowering algorithm for every source expression
 - [~] exact source-map/tool-metadata payloads for high-fidelity decompilation
-- [~] exact import path resolution/package discovery
+- [x] import path resolution policy: ESM-like strings, manifest imports/dependencies, reserved `musi:`, extensionless policy, `index.ms` fallback
 
-SEIL locks:
+SEAM bytecode locks:
 
-- [x] WAT-like `(module ...)` text shape with CIL-like asm/reference role
-- [x] compact binary image: 40-byte fixed header, section directory, section families
+- [x] `.seam` compiled bytecode image as public artifact; no second bytecode layer
+- [x] WAT-like `(module ...)` text/disassembly tool shape with CIL-like asm/reference role
+- [x] compact `.seam` image: 40-byte fixed header, section directory, section families
 - [x] section payload rows: row-kind directory, row offset table, packed row bytes
 - [x] core section families: `names`, `asm`, `deps`, `defs`, `code`, `data`, `meta`, `tool`
 - [x] required vs skippable metadata policy
 - [x] opcode registry ranges and stack-effect notation
 - [x] managed `(ref T)` vs VM `(ptr T)` distinction
 - [x] verifier responsibilities: types, stack effects, metadata refs, roots, safepoints
-- [~] exact text assembler/disassembler canonical formatting details
+- [~] exact text/disassembly assembler/disassembler canonical formatting details
 - [~] exact per-type metadata binary encodings
 - [~] exact trap taxonomy and numeric edge behavior
 
 SEAM locks:
 
 - [x] loader/verify/link/init/execute lifecycle
-- [x] structured halt outcomes and failure channels
-- [x] frames, calls, returns, branches, cleanup, yield/resume obligations
+- [x] tagged host-visible outcomes: `returned`, `yielded`, `failed`, `trapped`, `cancelled`
+- [x] frames, calls, returns, branches, cleanup, yield/resume/cancel obligations
 - [x] managed memory direction: precise roots, layouts, safepoints, barriers, GenImmix allowed
 - [x] `fixed` implementation choices: pin, nonmoving, unmanaged copy, reject
 - [x] `unmanaged` outside managed tracing/movement/reclamation unless core metadata says otherwise
 - [x] explicit dynamic/capability/box/keyed protocols
 - [x] no hidden host UB; invalid behavior is reject/trap/failure
 - [~] exact frame object layout
-- [~] exact host embedding API
+- [~] exact host embedding API beyond tagged outcomes and opaque resumable handles
 - [~] exact GC policy/tuning and allocator details
 
 Runtime/core library locks:
@@ -402,8 +403,8 @@ Implementation/conformance evidence:
 
 - [~] parser generated/proven one-token lookahead
 - [~] lexer/parser fixtures for every locked syntax form
-- [~] lowering fixtures from Musi source to SEIL text/binary
-- [~] SEIL assembler/disassembler round-trip fixtures
+- [~] lowering fixtures from Musi source to `.seam` image plus text/disassembly
+- [~] SEAM bytecode text/disassembly assembler round-trip fixtures
 - [~] verifier pass/fail corpus
 - [~] known-phase evaluator tests
 - [~] runtime failure/GC/FFI tests

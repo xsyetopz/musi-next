@@ -1,8 +1,8 @@
 # SEAM memory and GC
 
-SEAM owns runtime value representation + memory management for SEIL execution. SEIL describes required types, layouts, memory ops; SEAM implements runtime contract.
+SEAM owns runtime value representation + memory management for SEAM bytecode execution. SEAM bytecode describes required types, layouts, memory ops; SEAM implements runtime contract.
 
-Project evidence: `LOCKED_LANGUAGE_DESIGN.md` sections 10, 16-18; `specs/seil/types-metadata.md`; `specs/seil/verification.md`.
+Project evidence: `LOCKED_LANGUAGE_DESIGN.md` sections 10, 16-18; `specs/seam-bytecode/types-metadata.md`; `specs/seam-bytecode/verification.md`.
 
 External sources:
 
@@ -13,13 +13,13 @@ External sources:
 
 ## Language-level model
 
-Musi is managed systems language. Ordinary managed values may be allocated, moved, traced, reclaimed by SEAM. `unmanaged T` marks storage/representation outside managed tracing, movement, reclamation unless core metadata says otherwise. Musi observes object addresses only through `fixed`, `Address`, `Region`, or `Access` capabilities. Stable address/access requirements are semantic and lower to SEIL metadata or checked ops.
+Musi is managed systems language. Ordinary managed values may be allocated, moved, traced, reclaimed by SEAM. `unmanaged T` marks storage/representation outside managed tracing, movement, reclamation unless core metadata says otherwise. Musi observes object addresses only through `fixed`, `Address`, `Region`, or `Access` capabilities. Stable address/access requirements are semantic and lower to SEAM bytecode metadata or checked ops.
 
-SEIL exposes managed refs as `(ref T)` and VM unmanaged access/pointer values as `(ptr T)`. Musi names these through `Address`, `Region`, `Access[T]`, `Access[mut T]`, and aliases like `MutAccess[T]`. Verification distinction:
+SEAM bytecode exposes managed refs as `(ref T)` and VM unmanaged access/pointer values as `(ptr T)`. Musi names these through `Address`, `Region`, `Access[T]`, `Access[mut T]`, and aliases like `MutAccess[T]`. Verification distinction:
 
 - managed refs are precise GC roots when live;
 - unmanaged pointer/access values and addresses are not roots;
-- managed refs cannot hide in integers, byte arrays, address storage, or opaque access storage in verifiable SEIL;
+- managed refs cannot hide in integers, byte arrays, address storage, or opaque access storage in verifiable SEAM bytecode;
 - interior/pinned refs need explicit metadata/capability support.
 
 ## Generational Immix runtime
@@ -32,7 +32,7 @@ SEAM may use generational Immix:
 - movement allowed unless layout/storage metadata says fixed/pinned;
 - old-to-young refs tracked by remembered sets via write barriers.
 
-Collector details are not ordinary SEIL syntax. SEIL specifies semantic data: exact managed-ref locations, layout metadata, safepoints, barrier obligations.
+Collector details are not ordinary SEAM bytecode syntax. SEAM bytecode specifies semantic data: exact managed-ref locations, layout metadata, safepoints, barrier obligations.
 
 ## Values and references
 
@@ -77,13 +77,13 @@ Generational collection needs barriers when managed ref stored into location out
 - globals/static slots;
 - core-defined ref-bearing storage.
 
-SEIL store/transition ops carry barrier obligations when target layout contains managed refs. Source never calls card-mark/remembered-set APIs directly. SEAM/JIT/interpreter inserts or executes barrier.
+SEAM bytecode store/transition ops carry barrier obligations when target layout contains managed refs. Source never calls card-mark/remembered-set APIs directly. SEAM/JIT/interpreter inserts or executes barrier.
 
-Raw byte/memory writes cannot update managed-ref-bearing storage in verifiable SEIL. Core checked bulk op may preserve barriers + root visibility when needed.
+Raw byte/memory writes cannot update managed-ref-bearing storage in verifiable SEAM bytecode. Core checked bulk op may preserve barriers + root visibility when needed.
 
 ## Fixed storage and pinning
 
-Musi `fixed` = address stability required for value/region. Lowers to SEIL metadata/ops constraining movement for lifetime. Moving/partly moving collector may implement with:
+Musi `fixed` = address stability required for value/region. Lowers to SEAM bytecode metadata/ops constraining movement for lifetime. Moving/partly moving collector may implement with:
 
 - nonmoving allocation;
 - temporary pinning with lexical/dynamic lifetime metadata;
@@ -94,7 +94,7 @@ Pinning visible to SEAM, not ordinary GC-unaware source logic. Excess/long pinni
 
 ## Finalization and destructors
 
-SEIL assumes no finalization for ordinary managed values. Resource management lowers through explicit cleanup/control metadata or core runtime types. If finalization added, core SEAM must define ordering, resurrection, safepoints, moving-collector interaction.
+SEAM bytecode assumes no finalization for ordinary managed values. Resource management lowers through explicit cleanup/control metadata or core runtime types. If finalization added, core SEAM must define ordering, resurrection, safepoints, moving-collector interaction.
 
 ## Unknowns
 

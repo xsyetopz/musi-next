@@ -1,30 +1,30 @@
 # Musi control-flow lowering
 
-Musi control lowers to SEIL stack-effect bodies, branch metadata, cleanup-region metadata, and suspension metadata.
+Musi control lowers to SEAM bytecode stack-effect bodies, branch metadata, cleanup-region metadata, and suspension metadata.
 
-Project evidence: `LOCKED_LANGUAGE_DESIGN.md` control rules, `grammar/musi.ebnf`, `seil_opcodes.def`.
+Project evidence: `LOCKED_LANGUAGE_DESIGN.md` control rules, `grammar/musi.ebnf`, `seam_bytecode_opcodes.def`.
 
-Reference: WebAssembly type-checks control edges for stack-machine validation: <https://webassembly.github.io/spec/core/valid/instructions.html>. SEIL uses separate block + metadata tables.
+Reference: WebAssembly type-checks control edges for stack-machine validation: <https://webassembly.github.io/spec/core/valid/instructions.html>. SEAM bytecode uses separate block + metadata tables.
 
 ## Conditional expressions
 
-Postfix `when` needs `Bit`. `a when cond else b` lowers to verified SEIL control; both result paths must match. Musi never invents hidden `Maybe`, `Unit`, bottom, or union to accept mismatched branches.
+Postfix `when` needs `Bit`. `a when cond else b` lowers to verified SEAM bytecode control; both result paths must match. Musi never invents hidden `Maybe`, `Unit`, bottom, or union to accept mismatched branches.
 
 Guarded expression without `else` valid only where guarded emission is admitted.
 
 ## Loops
 
-`while expr { ... }` lowers to explicit SEIL blocks + branches. Condition must be `Bit`. `leave` and `cycle` lower to branch/region edges preserving verified stack shape.
+`while expr { ... }` lowers to explicit SEAM bytecode blocks + branches. Condition must be `Bit`. `leave` and `cycle` lower to branch/region edges preserving verified stack shape.
 
 ## Defer and cleanup
 
-`defer expr` registers cleanup in current region. Cleanup runs on normal exit, `leave`, and `cycle` by region metadata + cleanup instructions. Guarded defer condition checked at registration.
+`defer expr` registers cleanup in current region. Cleanup runs on normal exit, `leave`, `cycle`, cancellation, and close by region metadata + cleanup instructions. Guarded defer condition checked at registration. Nested cleanup order is lexical LIFO for normal return, `leave`, `cycle`, cancellation, and close; trap/abort cleanup remains separately specified.
 
 Cleanup regions lower to `cln.push`, `cln.pop`, `cln.run`, `leave`, and region metadata.
 
 ## Yield and suspension
 
-`yield expr?` lowers to `yld` plus yield/resume signature metadata. Yield suspends/resumes; not function call. Defers do not run at suspension. Pending defers run at final close/drop/cancel by runtime rules.
+`yield expr?` lowers to `yld` plus yield/resume signature metadata. Yield suspends/resumes; not function call. Hosts receive opaque resumable handles with resume, cancel, close/drop, status, and outcome. Defers do not run at suspension. Pending defers run at final close/drop/cancel by runtime rules.
 
 ## Match
 
@@ -36,6 +36,5 @@ Compiler rejects non-`Bit` conditions, incompatible branch results, invalid `lea
 
 ## Unknowns
 
-- Exact SEIL block layout pattern per control form not locked.
-- Exact generator object representation not specified.
-- Exact cleanup order among nested regions needs runtime rule table.
+- Exact SEAM bytecode block layout pattern per control form not locked.
+- Exact generator/resumable internal object representation not specified.

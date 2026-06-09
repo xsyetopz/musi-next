@@ -1,8 +1,8 @@
 # SEAM frames, calls, returns, branches, and suspension
 
-SEAM executes verified SEIL bodies with frames and typed evaluation stacks. Applies after verification accepts module.
+SEAM executes verified SEAM bytecode bodies with frames and typed evaluation stacks. Applies after verification accepts module.
 
-Project evidence: `LOCKED_LANGUAGE_DESIGN.md` opcode/control rules, `seil_opcodes.def`, `grammar/musi.ebnf`.
+Project evidence: `LOCKED_LANGUAGE_DESIGN.md` opcode/control rules, `seam_bytecode_opcodes.def`, `grammar/musi.ebnf`.
 
 References: WebAssembly defines frames, labels, calls, traps: <https://webassembly.github.io/spec/core/exec/runtime.html>. JVM defines frames with locals, operand stack, returns: <https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-2.html#jvms-2.6>.
 
@@ -33,7 +33,7 @@ Arguments leave caller stack in signature order and become callee argument slots
 
 `ret` ends current frame. With caller: transfer results. Entry frame: successful halt with entry outputs.
 
-`trap`, unhandled `throw`, runtime violations impossible to verify statically, limit exhaustion, and failed required capabilities halt unsuccessfully through structured failure channel.
+`trap`, runtime violations impossible to verify statically, limit exhaustion, unhandled failures, and failed required capabilities halt unsuccessfully through structured failure channel.
 
 ## Branches
 
@@ -41,7 +41,9 @@ Arguments leave caller stack in signature order and become callee argument slots
 
 ## Exceptions and cleanup
 
-`throw` starts exceptional edge. `rethrow` continues active exceptional edge. Handler match and cleanup order live in body metadata. `leave` exits region and triggers required cleanup.
+`throw` starts exceptional edge. `rethrow` continues active exceptional edge. Handler match lives in body metadata by protected region + exit/failure reason, not raw instruction ranges. `leave` exits region and triggers required cleanup.
+
+Cleanup order is lexical LIFO for normal return, `leave`, `cycle`, cancellation, and close. Trap/abort cleanup remains separately specified.
 
 Cleanup ops manage active cleanup-region stack:
 
@@ -51,16 +53,18 @@ Cleanup ops manage active cleanup-region stack:
 
 ## Suspension
 
-`yld` suspends invocation by yield/resume metadata. Suspension captures enough frame state to resume at correct continuation with required resume values.
+`yld` suspends invocation by yield/resume metadata. Suspension captures enough frame state to resume at correct continuation with required resume values. Hosts see an opaque resumable handle, not raw frames.
 
-Defers/cleanups do not run merely because frame suspends. Pending cleanups run when suspended computation closes, drops, cancels, or exits normally by runtime metadata.
+Opaque resumable handles support resume, cancel, close/drop, status, and outcome. Cancellation is cooperative at safepoints/yield points first; forced close exists only for teardown.
+
+Defers/cleanups do not run merely because frame suspends. Pending cleanups run when suspended computation closes, drops, cancels, or exits normally by runtime metadata. Cancellation runs pending defers before `cancelled` unless cleanup traps/fails.
 
 ## Failure cases
 
-Runtime control failure: unhandled exception, invalid dynamic call resolution, failed capability, trap, limit exhaustion, invalid memory/control state. Failure halts invocation unsuccessfully and preserves diagnostic context.
+Runtime control failure: unhandled failure/throw, invalid dynamic call resolution, failed capability, trap, limit exhaustion, invalid memory/control state. Failure halts invocation unsuccessfully and preserves diagnostic context.
 
 ## Unknowns
 
 - Exact in-memory frame layout not specified.
-- Exact handler matching table format not specified.
-- Exact cancellation API for suspended computations not specified.
+- Exact binary handler matching table format not specified.
+- Exact host embedding function signatures for resumable handles not specified.

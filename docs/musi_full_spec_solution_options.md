@@ -16,7 +16,7 @@ All directions keep:
 - verbose spelling where it makes behavior visible;
 - maximal munch + one-token-lookahead source syntax;
 - managed default runtime with explicit `fixed`, `unmanaged`, `Address`, `Region`, `Access[T]`, and `Access[mut T]`;
-- `known` execution by verified SEIL, not source-tree evaluation;
+- `known` execution by verified SEAM bytecode, not source-tree evaluation;
 - runtime/compiler intrinsics declared through `musi:rt` metadata;
 - no Rust-derived design source.
 
@@ -116,13 +116,13 @@ Where it avoids workarounds:
 - no fake stringly dynamic call protocol;
 - no lost failure/context when crossing the host boundary.
 
-Conceptual proposal sketch, not current grammar:
+Current grammar shape:
 
 ```musi
-@extern(.C, "host_log")
+@extern(abi := .c, symbol := "host_log")
 let host_log(text : CString) : CInt;
 
-@extern(.C, "plugin_update")
+@extern(abi := .c, symbol := "plugin_update")
 export let plugin_update(dt : Float32) : CInt := (
   host_log("update");
   0
@@ -157,14 +157,14 @@ Open gaps closed this way:
 
 ## C — Musi as Reflective Programmable System
 
-Direction: Musi is a programmable systems environment. Code, metadata, modules, frames, failures, capabilities, and SEIL/runtime structures are explicit typed values when authority is present. This maximizes language power without using hidden magic.
+Direction: Musi is a programmable systems environment. Code, metadata, modules, frames, failures, capabilities, and SEAM bytecode/runtime structures are explicit typed values when authority is present. This maximizes language power without using hidden magic.
 
 First-class citizens:
 
 - all B citizens;
 - typed metadata schemas;
 - module reflection;
-- SEIL/decompile metadata;
+- SEAM bytecode/decompile metadata;
 - frame and failure inspection;
 - capability inspection;
 - schema derivation;
@@ -215,7 +215,7 @@ let frame := runtime.current_frame(capability);
 Open gaps closed this way:
 
 - tool/source metadata schemas become language-visible, typed, and stable;
-- verifier diagnostics, SEIL text, binary rows, and decompile metadata get exact schemas;
+- verifier diagnostics, SEAM bytecode text/disassembly, binary rows, and decompile metadata get exact schemas;
 - frame, failure, capability, and host APIs become inspectable typed runtime structures;
 - self-hosting and live tooling become explicit language goals.
 

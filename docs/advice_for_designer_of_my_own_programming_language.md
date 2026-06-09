@@ -48,7 +48,7 @@ Rules below support those goals.
 
 ## Runtime
 
-- Choose stack vs register machine deliberately; this repo uses SEIL/SEAM as source of truth.
+- Choose stack vs register machine deliberately; this repo uses SEAM bytecode/SEAM as source of truth.
 - Avoid GC pressure where possible; consider explicit ownership such as `weak` and `unique`, plus exit-time cycle detection.
 - Avoid pointer-chasing data structures where possible.
 - Think through shared library paths, TLS models, and relocations even for interpreted languages.
