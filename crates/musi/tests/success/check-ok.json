@@ -1,9 +1,0 @@
-{
-  "schema": "musi.diagnostics.v1",
-  "tool": "musi",
-  "command": "check",
-  "status": "ok",
-  "package_root": "<package-root>",
-  "manifest": "<manifest>",
-  "diagnostics": []
-}
