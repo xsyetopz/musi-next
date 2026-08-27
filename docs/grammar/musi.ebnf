@@ -1,0 +1,487 @@
+/* Musi concise normative grammar.
+   Semantic restrictions are in the normative clauses of MSR1.
+
+   Newline/comments are trivia. A statement is expression ';'. ',' separates
+   peers. Lexing uses maximal munch over the explicitly defined token set.
+   Every defined multi-character punctuation token is indivisible; adjacent
+   punctuation does not compound unless that exact token is defined.
+   The normative source grammar is LL(1). Expression precedence may be
+   implemented with Pratt parsing without relaxing that requirement. */
+
+source                          ::= source-items?
+
+source-items                    ::= source-item ";" (source-item ";")*
+
+source-item                     ::= pragma-group
+                                    | expression
+
+/* ---------- metadata ---------- */
+
+attribute-group                 ::= "$[" metadata-items? "]"
+
+pragma-group                    ::= "%[" metadata-items? "]"
+
+metadata-items                  ::= metadata-item ("," metadata-item)* ","?
+
+metadata-item                   ::= (value-identifier | "volatile") metadata-arguments?
+
+metadata-arguments              ::= "(" argument-list? ")"
+
+/* ---------- binding expressions ---------- */
+
+binding-expression              ::= attribute-group?
+                        export-modifier?
+                        static-modifier?
+                        binding-prefix
+
+export-modifier                 ::= "export"
+
+static-modifier                 ::= "static"
+
+binding-prefix                  ::= "let" let-binding-tail
+                      | "var" var-binding-tail
+
+let-binding-tail                ::= mutual-binding-group
+                      | let-ordinary-binding-tail
+
+mutual-binding-group            ::= "{" mutual-binding-members? "}"
+
+mutual-binding-members          ::= mutual-binding-member
+                        (";" mutual-binding-member)*
+                        ";"?
+mutual-binding-member           ::= let-binding-head binding-result? ":=" expression
+
+let-ordinary-binding-tail       ::= let-binding-head binding-result? binding-definition?
+
+var-binding-tail                ::= datum-binding-head type-expression? binding-definition?
+
+binding-definition              ::= ":=" expression
+
+binding-result                  ::= type-expression
+                                    | "~>" type-expression
+
+let-binding-head                ::= receiver-binding-head
+                      | named-binding-head
+                      | nonidentifier-binding-pattern
+
+datum-binding-head              ::= identifier
+                      | nonidentifier-binding-pattern
+
+named-binding-head              ::= identifier known-parameters? runtime-parameters?
+
+receiver-binding-head           ::= "(" receiver-mutability? value-identifier receiver-head ")"
+                        "." value-identifier known-parameters? runtime-parameters?
+receiver-mutability             ::= "var"
+
+receiver-head                   ::= type-path receiver-parameters?
+
+receiver-parameters             ::= "[" receiver-parameter-list? "]"
+
+receiver-parameter-list         ::= receiver-parameter ("," receiver-parameter)* ","?
+
+receiver-parameter              ::= value-identifier type-expression
+
+nonidentifier-binding-pattern   ::= "_"
+                      | tuple-binding-pattern
+                      | array-binding-pattern
+                      | record-binding-pattern
+
+known-parameters                ::= "[" known-parameter-list? "]"
+
+known-parameter-list            ::= known-parameter ("," known-parameter)* ","?
+
+known-parameter                 ::= attribute-group? (value-identifier | "_")
+                        type-expression default-value?
+
+runtime-parameters              ::= "(" runtime-parameter-list? ")"
+
+runtime-parameter-list          ::= runtime-parameter ("," runtime-parameter)* ","?
+
+runtime-parameter               ::= attribute-group? (value-identifier | "_")
+                        type-expression default-value?
+
+default-value                   ::= ":=" expression
+
+/* ---------- expression precedence ---------- */
+
+expression                      ::= assignment-expression
+
+assignment-expression           ::= conditional-expression (":=" conditional-expression)?
+
+conditional-expression          ::= logical-or-expression
+                        ("when" logical-or-expression
+                         ("else" conditional-expression)?)?
+
+logical-or-expression           ::= logical-and-expression ("or" logical-and-expression)*
+
+logical-and-expression          ::= relation-expression ("and" relation-expression)*
+
+relation-expression             ::= range-expression
+                        (("=" | "~=" | "<" | "<=" | ">" | ">=")
+                         range-expression)?
+
+range-expression                ::= scalar-expression range-tail?
+                      | open-lower-range
+range-tail                      ::= "..<" scalar-expression
+                      | "..=" scalar-expression
+                      | ".."
+open-lower-range                ::= "..<" scalar-expression
+                      | "..=" scalar-expression
+                      | ".."
+
+/* Arithmetic and bitvector infix families are incomparable. Once the first
+   scalar infix family is chosen, the other family cannot appear without an
+   enclosing computation expression. */
+scalar-expression               ::= prefix-expression scalar-tail
+
+scalar-tail                     ::= arithmetic-start
+                                    | bitvector-start
+                                    |
+
+arithmetic-start                ::= multiplicative-operator prefix-expression
+                        multiplicative-tail additive-tail
+                      | additive-operator multiplicative-expression
+                        additive-tail
+multiplicative-expression       ::= prefix-expression multiplicative-tail
+
+multiplicative-tail             ::= (multiplicative-operator prefix-expression)*
+
+additive-tail                   ::= (additive-operator multiplicative-expression)*
+
+multiplicative-operator         ::= "*"
+                                    | "/"
+                                    | "%"
+
+additive-operator               ::= "+"
+                                    | "-"
+
+bitvector-start                 ::= shift-operator prefix-expression shift-tail
+                        bitand-tail bitxor-tail bitor-tail
+                      | "&" shift-expression bitand-tail bitxor-tail bitor-tail
+                      | "^" bitand-expression bitxor-tail bitor-tail
+                      | "|" bitxor-expression bitor-tail
+shift-expression                ::= prefix-expression shift-tail
+
+shift-tail                      ::= (shift-operator prefix-expression)*
+
+bitand-expression               ::= shift-expression bitand-tail
+
+bitand-tail                     ::= ("&" shift-expression)*
+
+bitxor-expression               ::= bitand-expression bitxor-tail
+
+bitxor-tail                     ::= ("^" bitand-expression)*
+
+bitor-tail                      ::= ("|" bitxor-expression)*
+
+shift-operator                  ::= "shl"
+                                    | "shr"
+                                    | "rol"
+                                    | "ror"
+
+prefix-expression               ::= ("-" | "~" | "@" | "not") prefix-expression
+                      | known-expression
+                      | postfix-expression
+known-expression                ::= "known" prefix-expression
+
+postfix-expression              ::= primary-expression postfix-operation*
+
+postfix-operation               ::= call
+                      | known-application
+                      | runtime-index
+                      | member-access
+                      | nullable-member-access
+                      | designation
+
+call                            ::= "(" argument-list? ")"
+
+argument-list                   ::= argument ("," argument)* ","?
+
+argument                        ::= expression
+
+known-application               ::= "[" known-argument-list? "]"
+
+known-argument-list             ::= known-argument ("," known-argument)* ","?
+
+known-argument                  ::= expression
+
+runtime-index                   ::= ".[" expression "]"
+
+member-access                   ::= "." identifier
+
+nullable-member-access          ::= "?." identifier
+
+designation                     ::= ".^"
+
+primary-expression              ::= binding-expression
+                      | literal
+                      | path
+                      | computation
+                      | tuple-value
+                      | record-value
+                      | array-value
+                      | record-type-expression
+                      | choice-expression
+                      | match-expression
+                      | lambda-expression
+                      | while-expression
+                      | leave-expression
+                      | cycle-expression
+                      | defer-expression
+                      | yield-expression
+                      | import-expression
+
+/* ---------- computation ---------- */
+
+computation                     ::= "(" computation-body? ")"
+
+computation-body                ::= expression (";" expression)* ";"?
+
+/* ---------- lambda ---------- */
+
+lambda-expression               ::= "lambda" known-parameters? runtime-parameters
+                        lambda-result? "=>" expression
+lambda-result                   ::= type-expression
+                                    | "~>" type-expression
+
+/* ---------- aggregate datums ---------- */
+
+tuple-value                     ::= "#(" expression-list? ")"
+
+array-value                     ::= "#[" expression-list? "]"
+
+record-value                    ::= "#{" record-value-items? "}"
+
+expression-list                 ::= expression ("," expression)* ","?
+
+record-value-items              ::= record-value-field record-value-tail
+                      | record-expansion ","?
+record-value-tail               ::= "," record-value-after-comma
+                                    |
+
+record-value-after-comma        ::= record-value-field record-value-tail
+                      | record-expansion ","?
+                      |
+record-value-field              ::= value-identifier ":=" expression
+
+record-expansion                ::= "..." expression
+
+/* ---------- record types ---------- */
+
+record-type-expression          ::= "record" "{" record-fields? "}"
+
+record-fields                   ::= record-field (";" record-field)* ";"?
+
+record-field                    ::= attribute-group? "var"? value-identifier
+                        type-expression default-value?
+
+/* ---------- choices ---------- */
+
+choice-expression               ::= "choice" "{" choice-cases? "}"
+
+choice-cases                    ::= choice-case (";" choice-case)* ";"?
+
+choice-case                     ::= attribute-group? "case" type-identifier choice-case-tail?
+
+choice-case-tail                ::= runtime-case-payload
+                                    | ":=" expression
+
+runtime-case-payload            ::= "(" case-parameter-list? ")"
+
+case-parameter-list             ::= case-parameter ("," case-parameter)* ","?
+
+case-parameter                  ::= value-identifier type-expression
+
+/* ---------- matching ---------- */
+
+match-expression                ::= "match" expression "{" match-case-list "}"
+
+match-case-list                 ::= match-case ("," match-case)* ","?
+
+match-case                      ::= attribute-group? "case" match-pattern
+                        match-guard? "=>" expression
+match-guard                     ::= "when" expression
+
+match-pattern                   ::= "_" typed-pattern-tail?
+                      | value-identifier typed-pattern-tail?
+                      | tuple-binding-pattern
+                      | array-binding-pattern
+                      | record-binding-pattern
+                      | literal-match-pattern
+                      | choice-pattern
+typed-pattern-tail              ::= type-expression
+
+literal-match-pattern           ::= literal (("..<" | "..=") literal)?
+
+choice-pattern                  ::= type-identifier choice-pattern-payload?
+
+choice-pattern-payload          ::= "(" match-pattern-list? ")"
+
+match-pattern-list              ::= match-pattern ("," match-pattern)* ","?
+
+/* ---------- binding patterns ---------- */
+
+binding-pattern                 ::= "_"
+                      | identifier-pattern
+                      | tuple-binding-pattern
+                      | array-binding-pattern
+                      | record-binding-pattern
+identifier-pattern              ::= identifier
+
+tuple-binding-pattern           ::= "#(" positional-binding-pattern-body? ")"
+
+array-binding-pattern           ::= "#[" positional-binding-pattern-body? "]"
+
+positional-binding-pattern-body ::= binding-pattern
+                        ("," binding-pattern)*
+                        ("," "..." binding-rest)?
+                        ","?
+                      | "..." binding-rest ","?
+binding-rest                    ::= value-identifier
+                                    | "_"
+
+record-binding-pattern          ::= "#{" record-binding-pattern-body? "}"
+
+record-binding-pattern-body     ::= record-binding-field
+                        ("," record-binding-field)*
+                        ("," "..." binding-rest)?
+                        ","?
+                      | "..." binding-rest ","?
+record-binding-field            ::= value-identifier (":=" binding-pattern)?
+
+/* ---------- control ---------- */
+
+while-expression                ::= "while" expression computation
+
+leave-expression                ::= "leave"
+
+cycle-expression                ::= "cycle"
+
+defer-expression                ::= "defer" expression
+
+yield-expression                ::= "yield"
+
+/* ---------- imports ---------- */
+
+import-expression               ::= "import" string-literal
+
+/* ---------- types ---------- */
+
+type-expression                 ::= callable-type
+
+callable-type                   ::= runtime-type-domain callable-arrow callable-type
+                      | type-postfix (callable-arrow callable-type)?
+callable-arrow                  ::= "->"
+                                    | "~>"
+
+runtime-type-domain             ::= "(" type-expression-list? ")"
+
+type-expression-list            ::= type-expression ("," type-expression)* ","?
+
+type-postfix                    ::= type-prefix
+
+type-prefix                     ::= "?" type-prefix
+                      | access-type
+                      | fixed-array-type
+                      | type-primary
+access-type                     ::= "^" access-qualifiers? type-prefix
+
+access-qualifiers               ::= "write" "volatile"?
+                      | "volatile"
+fixed-array-type                ::= "[" expression "]" type-prefix
+/* The bracketed expression in a fixed-array type must evaluate compile-known to Index. */
+type-primary                    ::= type-path type-arguments?
+                      | tuple-type
+                      | record-type-expression
+                      | choice-expression
+tuple-type                      ::= "#(" type-expression-list? ")"
+
+type-arguments                  ::= "[" known-argument-list? "]"
+
+/* type paths may begin with a lowerCamel module binding; the final resolved
+   binding must be type-valued. */
+type-path                       ::= identifier ("." identifier)*
+
+/* ---------- names ---------- */
+
+path                            ::= identifier ("." identifier)*
+
+identifier                      ::= type-identifier
+                                    | value-identifier
+
+ascii-digit                     ::= [#x30-#x39]
+
+ascii-letter                    ::= [#x41-#x5A]
+                                    | [#x61-#x7A]
+
+upper-ascii                     ::= [#x41-#x5A]
+
+lower-ascii                     ::= [#x61-#x7A]
+
+type-identifier                 ::= upper-ascii identifier-tail*
+
+value-identifier                ::= lower-ascii identifier-tail*
+
+identifier-tail                 ::= ascii-letter
+                                    | ascii-digit
+
+/* ---------- literals ---------- */
+
+literal                         ::= integer-literal
+                                    | real-literal
+                                    | rune-literal
+                                    | string-literal
+                                    | raw-string-literal
+                                    | byte-literal
+                                    | byte-string-literal
+                                    | raw-byte-string-literal
+
+/* These envelope productions identify lexer-produced tokens. Their exact
+   accepted spellings remain the scanner contracts in MSR1 section 39; these
+   rules are not a second lexer grammar. */
+integer-literal                 ::= integer-token
+
+real-literal                    ::= real-token
+
+rune-literal                    ::= rune-token
+
+string-literal                  ::= string-token
+
+raw-string-literal              ::= raw-string-token
+
+byte-literal                    ::= byte-token
+
+byte-string-literal             ::= byte-string-token
+
+raw-byte-string-literal         ::= raw-byte-string-token
+
+integer-token                   ::= lexical-token-character+
+
+real-token                      ::= lexical-token-character+
+
+rune-token                      ::= lexical-token-character+
+
+string-token                    ::= lexical-token-character+
+
+raw-string-token                ::= lexical-token-character+
+
+byte-token                      ::= lexical-token-character+
+
+byte-string-token               ::= lexical-token-character+
+
+raw-byte-string-token           ::= lexical-token-character+
+
+lexical-token-character         ::= [#x0-#xD7FF]
+                                    | [#xE000-#x10FFFF]
+
+/* Literal token forms are specified by the lexical contracts in MSR1.
+
+   Argument classification rule:
+   within runtime/known argument lists, a top-level unparenthesized expression
+   of the form `value-identifier := expression` is a named argument. Other forms are
+   positional expressions. A mutation intentionally supplied as an argument
+   value must be nested in a computation.
+
+   Semantic scope restrictions (module-only export/static/import/receiver/etc.)
+   and body-supplier restrictions are intentionally not duplicated in the
+   syntactic grammar. */

@@ -1,0 +1,300 @@
+/* Common Portable Code textual form, version 1. ASCII. */
+
+cpc-file                  ::= header newline requirement-declaration* (top-declaration newline?)*
+
+header                    ::= "CPC" space unsigned-decimal
+
+requirement-declaration   ::= "REQUIRE" space requirement newline
+
+requirement               ::= "TARGET" space contract-id space unsigned-decimal
+                      | "ABI" space unsigned-decimal space contract-id space unsigned-decimal
+                      | "CAP" space contract-id
+contract-id               ::= ascii-letter (ascii-letter | ascii-digit | "." | "_" | "-")*
+
+top-declaration           ::= type-declaration
+                      | variant-type-declaration
+                      | global-declaration
+                      | extern-declaration
+                      | function-declaration
+
+type-declaration          ::= "TYPE" space type-id space simple-type-definition newline
+
+variant-type-declaration  ::= "TYPE" space type-id space "VARIANT" newline
+                        variant-case+
+                        "ENDTYPE" newline
+variant-case              ::= "CASE" space unsigned-decimal
+                        (space type)* newline
+
+simple-type-definition    ::= "ARRAY" space type space unsigned-decimal
+                      | "RECORD" (space type)*
+                      | "REF" space type space ref-mode space ref-kind
+                      | "STORAGE" space unsigned-decimal space positive-decimal
+                      | "ATOMIC" space type
+                      | "FUNC" space signature
+
+global-declaration        ::= "GLOBAL" space global-id space global-mode space type space global-init newline
+
+global-mode               ::= "RO"
+                              | "RW"
+
+global-init               ::= "ZERO"
+                      | "CONST" space scalar-literal
+
+extern-declaration        ::= "EXTERN" space extern-id space "FUNC" space signature
+                        space "ABI" space unsigned-decimal newline
+
+function-declaration      ::= "FUNC" space function-id space signature
+                        space "STACK" space unsigned-decimal newline
+                        local-declaration*
+                        label-block label-block*
+                        "END" newline
+local-declaration         ::= "LOCAL" space type newline
+
+label-block               ::= label-id ":" newline instruction-line*
+
+instruction-line          ::= (space space space space)? instruction (space comment)? newline
+
+comment                   ::= ";" comment-char*
+
+comment-char              ::= ascii-printable-except-lf
+
+signature                 ::= parameter-types space "->" space result-type space effect
+
+parameter-types           ::= "VOID"
+                              | type (space type)*
+
+result-type               ::= "VOID"
+                              | type
+
+effect                    ::= "PLAIN"
+                              | "YIELD"
+
+instruction               ::= ldc-instruction
+                      | index-instruction
+                      | nooperand-instruction
+                      | unarytyped-instruction
+                      | binarytyped-instruction
+                      | cmp-instruction
+                      | cvt-instruction
+                      | agg-instruction
+                      | ref-instruction
+                      | memory-instruction
+                      | lif-instruction
+                      | atm-instruction
+                      | dyn-instruction
+                      | branch-instruction
+                      | call-instruction
+                      | trap-instruction
+
+ldc-instruction           ::= "LDC" space constant-type space scalar-literal
+
+index-instruction         ::= ("LDA" | "LDL" | "STL") space unsigned-decimal
+                      | "LDF" space callable-id
+nooperand-instruction     ::= "DUP"
+                              | "POP"
+                              | "SWP"
+                              | "ADR"
+                              | "ADS"
+                      | "YLD" | "RET"
+
+unarytyped-instruction    ::= "NEG" space neg-type
+                      | "NOT" space bit-operation-type
+binarytyped-instruction   ::= ("ADD" | "SUB" | "MUL" | "DIV") space arithmetic-type
+                      | "REM" space integer-type
+                      | ("WAD" | "WSB" | "WML" | "AND" | "OR" | "XOR" | "SHL" | "ROL" | "ROR") space bit-operation-type
+                      | "SHR" space logical-shift-type
+                      | "SAR" space signed-integer-type
+
+cmp-instruction           ::= "CMP" space ("EQ" | "NE") space equality-type
+                      | "CMP" space ("LT" | "LE" | "GT" | "GE") space ordered-type
+
+cvt-instruction           ::= "CVT" space conversion-mode space conversion-type space conversion-type
+
+conversion-mode           ::= "EXACT"
+                              | "CHECK"
+                              | "TRUNC"
+                              | "BIT"
+
+agg-instruction           ::= "AGG" space "NEW" space type-id
+                      | "AGG" space "GET" space type-id space unsigned-decimal
+                      | "AGG" space "SET" space type-id space unsigned-decimal
+                      | "AGG" space "IDX" space type-id
+                      | "AGG" space "PUT" space type-id
+                      | "AGG" space "TAG" space type-id
+                      | "AGG" space "CASE" space type-id space unsigned-decimal
+                      | "AGG" space "PAY" space type-id space unsigned-decimal space unsigned-decimal
+
+ref-instruction           ::= "REF" space "ARG" space unsigned-decimal
+                      | "REF" space "LOC" space unsigned-decimal
+                      | "REF" space "GLB" space unsigned-decimal
+                      | "REF" space "FLD" space unsigned-decimal
+                      | "REF" space "IDX"
+                      | "REF" space "WEAK"
+
+memory-instruction        ::= ("LD" | "ST" | "VLD" | "VST"
+                       | "RLD" | "RST" | "RVL" | "RVS") space type
+                      | "AOF"
+
+lif-instruction           ::= "LIF" space ("BEG" | "END") space type
+
+atm-instruction           ::= "ATM" space ("LD" | "ST" | "XCH" | "ADD" | "SUB" | "AND" | "OR" | "XOR") space type space memory-order
+                      | "ATM" space "CMP" space type space memory-order space memory-order
+memory-order              ::= "RELAX"
+                              | "ACQ"
+                              | "REL"
+                              | "ACQREL"
+                              | "SEQCST"
+
+dyn-instruction           ::= "DYN" space dyn-subop space type
+
+dyn-subop                 ::= "ERA"
+                              | "ISA"
+                              | "REF"
+
+branch-instruction        ::= ("JMP" | "BRT" | "BRF") space label-id
+
+call-instruction          ::= ("CAL" | "YCL") space callable-id
+                      | ("CAI" | "YCI") space type-id
+callable-id               ::= function-id
+                              | extern-id
+
+trap-instruction          ::= "TRP" space unsigned-decimal
+
+ref-mode                  ::= "R"
+                              | "W"
+
+ref-kind                  ::= "O"
+                              | "V"
+
+type                      ::= scalar-type
+                              | type-id
+
+scalar-type               ::= "UNIT"
+                              | "BOOL"
+                              | "DYNREF"
+                      | integer-type | float-type | bits-type | "ADDR"
+constant-type             ::= "BOOL"
+                              | integer-type
+                              | float-type
+                              | bits-type
+
+arithmetic-type           ::= integer-type
+                              | float-type
+
+conversion-type           ::= integer-type
+                              | float-type
+                              | bits-type
+
+bit-operation-type        ::= integer-type
+                              | bits-type
+
+logical-shift-type        ::= unsigned-integer-type
+                              | bits-type
+
+neg-type                  ::= signed-integer-type
+                              | float-type
+
+equality-type             ::= "BOOL"
+                              | integer-type
+                              | float-type
+                              | bits-type
+                              | "ADDR"
+
+ordered-type              ::= integer-type
+                              | float-type
+
+integer-type              ::= signed-integer-type
+                              | unsigned-integer-type
+
+signed-integer-type       ::= "I8"
+                              | "I16"
+                              | "I32"
+                              | "I64"
+
+unsigned-integer-type     ::= "U8"
+                              | "U16"
+                              | "U32"
+                              | "U64"
+
+float-type                ::= "F16"
+                              | "F32"
+                              | "F64"
+
+bits-type                 ::= "BITS[" positive-decimal "]"
+
+scalar-literal            ::= bool-literal
+                              | integer-literal
+                              | hex-literal
+                              | binary-literal
+
+bool-literal              ::= "FALSE"
+                              | "TRUE"
+
+integer-literal           ::= "-"? unsigned-decimal
+
+hex-literal               ::= "0x" hex-digit hex-digit*
+
+binary-literal            ::= "0b" binary-digit binary-digit*
+
+type-id                   ::= "T" unsigned-decimal
+
+global-id                 ::= "G" unsigned-decimal
+
+extern-id                 ::= "X" unsigned-decimal
+
+function-id               ::= "F" unsigned-decimal
+
+label-id                  ::= "L" unsigned-decimal
+
+positive-decimal          ::= nonzero-digit decimal-digit*
+
+unsigned-decimal          ::= "0"
+                              | positive-decimal
+
+decimal-digit             ::= "0"
+                              | nonzero-digit
+
+nonzero-digit             ::= "1"
+                              | "2"
+                              | "3"
+                              | "4"
+                              | "5"
+                              | "6"
+                              | "7"
+                              | "8"
+                              | "9"
+
+hex-digit                 ::= decimal-digit
+                              | "A"
+                              | "B"
+                              | "C"
+                              | "D"
+                              | "E"
+                              | "F"
+
+binary-digit              ::= "0"
+                              | "1"
+
+ascii-digit               ::= decimal-digit
+
+ascii-letter              ::= "A"
+                              | "B"
+                              | "C"
+                              | "D"
+                              | "E"
+                              | "F"
+                              | "G"
+                              | "H"
+                              | "I"
+                              | "J"
+                              | "K"
+                              | "L"
+                              | "M"
+                      | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+                      | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
+                      | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z"
+space                     ::= " "
+
+newline                   ::= "\n"
+
+ascii-printable-except-lf ::= [#x20-#x7E]
